@@ -2,8 +2,8 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-07-28 09:35:50
- * @FilePath: \go-middleware\convert\convert.go
+ * @LastEditTime: 2024-07-28 11:08:14
+ * @FilePath: \go-toolbox\convert\convert.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
@@ -16,7 +16,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"strconv"
 	"strings"
 	"time"
@@ -153,16 +153,13 @@ func HexSuffixZero(hex string, byteSize int) string {
 
 func HexPrefixZero(hex string, byteSize int) string {
 	data1 := HexToBytes(hex)
-	data2 := make([]byte, byteSize-len(data1))
-	for _, v := range data1 {
-		data2 = append(data2, v)
-	}
+	data2 := append(make([]byte, byteSize-len(data1)), data1...)
 	return BytesToHex(data2)
 }
 
 // GBKSuffixZero GBK 编码按字节右补0
 func GBKSuffixZero(gbkStr string, byteSize int) string {
-	data1, _ := ioutil.ReadAll(transform.NewReader(bytes.NewReader([]byte(gbkStr)), simplifiedchinese.GBK.NewEncoder()))
+	data1, _ := io.ReadAll(transform.NewReader(bytes.NewReader([]byte(gbkStr)), simplifiedchinese.GBK.NewEncoder()))
 	data2 := make([]byte, byteSize)
 	copy(data2, data1)
 	return BytesToHex(data2)
@@ -170,7 +167,7 @@ func GBKSuffixZero(gbkStr string, byteSize int) string {
 
 // GBKSuffixSpace 编码按字节右补空格
 func GBKSuffixSpace(chinese string, byteSize int) (hex string) {
-	data1, _ := ioutil.ReadAll(transform.NewReader(bytes.NewReader([]byte(chinese)), simplifiedchinese.GBK.NewEncoder()))
+	data1, _ := io.ReadAll(transform.NewReader(bytes.NewReader([]byte(chinese)), simplifiedchinese.GBK.NewEncoder()))
 	data2 := make([]byte, byteSize)
 	copy(data2, data1)
 	for i := len(data1); i < len(data2); i++ {
