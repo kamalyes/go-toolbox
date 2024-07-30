@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-07-30 16:40:14
+ * @LastEditTime: 2024-07-30 17:26:07
  * @FilePath: \go-toolbox\regex\any.go
  * @Description:
  *
@@ -108,6 +108,12 @@ func (g *AnyRegs) MatchNLeCharacter(str string, n int) bool {
 // MatchEnCharacter 纯英文字符串,大小写不敏感
 func (g *AnyRegs) MatchEnCharacter(str string) bool {
 	compile := regexp.MustCompile(regEnCharacter)
+	return compile.MatchString(str)
+}
+
+// MatchEnCharacterDotUnderLine 检查字符串是否为只包含字母、数字、点号和下划线
+func MatchEnCharacterDotUnderLine(str string) bool {
+	compile := regexp.MustCompile(regEnCharacterDotUnderLine)
 	return compile.MatchString(str)
 }
 

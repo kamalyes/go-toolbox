@@ -53,6 +53,9 @@ const (
 	// 纯小写英文字符串
 	regLowerEnCharacter = `^[a-z]+$`
 
+	// 英文、数字、（.）点、（_）下划线
+	regEnCharacterDotUnderLine = `^[a-zA-Z0-9._]+$`
+
 	// 数字和26个英文字母组成的字符串,大小写不敏感
 	regNumberEnCharacter = `^[A-Za-z0-9]+$`
 
