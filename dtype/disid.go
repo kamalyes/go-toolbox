@@ -18,7 +18,7 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/kamalyes/go-toolbox/convert"
+	"github.com/kamalyes/go-toolbox/stringx"
 )
 
 type DistributedId int64
@@ -41,7 +41,7 @@ func (t DistributedId) Value() (driver.Value, error) {
 func (t *DistributedId) Scan(v interface{}) error {
 	switch v.(type) {
 	case []uint8:
-		numStr := convert.AsString(v.([]uint8))
+		numStr := stringx.ParseStr(v.([]uint8))
 		num, _ := strconv.ParseInt(numStr, 10, 64)
 		*t = DistributedId(num)
 	case int64:
