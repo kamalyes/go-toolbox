@@ -21,7 +21,7 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
       - name: Fetch Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Make Ready
         run: |
           go version
@@ -41,6 +41,6 @@ jobs:
         with:
           go-version: ^1.20
       - name: Fetch Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Run Benchmark
         run: go test -run=^$ -benchmem -benchtime=1s -bench=.
