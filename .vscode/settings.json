@@ -134,6 +134,7 @@
       "Gorm",
       "govet",
       "kamalyes",
+      "loggercheck",
       "mapstructure",
       "Mqtt",
       "nolintlint",
@@ -142,9 +143,9 @@
       "postgre",
       "predeclared",
       "promlinter",
+      "Strtotime",
       "testifylint",
       "testpackage",
-      "loggercheck",
       "varchar",
       "Wechat"
     ]

@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-07-30 16:33:10
+ * @LastEditTime: 2024-07-30 16:40:14
  * @FilePath: \go-toolbox\regex\any.go
  * @Description:
  *
@@ -194,11 +194,11 @@ func (g *AnyRegs) MatchChineseIDCardNumber(id string) bool {
 	if !compile.MatchString(id) {
 		return false
 	}
-	if len(id) == 15 {
-		// Convert 15-digit ID card to 18-digit
+	switch len(id) {
+	case 15:
 		id = id[:6] + "19" + id[6:]
-		id = id + calculateChecksum(id)
-	} else if len(id) == 18 {
+		return id == id+calculateChecksum(id)
+	case 18:
 		// Validate the checksum of 18-digit ID card
 		return calculateChecksum(id[:17]) == string(id[17])
 	}
