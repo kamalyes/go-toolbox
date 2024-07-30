@@ -10,6 +10,8 @@
  */
 package chinese
 
+import "unicode"
+
 var Chinese = new(chinese)
 
 type chinese struct{}
@@ -38,4 +40,14 @@ func (c chinese) Len(str string) int {
 func (c chinese) Cut(str string, start int, end int) string {
 	rt := []rune(str)
 	return string(rt[start:end])
+}
+
+// 校验字符串是否包含中文字符
+func ContainsChinese(s string) bool {
+	for _, r := range s {
+		if unicode.Is(unicode.Scripts["Han"], r) {
+			return true
+		}
+	}
+	return false
 }

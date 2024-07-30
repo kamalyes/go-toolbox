@@ -123,6 +123,7 @@
     },
     "cSpell.words": [
       "ADMI",
+      "amap",
       "casbin",
       "CSBEF",
       "Datetime",
@@ -131,10 +132,19 @@
       "goconfig",
       "gonic",
       "Gorm",
+      "govet",
       "kamalyes",
       "mapstructure",
       "Mqtt",
+      "nolintlint",
+      "nonamedreturns",
+      "perfsprint",
       "postgre",
+      "predeclared",
+      "promlinter",
+      "testifylint",
+      "testpackage",
+      "loggercheck",
       "varchar",
       "Wechat"
     ]
