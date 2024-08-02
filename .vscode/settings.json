@@ -124,6 +124,7 @@
     "cSpell.words": [
       "ADMI",
       "amap",
+      "bytedance",
       "bytex",
       "casbin",
       "CSBEF",
@@ -134,6 +135,7 @@
       "gonic",
       "Gorm",
       "govet",
+      "jsoniter",
       "kamalyes",
       "loggercheck",
       "mapstructure",
