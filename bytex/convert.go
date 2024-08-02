@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-07-30 18:31:24
+ * @LastEditTime: 2024-08-03 00:52:52
  * @FilePath: \go-toolbox\bytex\convert.go
  * @Description:
  *
@@ -15,12 +15,8 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"io"
 	"strconv"
 	"strings"
-
-	"golang.org/x/text/encoding/simplifiedchinese"
-	"golang.org/x/text/transform"
 )
 
 // BytesToHex 字节数组转hex
@@ -139,55 +135,4 @@ func BytesToBinStrWithSplit(bs []byte, split string) string {
 	}
 	buf.WriteString(fmt.Sprintf("%08b", bs[length-1]))
 	return buf.String()
-}
-
-// HexSuffixZero hex 后补位
-func HexSuffixZero(hex string, byteSize int) string {
-	data1 := HexToBytes(hex)
-	data2 := make([]byte, byteSize)
-	copy(data2, data1)
-	return BytesToHex(data2)
-}
-
-func HexPrefixZero(hex string, byteSize int) string {
-	data1 := HexToBytes(hex)
-	data2 := append(make([]byte, byteSize-len(data1)), data1...)
-	return BytesToHex(data2)
-}
-
-// GBKSuffixZero GBK 编码按字节右补0
-func GBKSuffixZero(gbkStr string, byteSize int) string {
-	data1, _ := io.ReadAll(transform.NewReader(bytes.NewReader([]byte(gbkStr)), simplifiedchinese.GBK.NewEncoder()))
-	data2 := make([]byte, byteSize)
-	copy(data2, data1)
-	return BytesToHex(data2)
-}
-
-// GBKSuffixSpace 编码按字节右补空格
-func GBKSuffixSpace(chinese string, byteSize int) (hex string) {
-	data1, _ := io.ReadAll(transform.NewReader(bytes.NewReader([]byte(chinese)), simplifiedchinese.GBK.NewEncoder()))
-	data2 := make([]byte, byteSize)
-	copy(data2, data1)
-	for i := len(data1); i < len(data2); i++ {
-		data2[i] = 0x20
-	}
-	return string(data2)
-}
-
-// HexReverse 字节颠倒
-func HexReverse(hex string) string {
-	toBytes := HexToBytes(hex)
-	length := len(toBytes)
-	if length <= 1 {
-		return hex
-	}
-	for i := range toBytes {
-		a := toBytes[i]
-		toBytes[i] = toBytes[length-1-i]
-		toBytes[length-1-i] = a
-		if i == length/2 {
-			break
-		}
-	}
-	return BytesToHex(toBytes)
 }

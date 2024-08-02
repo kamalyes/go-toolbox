@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-08-02 16:13:28
+ * @LastEditTime: 2024-08-03 00:33:31
  * @FilePath: \go-toolbox\desensitize\desensitize.go
  * @Description:
  *
@@ -19,8 +19,9 @@ import (
 
 // Desensitize 数据脱敏
 func Desensitize(str string, DesensitizeType DesensitizeType, options ...DesensitizeOptions) string {
+	// 如果数据为空，则返回空字符串
 	if stringx.IsEmpty(str) {
-		return ""
+		return str
 	}
 	opt := NewDesensitizeOptions()
 	if len(options) > 0 {
@@ -61,8 +62,9 @@ func Desensitize(str string, DesensitizeType DesensitizeType, options ...Desensi
 
 // 通用脱敏函数
 func SensitiveData(data string, start, end int) string {
-	if len(data) == 0 { // 如果数据为空，则返回空字符串
-		return ""
+	// 如果数据为空，则返回空字符串
+	if stringx.IsEmpty(data) {
+		return data
 	}
 
 	// 获取字符数量
@@ -91,7 +93,7 @@ func SensitiveData(data string, start, end int) string {
 func phoneNumber(phone string, start, end int) string {
 	// 空判断
 	if stringx.IsEmpty(phone) {
-		return ""
+		return phone
 	}
 	phone = stringx.Pad(phone, 11)
 	return SensitiveData(phone, start, end)
@@ -101,7 +103,7 @@ func phoneNumber(phone string, start, end int) string {
 func carLicense(carNo string) string {
 	// 空判断
 	if stringx.IsEmpty(carNo) {
-		return ""
+		return carNo
 	}
 
 	newCarNo := carNo
