@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-07-30 17:26:07
+ * @LastEditTime: 2024-08-02 15:33:54
  * @FilePath: \go-toolbox\stringx\replace.go
  * @Description:
  *
@@ -13,6 +13,7 @@ package stringx
 import (
 	"regexp"
 	"strings"
+	"unicode/utf8"
 )
 
 // Replace 替换字符串
@@ -49,6 +50,54 @@ func ReplaceWithIndex(str string, startIndex int, endIndex int, replacedStr stri
 	replaceCount := endIndex - startIndex
 
 	return string(runes[:startIndex]) + RepeatByLength(replacedStr, replaceCount) + string(runes[endIndex:])
+}
+
+type PadPosition int
+
+const (
+	Left PadPosition = iota
+	Right
+	Middle
+)
+
+type Paddler struct {
+	Position PadPosition
+}
+
+func SetPadPosition(p *Paddler, position PadPosition) {
+	p.Position = position
+}
+
+// Pad 输入的字符长度<minLength时自动补位*
+func Pad(input string, minLength int, paddler ...*Paddler) string {
+	pad := Paddler{Position: Middle}
+	charCount := utf8.RuneCountInString(input)
+
+	if charCount >= minLength {
+		return input
+	}
+
+	padLen := minLength - charCount
+	leftPadLen := padLen / 2
+	if leftPadLen < 4 {
+		leftPadLen = 4
+	}
+	rightPadLen := padLen - leftPadLen
+
+	if len(paddler) > 0 {
+		pad = *paddler[0]
+		switch pad.Position {
+		case Left:
+			return strings.Repeat("*", padLen) + input
+		case Right:
+			return input + strings.Repeat("*", padLen)
+		case Middle:
+			return strings.Repeat("*", leftPadLen) + input + strings.Repeat("*", rightPadLen)
+		}
+	}
+
+	// 默认为中间填充
+	return input[:leftPadLen] + strings.Repeat("*", padLen) + input[leftPadLen:]
 }
 
 // ReplaceIgnoreCase 替换字符串

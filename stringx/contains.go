@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-07-30 17:26:07
+ * @LastEditTime: 2024-08-02 09:58:23
  * @FilePath: \go-toolbox\stringx\contains.go
  * @Description:
  *
@@ -88,4 +88,14 @@ func GetContainsStr(str string, searchStrs []string) string {
 		}
 	}
 	return ""
+}
+
+// 校验字符串是否包含中文字符
+func ContainsChinese(s string) bool {
+	for _, r := range s {
+		if unicode.Is(unicode.Scripts["Han"], r) {
+			return true
+		}
+	}
+	return false
 }

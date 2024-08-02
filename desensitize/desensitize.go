@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-07-30 17:26:07
+ * @LastEditTime: 2024-08-02 16:13:28
  * @FilePath: \go-toolbox\desensitize\desensitize.go
  * @Description:
  *
@@ -11,35 +11,43 @@
 
 package desensitize
 
-import "github.com/kamalyes/go-toolbox/stringx"
+import (
+	"unicode/utf8"
+
+	"github.com/kamalyes/go-toolbox/stringx"
+)
 
 // Desensitize 数据脱敏
-func Desensitize(str string, DesensitizeType DesensitizeType) string {
+func Desensitize(str string, DesensitizeType DesensitizeType, options ...DesensitizeOptions) string {
 	if stringx.IsEmpty(str) {
 		return ""
 	}
+	opt := NewDesensitizeOptions()
+	if len(options) > 0 {
+		opt = options[0]
+	}
 	var newStr string
 	switch DesensitizeType {
-	case UserId:
-		newStr = userId(str)
+	case CustomExtension:
+		newStr = SensitiveData(str, opt.CustomExtensionStartIndex, opt.CustomExtensionEndIndex)
 	case ChineseName:
-		newStr = chineseName(str)
+		newStr = SensitiveData(str, opt.ChineseNameStartIndex, opt.ChineseNameEndIndex)
 	case IDCard:
-		newStr = idCard(str, 1, 2)
-	case FixedPhone:
-		newStr = fixedPhone(str)
+		newStr = SensitiveData(str, opt.IdCardStartIndex, opt.IdCardEndIndex)
+	case PhoneNumber:
+		newStr = phoneNumber(str, opt.PhoneNumberStartIndex, opt.PhoneNumberEndIndex)
 	case MobilePhone:
-		newStr = mobilePhone(str)
+		newStr = SensitiveData(str, 3, stringx.Length(str)-4)
 	case Address:
-		newStr = address(str, 8)
+		newStr = SensitiveData(str, stringx.Length(str)-opt.AddressLength, stringx.Length(str))
 	case Email:
-		newStr = email(str)
+		newStr = SensitiveData(str, 1, stringx.IndexOf(str, "@"))
 	case Password:
-		newStr = password(str)
+		newStr = SensitiveData(str, 1, stringx.Length(str))
 	case CarLicense:
 		newStr = carLicense(str)
 	case BankCard:
-		newStr = bankCard(str)
+		newStr = bankCard(str, opt.IdCardLength)
 	case IPV4:
 		newStr = ipv4(str)
 	case IPV6:
@@ -51,84 +59,47 @@ func Desensitize(str string, DesensitizeType DesensitizeType) string {
 	return newStr
 }
 
-// 用户ID脱敏
-func userId(id string) string {
-	return "0"
+// 通用脱敏函数
+func SensitiveData(data string, start, end int) string {
+	if len(data) == 0 { // 如果数据为空，则返回空字符串
+		return ""
+	}
+
+	// 获取字符数量
+	charCount := utf8.RuneCountInString(data)
+
+	// 调整起始位置和结束位置
+	if start <= 0 || start >= charCount {
+		start = 1
+	}
+
+	if end <= 0 || end >= charCount {
+		end = charCount
+	}
+
+	// 如果起始位置和结束位置相等，则视为需要处理整个文本
+	if start == end {
+		start = 1
+		end = charCount
+	}
+
+	// 对指定位置的敏感数据进行隐藏处理
+	return stringx.Hide(data, start, end)
 }
 
-// 中文名称脱敏
-func chineseName(name string) string {
-	// 只展示第一个字符
-	if stringx.IsEmpty(name) {
-		return ""
-	}
-	return stringx.Hide(name, 1, stringx.Length(name))
-}
-
-// 身份证脱敏
-func idCard(cardNo string, front int, end int) string {
-	if stringx.IsEmpty(cardNo) {
-		return ""
-	}
-	if front+end > stringx.Length(cardNo) {
-		return ""
-	}
-	if front < 0 || end < 0 {
-		return ""
-	}
-
-	return stringx.Hide(cardNo, front, stringx.Length(cardNo)-end)
-}
-
-// 固定电话脱敏
-func fixedPhone(phone string) string {
+// 手机号脱敏
+func phoneNumber(phone string, start, end int) string {
+	// 空判断
 	if stringx.IsEmpty(phone) {
 		return ""
 	}
-
-	return stringx.Hide(phone, 4, stringx.Length(phone)-2)
-}
-
-// 移动电话脱敏
-func mobilePhone(phone string) string {
-	if stringx.IsEmpty(phone) {
-		return ""
-	}
-
-	return stringx.Hide(phone, 3, stringx.Length(phone)-4)
-}
-
-// 地址脱敏,后 s 位进行脱敏
-func address(addr string, sensitiveSize int) string {
-	if stringx.IsEmpty(addr) {
-		return ""
-	}
-	length := stringx.Length(addr)
-	return stringx.Hide(addr, length-sensitiveSize, length)
-}
-
-// 邮箱脱敏
-func email(email string) string {
-	if stringx.IsEmpty(email) {
-		return ""
-	}
-	index := stringx.IndexOf(email, "@")
-	if index <= 1 {
-		return email
-	}
-	return stringx.Hide(email, 1, index)
-}
-
-// 密码脱敏
-func password(pass string) string {
-	if stringx.IsEmpty(pass) {
-		return ""
-	}
-	return stringx.RepeatByLength("*", stringx.Length(pass))
+	phone = stringx.Pad(phone, 11)
+	return SensitiveData(phone, start, end)
 }
 
 // 车牌号脱敏
 func carLicense(carNo string) string {
+	// 空判断
 	if stringx.IsEmpty(carNo) {
 		return ""
 	}
@@ -144,44 +115,65 @@ func carLicense(carNo string) string {
 }
 
 // 银行卡号脱敏
-func bankCard(cardNo string) string {
+func bankCard(cardNo string, cardLength int) string {
+	// 如果卡号为空，则直接返回原卡号
 	if stringx.IsEmpty(cardNo) {
 		return cardNo
 	}
 
-	cleanCarNo := stringx.CleanEmpty(cardNo)
+	// 清理卡号中的空格
+	cleanCardNo := stringx.CleanEmpty(cardNo)
+	// 使用指定的长度填充卡号
+	cleanCardNo = stringx.Pad(cleanCardNo, cardLength)
+	// 获取卡号长度
+	length := stringx.Length(cleanCardNo)
+	// 默认间隔为4
+	interval := 4
 
-	if stringx.Length(cleanCarNo) < 9 {
-		return cardNo
+	// 根据卡号长度和特殊情况调整末尾长度
+	endLength := length % interval
+	if cardLength == 16 {
+		endLength = length % 3
 	}
-	length := stringx.Length(cleanCarNo)
-	endLength := length % 4
-	if endLength == 0 {
-		endLength = 4
-	}
-	midLength := length - 4 - endLength
+	// 计算中间部分长度
+	midLength := length - interval - endLength
 
-	newCardNo := []rune(cleanCarNo[:4])
+	// 生成新的卡号切片，初始包含前4位
+	newCardNo := []rune(cleanCardNo[:interval])
 	for i := 0; i < midLength; i++ {
-		if i%4 == 0 {
+		// 每隔4位插入一个空格
+		if i%interval == 0 {
 			newCardNo = append(newCardNo, ' ')
 		}
+		// 其余字符用*替换
 		newCardNo = append(newCardNo, '*')
 	}
+	// 在中间部分的最末尾插入一个空格
 	newCardNo = append(newCardNo, ' ')
-	newCardNo = append(newCardNo, []rune(cleanCarNo[length-endLength:length])...)
+	// 添加卡号的最后4位
+	lastFour := cleanCardNo[len(cleanCardNo)-4:]
+	newCardNo = append(newCardNo, []rune(lastFour)...)
 
+	// 返回格式化后的卡号
 	return string(newCardNo)
 }
 
 // ipv4 脱敏
 func ipv4(ip string) string {
+	// 空判断
+	if stringx.IsEmpty(ip) {
+		return ip
+	}
 	newIP := stringx.SubBefore(ip, ".", false)
 	return newIP + ".*.*.*"
 }
 
 // ipv6 脱敏
 func ipv6(ip string) string {
+	// 空判断
+	if stringx.IsEmpty(ip) {
+		return ip
+	}
 	newIP := stringx.SubBefore(ip, ":", false)
 	return newIP + ":*:*:*:*:*:*:*"
 }

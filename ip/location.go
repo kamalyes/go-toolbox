@@ -3,7 +3,7 @@
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2024-07-28 12:48:08
- * @FilePath: \go-toolbox\ip\ip_location.go
+ * @FilePath: \go-toolbox\ip\location.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.

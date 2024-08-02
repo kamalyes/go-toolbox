@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-07-30 18:22:06
+ * @LastEditTime: 2024-08-02 15:50:42
  * @FilePath: \go-toolbox\stringx\base.go
  * @Description:
  *
@@ -49,6 +49,23 @@ func Equals(str1 string, str2 string) bool {
 // EqualsIgnoreCase 比较2个字符串（大小写不敏感）
 func EqualsIgnoreCase(str1 string, str2 string) bool {
 	return strings.EqualFold(str1, str2)
+}
+
+// InsertSpaces 插入空值
+func InsertSpaces(str string, interval int) string {
+	var buffer strings.Builder
+	count := 0
+
+	for _, char := range str {
+		buffer.WriteRune(char)
+		count++
+		if count == interval {
+			buffer.WriteRune(' ')
+			count = 0
+		}
+	}
+
+	return buffer.String()
 }
 
 // EqualsAny 给定字符串是否与提供的中任一字符串相同，相同则返回true，没有相同的返回false;
@@ -118,11 +135,19 @@ func levenshteinDistance(str1 string, str2 string) (int, error) {
 			if str1[i-1] != str2[j-1] {
 				cost = 1
 			}
-			tmp, err := numberx.Min([]int{dist[i-1][j] + 1, dist[i][j-1] + 1, dist[i-1][j-1] + cost})
+			intList := []interface{}{dist[i-1][j] + 1, dist[i][j-1] + 1, dist[i-1][j-1] + cost}
+			tmp, err := numberx.MinMax(intList, func(a, b interface{}) interface{} {
+				val1 := a.(int)
+				val2 := b.(int)
+				if val1 < val2 {
+					return val1
+				}
+				return val2
+			})
 			if err != nil {
 				return 0, err
 			}
-			dist[i][j] = tmp
+			dist[i][j] = tmp.(int)
 		}
 	}
 
