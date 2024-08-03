@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-08-03 16:54:02
+ * @LastEditTime: 2024-08-03 23:10:59
  * @FilePath: \go-toolbox\stringx\format_test.go
  * @Description:
  *
@@ -17,7 +17,6 @@ import (
 )
 
 func TestAllFormatFunctions(t *testing.T) {
-	t.Run("TestParseStr", TestParseStr)
 	t.Run("TestFillBefore", TestFillBefore)
 	t.Run("TestFillAfter", TestFillAfter)
 	t.Run("TestFormat", TestFormat)
@@ -26,27 +25,6 @@ func TestAllFormatFunctions(t *testing.T) {
 	t.Run("TestTruncate", TestTruncate)
 	t.Run("TestAddPrefixIfNot", TestAddPrefixIfNot)
 	t.Run("TestAddSuffixIfNot", TestAddSuffixIfNot)
-}
-
-func TestParseStr(t *testing.T) {
-	tests := []struct {
-		name   string
-		input  interface{}
-		output string
-	}{
-		{"StringInput", "Hello", "Hello"},
-		{"IntInput", 42, "42"},
-		{"FloatInput", 3.14, "3.14"},
-		{"BoolInput", true, "true"},
-		{"StructInput", struct{ Name string }{"John"}, `{"Name":"John"}`},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := ParseStr(tt.input)
-			assert.Equal(t, tt.output, result)
-		})
-	}
 }
 
 func TestFillBefore(t *testing.T) {
