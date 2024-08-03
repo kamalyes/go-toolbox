@@ -10,7 +10,12 @@
  */
 package stringx
 
-import "strings"
+import (
+	"reflect"
+	"strings"
+
+	"github.com/kamalyes/go-toolbox/validator"
+)
 
 // Repeat 重复字符串
 func Repeat(str string, count int) string {
@@ -19,7 +24,7 @@ func Repeat(str string, count int) string {
 
 // RepeatByLength 重复某个字符串到指定长度
 func RepeatByLength(str string, padLen int) string {
-	if IsEmpty(str) {
+	if validator.IsEmptyValue(reflect.ValueOf(str)) {
 		return ""
 	}
 	if padLen <= 0 {

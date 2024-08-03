@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-08-02 15:33:54
+ * @LastEditTime: 2024-08-03 10:54:57
  * @FilePath: \go-toolbox\stringx\replace.go
  * @Description:
  *
@@ -82,7 +82,6 @@ func Pad(input string, minLength int, paddler ...*Paddler) string {
 	if leftPadLen < 4 {
 		leftPadLen = 4
 	}
-	rightPadLen := padLen - leftPadLen
 
 	if len(paddler) > 0 {
 		pad = *paddler[0]
@@ -92,7 +91,7 @@ func Pad(input string, minLength int, paddler ...*Paddler) string {
 		case Right:
 			return input + strings.Repeat("*", padLen)
 		case Middle:
-			return strings.Repeat("*", leftPadLen) + input + strings.Repeat("*", rightPadLen)
+			return input[:leftPadLen] + strings.Repeat("*", padLen) + input[leftPadLen:]
 		}
 	}
 

@@ -2,8 +2,8 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-07-28 09:37:19
- * @FilePath: \go-middleware\validator\validator.go
+ * @LastEditTime: 2024-08-03 16:56:00
+ * @FilePath: \go-toolbox\validator\validator.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
@@ -17,6 +17,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 type Rules map[string][]string
@@ -55,6 +56,63 @@ func IsEmptyValue(v reflect.Value) bool {
 		return IsEmptyValue(v.Elem())
 	default:
 		return false
+	}
+}
+
+// HasEmpty 判断提供的接口数组是否包含空值，并返回空值数量
+func HasEmpty(elems []interface{}) (bool, int) {
+	if len(elems) == 0 {
+		return true, 0
+	}
+
+	emptyCount := 0
+
+	for _, elem := range elems {
+		if IsEmptyValue(reflect.ValueOf(elem)) {
+			emptyCount++
+		}
+	}
+
+	return emptyCount > 0, emptyCount
+}
+
+// IsAllEmpty 判断提供的接口数组是否全是空值
+func IsAllEmpty(elems []interface{}) bool {
+	if len(elems) == 0 {
+		return true
+	}
+
+	for _, elem := range elems {
+		if !IsEmptyValue(reflect.ValueOf(elem)) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// IsUndefined 检查字符串是否等于 "undefined"（不区分大小写，忽略前后空格）
+func IsUndefined(str string) bool {
+	trimmedStr := strings.TrimSpace(str)
+	return strings.EqualFold(trimmedStr, "undefined")
+}
+
+// 校验字符串是否包含中文字符
+func ContainsChinese(s string) bool {
+	for _, r := range s {
+		if unicode.Is(unicode.Scripts["Han"], r) {
+			return true
+		}
+	}
+	return false
+}
+
+// EmptyToDefault 如果字符串是""，则返回指定默认字符串，否则返回字符串本身。
+func EmptyToDefault(str string, defaultStr string) string {
+	if IsEmptyValue(reflect.ValueOf(str)) {
+		return defaultStr
+	} else {
+		return str
 	}
 }
 

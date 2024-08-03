@@ -38,6 +38,8 @@ type DesensitizeOptions struct {
 	IdCardLength              int
 	PhoneNumberStartIndex     int
 	PhoneNumberEndIndex       int
+	MobilePhoneStartIndex     int
+	EmailStartIndex           int
 	AddressLength             int
 }
 
@@ -53,6 +55,8 @@ func NewDesensitizeOptions() DesensitizeOptions {
 		IdCardLength:              19,
 		PhoneNumberStartIndex:     3,
 		PhoneNumberEndIndex:       6,
+		MobilePhoneStartIndex:     3,
+		EmailStartIndex:           1,
 		AddressLength:             8,
 	}
 }

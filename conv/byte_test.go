@@ -3,12 +3,12 @@
  * @Date: 2024-08-03 00:38:34
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2024-08-03 01:28:32
- * @FilePath: \go-toolbox\bytex\convert_test.go
+ * @FilePath: \go-toolbox\conv\byte_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package bytex
+package conv
 
 import (
 	"testing"

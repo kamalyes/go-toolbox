@@ -10,7 +10,11 @@
  */
 package stringx
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/kamalyes/go-toolbox/validator"
+)
 
 // Split 分割字符串
 func Split(str string, separator string) []string {
@@ -27,7 +31,8 @@ func SplitTrim(str string, separator string) []string {
 	split := Split(str, separator)
 	var result []string
 	for _, s := range split {
-		if IsNotEmpty(s) {
+		hasEmpty, _ := validator.HasEmpty([]interface{}{s})
+		if !hasEmpty {
 			result = append(result, Trim(s))
 		}
 	}
@@ -39,7 +44,8 @@ func SplitTrimLimit(str string, separator string, limit int) []string {
 	split := SplitLimit(str, separator, limit)
 	var result []string
 	for _, s := range split {
-		if IsNotEmpty(s) {
+		hasEmpty, _ := validator.HasEmpty([]interface{}{s})
+		if !hasEmpty {
 			result = append(result, Trim(s))
 		}
 	}

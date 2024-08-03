@@ -10,7 +10,12 @@
  */
 package stringx
 
-import "strings"
+import (
+	"reflect"
+	"strings"
+
+	"github.com/kamalyes/go-toolbox/validator"
+)
 
 // StartWith 字符串是否以给定字符开始
 func StartWith(str string, prefix string) bool {
@@ -25,7 +30,7 @@ func StartWithIgnoreCase(str string, prefix string) bool {
 // StartWithAny 给定字符串是否以任何一个字符串开始;
 // 给定字符串和数组为空都返回false
 func StartWithAny(str string, prefixes []string) bool {
-	if IsEmpty(str) || len(prefixes) == 0 {
+	if validator.IsEmptyValue(reflect.ValueOf(str)) || len(prefixes) == 0 {
 		return false
 	}
 	for _, prefix := range prefixes {
@@ -39,7 +44,7 @@ func StartWithAny(str string, prefixes []string) bool {
 // StartWithAnyIgnoreCase 给定字符串是否以任何一个字符串开始(忽略大小写)
 // 给定字符串和数组为空都返回false
 func StartWithAnyIgnoreCase(str string, prefixes []string) bool {
-	if IsEmpty(str) || len(prefixes) == 0 {
+	if validator.IsEmptyValue(reflect.ValueOf(str)) || len(prefixes) == 0 {
 		return false
 	}
 	for _, prefix := range prefixes {
@@ -63,7 +68,7 @@ func EndWithIgnoreCase(str string, suffix string) bool {
 // EndWithAny 给定字符串是否以任何一个字符串结尾
 // 给定字符串和数组为空都返回false
 func EndWithAny(str string, suffixes []string) bool {
-	if IsEmpty(str) || len(suffixes) == 0 {
+	if validator.IsEmptyValue(reflect.ValueOf(str)) || len(suffixes) == 0 {
 		return false
 	}
 	for _, suffix := range suffixes {
@@ -77,7 +82,7 @@ func EndWithAny(str string, suffixes []string) bool {
 // EndWithAnyIgnoreCase 给定字符串是否以任何一个字符串结尾（忽略大小写）
 // 给定字符串和数组为空都返回false
 func EndWithAnyIgnoreCase(str string, suffixes []string) bool {
-	if IsEmpty(str) || len(suffixes) == 0 {
+	if validator.IsEmptyValue(reflect.ValueOf(str)) || len(suffixes) == 0 {
 		return false
 	}
 	for _, suffix := range suffixes {

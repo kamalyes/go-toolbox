@@ -10,11 +10,16 @@
  */
 package stringx
 
-import "strings"
+import (
+	"reflect"
+	"strings"
+
+	"github.com/kamalyes/go-toolbox/validator"
+)
 
 // Trim 除去字符串头尾部的空白
 func Trim(str string) string {
-	if IsEmpty(str) {
+	if validator.IsEmptyValue(reflect.ValueOf(str)) {
 		return str
 	}
 	return strings.TrimSpace(str)

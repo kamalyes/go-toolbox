@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-07-30 17:26:07
+ * @LastEditTime: 2024-08-03 16:39:01
  * @FilePath: \go-toolbox\stringx\index.go
  * @Description:
  *
@@ -10,7 +10,69 @@
  */
 package stringx
 
-import "strings"
+import (
+	"strings"
+)
+
+type searchOptions struct {
+	start int
+	end   int
+}
+
+// WithStart 用于配置起始位置
+func WithStart(start int) func(*searchOptions) {
+	return func(so *searchOptions) {
+		so.start = start
+	}
+}
+
+// WithEnd 用于配置结束位置
+func WithEnd(end int) func(*searchOptions) {
+	return func(so *searchOptions) {
+		so.end = end
+	}
+}
+
+// SafeIndexOfByRange 在指定范围内查找指定字符，避免下标溢出
+func SafeIndexOfByRange(str string, subStr string, options ...func(*searchOptions)) (index int) {
+	if subStr == str || len(subStr) == len(str) {
+		return 0
+	}
+
+	index = -1
+	defaultOptions := searchOptions{
+		start: 0,
+		end:   len(str),
+	}
+
+	for _, option := range options {
+		option(&defaultOptions)
+	}
+
+	if defaultOptions.start < 0 {
+		defaultOptions.start = 0
+	}
+
+	if defaultOptions.end < 0 {
+		defaultOptions.end = 0
+	} else if defaultOptions.end > len(str) {
+		defaultOptions.end = len(str)
+	}
+
+	if defaultOptions.start > len(str) {
+		return index
+	}
+
+	if defaultOptions.start >= defaultOptions.end {
+		return index
+	}
+
+	index = strings.Index(str[defaultOptions.start:defaultOptions.end], subStr)
+	if index != -1 {
+		index += defaultOptions.start
+	}
+	return
+}
 
 // IndexOf 返回字符在原始字符串的下标
 func IndexOf(str string, subStr string) int {
@@ -19,25 +81,12 @@ func IndexOf(str string, subStr string) int {
 
 // IndexOfByRange 指定范围内查找指定字符
 func IndexOfByRange(str string, subStr string, start int, end int) int {
-	if end > len(str) {
-		end = len(str)
-	}
-	index := strings.Index(str[start:end], subStr)
-	if index > -1 {
-		return start + index
-	} else {
-		return index
-	}
+	return SafeIndexOfByRange(str, subStr, WithStart(start), WithEnd(end))
 }
 
 // IndexOfByRangeStart 指定范围内查找指定字符
 func IndexOfByRangeStart(str string, subStr string, start int) int {
-	index := strings.Index(str[start:], subStr)
-	if index > -1 {
-		return start + index
-	} else {
-		return index
-	}
+	return SafeIndexOfByRange(str, subStr, WithStart(start))
 }
 
 // IndexOfIgnoreCase 返回字符在原始字符串的下标(大小写不敏感)
@@ -62,42 +111,28 @@ func LastIndexOfIgnoreCase(str string, subStr string) int {
 
 // LastIndexOfByRangeStart 从指定下标开始，返回最后出现指定字符串的下标
 func LastIndexOfByRangeStart(str string, subStr string, start int) int {
-	index := strings.LastIndex(str[start:], subStr)
-	if index > -1 {
-		return start + index
-	}
-	return index
+	return SafeIndexOfByRange(str, subStr, WithStart(start))
 }
 
-// LastIndexOfIgnoreCaseByRangeStart 从指定下标开始，返回最后出现指定字符串的下标(大小写不敏感)
-func LastIndexOfIgnoreCaseByRangeStart(str string, subStr string, start int) int {
-	index := LastIndexOfIgnoreCase(str[start:], subStr)
-	if index > -1 {
-		return start + index
+// OrdinalIndexOf 返回字符串 subStr 在字符串 str 中第 ordinal 次出现的位置。
+// 如果 str="" 或 subStr=" 或 ordinal≥0 则返回-1
+func OrdinalIndexOf(str string, subStr string, ordinal int, start ...int) int {
+	if subStr == str || len(subStr) == len(str) {
+		return 0
 	}
-	return index
-}
-
-// OrdinalIndexOf 返回字符串 searchStr 在字符串 str 中第 ordinal 次出现的位置。
-// 如果 str="" 或 searchStr=" 或 ordinal≥0 则返回-1
-func OrdinalIndexOf(str string, subStr string, ordinal int) int {
-	if str == "" || subStr == "" || ordinal <= 0 {
-		return -1
-	}
-
-	index := -1
-	count := 0
-
-	for {
-		idx := strings.Index(str[index+1:], subStr)
-		if idx == -1 {
+	findIndex := 0
+	ordinalIndex := 0
+	for i := 0; i < len(str); i++ {
+		idx := SafeIndexOfByRange(str, subStr, WithStart(findIndex), WithEnd(len(str)-findIndex))
+		switch idx {
+		case -1:
+			return -1
+		}
+		findIndex = idx + 1
+		ordinalIndex += 1
+		if ordinalIndex == ordinal {
 			break
 		}
-		index += idx + 1
-		count++
-		if count == ordinal {
-			return index
-		}
 	}
-	return -1
+	return findIndex - 1
 }

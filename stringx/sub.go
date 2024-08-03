@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-07-30 17:26:07
+ * @LastEditTime: 2024-08-03 10:15:25
  * @FilePath: \go-toolbox\stringx\sub.go
  * @Description:
  *
@@ -10,16 +10,18 @@
  */
 package stringx
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/kamalyes/go-toolbox/validator"
+)
 
 // SubBefore 截取分隔字符串之前的字符串，不包括分隔字符串
 // isLastSeparator - 是否查找最后一个分隔字符串（多次出现分隔字符串时选取最后一个），true为选取最后一个
 func SubBefore(str string, separator string, isLastSeparator bool) string {
-	if IsEmpty(str) {
+	hasEmpty, _ := validator.HasEmpty([]interface{}{str, separator})
+	if hasEmpty {
 		return str
-	}
-	if IsEmpty(separator) {
-		return ""
 	}
 
 	var pos int
@@ -38,13 +40,11 @@ func SubBefore(str string, separator string, isLastSeparator bool) string {
 	return str[:pos]
 }
 
-// SubAfter 截取分隔字符串之前的字符串，不包括分隔字符串
+// SubAfter 截取分隔字符串之后的字符串，不包括分隔字符串
 func SubAfter(str string, separator string, isLastSeparator bool) string {
-	if IsEmpty(str) {
+	hasEmpty, _ := validator.HasEmpty([]interface{}{str, separator})
+	if hasEmpty {
 		return str
-	}
-	if IsEmpty(separator) {
-		return ""
 	}
 
 	var pos int
@@ -63,8 +63,10 @@ func SubAfter(str string, separator string, isLastSeparator bool) string {
 
 // SubBetween 截取指定字符串中间部分，不包括标识字符串
 func SubBetween(str string, before string, after string) string {
-	if IsEmpty(str) || IsEmpty(before) || IsEmpty(after) {
-		return ""
+	// 校验传入的值若包含空值则直接return
+	hasEmpty, _ := validator.HasEmpty([]interface{}{str, before, after})
+	if hasEmpty {
+		return str
 	}
 	startIndex := IndexOf(str, before)
 	if startIndex == -1 {
@@ -82,7 +84,8 @@ func SubBetween(str string, before string, after string) string {
 
 // SubBetweenAll 截取指定字符串多段中间部分，不包括标识字符串
 func SubBetweenAll(str string, prefix string, suffix string) []string {
-	if HasEmpty([]string{str, prefix, suffix}) || !Contains(str, prefix) {
+	hasEmpty, _ := validator.HasEmpty([]interface{}{str, prefix, suffix})
+	if hasEmpty || !Contains(str, prefix) {
 		return []string{}
 	}
 

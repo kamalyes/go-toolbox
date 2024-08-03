@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-08-02 09:58:23
+ * @LastEditTime: 2024-08-03 09:57:12
  * @FilePath: \go-toolbox\stringx\contains.go
  * @Description:
  *
@@ -11,27 +11,30 @@
 package stringx
 
 import (
+	"reflect"
 	"strings"
 	"unicode"
+
+	"github.com/kamalyes/go-toolbox/validator"
 )
 
 // Contains 指定字符是否在字符串中出现过
-func Contains(str string, searchStr string) bool {
-	return strings.Contains(str, searchStr)
+func Contains(value string, searchStr string) bool {
+	return strings.Contains(value, searchStr)
 }
 
 // ContainsIgnoreCase 指定字符是否在字符串中出现过(忽略大小写)
-func ContainsIgnoreCase(str string, searchStr string) bool {
-	return Contains(strings.ToLower(str), strings.ToLower(searchStr))
+func ContainsIgnoreCase(value string, searchStr string) bool {
+	return Contains(strings.ToLower(value), strings.ToLower(searchStr))
 }
 
 // ContainsAny 查找指定字符串是否包含指定字符串列表中的任意一个字符串
-func ContainsAny(str string, searchStrs []string) bool {
-	if IsEmpty(str) || len(searchStrs) == 0 {
+func ContainsAny(value string, searchStrs []string) bool {
+	if validator.IsEmptyValue(reflect.ValueOf(value)) || len(searchStrs) == 0 {
 		return false
 	}
 	for _, searchStr := range searchStrs {
-		if ContainsIgnoreCase(str, searchStr) {
+		if ContainsIgnoreCase(value, searchStr) {
 			return true
 		}
 	}
@@ -40,7 +43,7 @@ func ContainsAny(str string, searchStrs []string) bool {
 
 // ContainsAnyIgnoreCase 找指定字符串是否包含指定字符串列表中的任意一个字符串（忽略大小写）
 func ContainsAnyIgnoreCase(str string, searchStrs []string) bool {
-	if IsEmpty(str) || len(searchStrs) == 0 {
+	if validator.IsEmptyValue(reflect.ValueOf(str)) || len(searchStrs) == 0 {
 		return false
 	}
 	lowerStr := strings.ToLower(str)
@@ -55,7 +58,7 @@ func ContainsAnyIgnoreCase(str string, searchStrs []string) bool {
 
 // ContainsAll 检查指定字符串中是否含给定的所有字符串
 func ContainsAll(str string, searchStrs []string) bool {
-	if IsEmpty(str) || len(searchStrs) == 0 {
+	if validator.IsEmptyValue(reflect.ValueOf(str)) || len(searchStrs) == 0 {
 		return false
 	}
 	for _, searchStr := range searchStrs {
@@ -79,7 +82,7 @@ func ContainsBlank(str string) bool {
 // GetContainsStr 查找指定字符串是否包含指定字符串列表中的任意一个字符串，如果包含返回找到的第一个字符串
 // 不存在返回空串
 func GetContainsStr(str string, searchStrs []string) string {
-	if IsEmpty(str) || len(searchStrs) == 0 {
+	if validator.IsEmptyValue(reflect.ValueOf(str)) || len(searchStrs) == 0 {
 		return ""
 	}
 	for _, searchStr := range searchStrs {
@@ -88,14 +91,4 @@ func GetContainsStr(str string, searchStrs []string) string {
 		}
 	}
 	return ""
-}
-
-// 校验字符串是否包含中文字符
-func ContainsChinese(s string) bool {
-	for _, r := range s {
-		if unicode.Is(unicode.Scripts["Han"], r) {
-			return true
-		}
-	}
-	return false
 }

@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-07-30 17:26:07
+ * @LastEditTime: 2024-08-03 11:02:37
  * @FilePath: \go-toolbox\stringx\remove.go
  * @Description:
  *
@@ -10,7 +10,11 @@
  */
 package stringx
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/kamalyes/go-toolbox/validator"
+)
 
 // RemoveAll 移除字符串中所有给定字符串;removeAll("aa-bb-cc-dd", "-") =》 aabbccdd
 func RemoveAll(str string, strToRemove string) string {
@@ -23,7 +27,8 @@ func RemoveAll(str string, strToRemove string) string {
 // RemoveAny 移除字符串中所有给定字符串，当某个字符串出现多次，则全部移除
 func RemoveAny(str string, strsToRemove []string) string {
 	var result = str
-	if IsNotEmpty(str) {
+	hasEmpty, _ := validator.HasEmpty([]interface{}{str})
+	if !hasEmpty {
 		for _, s := range strsToRemove {
 			result = RemoveAll(result, s)
 		}
@@ -38,7 +43,8 @@ func RemoveAllLineBreaks(str string) string {
 
 // RemovePrefix 去掉指定前缀
 func RemovePrefix(str string, prefix string) string {
-	if IsEmpty(str) || IsEmpty(prefix) {
+	hasEmpty, _ := validator.HasEmpty([]interface{}{str, prefix})
+	if hasEmpty {
 		return str
 	}
 	if strings.HasPrefix(str, prefix) {
@@ -49,14 +55,16 @@ func RemovePrefix(str string, prefix string) string {
 
 // RemovePrefixIgnoreCase 忽略大小写去掉指定前缀
 func RemovePrefixIgnoreCase(str string, prefix string) string {
-	str = strings.ToLower(str)
-	prefix = strings.ToLower(prefix)
-	return RemovePrefix(str, prefix)
+	if strings.HasPrefix(strings.ToLower(str), strings.ToLower(prefix)) {
+		return str[len(prefix):]
+	}
+	return str
 }
 
 // RemoveSuffix 去掉指定后缀
 func RemoveSuffix(str string, suffix string) string {
-	if IsEmpty(str) || IsEmpty(suffix) {
+	hasEmpty, _ := validator.HasEmpty([]interface{}{str, suffix})
+	if hasEmpty {
 		return str
 	}
 	if strings.HasSuffix(str, suffix) {
@@ -67,5 +75,10 @@ func RemoveSuffix(str string, suffix string) string {
 
 // RemoveSuffixIgnoreCase 去掉指定后缀(忽略大小写)
 func RemoveSuffixIgnoreCase(str string, suffix string) string {
-	return RemoveSuffix(strings.ToLower(str), strings.ToLower(suffix))
+	lowerStr := strings.ToLower(str)
+	lowerSuffix := strings.ToLower(suffix)
+	if strings.HasSuffix(lowerStr, lowerSuffix) {
+		return str[:len(str)-len(suffix)]
+	}
+	return str
 }

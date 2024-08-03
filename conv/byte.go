@@ -2,14 +2,14 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-08-03 00:52:52
- * @FilePath: \go-toolbox\bytex\convert.go
+ * @LastEditTime: 2024-08-03 09:55:58
+ * @FilePath: \go-toolbox\conv\byte.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
 
-package bytex
+package conv
 
 import (
 	"bytes"
