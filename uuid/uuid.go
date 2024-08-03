@@ -17,7 +17,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/kamalyes/go-toolbox/stringx"
+	"github.com/kamalyes/go-toolbox/convert"
 )
 
 // SameSubStr 创建多少个相同 子字符串的字符串
@@ -43,7 +43,7 @@ func UniqueID(fields ...interface{}) string {
 	var buf strings.Builder
 	for i := range fields {
 		field := fields[i]
-		buf.WriteString(stringx.ParseStr(field))
+		buf.WriteString(convert.MustString(field))
 	}
 	s := strings.TrimSpace(buf.String())
 	if s == "" {

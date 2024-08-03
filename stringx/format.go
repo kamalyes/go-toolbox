@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-07-30 18:33:45
+ * @LastEditTime: 2024-08-03 23:10:45
  * @FilePath: \go-toolbox\stringx\format.go
  * @Description:
  *
@@ -11,55 +11,9 @@
 package stringx
 
 import (
-	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
-	"time"
 )
-
-// ParseStr 解析字符串
-func ParseStr(source interface{}) string {
-	switch v := source.(type) {
-	case string:
-		return v
-	case []byte:
-		return string(v)
-	case int:
-		return strconv.Itoa(v)
-	case int8:
-		return strconv.Itoa(int(v))
-	case int16:
-		return strconv.Itoa(int(v))
-	case int32:
-		return strconv.FormatInt(int64(v), 10)
-	case int64:
-		return strconv.FormatInt(v, 10)
-	case uint:
-		return strconv.FormatUint(uint64(v), 10)
-	case uint8:
-		return strconv.FormatUint(uint64(v), 10)
-	case uint16:
-		return strconv.FormatUint(uint64(v), 10)
-	case uint32:
-		return strconv.FormatUint(uint64(v), 10)
-	case uint64:
-		return strconv.FormatUint(v, 10)
-	case float32:
-		return strconv.FormatFloat(float64(v), 'f', -1, 64)
-	case float64:
-		return strconv.FormatFloat(v, 'f', -1, 64)
-	case time.Time:
-		return time.Time.Format(v, "2006-01-02 15:04:05")
-	case bool:
-		return strconv.FormatBool(v)
-	default:
-		{
-			b, _ := json.Marshal(v)
-			return string(b)
-		}
-	}
-}
 
 // FillBefore 将已有字符串填充为规定长度，如果已有字符串超过这个长度则返回这个字符串
 func FillBefore(str string, char string, length int) string {
