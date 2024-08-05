@@ -260,3 +260,9 @@ func RemoveSymbols(s string) string {
 	reg := regexp.MustCompile(`[^\w]+`)
 	return reg.ReplaceAllString(s, "")
 }
+
+// MatchTime 时间
+func (g *AnyRegs) MatchTime(input string) bool {
+	re := regexp.MustCompile(regTime)
+	return re.MatchString(input)
+}
