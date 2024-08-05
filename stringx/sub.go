@@ -79,7 +79,7 @@ func SubBetween(str string, before string, after string) string {
 		return ""
 	}
 
-	return str[startIndex : startIndex+endIndex]
+	return str[startIndex:endIndex]
 }
 
 // SubBetweenAll 截取指定字符串多段中间部分，不包括标识字符串
