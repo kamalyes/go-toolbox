@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-08-03 10:55:32
+ * @LastEditTime: 2024-10-16 08:57:23
  * @FilePath: \go-toolbox\stringx\replace_test.go
  * @Description:
  *
@@ -25,6 +25,7 @@ func TestAllReplaceFunctions(t *testing.T) {
 	t.Run("TestEndWithIgnoreCase", TestEndWithIgnoreCase)
 	t.Run("TestReplaceWithMatcher", TestReplaceWithMatcher)
 	t.Run("TestHide", TestHide)
+	t.Run("TestReplaceSpecialChars", TestReplaceSpecialChars)
 
 }
 
@@ -72,4 +73,26 @@ func TestReplaceWithMatcher(t *testing.T) {
 func TestHide(t *testing.T) {
 	result := Hide("password12345", 8, 10)
 	assert.Equal(t, "password**345", result)
+}
+
+func TestReplaceSpecialChars(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"Hello, World!", "HelloXXWorldX"},
+		{"Go is fun.", "GoXisXfunX"},
+		{"Special #chars#", "SpecialXXcharsX"},
+		{"1234-5678", "1234X5678"},
+		{"NoSpecialChars", "NoSpecialChars"},
+		{"", ""},
+		{"!@#$%^&*()", "XXXXXXXXXX"},
+	}
+
+	for _, test := range tests {
+		output := ReplaceSpecialChars(test.input)
+		if output != test.expected {
+			t.Errorf("ReplaceSpecialChars(%q) = %q; expected %q", test.input, output, test.expected)
+		}
+	}
 }

@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-08-06 15:52:39
+ * @LastEditTime: 2024-10-15 15:55:05
  * @FilePath: \go-toolbox\system\base.go
  * @Description:
  *
@@ -11,12 +11,24 @@
 package system
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/kamalyes/go-toolbox/random"
+	"github.com/kamalyes/go-toolbox/stringx"
 )
+
+func PanicGetHostName() string {
+	hostname, err := os.Hostname()
+	if err != nil {
+		// 如果获取主机名时出现错误，则返回一个带有错误信息的错误
+		panic(fmt.Errorf("无法获取主机名: %v", err))
+	}
+	return hostname
+}
 
 // 获取主机名函数
 func SafeGetHostName() string {
@@ -26,6 +38,18 @@ func SafeGetHostName() string {
 	}
 	output = strings.ReplaceAll(output, "-", "_")
 	return string(output)
+}
+
+// HashUnixMicroCipherText
+func HashUnixMicroCipherText() string {
+	var (
+		nowUnixMicro = time.Now().UnixMicro()
+		hostName     = PanicGetHostName()
+		randStr      = random.RandString(10, 4)
+		plainText    = fmt.Sprintf("%s%s%d", hostName, randStr, nowUnixMicro)
+		cipherText   = stringx.CalculateMD5Hash(plainText)
+	)
+	return cipherText
 }
 
 func ServerIP() (string, string) {

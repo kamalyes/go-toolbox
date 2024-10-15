@@ -119,3 +119,17 @@ func ReplaceWithMatcher(str string, regex string, replaceFun func(string) string
 func Hide(str string, startInclude int, endExclude int) string {
 	return ReplaceWithIndex(str, startInclude, endExclude, "*")
 }
+
+// ReplaceSpecialChars 去掉特殊符号、转为X
+func ReplaceSpecialChars(str string) string {
+	// 创建一个包含标点符号和特殊字符的字符串
+	specialChars := "!\"#$%&'()*+,-./:;<=> ?@[\\]^_`{|}~"
+	// 使用 Map 函数将标点符号和特殊字符替换为 'X'
+	cleanedStr := strings.Map(func(r rune) rune {
+		if strings.ContainsRune(specialChars, r) {
+			return 'X'
+		}
+		return r // 保留非特殊字符
+	}, str)
+	return cleanedStr
+}
