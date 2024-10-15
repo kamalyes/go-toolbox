@@ -25,6 +25,7 @@ func TestAllReplaceFunctions(t *testing.T) {
 	t.Run("TestEndWithIgnoreCase", TestEndWithIgnoreCase)
 	t.Run("TestReplaceWithMatcher", TestReplaceWithMatcher)
 	t.Run("TestHide", TestHide)
+	t.Run("TestReplaceSpecialChars", TestReplaceSpecialChars)
 
 }
 
@@ -72,4 +73,26 @@ func TestReplaceWithMatcher(t *testing.T) {
 func TestHide(t *testing.T) {
 	result := Hide("password12345", 8, 10)
 	assert.Equal(t, "password**345", result)
+}
+
+func TestReplaceSpecialChars(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"Hello, World!", "HelloXX WorldX"},
+		{"Go is fun.", "Go is funX"},
+		{"Special #chars#", "Special XcharsX"},
+		{"1234-5678", "1234X5678"},
+		{"NoSpecialChars", "NoSpecialChars"},
+		{"", ""},
+		{"!@#$%^&*()", "XXXXXXXXXX"},
+	}
+
+	for _, test := range tests {
+		output := ReplaceSpecialChars(test.input)
+		if output != test.expected {
+			t.Errorf("ReplaceSpecialChars(%q) = %q; expected %q", test.input, output, test.expected)
+		}
+	}
 }

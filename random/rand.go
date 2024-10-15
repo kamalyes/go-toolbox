@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-08-05 09:20:34
+ * @LastEditTime: 2024-10-15 15:26:39
  * @FilePath: \go-toolbox\random\rand.go
  * @Description:
  *

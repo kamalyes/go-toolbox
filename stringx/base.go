@@ -11,6 +11,8 @@
 package stringx
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"reflect"
 	"strings"
 
@@ -124,4 +126,25 @@ func Count(str string, searchStr string) int {
 //	0 相等；<0 小于； >0 大于
 func CompareIgnoreCase(str1 string, str2 string) int {
 	return strings.Compare(strings.ToLower(str1), strings.ToLower(str2))
+}
+
+// ExtractValue 从给定的字符串中提取指定的键的值
+func ExtractValue(extra string, key string, searchPrefix string) string {
+	// 构造要查找的键名
+	searchKey := key + "="
+	if strings.Contains(extra, searchKey) {
+		start := strings.Index(extra, searchKey) + len(searchKey)
+		end := strings.Index(extra[start:], searchPrefix)
+		if end == -1 {
+			return extra[start:] // 如果没有分号，返回到字符串末尾
+		}
+		return extra[start : start+end]
+	}
+	return "" // 如果没有找到，返回空字符串
+}
+
+// CalculateMD5Hash 计算string md5 hash值
+func CalculateMD5Hash(input string) string {
+	hash := md5.Sum([]byte(input))
+	return hex.EncodeToString(hash[:])
 }
