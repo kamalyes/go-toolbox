@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-08-03 10:54:57
+ * @LastEditTime: 2024-10-16 19:49:20
  * @FilePath: \go-toolbox\stringx\replace.go
  * @Description:
  *
@@ -120,14 +120,19 @@ func Hide(str string, startInclude int, endExclude int) string {
 	return ReplaceWithIndex(str, startInclude, endExclude, "*")
 }
 
-// ReplaceSpecialChars 去掉特殊符号、转为X
-func ReplaceSpecialChars(str string) string {
-	// 创建一个包含标点符号和特殊字符的字符串
-	specialChars := "!\"#$%&'()*+,-./:;<=> ?@[\\]^_`{|}~"
-	// 使用 Map 函数将标点符号和特殊字符替换为 'X'
+// ReplaceSpecialChars 去掉特殊符号、转为自定义
+func ReplaceSpecialChars(str string, replaceValue rune) string {
+	// 定义不同类别的特殊字符
+	englishPunctuation := `!"#$%&'()*+,-./:;<=>?@[\\]^_` + "`" + `{|}~`
+	chinesePunctuation := `，。！？；：“”‘’《》`
+	otherSpecialChars := `【】〔〕…· `
+
+	// 将所有特殊字符组合在一起
+	specialChars := englishPunctuation + chinesePunctuation + otherSpecialChars
+	// 使用 Map 函数将标点符号和特殊字符替换为自定义
 	cleanedStr := strings.Map(func(r rune) rune {
 		if strings.ContainsRune(specialChars, r) {
-			return 'X'
+			return replaceValue
 		}
 		return r // 保留非特殊字符
 	}, str)

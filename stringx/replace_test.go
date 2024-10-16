@@ -90,7 +90,7 @@ func TestReplaceSpecialChars(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		output := ReplaceSpecialChars(test.input)
+		output := ReplaceSpecialChars(test.input, 'X')
 		if output != test.expected {
 			t.Errorf("ReplaceSpecialChars(%q) = %q; expected %q", test.input, output, test.expected)
 		}

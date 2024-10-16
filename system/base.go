@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-10-15 15:55:05
+ * @LastEditTime: 2024-10-16 19:51:49
  * @FilePath: \go-toolbox\system\base.go
  * @Description:
  *
@@ -36,8 +36,7 @@ func SafeGetHostName() string {
 	if err != nil {
 		output = random.FRandAlphaString(8)
 	}
-	output = strings.ReplaceAll(output, "-", "_")
-	return string(output)
+	return stringx.ReplaceSpecialChars(output, 'x')
 }
 
 // HashUnixMicroCipherText
