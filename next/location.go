@@ -2,14 +2,14 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-07-28 12:48:08
- * @FilePath: \go-toolbox\ip\location.go
+ * @LastEditTime: 2024-07-28 12:55:08
+ * @FilePath: \go-toolbox\next\location.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
 
-package ip
+package next
 
 import (
 	"crypto/md5"

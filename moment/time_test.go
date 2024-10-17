@@ -2,8 +2,8 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-07-28 09:36:36
- * @FilePath: \go-middleware\moment\time_test.go
+ * @LastEditTime: 2024-10-17 15:05:55
+ * @FilePath: \go-toolbox\moment\time_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
@@ -16,83 +16,83 @@ import (
 )
 
 func TestMomentFunctions(t *testing.T) {
-	t.Run("String", TestString)
-	t.Run("Hour", TestHour)
-	t.Run("Minute", TestMinute)
-	t.Run("Second", TestSecond)
-	t.Run("Timestamp", TestTimestamp)
-	t.Run("Milliseconds", TestMilliseconds)
-	t.Run("Microsecond", TestMicrosecond)
-	t.Run("Nanosecond", TestNanosecond)
-	t.Run("GmtTime", TestGmtTime)
+	t.Run("String", TestParseString)
+	t.Run("Hour", TestParseHour)
+	t.Run("Minute", TestParseMinute)
+	t.Run("Second", TestParseSecond)
+	t.Run("Timestamp", TestParseTimestamp)
+	t.Run("Milliseconds", TestCurrentMillisecond)
+	t.Run("Microsecond", TestCurrentMicrosecond)
+	t.Run("Nanosecond", TestCurrentNanosecond)
+	t.Run("GmtTime", TestCurrentGmtTime)
 	t.Run("LocalTime", TestLocalTime)
 	t.Run("Strtotime", TestStrtotime)
 	t.Run("CharToCode", TestCharToCode)
 }
 
-func TestString(t *testing.T) {
-	result := String()
+func TestParseString(t *testing.T) {
+	result := ParseString()
 	if len(result) == 0 {
-		t.Errorf("String() returned an empty string")
+		t.Errorf("ParseString() returned an empty string")
 	}
 }
 
-func TestHour(t *testing.T) {
+func TestParseHour(t *testing.T) {
 	now := time.Now()
-	hour := Hour(now)
+	hour := ParseHour(now)
 	if hour < 0 || hour > 23 {
-		t.Errorf("Hour() returned an invalid hour value: %d", hour)
+		t.Errorf("ParseHour() returned an invalid hour value: %d", hour)
 	}
 }
 
-func TestMinute(t *testing.T) {
+func TestParseMinute(t *testing.T) {
 	now := time.Now()
-	minute := Minute(now)
+	minute := ParseMinute(now)
 	if minute < 0 || minute > 59 {
-		t.Errorf("Minute() returned an invalid minute value: %d", minute)
+		t.Errorf("ParseMinute() returned an invalid minute value: %d", minute)
 	}
 }
 
-func TestSecond(t *testing.T) {
+func TestParseSecond(t *testing.T) {
 	now := time.Now()
-	second := Second(now)
+	second := ParseSecond(now)
 	if second < 0 || second > 59 {
-		t.Errorf("Second() returned an invalid second value: %d", second)
+		t.Errorf("ParseSecond() returned an invalid second value: %d", second)
 	}
 }
 
-func TestTimestamp(t *testing.T) {
-	timestamp := Timestamp("2024-01-01 00:00:00")
+func TestParseTimestamp(t *testing.T) {
+	timestamp := ParseTimestamp("2024-01-01 00:00:00")
 	if timestamp <= 0 {
-		t.Errorf("Timestamp() returned an invalid timestamp value: %d", timestamp)
+		t.Errorf("ParseTimestamp() returned an invalid timestamp value: %d", timestamp)
 	}
 }
 
-func TestMilliseconds(t *testing.T) {
-	ms := Millisecond()
+func TestCurrentMillisecond(t *testing.T) {
+	ms := CurrentMillisecond()
 	if ms <= 0 {
-		t.Errorf("Millisecond() returned an invalid millisecond value: %d", ms)
+		t.Errorf("CurrentMillisecond() returned an invalid millisecond value: %d", ms)
 	}
 }
 
-func TestMicrosecond(t *testing.T) {
-	micros := Microsecond()
+func TestCurrentMicrosecond(t *testing.T) {
+	micros := CurrentMicrosecond()
 	if micros <= 0 {
-		t.Errorf("Microsecond() returned an invalid microsecond value: %d", micros)
+		t.Errorf("CurrentMicrosecond() returned an invalid microsecond value: %d", micros)
 	}
 }
 
-func TestNanosecond(t *testing.T) {
-	nanos := Nanosecond()
+func TestCurrentNanosecond(t *testing.T) {
+	nanos := CurrentNanosecond()
 	if nanos <= 0 {
-		t.Errorf("Nanosecond() returned an invalid nanosecond value: %d", nanos)
+		t.Errorf("CurrentNanosecond() returned an invalid nanosecond value: %d", nanos)
 	}
 }
 
-func TestGmtTime(t *testing.T) {
-	gmtTime := GmtTime()
+func TestCurrentGmtTime(t *testing.T) {
+	gmtTime := CurrentGmtTime()
 	if len(gmtTime) == 0 {
-		t.Errorf("GmtTime() returned an empty string")
+		t.Errorf("CurrentGmtTime() returned an empty string")
 	}
 }
 

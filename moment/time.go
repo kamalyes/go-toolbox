@@ -20,7 +20,7 @@ import (
 )
 
 // timestamp
-func String(f ...string) string {
+func ParseString(f ...string) string {
 	format := "2006-01-02 15:04:05"
 	if len(f) > 0 {
 		format = f[0]
@@ -29,7 +29,7 @@ func String(f ...string) string {
 }
 
 // 获取小时
-func Hour(t ...time.Time) int {
+func ParseHour(t ...time.Time) int {
 	tmp := time.Now()
 	if len(t) > 0 {
 		tmp = t[0]
@@ -38,7 +38,7 @@ func Hour(t ...time.Time) int {
 }
 
 // 获取分钟
-func Minute(t ...time.Time) int {
+func ParseMinute(t ...time.Time) int {
 	tmp := time.Now()
 	if len(t) > 0 {
 		tmp = t[0]
@@ -47,7 +47,7 @@ func Minute(t ...time.Time) int {
 }
 
 // 获取秒
-func Second(t ...time.Time) int {
+func ParseSecond(t ...time.Time) int {
 	tmp := time.Now()
 	if len(t) > 0 {
 		tmp = t[0]
@@ -56,7 +56,7 @@ func Second(t ...time.Time) int {
 }
 
 // 字符串转时间戳
-func Timestamp(args ...string) int64 {
+func ParseTimestamp(args ...string) int64 {
 	var timestamp int64 = 0
 	l := len(args)
 	if l == 0 {
@@ -76,24 +76,24 @@ func Timestamp(args ...string) int64 {
 }
 
 // 毫秒
-func Millisecond() int64 {
+func CurrentMillisecond() int64 {
 	tmp := time.Now().UnixNano()
 	return tmp / 1e6
 }
 
 // 微秒
-func Microsecond() int64 {
+func CurrentMicrosecond() int64 {
 	tmp := time.Now().UnixNano()
 	return tmp / 1e3
 }
 
 // 纳秒
-func Nanosecond() int64 {
+func CurrentNanosecond() int64 {
 	return time.Now().UnixNano()
 }
 
 // GMT TIME
-func GmtTime() string {
+func CurrentGmtTime() string {
 	now := time.Now()
 	year, mon, day := now.UTC().Date()
 	hour, min, sec := now.UTC().Clock()

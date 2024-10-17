@@ -2,8 +2,8 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-07-28 09:36:36
- * @FilePath: \go-middleware\moment\date_test.go
+ * @LastEditTime: 2024-10-17 15:05:00
+ * @FilePath: \go-toolbox\moment\date_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
@@ -16,69 +16,69 @@ import (
 )
 
 func TestDateAllFunctions(t *testing.T) {
-	t.Run("TestYear", TestYear)
-	t.Run("TestMonth", TestMonth)
-	t.Run("TestDay", TestDay)
-	t.Run("TestYearDay", TestYearDay)
-	t.Run("TestYearDefault", TestYearDefault)
-	t.Run("TestMonthDefault", TestMonthDefault)
-	t.Run("TestDayDefault", TestDayDefault)
+	t.Run("TestParseYear", TestParseYear)
+	t.Run("TestParseMonth", TestParseMonth)
+	t.Run("TestParseDay", TestParseDay)
+	t.Run("TestParseYearDay", TestParseYearDay)
+	t.Run("TestParseYearDefault", TestParseYearDefault)
+	t.Run("TestParseMonthDefault", TestParseMonthDefault)
+	t.Run("TestParseDayDefault", TestParseDayDefault)
 }
 
-func TestYear(t *testing.T) {
+func TestParseYear(t *testing.T) {
 	testTime := time.Date(2024, time.April, 2, 0, 0, 0, 0, time.UTC)
-	year := Year(testTime)
+	year := ParseYear(testTime)
 	expectedYear := 2024
 	if year != expectedYear {
-		t.Errorf("Year() returned %d, expected %d", year, expectedYear)
+		t.Errorf("ParseYear() returned %d, expected %d", year, expectedYear)
 	}
 }
 
-func TestMonth(t *testing.T) {
+func TestParseMonth(t *testing.T) {
 	testTime := time.Date(2024, time.April, 2, 0, 0, 0, 0, time.UTC)
-	month := Month(testTime)
+	month := ParseMonth(testTime)
 	expectedMonth := 4
 	if month != expectedMonth {
-		t.Errorf("Month() returned %d, expected %d", month, expectedMonth)
+		t.Errorf("ParseMonth() returned %d, expected %d", month, expectedMonth)
 	}
 }
 
-func TestDay(t *testing.T) {
+func TestParseDay(t *testing.T) {
 	testTime := time.Date(2024, time.April, 2, 0, 0, 0, 0, time.UTC)
-	day := Day(testTime)
+	day := ParseDay(testTime)
 	expectedDay := 2
 	if day != expectedDay {
-		t.Errorf("Day() returned %d, expected %d", day, expectedDay)
+		t.Errorf("ParseDay() returned %d, expected %d", day, expectedDay)
 	}
 }
 
-func TestYearDay(t *testing.T) {
+func TestParseYearDay(t *testing.T) {
 	testTime := time.Date(2024, time.April, 2, 0, 0, 0, 0, time.UTC)
-	yearDay := YearDay(testTime)
+	yearDay := ParseYearDay(testTime)
 	expectedYearDay := 93
 	if yearDay != expectedYearDay {
-		t.Errorf("YearDay() returned %d, expected %d", yearDay, expectedYearDay)
+		t.Errorf("ParseYearDay() returned %d, expected %d", yearDay, expectedYearDay)
 	}
 }
 
-func TestYearDefault(t *testing.T) {
-	year := Year()
+func TestParseYearDefault(t *testing.T) {
+	year := ParseYear()
 	currentYear := time.Now().Year()
 	if year != currentYear {
 		t.Errorf("YearDefault() returned %d, expected %d", year, currentYear)
 	}
 }
 
-func TestMonthDefault(t *testing.T) {
-	month := Month()
+func TestParseMonthDefault(t *testing.T) {
+	month := ParseMonth()
 	currentMonth := int(time.Now().Month())
 	if month != currentMonth {
 		t.Errorf("MonthDefault() returned %d, expected %d", month, currentMonth)
 	}
 }
 
-func TestDayDefault(t *testing.T) {
-	day := Day()
+func TestParseDayDefault(t *testing.T) {
+	day := ParseDay()
 	currentDay := int(time.Now().Day())
 	if day != currentDay {
 		t.Errorf("DayDefault() returned %d, expected %d", day, currentDay)

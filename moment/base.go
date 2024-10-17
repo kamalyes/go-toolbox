@@ -53,10 +53,6 @@ func GetCurrentTimeInfo() (string, int, time.Time) {
 	return currentTime.Format("2006-01-02"), currentTime.Hour(), currentTime
 }
 
-const (
-	DefaultTimezone = "Asia/Singapore"
-)
-
 // GetServerTimezone 获取服务器的本地时区信息
 func GetServerTimezone() string {
 	loc, err := time.LoadLocation("Local")

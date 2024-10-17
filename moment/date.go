@@ -2,8 +2,8 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-07-28 09:36:36
- * @FilePath: \go-middleware\moment\date.go
+ * @LastEditTime: 2024-10-17 15:54:55
+ * @FilePath: \go-toolbox\moment\date.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
@@ -12,7 +12,7 @@ package moment
 
 import "time"
 
-func Year(t ...time.Time) int {
+func ParseYear(t ...time.Time) int {
 	tmp := time.Now()
 	if len(t) > 0 {
 		tmp = t[0]
@@ -20,7 +20,7 @@ func Year(t ...time.Time) int {
 	return tmp.Year()
 }
 
-func Month(t ...time.Time) int {
+func ParseMonth(t ...time.Time) int {
 	tmp := time.Now()
 	if len(t) > 0 {
 		tmp = t[0]
@@ -28,7 +28,7 @@ func Month(t ...time.Time) int {
 	return int(tmp.Month())
 }
 
-func Day(t ...time.Time) int {
+func ParseDay(t ...time.Time) int {
 	tmp := time.Now()
 	if len(t) > 0 {
 		tmp = t[0]
@@ -36,7 +36,7 @@ func Day(t ...time.Time) int {
 	return tmp.Day()
 }
 
-func YearDay(t ...time.Time) int {
+func ParseYearDay(t ...time.Time) int {
 	tmp := time.Now()
 	if len(t) > 0 {
 		tmp = t[0]

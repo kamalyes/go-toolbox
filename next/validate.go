@@ -2,14 +2,14 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-08-02 10:10:05
- * @FilePath: \go-toolbox\ip\validate.go
+ * @LastEditTime: 2024-10-17 16:05:19
+ * @FilePath: \go-toolbox\next\validate.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
 
-package ip
+package next
 
 import (
 	"errors"
@@ -157,4 +157,46 @@ func IsIPv6(ip string) (ok bool) {
 	} else {
 		return true
 	}
+}
+
+// HasLocalIPAddr 检测 IP 地址字符串是否是内网地址
+func HasLocalIPAddr(ip string) bool {
+	parsedIP := net.ParseIP(ip)
+	return parsedIP != nil && HasLocalIP(parsedIP)
+}
+
+// HasLocalIP 检测 IP 地址是否是内网地址
+func HasLocalIP(ip net.IP) bool {
+	if ip.IsLoopback() {
+		return true // 回环地址是内网地址
+	}
+
+	if ip4 := ip.To4(); ip4 != nil {
+		// 检查 IPv4 内网地址
+		return isPrivateIPv4(ip4)
+	}
+
+	// 检查 IPv6 内网地址
+	return isPrivateIPv6(ip)
+}
+
+// isPrivateIPv4 检查 IPv4 地址是否是内网地址
+func isPrivateIPv4(ip4 net.IP) bool {
+	switch {
+	case ip4[0] == 10: // 10.0.0.0/8
+		return true
+	case ip4[0] == 172 && ip4[1] >= 16 && ip4[1] <= 31: // 172.16.0.0/12
+		return true
+	case ip4[0] == 169 && ip4[1] == 254: // 169.254.0.0/16
+		return true
+	case ip4[0] == 192 && ip4[1] == 168: // 192.168.0.0/16
+		return true
+	default:
+		return false
+	}
+}
+
+// isPrivateIPv6 检查 IPv6 地址是否是内网地址
+func isPrivateIPv6(ip net.IP) bool {
+	return (ip[0] == 0xFE && (ip[1]&0xC0) == 0x80) || (ip[0] == 0xFC || ip[0] == 0xFD)
 }

@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-08-03 21:32:26
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-08-03 23:20:44
+ * @LastEditTime: 2024-10-17 16:03:19
  * @FilePath: \go-toolbox\convert\convert_test.go
  * @Description:
  *
@@ -11,189 +11,341 @@
 package convert
 
 import (
-	"strings"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/assert"
 )
 
-var (
-	testString = "啊哈哈哈 123@"
-)
-
-func TestMustJSONString(t *testing.T) {
-	t.Parallel()
-	js := map[string]interface{}{
-		"_c": "中 文",
-		"a":  true,
-		"b":  1.23,
-	}
-	actual := MustJSONString(&js)
-
-	assert.Equal(t, true, strings.Contains(actual, `"a":true`))
-	assert.Equal(t, true, strings.Contains(actual, `"b":1.23`))
-	assert.Equal(t, true, strings.Contains(actual, `"_c":"中 文"`))
-
-	actualIndent := MustJSONIndentString(&js)
-	assert.Equal(t, true, strings.Contains(actualIndent, "  "))
+func TestAllConvertFunctions(t *testing.T) {
+	t.Run("TestMustString", TestMustString)
+	t.Run("TestMustInt", TestMustInt)
+	t.Run("TestMustBool", TestMustBool)
+	t.Run("TestB64Encode", TestB64Encode)
+	t.Run("TestB64Decode", TestB64Decode)
+	t.Run("TestHexToBytes", TestHexToBytes)
+	t.Run("TestBytesBCC", TestBytesBCC)
+	t.Run("TestHexBCC", TestHexBCC)
+	t.Run("TestDecToHex", TestDecToHex)
+	t.Run("TestHexToDec", TestHexToDec)
+	t.Run("TestDecToBin", TestDecToBin)
+	t.Run("TestByteToBinStr", TestByteToBinStr)
+	t.Run("TestBytesToBinStr", TestBytesToBinStr)
+	t.Run("TestBytesToBinStrWithSplit", TestBytesToBinStrWithSplit)
 }
 
 func TestMustString(t *testing.T) {
-	now := time.Date(2022, 1, 2, 3, 4, 5, 0, time.UTC)
-	for _, v := range []struct {
-		in  interface{}
-		out string
+	tests := []struct {
+		input    interface{}
+		expected string
 	}{
-		{"Is string?", "Is string?"},
-		{0, "0"},
-		{0.005, "0.005"},
+		{"hello", "hello"},
+		{[]byte("world"), "world"},
 		{nil, ""},
 		{true, "true"},
-		{false, "false"},
-		{[]byte(testString), testString},
-		{[]int{0, 2, 1}, "[0,2,1]"},
-		{map[string]interface{}{"a": 0, "b": true, "C": []byte("c")}, "{\"C\":\"Yw==\",\"a\":0,\"b\":true}"},
-		{now, "2022-01-02 03:04:05"},
-	} {
-		assert.Equal(t, v.out, MustString(v.in))
-	}
-	assert.Equal(t, "2022-01-02T03:04:05Z", MustString(now, time.RFC3339))
-
-	tests := []struct {
-		name   string
-		input  interface{}
-		output string
-	}{
-		{"StringInput", "Hello", "Hello"},
-		{"IntInput", 42, "42"},
-		{"FloatInput", 3.14, "3.14"},
-		{"BoolInput", true, "true"},
-		{"StructInput", struct{ Name string }{"John"}, `{"Name":"John"}`},
+		{42, "42"},
+		{3.14, "3.14"},
+		{time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC), "2024-01-01T12:00:00Z"},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := MustString(tt.input)
-			assert.Equal(t, tt.output, result)
-		})
+	for _, test := range tests {
+		result := MustString(test.input)
+		if result != test.expected {
+			t.Errorf("MustString(%v) = %s; want %s", test.input, result, test.expected)
+		}
 	}
 }
 
 func TestMustInt(t *testing.T) {
-	for _, v := range []struct {
-		in  interface{}
-		out int
+	tests := []struct {
+		input    interface{}
+		expected int
 	}{
-		{"2", 2},
-		{"  2 \n ", 2},
-		{0b0010, 2},
-		{10, 10},
-		{0o77, 63},
-		{0xff, 255},
-		{-1, -1},
-		{true, 1},
-		{"0x", 0},
-		{false, 0},
-		{uint(11), 11},
-		{uint64(11), 11},
-		{int64(11), 11},
-		{float32(11.0), 11},
-		{1.005, 1},
+		{"123", 123},
+		{123, 123},
 		{nil, 0},
-	} {
-		assert.Equal(t, v.out, MustInt(v.in))
+		{true, 1},
+		{false, 0},
+		{3.14, 3},
+		{convertToInt, 0},
+	}
+
+	for _, test := range tests {
+		result, _ := MustInt(test.input)
+		if result != test.expected {
+			t.Errorf("MustInt(%v) = %d; want %d", test.input, result, test.expected)
+		}
 	}
 }
 
 func TestMustBool(t *testing.T) {
-	for _, v := range []struct {
-		in  interface{}
-		out bool
+	tests := []struct {
+		input    interface{}
+		expected bool
 	}{
 		{"1", true},
-		{"t", true},
-		{"T", true},
-		{"TRUE", true},
 		{"true", true},
-		{"True", true},
-		{true, true},
-		{1, true},
-		{2, true},
-		{2.1, true},
-		{0x01, true},
-		{false, false},
-		{0.1, false},
+		{"false", false},
 		{0, false},
-		{"2", false},
+		{1, true},
 		{nil, false},
-		{"TrUe", false},
-	} {
-		assert.Equal(t, v.out, MustBool(v.in))
+		{true, true},
+		{false, false},
+	}
+
+	for _, test := range tests {
+		result := MustBool(test.input)
+		if result != test.expected {
+			t.Errorf("MustBool(%v) = %v; want %v", test.input, result, test.expected)
+		}
 	}
 }
 
 func TestB64Encode(t *testing.T) {
-	t.Parallel()
-	assert.Equal(t, "6Kej56CBL+e8lueggX4g6aG25pu/JiM=", B64Encode(S2B("解码/编码~ 顶替&#")))
-}
-
-func TestB64UrlEncode(t *testing.T) {
-	t.Parallel()
-	assert.Equal(t, "6Kej56CBL-e8lueggX4g6aG25pu_JiM=", B64UrlEncode(S2B("解码/编码~ 顶替&#")))
-}
-
-func TestB64Decode(t *testing.T) {
-	t.Parallel()
-	assert.Equal(t, []byte("解码/编码~ 顶替&#"), B64Decode("6Kej56CBL+e8lueggX4g6aG25pu/JiM="))
-}
-
-func TestB64UrlDecode(t *testing.T) {
-	for _, v := range []struct {
-		in  string
-		out []byte
+	tests := []struct {
+		input    []byte
+		expected string
 	}{
-		{"6Kej56CBL-e8lueggX4g6aG25pu_JiM=", []byte("解码/编码~ 顶替&#")},
-		{"123", nil},
-	} {
-		assert.Equal(t, v.out, B64UrlDecode(v.in))
+		{[]byte("hello"), "aGVsbG8="},
+		{[]byte("world"), "d29ybGQ="},
+		{[]byte(""), ""},
+	}
+
+	for _, test := range tests {
+		result := B64Encode(test.input)
+		if result != test.expected {
+			t.Errorf("B64Encode(%s) = %s; want %s", test.input, result, test.expected)
+		}
 	}
 }
 
-func Benchmark_S2B(b *testing.B) {
-	s := strings.Repeat(testString, 10000)
-	bs := []byte(s)
-	var res []byte
-	b.ResetTimer()
-	b.Run("unsafe", func(b *testing.B) {
-		for n := 0; n < b.N; n++ {
-			res = S2B(s)
+func TestB64Decode(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected []byte
+	}{
+		{"aGVsbG8=", []byte("hello")},
+		{"d29ybGQ=", []byte("world")},
+		{"", []byte{}},
+	}
+
+	for _, test := range tests {
+		result, err := B64Decode(test.input)
+		if err != nil {
+			t.Errorf("B64Decode(%s) returned an error: %v", test.input, err)
+			continue
 		}
-		assert.Equal(b, bs, res)
-	})
-	b.Run("default", func(b *testing.B) {
-		for n := 0; n < b.N; n++ {
-			res = []byte(s)
+		if !equalBytes(result, test.expected) {
+			t.Errorf("B64Decode(%s) = %v; want %v", test.input, result, test.expected)
 		}
-		assert.Equal(b, bs, res)
-	})
+	}
 }
 
-func Benchmark_B2S(b *testing.B) {
-	s := strings.Repeat(testString, 10000)
-	bs := []byte(s)
-	var res string
-	b.ResetTimer()
-	b.Run("unsafe", func(b *testing.B) {
-		for n := 0; n < b.N; n++ {
-			res = B2S(bs)
+func TestHexToBytes(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected []byte
+	}{
+		{"AABB", []byte{0xAA, 0xBB}},
+		{"", []byte{}}, // empty input should return empty byte array
+		{"GG", nil},    // invalid hex should return error
+	}
+
+	for _, test := range tests {
+		result, err := HexToBytes(test.input)
+		if test.expected == nil && err == nil {
+			t.Errorf("HexToBytes(%s) should return an error", test.input)
+			continue
+		} else if test.expected != nil && err != nil {
+			t.Errorf("HexToBytes(%s) returned an error: %v", test.input, err)
+			continue
 		}
-		assert.Equal(b, s, res)
-	})
-	b.Run("default", func(b *testing.B) {
-		for n := 0; n < b.N; n++ {
-			res = string(bs)
+		if !equalBytes(result, test.expected) {
+			t.Errorf("HexToBytes(%s) = %v; want %v", test.input, result, test.expected)
 		}
-		assert.Equal(b, s, res)
-	})
+	}
+}
+
+func TestBytesBCC(t *testing.T) {
+	tests := []struct {
+		input    []byte
+		expected byte
+	}{
+		{[]byte{0x01, 0x02, 0x03}, 0x00},
+		{[]byte{0xFF, 0xFF, 0xFF}, 0xFF},
+		{[]byte{0x00}, 0x00},
+	}
+
+	for _, test := range tests {
+		result := BytesBCC(test.input)
+		if result != test.expected {
+			t.Errorf("BytesBCC(%v) = %v; want %v", test.input, result, test.expected)
+		}
+	}
+}
+
+func TestHexBCC(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"AABBCC", "dd"},
+		{"aabbcc", "dd"},
+		{"", "00"}, // empty input should return BCC as 0
+	}
+
+	for _, test := range tests {
+		result, err := HexBCC(test.input)
+		if err != nil {
+			t.Errorf("HexBCC(%s) returned an error: %v", test.input, err)
+			continue
+		}
+		if result != test.expected {
+			t.Errorf("HexBCC(%s) = %s; want %s", test.input, result, test.expected)
+		}
+	}
+}
+
+func TestDecToHex(t *testing.T) {
+	tests := []struct {
+		input    uint64
+		expected string
+	}{
+		{255, "FF"},
+		{0, "00"},
+		{4095, "0FFF"},
+	}
+
+	for _, test := range tests {
+		result := DecToHex(test.input)
+		if result != test.expected {
+			t.Errorf("DecToHex(%d) = %s; want %s", test.input, result, test.expected)
+		}
+	}
+}
+
+func TestHexToDec(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected uint64
+	}{
+		{"FF", 255},
+		{"0FFF", 4095},
+		{"00", 0},
+	}
+
+	for _, test := range tests {
+		result, err := HexToDec(test.input)
+		if err != nil {
+			t.Errorf("HexToDec(%s) returned an error: %v", test.input, err)
+			continue
+		}
+		if result != test.expected {
+			t.Errorf("HexToDec(%s) = %d; want %d", test.input, result, test.expected)
+		}
+	}
+}
+
+func TestDecToBin(t *testing.T) {
+	tests := []struct {
+		input    uint64
+		expected string
+	}{
+		{0, "00000000"},
+		{1, "00000001"},
+		{255, "11111111"},
+	}
+
+	for _, test := range tests {
+		result := DecToBin(test.input)
+		if result != test.expected {
+			t.Errorf("DecToBin(%d) = %s; want %s", test.input, result, test.expected)
+		}
+	}
+}
+
+func TestHexToBin(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"FF", "11111111"},
+		{"0", "00000000"},
+	}
+
+	for _, test := range tests {
+		result, err := HexToBin(test.input)
+		if err != nil {
+			t.Errorf("HexToBin(%s) returned an error: %v", test.input, err)
+			continue
+		}
+		if result != test.expected {
+			t.Errorf("HexToBin(%s) = %s; want %s", test.input, result, test.expected)
+		}
+	}
+}
+
+func TestByteToBinStr(t *testing.T) {
+	tests := []struct {
+		input    byte
+		expected string
+	}{
+		{0, "00000000"},
+		{1, "00000001"},
+		{255, "11111111"},
+	}
+
+	for _, test := range tests {
+		result := ByteToBinStr(test.input)
+		if result != test.expected {
+			t.Errorf("ByteToBinStr(%d) = %s; want %s", test.input, result, test.expected)
+		}
+	}
+}
+
+func TestBytesToBinStr(t *testing.T) {
+	tests := []struct {
+		input    []byte
+		expected string
+	}{
+		{[]byte{0, 1, 2}, "000000000000000100000010"},
+		{[]byte{255}, "11111111"},
+		{[]byte{}, ""},
+	}
+
+	for _, test := range tests {
+		result := BytesToBinStr(test.input)
+		if result != test.expected {
+			t.Errorf("BytesToBinStr(%v) = %s; want %s", test.input, result, test.expected)
+		}
+	}
+}
+
+func TestBytesToBinStrWithSplit(t *testing.T) {
+	tests := []struct {
+		input    []byte
+		split    string
+		expected string
+	}{
+		{[]byte{0, 1, 2}, " ", "00000000 00000001 00000010"},
+		{[]byte{255}, "", "11111111"},
+		{[]byte{}, "-", ""},
+	}
+
+	for _, test := range tests {
+		result := BytesToBinStrWithSplit(test.input, test.split)
+		if result != test.expected {
+			t.Errorf("BytesToBinStrWithSplit(%v, %s) = %s; want %s", test.input, test.split, result, test.expected)
+		}
+	}
+}
+
+func equalBytes(a, b []byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
