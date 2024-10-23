@@ -11,9 +11,10 @@
 package sign
 
 import (
-	"crypto/rand"
 	"encoding/base64"
 	"testing"
+
+	"github.com/kamalyes/go-toolbox/random"
 )
 
 func TestAesEncryptDecrypt(t *testing.T) {
@@ -84,24 +85,12 @@ func TestAesEncryptDecrypt(t *testing.T) {
 	}
 }
 
-func generateRandomString(length int) (string, error) {
-	bytes := make([]byte, length)
-	_, err := rand.Read(bytes)
-	if err != nil {
-		return "", err
-	}
-	return base64.StdEncoding.EncodeToString(bytes), nil
-}
-
 func BenchmarkAesEncryptDecrypt(b *testing.B) {
 	var password = "example1235678"
 	var byteKey = GenerateByteKey(password, 32)
 
 	// 生成随机字符串作为测试输入
-	plainText, err := generateRandomString(4096) // 4 KB 的随机字符串
-	if err != nil {
-		b.Fatalf("Failed to generate random string: %v", err)
-	}
+	plainText := random.FRandString(4096) // 4 KB
 
 	b.Run("EncryptDecrypt", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {

@@ -12,11 +12,13 @@
 package random
 
 import (
+	"encoding/json"
 	"math"
 	"math/rand"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/kamalyes/go-toolbox/convert"
 	"github.com/stretchr/testify/assert"
@@ -189,6 +191,81 @@ func TestS2B(t *testing.T) {
 
 	assert.Equal(t, true, convert.S2B("") == nil)
 	assert.Equal(t, testBytes, convert.S2B(testString))
+}
+
+func TestFRandomBytesJSON(t *testing.T) {
+	length := 16 // 测试生成的随机字节长度
+	// 调用 FRandomBytesJSON 函数
+	jsonStr, err := FRandomBytesJSON(length)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	// 检查 JSON 字符串是否有效
+	var result []byte
+	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
+		t.Fatalf("Expected valid JSON, got error: %v", err)
+	}
+
+	// 检查生成的随机字节长度
+	if len(result) != length {
+		t.Errorf("Expected length %d, got %d", length, len(result))
+	}
+}
+
+// 性能测试函数
+func BenchmarkFRandomBytesJSON(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_, err := FRandomBytesJSON(1024) // 测试生成1024字节的随机字节字符串
+		if err != nil {
+			b.Error(err) // 如果有错误，记录
+		}
+	}
+}
+
+// 定义测试模型
+type TestModel struct {
+	Name      string         `json:"name"`
+	Age       int            `json:"age"`
+	Salary    float64        `json:"salary"`
+	IsActive  bool           `json:"is_active"`
+	CreatedAt time.Time      `json:"created_at"`
+	Tags      []string       `json:"tags"`
+	Settings  map[string]int `json:"settings"`
+}
+
+// TestGenerateRandomModel 测试 GenerateRandomModel 函数
+func TestGenerateRandomModel(t *testing.T) {
+	// 创建一个 TestModel 的实例
+	model := &TestModel{}
+
+	// 调用 GenerateRandomModel
+	jsonResult, err := GenerateRandomModel(model)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+	t.Log("jsonResult", jsonResult)
+	// 验证返回的 JSON 字符串是否有效
+	var resultMap map[string]interface{}
+	if err := json.Unmarshal([]byte(jsonResult), &resultMap); err != nil {
+		t.Fatalf("Expected valid JSON, got error: %v", err)
+	}
+
+	// 验证字段是否被填充
+	if resultMap["name"] == "" || resultMap["age"] == nil || resultMap["salary"] == nil || resultMap["is_active"] == nil {
+		t.Error("Expected fields to be populated, but they are not")
+	}
+}
+
+// BenchmarkGenerateRandomModel 性能测试 GenerateRandomModel 函数
+func BenchmarkGenerateRandomModel(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		model := &TestModel{}
+		_, err := GenerateRandomModel(model)
+		if err != nil {
+			b.Fatalf("Expected no error, got %v", err)
+		}
+	}
 }
 
 func BenchmarkRandBytesParallel(b *testing.B) {
