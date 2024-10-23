@@ -11,6 +11,7 @@
 package sign
 
 import (
+	"crypto/rand"
 	"encoding/base64"
 	"testing"
 )
@@ -81,4 +82,42 @@ func TestAesEncryptDecrypt(t *testing.T) {
 			base64.StdEncoding.EncodeToString(tc.key),
 			decryptedText)
 	}
+}
+
+func generateRandomString(length int) (string, error) {
+	bytes := make([]byte, length)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(bytes), nil
+}
+
+func BenchmarkAesEncryptDecrypt(b *testing.B) {
+	var password = "example1235678"
+	var byteKey = GenerateByteKey(password, 32)
+
+	// 生成随机字符串作为测试输入
+	plainText, err := generateRandomString(4096) // 4 KB 的随机字符串
+	if err != nil {
+		b.Fatalf("Failed to generate random string: %v", err)
+	}
+
+	b.Run("EncryptDecrypt", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			encryptedText, err := AesEncrypt(plainText, byteKey)
+			if err != nil {
+				b.Fatalf("Encryption failed: %v", err)
+			}
+
+			decryptedText, err := AesDecrypt(encryptedText, byteKey)
+			if err != nil {
+				b.Fatalf("Decryption failed: %v", err)
+			}
+
+			if decryptedText != plainText {
+				b.Errorf("Decrypted text does not match original. Got: %s, Want: %s", decryptedText, plainText)
+			}
+		}
+	})
 }
