@@ -256,3 +256,16 @@ func BytesToBinStrWithSplit(bs []byte, split string) string {
 	}
 	return buf.String()
 }
+
+// Base64ToByte 将 Base64 字符串解码为字节切片
+// 参数：imageBase64 - 要解码的 Base64 字符串
+// 返回：解码后的字节切片和可能的错误
+func Base64ToByte(imageBase64 string) ([]byte, error) {
+	// 解码 Base64 字符串
+	image, err := base64.StdEncoding.DecodeString(imageBase64)
+	if err != nil {
+		return nil, err // 返回错误
+	}
+
+	return image, nil // 返回解码后的字节
+}

@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-08-06 15:57:30
+ * @LastEditTime: 2024-10-28 10:00:22
  * @FilePath: \go-toolbox\system\base_test.go
  * @Description:
  *
@@ -11,6 +11,8 @@
 package system
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -44,5 +46,28 @@ func TestHashUnixMicroCipherText(t *testing.T) {
 	// 由于时间戳和随机字符串的原因，连续两次调用的结果应该不同
 	if hash1 == hash2 {
 		t.Error("连续两次调用 HashUnixMicroCipherText 生成的哈希值相同，期望不同")
+	}
+}
+
+// TestGetCurrentPath 测试 GetCurrentPath 函数
+func TestGetCurrentPath(t *testing.T) {
+	expectedDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get expected working directory: %v", err)
+	}
+
+	actualDir, err := GetCurrentPath()
+	if err != nil {
+		t.Fatalf("GetCurrentPath() returned an error: %v", err)
+	}
+
+	// 比较实际路径和预期路径
+	if actualDir != expectedDir {
+		t.Errorf("Expected %s, but got %s", expectedDir, actualDir)
+	}
+
+	// 额外检查路径是否是绝对路径
+	if !filepath.IsAbs(actualDir) {
+		t.Errorf("Expected an absolute path, but got a relative path: %s", actualDir)
 	}
 }

@@ -75,3 +75,13 @@ func ServerIP() (string, string) {
 
 	return externalIP, internalIP
 }
+
+// GetCurrentPath 获取当前工作目录的路径
+func GetCurrentPath() (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		// 返回一个格式化的错误，而不是忽略它
+		return "", fmt.Errorf("failed to get current working directory: %w", err)
+	}
+	return dir, nil
+}

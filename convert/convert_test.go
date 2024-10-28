@@ -11,6 +11,12 @@
 package convert
 
 import (
+	"bytes"
+	"encoding/base64"
+	"image"
+	"image/color"
+	"image/draw"
+	"image/png"
 	"testing"
 	"time"
 )
@@ -30,6 +36,7 @@ func TestAllConvertFunctions(t *testing.T) {
 	t.Run("TestByteToBinStr", TestByteToBinStr)
 	t.Run("TestBytesToBinStr", TestBytesToBinStr)
 	t.Run("TestBytesToBinStrWithSplit", TestBytesToBinStrWithSplit)
+	t.Run("TestBase64ToByte", TestBase64ToByte)
 }
 
 func TestMustString(t *testing.T) {
@@ -348,4 +355,46 @@ func equalBytes(a, b []byte) bool {
 		}
 	}
 	return true
+}
+
+// createImage 创建一张简单的图像并返回其 Base64 编码
+func createImage() (string, error) {
+	// 创建一个 100x100 像素的图像
+	img := image.NewRGBA(image.Rect(0, 0, 100, 100))
+
+	// 填充背景为白色
+	draw.Draw(img, img.Bounds(), &image.Uniform{color.White}, image.Point{}, draw.Src)
+
+	// 画一个红色的矩形
+	red := color.RGBA{255, 0, 0, 255}
+	draw.Draw(img, image.Rect(10, 10, 90, 90), &image.Uniform{red}, image.Point{}, draw.Over)
+
+	// 创建一个字节缓冲区
+	buf := new(bytes.Buffer)
+
+	// 将图像编码为 PNG 格式并写入缓冲区
+	err := png.Encode(buf, img)
+	if err != nil {
+		return "", err
+	}
+
+	// 将字节缓冲区转换为 Base64 字符串
+	return base64.StdEncoding.EncodeToString(buf.Bytes()), nil
+}
+
+// TestBase64ToByte 测试 Base64ToByte 函数
+func TestBase64ToByte(t *testing.T) {
+	validBase64, err := createImage()
+	if err != nil {
+		t.Fatalf("Error creating image: %v", err)
+	}
+
+	imageBytes, err := Base64ToByte(validBase64)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	if len(imageBytes) == 0 {
+		t.Fatal("Expected non-empty byte slice")
+	}
 }
