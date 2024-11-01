@@ -44,7 +44,7 @@
 
 - **stringx**: A library of tools used to handle strings, providing extended functions for strings, such as formatting, splitting, concatenation, etc. Implementations may vary by language or library.
 
-- **system**: A programming interface or library associated with the system for interacting with the operating system.
+- **osx**: A programming interface or library associated with the system for interacting with the operating system.
 
 - **uuid**: Universally Unique Identifier (UUID) is a standardized identifier used to uniquely identify information in a distributed system. Uuids are usually used in scenarios such as database primary key and session ID.
 
