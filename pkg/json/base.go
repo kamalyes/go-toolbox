@@ -2,13 +2,15 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-10-24 11:25:16
+ * @LastEditTime: 2024-11-03 22:55:31
  * @FilePath: \go-toolbox\pkg\json\base.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
 package json
+
+import "strings"
 
 // KeyValuePairs 是一个用于存储键值对的结构体
 type KeyValuePairs struct {
@@ -43,4 +45,33 @@ func AppendKeysToJSON(originalJSON string, pairs *KeyValuePairs) (string, error)
 	}
 
 	return string(updatedJSON), nil
+}
+
+// ReplaceKeys 替换 JSON 中的键（key）中的指定字符串为目标字符串
+func ReplaceKeys(data interface{}, oldStr, newStr string) (interface{}, error) {
+	switch v := data.(type) {
+	case map[string]interface{}:
+		replacedMap := make(map[string]interface{})
+		for k, value := range v {
+			// 替换键中的字符串
+			newKey := strings.ReplaceAll(k, oldStr, newStr)
+			replacedValue, err := ReplaceKeys(value, oldStr, newStr) // 递归处理值
+			if err != nil {
+				return nil, err
+			}
+			replacedMap[newKey] = replacedValue
+		}
+		return replacedMap, nil
+	case []interface{}:
+		for i, value := range v {
+			replacedValue, err := ReplaceKeys(value, oldStr, newStr) // 递归处理值
+			if err != nil {
+				return nil, err
+			}
+			v[i] = replacedValue
+		}
+		return v, nil
+	default:
+		return data, nil
+	}
 }
