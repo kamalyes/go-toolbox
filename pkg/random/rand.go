@@ -358,7 +358,7 @@ func GenerateRandomModel(model interface{}) (interface{}, string, error) {
 	}
 
 	// 将模型转换为 JSON 格式
-	jsonData, err := convert.MustJSON(model)
+	jsonData, err := convert.MustJSONIndent(model)
 	if err != nil {
 		return nil, "", err
 	}
@@ -393,6 +393,11 @@ func setRandomValue(field reflect.Value, fieldType reflect.StructField) error {
 	case reflect.Struct:
 		if fieldType.Type == reflect.TypeOf(time.Time{}) {
 			field.Set(reflect.ValueOf(FRandTime())) // 随机生成时间
+		} else {
+			// 递归填充嵌套结构体字段
+			if err := populateFields(field); err != nil {
+				return err
+			}
 		}
 	case reflect.Slice:
 		return setRandomSlice(field, fieldType) // 处理切片类型
@@ -411,6 +416,16 @@ func setRandomSlice(field reflect.Value, fieldType reflect.StructField) error {
 		slice := reflect.MakeSlice(fieldType.Type, length, length)
 		for j := 0; j < length; j++ {
 			slice.Index(j).SetString(FRandString(5)) // 随机生成5个字符的字符串
+		}
+		field.Set(slice) // 设置生成的切片
+	} else if fieldType.Type.Elem().Kind() == reflect.Struct {
+		length := FRandInt(1, 5) // 随机长度
+		slice := reflect.MakeSlice(fieldType.Type, length, length)
+		for j := 0; j < length; j++ {
+			// 递归填充每个嵌套结构体
+			if err := populateFields(slice.Index(j)); err != nil {
+				return err
+			}
 		}
 		field.Set(slice) // 设置生成的切片
 	}

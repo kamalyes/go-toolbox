@@ -24,14 +24,8 @@ import (
 )
 
 // MustJSONIndent 转 json 返回 []byte
-func MustJSONIndent(v interface{}) []byte {
-	js, _ := json.MarshalIndent(v, "", "  ")
-	return js
-}
-
-// MustJSONIndentString 转 json Indent 返回 string
-func MustJSONIndentString(v interface{}) string {
-	return string(MustJSONIndent(v))
+func MustJSONIndent(v interface{}) ([]byte, error) {
+	return json.MarshalIndent(v, "", "  ")
 }
 
 // MustJSON 转 json 返回 []byte
