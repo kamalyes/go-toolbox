@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-08-03 21:32:26
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-08-03 23:19:16
+ * @LastEditTime: 2024-11-03 13:57:05
  * @FilePath: \go-toolbox\pkg\convert\convert.go
  * @Description:
  *
@@ -35,14 +35,8 @@ func MustJSONIndentString(v interface{}) string {
 }
 
 // MustJSON 转 json 返回 []byte
-func MustJSON(v interface{}) []byte {
-	js, _ := json.Marshal(v)
-	return js
-}
-
-// MustJSONString 转 json 返回 string
-func MustJSONString(v interface{}) string {
-	return string(MustJSON(v))
+func MustJSON(v interface{}) ([]byte, error) {
+	return json.Marshal(v)
 }
 
 // MustString 强制转为字符串

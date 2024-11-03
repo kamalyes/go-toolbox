@@ -2,8 +2,8 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-10-24 11:25:16
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-10-24 11:25:16
- * @FilePath: \go-toolbox\tests\gzip_test.go
+ * @LastEditTime: 2024-11-03 13:52:20
+ * @FilePath: \go-toolbox\tests\zipx_gzip_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
@@ -47,13 +47,13 @@ func decompressModel(compressedData []byte) (TestModel, error) {
 
 // TestGzipCompressJSON 测试 GzipCompressJSON 函数
 func TestGzipCompressJSON(t *testing.T) {
-	modelJSON, err := random.GenerateRandomModel(&TestModel{})
+	_, jsonData, err := random.GenerateRandomModel(&TestModel{})
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
 	var model TestModel
-	err = json.Unmarshal([]byte(modelJSON), &model)
+	err = json.Unmarshal([]byte(jsonData), &model)
 	if err != nil {
 		t.Fatalf("Failed to unmarshal model JSON: %v", err)
 	}
@@ -110,13 +110,13 @@ func TestCompressDecompress(t *testing.T) {
 // BenchmarkGzipCompressJSON 性能测试 GzipCompressJSON 函数
 func BenchmarkGzipCompressJSON(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		modelJSON, err := random.GenerateRandomModel(&TestModel{})
+		_, jsonData, err := random.GenerateRandomModel(&TestModel{})
 		if err != nil {
 			b.Fatalf("Expected no error, got %v", err)
 		}
 
 		var model TestModel
-		err = json.Unmarshal([]byte(modelJSON), &model)
+		err = json.Unmarshal([]byte(jsonData), &model)
 		if err != nil {
 			b.Fatalf("Failed to unmarshal model JSON: %v", err)
 		}
@@ -130,13 +130,13 @@ func BenchmarkGzipCompressJSON(b *testing.B) {
 
 // BenchmarkGzipDecompressJSON 性能测试 GzipDecompressJSON 函数
 func BenchmarkGzipDecompressJSON(b *testing.B) {
-	modelJSON, err := random.GenerateRandomModel(&TestModel{})
+	_, jsonData, err := random.GenerateRandomModel(&TestModel{})
 	if err != nil {
 		b.Fatalf("Expected no error, got %v", err)
 	}
 
 	var model TestModel
-	err = json.Unmarshal([]byte(modelJSON), &model)
+	err = json.Unmarshal([]byte(jsonData), &model)
 	if err != nil {
 		b.Fatalf("Failed to unmarshal model JSON: %v", err)
 	}

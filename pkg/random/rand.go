@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-10-23 18:37:22
+ * @LastEditTime: 2024-11-03 13:50:35
  * @FilePath: \go-toolbox\pkg\random\rand.go
  * @Description:
  *
@@ -11,7 +11,6 @@
 package random
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"math/rand"
@@ -21,6 +20,7 @@ import (
 	"time"
 
 	"github.com/kamalyes/go-toolbox/pkg/convert"
+	"github.com/kamalyes/go-toolbox/pkg/json"
 )
 
 // Implement Source and Source64 interfaces
@@ -334,23 +334,27 @@ func FRandTime() time.Time {
 }
 
 // GenerateRandomModel 生成随机模型的 JSON 格式
-func GenerateRandomModel(model interface{}) (string, error) {
+func GenerateRandomModel(model interface{}) (interface{}, string, error) {
 	v := reflect.ValueOf(model)
 
 	// 确保传入的是指针类型且非空
 	if v.Kind() != reflect.Ptr || v.IsNil() {
-		return "", nil
+		return nil, "", nil
 	}
 
 	v = v.Elem() // 获取指针指向的值
 
 	// 填充模型字段的随机值
 	if err := populateFields(v); err != nil {
-		return "", err
+		return nil, "", err
 	}
 
 	// 将模型转换为 JSON 格式
-	return convertToJSON(model)
+	jsonData, err := convert.MustJSON(model)
+	if err != nil {
+		return nil, "", err
+	}
+	return model, string(jsonData), nil
 }
 
 // populateFields 填充结构体字段的随机值
@@ -418,13 +422,4 @@ func setRandomMap(field reflect.Value, fieldType reflect.StructField) error {
 		field.Set(m) // 设置生成的映射
 	}
 	return nil
-}
-
-// convertToJSON 将模型转换为 JSON 格式
-func convertToJSON(model interface{}) (string, error) {
-	jsonData, err := json.Marshal(model) // 将模型序列化为 JSON
-	if err != nil {
-		return "", err
-	}
-	return string(jsonData), nil
 }

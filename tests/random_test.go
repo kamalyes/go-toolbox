@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-01 02:16:16
+ * @LastEditTime: 2024-11-03 13:51:48
  * @FilePath: \go-toolbox\tests\random_test.go
  * @Description:
  *
@@ -241,8 +241,8 @@ func TestGenerateRandomModel(t *testing.T) {
 	model := &TestModel{}
 
 	// 调用 GenerateRandomModel
-	jsonResult, err := random.GenerateRandomModel(model)
-	if err != nil {
+	modelResult, jsonResult, err := random.GenerateRandomModel(model)
+	if err != nil || modelResult == nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 	t.Log("jsonResult", jsonResult)
@@ -262,7 +262,7 @@ func TestGenerateRandomModel(t *testing.T) {
 func BenchmarkGenerateRandomModel(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		model := &TestModel{}
-		_, err := random.GenerateRandomModel(model)
+		_, _, err := random.GenerateRandomModel(model)
 		if err != nil {
 			b.Fatalf("Expected no error, got %v", err)
 		}
