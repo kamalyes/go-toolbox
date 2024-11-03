@@ -170,6 +170,14 @@ func RandString(n int, mode RandType) (str string) {
 	return
 }
 
+// RandStringSlice 指定长度的随机字符串
+func RandStringSlice(count, len int, mode RandType) (result []string) {
+	for i := 0; i < count; i++ {
+		result = append(result, RandString(len, mode))
+	}
+	return result
+}
+
 // RandomStr 随机一个字符串
 func RandomStr(length int, customBytes ...string) string {
 	var sb strings.Builder

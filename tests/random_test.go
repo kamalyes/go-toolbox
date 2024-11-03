@@ -235,6 +235,16 @@ type TestModel struct {
 	Settings  map[string]int `json:"settings"`
 }
 
+func TestRandStringSlice(t *testing.T) {
+	count := 5
+	length := 10
+	mode := random.CAPITAL
+	result := random.RandStringSlice(count, length, mode)
+
+	// 验证生成的切片长度
+	assert.Equal(t, count, len(result), "生成的切片长度应与请求的 count 相等")
+}
+
 // TestGenerateRandomModel 测试 GenerateRandomModel 函数
 func TestGenerateRandomModel(t *testing.T) {
 	// 创建一个 TestModel 的实例
