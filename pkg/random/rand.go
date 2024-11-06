@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-03 13:50:35
+ * @LastEditTime: 2024-11-06 13:05:55
  * @FilePath: \go-toolbox\pkg\random\rand.go
  * @Description:
  *
@@ -370,10 +370,12 @@ func populateFields(v reflect.Value) error {
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i)
 		fieldType := v.Type().Field(i)
-
-		// 根据字段类型设置随机值
-		if err := setRandomValue(field, fieldType); err != nil {
-			return err
+		// 仅处理导出字段
+		if field.CanSet() {
+			// 根据字段类型设置随机值
+			if err := setRandomValue(field, fieldType); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -403,6 +405,14 @@ func setRandomValue(field reflect.Value, fieldType reflect.StructField) error {
 		return setRandomSlice(field, fieldType) // 处理切片类型
 	case reflect.Map:
 		return setRandomMap(field, fieldType) // 处理映射类型
+	case reflect.Ptr: // 处理指针类型
+		if field.IsNil() {
+			field.Set(reflect.New(fieldType.Type.Elem())) // 确保指针被分配
+		}
+		// 仅当指针指向结构体时才递归填充
+		if fieldType.Type.Elem().Kind() == reflect.Struct {
+			return populateFields(field.Elem())
+		}
 	default:
 		// 你可以添加更多类型的处理逻辑
 	}

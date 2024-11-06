@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-03 13:51:48
+ * @LastEditTime: 2024-11-06 13:09:15
  * @FilePath: \go-toolbox\tests\random_test.go
  * @Description:
  *
@@ -266,6 +266,75 @@ func TestGenerateRandomModel(t *testing.T) {
 	if resultMap["name"] == "" || resultMap["age"] == nil || resultMap["salary"] == nil || resultMap["is_active"] == nil {
 		t.Error("Expected fields to be populated, but they are not")
 	}
+}
+
+// Address 示例嵌套结构体
+type Address struct {
+	Street  string `json:"street"`
+	City    string `json:"city"`
+	ZipCode string `json:"zip_code"`
+}
+
+// User 示例结构体
+type User struct {
+	Name       string         `json:"name"`
+	Age        *int           `json:"age"` // 指针类型
+	Height     float64        `json:"height"`
+	IsActive   bool           `json:"is_active"`
+	CreatedAt  time.Time      `json:"created_at"`
+	Hobbies    []string       `json:"hobbies"`
+	Attributes map[string]int `json:"attributes"`
+	Address    *Address       `json:"address"` // 指针类型
+}
+
+func TestGenerateRandomModelComplex(t *testing.T) {
+	// 创建一个 User 结构体的指针
+	user := &User{}
+
+	// 生成随机模型
+	model, jsonOutput, err := random.GenerateRandomModel(user)
+	if err != nil {
+		t.Fatalf("Error generating random model: %v", err)
+	}
+
+	// 验证生成的模型不为 nil
+	if model == nil {
+		t.Fatal("Generated model is nil")
+	}
+
+	// 验证 JSON 输出不为空
+	if jsonOutput == "" {
+		t.Fatal("JSON output is empty")
+	}
+
+	// 验证 JSON 格式有效
+	var js json.RawMessage
+	if err := json.Unmarshal([]byte(jsonOutput), &js); err != nil {
+		t.Fatalf("Invalid JSON output: %v", err)
+	}
+
+	// 验证指针字段是否被正确填充
+	userPtr := model.(*User)
+	if userPtr.Age == nil {
+		t.Fatal("Age pointer is nil, expected a value")
+	}
+
+	// 验证嵌套结构体是否被正确填充
+	if userPtr.Address == nil {
+		t.Fatal("Address pointer is nil, expected a value")
+	}
+
+	// 验证切片和映射是否被正确填充
+	if len(userPtr.Hobbies) == 0 {
+		t.Fatal("Hobbies slice is empty, expected at least one value")
+	}
+
+	if len(userPtr.Attributes) == 0 {
+		t.Fatal("Attributes map is empty, expected at least one key-value pair")
+	}
+
+	// 可选：打印输出以便调试
+	t.Logf("Generated JSON: %s", jsonOutput)
 }
 
 // BenchmarkGenerateRandomModel 性能测试 GenerateRandomModel 函数
