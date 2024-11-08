@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-08-02 09:52:50
+ * @LastEditTime: 2024-11-08 16:53:49
  * @FilePath: \go-toolbox\pkg\array\array.go
  * @Description:
  *
@@ -125,7 +125,8 @@ func IsExistRepeatInInterfaceArray(array []interface{}) (exist bool) {
 func RemoveEmptyInterfaceInArray(array []interface{}) []interface{} {
 	var result []interface{}
 	for _, v := range array {
-		if !validator.IsEmptyValue(reflect.ValueOf(v)) {
+		// 只移除空字符串和零值，但保留 nil
+		if !validator.IsEmptyValue(reflect.ValueOf(v)) || v == nil {
 			result = append(result, v)
 		}
 	}

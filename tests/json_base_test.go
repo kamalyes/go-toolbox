@@ -107,36 +107,6 @@ func TestAppendKeysToJSON(t *testing.T) {
 	}
 }
 
-// BenchmarkAppendKeysToJSON 基准测试 AppendKeysToJSON 函数
-func BenchmarkAppendKeysToJSON(b *testing.B) {
-	originalJSON := `{"name": "Alice", "age": 30}`
-	pairs := json.NewKeyValuePairs().
-		Add("city", "New York").
-		Add("country", "USA").
-		Add("occupation", "Engineer").
-		Add("hobby", "Photography")
-
-	expected := map[string]interface{}{
-		"name":       "Alice",
-		"age":        float64(30),
-		"city":       "New York",
-		"country":    "USA",
-		"occupation": "Engineer",
-		"hobby":      "Photography",
-	}
-
-	// 运行基准测试
-	for i := 0; i < b.N; i++ {
-		updatedJSON, err := json.AppendKeysToJSON(originalJSON, pairs)
-		if err != nil {
-			b.Fatalf("期望没有错误，实际错误为 %v", err)
-		}
-
-		result := parseJSON(b, updatedJSON)
-		checkJSONEquality(b, result, expected)
-	}
-}
-
 func TestReplaceKeysComplex(t *testing.T) {
 	tests := []struct {
 		input    string

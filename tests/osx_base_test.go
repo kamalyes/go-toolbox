@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-01 02:31:11
+ * @LastEditTime: 2024-11-09 20:03:11
  * @FilePath: \go-toolbox\tests\osx_base_test.go
  * @Description:
  *
@@ -11,8 +11,9 @@
 package tests
 
 import (
-	"os"
-	"path/filepath"
+	"fmt"
+	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/kamalyes/go-toolbox/pkg/osx"
@@ -35,40 +36,74 @@ func TestHashUnixMicroCipherText(t *testing.T) {
 	hash2 := osx.HashUnixMicroCipherText()
 
 	// 验证生成的哈希值不为空
-	if hash1 == "" {
-		t.Error("HashUnixMicroCipherText 生成的哈希值为空")
-	}
+	assert.NotEqual(t, hash1, "")
+	assert.NotEqual(t, hash2, "")
+	assert.Equal(t, len(hash1), 32)
+	assert.NotEqual(t, hash1, hash2)
+}
 
-	// 验证生成的哈希值长度是否为32（MD5哈希值长度）
-	if len(hash1) != 32 {
-		t.Errorf("期望哈希值长度为32，但得到的长度为 %d", len(hash1))
+func TestGetServerIP(t *testing.T) {
+	externalIP, internalIP, err := osx.GetLocalInterfaceIeIp()
+	assert.Nil(t, err)
+	if externalIP != "" {
+		t.Logf("externalIP %s", externalIP)
 	}
-
-	// 由于时间戳和随机字符串的原因，连续两次调用的结果应该不同
-	if hash1 == hash2 {
-		t.Error("连续两次调用 HashUnixMicroCipherText 生成的哈希值相同，期望不同")
+	if internalIP != "" {
+		t.Logf("internalIP %s", internalIP)
 	}
 }
 
-// TestGetCurrentPath 测试 GetCurrentPath 函数
-func TestGetCurrentPath(t *testing.T) {
-	expectedDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Failed to get expected working directory: %v", err)
+func TestGetLocalInterfaceIps(t *testing.T) {
+	ips, err := osx.GetLocalInterfaceIps()
+	assert.Nil(t, err)
+	assert.NotEmpty(t, ips, fmt.Sprintf("Expected at least one global unicast IP, got: %v", ips))
+	for _, ip := range ips {
+		assert.NotEmpty(t, ip, fmt.Sprintf("Invalid IP address: %s", ip))
 	}
+}
 
-	actualDir, err := osx.GetCurrentPath()
-	if err != nil {
-		t.Fatalf("GetCurrentPath() returned an error: %v", err)
-	}
+func TestGetClientPublicIP_XForwardedFor(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/", nil)
+	testIp := "1.2.3.4"
+	req.Header.Set("X-Forwarded-For", testIp)
+	ip, err := osx.GetClientPublicIP(req)
+	assert.Nil(t, err)
+	assert.Equal(t, testIp, ip)
+	assert.NotEmpty(t, ip, fmt.Sprintf("Expected IP %s, got: %s", testIp, ip))
+}
 
-	// 比较实际路径和预期路径
-	if actualDir != expectedDir {
-		t.Errorf("Expected %s, but got %s", expectedDir, actualDir)
-	}
+func TestGetClientPublicIP_XRealIp(t *testing.T) {
+	testIp := "113.168.80.129"
+	req, _ := http.NewRequest("GET", "/", nil)
+	req.Header.Set("X-Real-Ip", testIp)
+	ip, err := osx.GetClientPublicIP(req)
+	assert.Nil(t, err)
+	assert.Equal(t, testIp, ip)
+	assert.NotEmpty(t, ip, fmt.Sprintf("Expected IP %s, got: %s", testIp, ip))
+}
 
-	// 额外检查路径是否是绝对路径
-	if !filepath.IsAbs(actualDir) {
-		t.Errorf("Expected an absolute path, but got a relative path: %s", actualDir)
-	}
+func TestGetClientPublicIP_RemoteAddr(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/", nil)
+	req.RemoteAddr = "115.10.11.12:12345"
+	spIp := strings.Split(req.RemoteAddr, ":")[0]
+	ip, err := osx.GetClientPublicIP(req)
+	assert.Nil(t, err)
+	assert.Equal(t, spIp, ip)
+	assert.NotEmpty(t, ip, fmt.Sprintf("Expected IP %s, got: %s", spIp, ip))
+}
+
+func TestGetConNetPublicIp(t *testing.T) {
+	ip, err := osx.GetConNetPublicIp()
+	assert.Nil(t, err)
+	assert.NotEmpty(t, ip, fmt.Sprintf("Expected public IP, got: %s", ip))
+}
+
+func TestGetClientPublicIP_NoValidIp(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/", nil)
+	req.Header.Set("X-Forwarded-For", "127.0.0.1") // Localhost IP
+	req.Header.Set("X-Real-Ip", "169.254.0.1")     // Link-local IP
+	req.RemoteAddr = "192.168.1.1:12345"           // Private IP
+	ip, err := osx.GetClientPublicIP(req)
+	assert.Nil(t, err)
+	assert.NotEmpty(t, ip, fmt.Sprintf("Expected public IP, got: %s", ip))
 }

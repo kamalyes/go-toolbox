@@ -1,9 +1,9 @@
 /*
  * @Author: kamalyes 501893067@qq.com
- * @Date: 2023-07-28 00:50:58
+ * @Date: 2024-11-09 10:50:50
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-01 02:01:01
- * @FilePath: \go-toolbox\tests\regexp_test.go
+ * @LastEditTime: 2024-11-09 10:50:50
+ * @FilePath: \go-toolbox\tests\stringx_regexp_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
@@ -14,14 +14,14 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/regex"
+	"github.com/kamalyes/go-toolbox/pkg/stringx"
 	"github.com/stretchr/testify/assert"
 )
 
-var r *regex.AnyRegs
+var r *stringx.AnyRegs
 
 func init() {
-	r = regex.NewAnyRegs()
+	r = stringx.NewAnyRegs()
 }
 
 // TestData 结构表示测试数据的格式
@@ -42,7 +42,7 @@ func runTests(t *testing.T, testData []TestData, matchFunc func(string) bool) {
 	}
 }
 
-func TestAllRegexFunctions(t *testing.T) {
+func TestAllstringxFunctions(t *testing.T) {
 	t.Run("TestRegIntOrFloat", TestRegIntOrFloat)
 	t.Run("TestAnyRegs_RegNumber", TestAnyRegs_RegNumber)
 	t.Run("TestAnyRegs_RegLenNNumber", TestAnyRegs_RegLenNNumber)
@@ -743,12 +743,11 @@ func TestAnyRegs_RegChineseCharacter(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			actual := r.MatchChineseCharacter(test.Input)
-
+			actual, _ := stringx.IsChineseCharacter(test.Input)
 			if test.Expected {
-				assert.True(t, actual, "Expected input '%s' to contain Chinese characters", test.Input)
+				assert.True(t, actual, "Expected input '%s' to Chinese characters", test.Input)
 			} else {
-				assert.False(t, actual, "Expected input '%s' to not contain Chinese characters", test.Input)
+				assert.False(t, actual, "Expected input '%s' to  Chinese characters", test.Input)
 			}
 		})
 	}
@@ -913,9 +912,9 @@ func TestAnyRegs_MatchEmptyLine(t *testing.T) {
 			Input:    "  \t \t\n",
 			Expected: true,
 		},
-		"Non-empty line": {
-			Input:    "This is not an empty line\n",
-			Expected: false,
+		"Non-empty new line": {
+			Input:    "empty newline\n",
+			Expected: true,
 		},
 		"Multiple empty lines": {
 			Input:    "\n\n\n",

@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-10-24 11:25:16
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-03 13:52:20
+ * @LastEditTime: 2024-11-08 11:55:55
  * @FilePath: \go-toolbox\tests\zipx_gzip_test.go
  * @Description:
  *
@@ -11,145 +11,95 @@
 package tests
 
 import (
-	"reflect"
+	"bytes"
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/json"
-	"github.com/kamalyes/go-toolbox/pkg/random"
 	"github.com/kamalyes/go-toolbox/pkg/zipx"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestAllGzipFunctions(t *testing.T) {
-	t.Run("TestGzipCompressJSON", TestGzipCompressJSON)
-	t.Run("TestGzipDecompressJSON", TestGzipDecompressJSON)
-	t.Run("TestCompressDecompress", TestCompressDecompress)
+	t.Run("TestGzipCompressDecompress", TestGzipCompressDecompress)
+	t.Run("TestGzipDecompressEmpty", TestGzipDecompressEmpty)
+	t.Run("TestGzipDecompressInvalidData", TestGzipDecompressInvalidData)
+	t.Run("TestMultiGzipCompressDecompress", TestMultiGzipCompressDecompress)
+	t.Run("TestGzipCompressLargeData", TestGzipCompressLargeData)
+	t.Run("TestGzipCompressEmpty", TestGzipCompressEmpty)
 }
 
-// helper function to compress a TestModel instance
-func compressModel(model TestModel) ([]byte, error) {
-	modelJSON, err := json.Marshal(model)
-	if err != nil {
-		return nil, err
-	}
-	return zipx.GzipCompress(modelJSON)
+// TestGzipCompressDecompress 测试压缩和解压缩的功能
+func TestGzipCompressDecompress(t *testing.T) {
+	// 测试数据
+	originalData := []byte("Hello, World! This is a test for gzip compression.")
+
+	// 压缩数据
+	compressedData, err := zipx.GzipCompress(originalData)
+	assert.NoError(t, err, "Compression error")
+	assert.NotZero(t, len(compressedData), "Compressed data is empty")
+
+	// 解压缩数据
+	decompressedData, err := zipx.GzipDecompress(compressedData)
+	assert.NoError(t, err, "Decompression error")
+	assert.True(t, bytes.Equal(originalData, decompressedData), "Decompressed data does not match original data")
 }
 
-// helper function to decompress data into a TestModel instance
-func decompressModel(compressedData []byte) (TestModel, error) {
-	var decompressedModel TestModel
-	decompressedJSON, _, err := zipx.GzipDecompress(compressedData)
-	if err != nil {
-		return decompressedModel, err
-	}
-	err = json.Unmarshal(decompressedJSON, &decompressedModel)
-	return decompressedModel, err
+// TestGzipDecompressEmpty 测试解压缩空数据的情况
+func TestGzipDecompressEmpty(t *testing.T) {
+	// 测试解压缩空数据
+	_, err := zipx.GzipDecompress([]byte{})
+	assert.Error(t, err, "Expected error for empty compressed data")
 }
 
-// TestGzipCompressJSON 测试 GzipCompressJSON 函数
-func TestGzipCompressJSON(t *testing.T) {
-	_, jsonData, err := random.GenerateRandomModel(&TestModel{})
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
-
-	var model TestModel
-	err = json.Unmarshal([]byte(jsonData), &model)
-	if err != nil {
-		t.Fatalf("Failed to unmarshal model JSON: %v", err)
-	}
-
-	compressedData, err := compressModel(model)
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
-	t.Logf("Compressed size: %d bytes", len(compressedData))
-
-	if len(compressedData) == 0 {
-		t.Error("Expected compressed data to be non-empty")
-	}
+// TestGzipDecompressInvalidData 测试解压缩无效数据的情况
+func TestGzipDecompressInvalidData(t *testing.T) {
+	// 测试解压缩无效数据
+	_, err := zipx.GzipDecompress([]byte{0x00, 0x01, 0x02})
+	assert.Error(t, err, "Expected error for invalid compressed data")
 }
 
-// TestGzipDecompressJSON 测试 GzipDecompressJSON 函数
-func TestGzipDecompressJSON(t *testing.T) {
-	model := TestModel{Name: "Alice", Age: 30}
+// TestMultiGzipCompressDecompress 测试多次压缩和解压缩
+func TestMultiGzipCompressDecompress(t *testing.T) {
+	originalData := []byte("This is a test for multiple compressions.")
 
-	compressedData, err := compressModel(model)
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
+	// 多次压缩
+	compressedData, err := zipx.MultiGZipCompress(originalData, 2)
+	assert.NoError(t, err, "Compression error")
 
-	decompressedModel, err := decompressModel(compressedData)
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
+	// 多次解压缩
+	decompressedData, err := zipx.MultiGZipDecompress(compressedData, 2)
+	assert.NoError(t, err, "Decompression error")
+	assert.True(t, bytes.Equal(originalData, decompressedData), "Decompressed data does not match original data")
 
-	if !reflect.DeepEqual(decompressedModel, model) {
-		t.Errorf("Expected decompressed model to be %+v, got %+v", model, decompressedModel)
-	}
+	t.Log("Compression and decompression successful!")
 }
 
-// TestCompressDecompress 测试压缩和解压缩的完整流程
-func TestCompressDecompress(t *testing.T) {
-	model := TestModel{Name: "Alice", Age: 30}
+// TestGzipCompressLargeData 测试大数据的压缩和解压缩
+func TestGzipCompressLargeData(t *testing.T) {
+	// 创建一个大数据
+	originalData := bytes.Repeat([]byte("A"), 1<<20) // 1 MB of 'A'
 
-	compressedData, err := compressModel(model)
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
+	// 压缩数据
+	compressedData, err := zipx.GzipCompress(originalData)
+	assert.NoError(t, err, "Compression error")
+	assert.NotZero(t, len(compressedData), "Compressed data is empty")
 
-	decompressedModel, err := decompressModel(compressedData)
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
+	t.Logf("Compressed data length: %d", len(compressedData))
 
-	if !reflect.DeepEqual(decompressedModel, model) {
-		t.Errorf("Expected decompressed model to be %+v, got %+v", model, decompressedModel)
-	}
+	// 解压缩数据
+	decompressedData, err := zipx.GzipDecompress(compressedData)
+	assert.NoError(t, err, "Decompression error")
+	assert.True(t, bytes.Equal(originalData, decompressedData), "Decompressed data does not match original data")
 }
 
-// BenchmarkGzipCompressJSON 性能测试 GzipCompressJSON 函数
-func BenchmarkGzipCompressJSON(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		_, jsonData, err := random.GenerateRandomModel(&TestModel{})
-		if err != nil {
-			b.Fatalf("Expected no error, got %v", err)
-		}
+// TestGzipCompressEmpty 测试压缩空数据的情况
+func TestGzipCompressEmpty(t *testing.T) {
+	// 压缩空数据
+	compressedData, err := zipx.GzipCompress([]byte{})
+	assert.NoError(t, err, "Compression error for empty data")
+	assert.NotZero(t, len(compressedData), "Compressed data for empty input is empty")
 
-		var model TestModel
-		err = json.Unmarshal([]byte(jsonData), &model)
-		if err != nil {
-			b.Fatalf("Failed to unmarshal model JSON: %v", err)
-		}
-
-		_, err = compressModel(model)
-		if err != nil {
-			b.Fatalf("Expected no error, got %v", err)
-		}
-	}
-}
-
-// BenchmarkGzipDecompressJSON 性能测试 GzipDecompressJSON 函数
-func BenchmarkGzipDecompressJSON(b *testing.B) {
-	_, jsonData, err := random.GenerateRandomModel(&TestModel{})
-	if err != nil {
-		b.Fatalf("Expected no error, got %v", err)
-	}
-
-	var model TestModel
-	err = json.Unmarshal([]byte(jsonData), &model)
-	if err != nil {
-		b.Fatalf("Failed to unmarshal model JSON: %v", err)
-	}
-
-	compressedData, err := compressModel(model)
-	if err != nil {
-		b.Fatalf("Expected no error, got %v", err)
-	}
-
-	for i := 0; i < b.N; i++ {
-		_, err := decompressModel(compressedData)
-		if err != nil {
-			b.Fatalf("Expected no error, got %v", err)
-		}
-	}
+	// 解压缩压缩后的空数据
+	decompressedData, err := zipx.GzipDecompress(compressedData)
+	assert.NoError(t, err, "Decompression error for empty compressed data")
+	assert.Empty(t, decompressedData, "Decompressed data for empty input should be empty")
 }

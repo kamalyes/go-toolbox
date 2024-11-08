@@ -2,14 +2,14 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-07-28 12:55:08
- * @FilePath: \go-toolbox\pkg\next\location.go
+ * @LastEditTime: 2024-11-09 00:19:28
+ * @FilePath: \go-toolbox\pkg\location\amap.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
 
-package next
+package location
 
 import (
 	"crypto/md5"
