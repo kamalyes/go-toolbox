@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-08-03 21:32:26
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-09 01:15:15
+ * @LastEditTime: 2024-11-10 16:11:02
  * @FilePath: \go-toolbox\pkg\convert\must.go
  * @Description:
  *
@@ -13,6 +13,7 @@ package convert
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -57,6 +58,9 @@ func convertToString[T any](v T, timeLayout ...string) string {
 			}
 			return t.Format(time.RFC3339)
 		}
+	default:
+		// 对于未知类型，使用 %v 格式化为默认字符串表示
+		return fmt.Sprintf("%v", val)
 	}
 	b, err := json.Marshal(v)
 	if err != nil {

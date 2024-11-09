@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-09 20:03:11
+ * @LastEditTime: 2024-11-10 17:21:35
  * @FilePath: \go-toolbox\tests\osx_base_test.go
  * @Description:
  *
@@ -106,4 +106,17 @@ func TestGetClientPublicIP_NoValidIp(t *testing.T) {
 	ip, err := osx.GetClientPublicIP(req)
 	assert.Nil(t, err)
 	assert.NotEmpty(t, ip, fmt.Sprintf("Expected public IP, got: %s", ip))
+}
+
+// TestGetCallerInfo 测试 GetCallerInfo 函数
+func TestGetCallerInfo(t *testing.T) {
+	caller := osx.GetCallerInfo(0)
+	assert.Equal(t, caller.FuncName, "GetCallerInfo")
+
+	caller = osx.GetCallerInfo(1)
+	assert.Equal(t, caller.FuncName, "TestGetCallerInfo")
+	assert.Equal(t, caller.Line, 116)
+
+	caller = osx.GetCallerInfo(2)
+	assert.Equal(t, caller.FuncName, "tRunner")
 }

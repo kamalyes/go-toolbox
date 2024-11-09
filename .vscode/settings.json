@@ -38,7 +38,7 @@
     // 插件配置项
     "fileheader.configObj": {
         "autoAdd": true, // 检测文件没有头部注释，自动添加文件头部注释
-        "autoAddLine": 100, // 文件超过多少行数 不再自动添加头部注释
+        "autoAddLine": 600, // 文件超过多少行数 不再自动添加头部注释
         "autoAlready": true, // 只添加插件支持的语言以及用户通过`language`选项自定义的注释
         "supportAutoLanguage": [], // 设置之后，在数组内的文件才支持自动添加
        // 自动添加头部注释黑名单
@@ -145,11 +145,13 @@
       "gonic",
       "Gorm",
       "govet",
+      "hashers",
       "jsoniter",
       "kamalyes",
       "linkname",
       "loggercheck",
       "mapstructure",
+      "mathx",
       "Mqtt",
       "nolintlint",
       "nonamedreturns",
@@ -157,6 +159,7 @@
       "perfsprint",
       "postgre",
       "predeclared",
+      "Proba",
       "promlinter",
       "Randu",
       "randx",

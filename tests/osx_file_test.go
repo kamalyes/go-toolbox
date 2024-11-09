@@ -1,8 +1,8 @@
 /*
  * @Author: kamalyes 501893067@qq.com
- * @Date: 2024-10-28 09:52:21
+ * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-01 22:19:15
+ * @LastEditTime: 2024-11-10 00:15:15
  * @FilePath: \go-toolbox\tests\osx_file_test.go
  * @Description:
  *
@@ -11,6 +11,7 @@
 package tests
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
@@ -19,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/kamalyes/go-toolbox/pkg/osx"
+	"github.com/stretchr/testify/assert"
 )
 
 // TestGetDirFiles 测试 GetDirFiles 函数
@@ -142,4 +144,100 @@ func TestSaveImage(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestFileNameWithoutExt 测试 FileNameWithoutExt 函数
+func TestFileNameWithoutExt(t *testing.T) {
+	// 测试文件名和期望结果
+	testCases := []struct {
+		input    string
+		expected string
+	}{
+		{"example.txt", "example"},
+		{"archive.tar.gz", "archive.tar"},
+		{"noext", "noext"},
+		{".hiddenfile", ""}, // 注意：这个行为可能根据需求有所不同
+	}
+
+	for _, testCase := range testCases {
+		result := osx.FileNameWithoutExt(testCase.input)
+		assert.Equal(t, testCase.expected, result, fmt.Sprintf("FileNameWithoutExt(%q) 应该返回 %q", testCase.input, testCase.expected))
+	}
+}
+
+// TestRemoveIfExist 测试 RemoveIfExist 函数
+func TestRemoveIfExist(t *testing.T) {
+	// 创建一个临时文件用于测试
+	tempFile := filepath.Join(osx.MkdirTemp(), "tempfile")
+	defer os.Remove(tempFile) // 清理：如果测试失败，将在测试完成后删除文件
+	// 但注意，如果 RemoveIfExist 成功，这个文件将在测试中被删除
+
+	// 创建文件
+	err := os.WriteFile(tempFile, []byte("test"), 0644)
+	assert.NoError(t, err, "ioutil.WriteFile 应该成功创建文件")
+
+	// 调用 RemoveIfExist
+	err = osx.RemoveIfExist(tempFile)
+	assert.NoError(t, err, "RemoveIfExist 应该成功删除文件")
+
+	// 检查文件是否已删除
+	assert.False(t, osx.FileExists(tempFile), "文件应该已被删除")
+}
+
+// TestCreateIfNotExist 测试 CreateIfNotExist 函数
+func TestCreateIfNotExist(t *testing.T) {
+	// 创建一个临时文件用于测试
+	tempFile := filepath.Join(osx.MkdirTemp(), "tempfile")
+	defer os.Remove(tempFile) // 测试完成后删除临时文件
+
+	// 调用 CreateIfNotExist
+	file, err := osx.CreateIfNotExist(tempFile)
+	assert.NoError(t, err, "CreateIfNotExist 应该成功创建文件")
+	assert.NotNil(t, file, "返回的文件句柄不应该为空")
+
+	// 检查文件是否存在
+	assert.True(t, osx.FileExists(tempFile), "文件应该存在")
+
+	// 关闭文件句柄
+	file.Close()
+
+	// 尝试再次创建同一个文件，应该返回错误
+	_, err = osx.CreateIfNotExist(tempFile)
+	assert.Error(t, err, "CreateIfNotExist 应该返回错误，因为文件已经存在")
+}
+
+func TestHash(t *testing.T) {
+	// 创建一个临时文件
+	tempFile, err := os.CreateTemp("", "tempFile.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tempFile.Name())
+
+	// 写入内容到临时文件
+	_, err = tempFile.Write([]byte("Hello, World!"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tempFile.Close()
+
+	// 计算文件的MD5哈希值
+	hash, err := osx.ComputeHashes(tempFile.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 验证哈希值是否正确
+	expectedMd5Hash := "65a8e27d8879283831b664bd8b7f0ad4"
+	expectedSha1Hash := "0a0a9f2a6772942557ab5355d76af442f8f65e01"
+	expectedSha224Hash := "72a23dfa411ba6fde01dbfabf3b00a709c93ebf273dc29e2d8b261ff"
+	expectedSha256Hash := "dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a4b28688a362182986f"
+	expectedSha384Hash := "5485cc9b3365b4305dfb4e8337e0a598a574f8242bf17289e0dd6c20a3cd44a089de16ab4ab308f63e44b1170eb5f515"
+	expectedSha512Hash := "374d794a95cdcfd8b35993185fef9ba368f160d8daf432d08ba9f1ed1e5abe6cc69291e0fa2fe0006a52570ef18c19def4e617c33ce52ef0a6e5fbe318cb0387"
+	assert.Equal(t, expectedMd5Hash, hash.MD5, fmt.Sprintf("Expected md5 %s, got %s", expectedMd5Hash, hash.MD5))
+	assert.Equal(t, expectedSha1Hash, hash.SHA1, fmt.Sprintf("Expected sha1 %s, got %s", expectedSha1Hash, hash.SHA1))
+	assert.Equal(t, expectedSha224Hash, hash.SHA224, fmt.Sprintf("Expected sha224 %s, got %s", expectedSha224Hash, hash.SHA224))
+	assert.Equal(t, expectedSha256Hash, hash.SHA256, fmt.Sprintf("Expected sha256 %s, got %s", expectedSha256Hash, hash.SHA256))
+	assert.Equal(t, expectedSha384Hash, hash.SHA384, fmt.Sprintf("Expected sha256 %s, got %s", expectedSha384Hash, hash.SHA384))
+	assert.Equal(t, expectedSha512Hash, hash.SHA512, fmt.Sprintf("Expected sha512 %s, got %s", expectedSha512Hash, hash.SHA512))
 }
