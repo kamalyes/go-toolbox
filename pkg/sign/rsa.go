@@ -1,0 +1,219 @@
+/*
+ * @Author: kamalyes 501893067@qq.com
+ * @Date: 2024-11-10 21:51:58
+ * @LastEditors: kamalyes 501893067@qq.com
+ * @LastEditTime: 2024-11-11 00:55:15
+ * @FilePath: \go-toolbox\pkg\sign\rsa.go
+ * @Description:
+ *
+ * Copyright (c) 2024 by kamalyes, All Rights Reserved.
+ */
+package sign
+
+import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/pem"
+	"errors"
+	"hash"
+	"os"
+
+	"github.com/kamalyes/go-toolbox/pkg/errorx"
+)
+
+// 错误定义
+var (
+	ErrPrivateKey         = errors.New("私钥文件错误")
+	ErrPublicKey          = errors.New("公钥解析错误")
+	ErrEncryptFail        = errors.New("加密失败")
+	ErrDecryptFail        = errors.New("解密失败")
+	ErrPemBlockTypeFail   = errors.New("PEM Block 类型不是PUBLIC KEY")
+	ErrNotRsaPrivateKey   = errors.New("不是RSA Private密钥")
+	ErrNotRsaPublicKeyKey = errors.New("不是RSA Public密钥")
+	ErrSaltEmpty          = errors.New("盐值不能为空") // 新增盐值为空的错误
+)
+
+// PEM类型常量
+const (
+	PrivateKeyType = "PRIVATE KEY"
+	PublicKeyType  = "PUBLIC KEY"
+)
+
+// RsaKeySize 定义了支持的RSA密钥大小
+type RsaKeySize int
+
+const (
+	RsaKeySize512  RsaKeySize = 512
+	RsaKeySize1024 RsaKeySize = 1024
+	RsaKeySize2048 RsaKeySize = 2048
+	RsaKeySize4096 RsaKeySize = 4096
+)
+
+// RsaKeyPair 包含RSA密钥对
+type RsaKeyPair struct {
+	PrivateKey *rsa.PrivateKey
+	PublicKey  *rsa.PublicKey
+}
+
+// RsaCrypto 定义了RSA加解密器的接口
+type RsaCrypto interface {
+	Encrypt(input []byte, salt []byte) ([]byte, error)
+	Decrypt(input []byte) ([]byte, error)
+	DecryptBase64(input string) ([]byte, error)
+	GetPrivateKey() *rsa.PrivateKey
+	GetPublicKey() *rsa.PublicKey
+}
+
+// rsaCryptoImpl 是RSA加解密器的实现
+type rsaCryptoImpl struct {
+	privateKey *rsa.PrivateKey  // 私钥
+	publicKey  *rsa.PublicKey   // 公钥
+	hashFunc   func() hash.Hash // 哈希函数
+}
+
+// encodePEM 封装了PEM编码的逻辑
+func encodePEM(blockType string, bytes []byte) string {
+	block := &pem.Block{
+		Type:  blockType,
+		Bytes: bytes,
+	}
+	return string(pem.EncodeToMemory(block))
+}
+
+// GenerateRsaKeyPair 生成指定大小的 RSA 密钥对
+func GenerateRsaKeyPair(keySize RsaKeySize) (*RsaKeyPair, error) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, int(keySize))
+	if err != nil {
+		return nil, errorx.WrapError("生成 RSA 密钥对失败", err)
+	}
+	return &RsaKeyPair{
+		PrivateKey: privateKey,
+		PublicKey:  &privateKey.PublicKey,
+	}, nil
+}
+
+// ExportRsaPrivateKeyToPEM 将 RSA 私钥导出为 PEM 格式
+func ExportRsaPrivateKeyToPEM(privateKey *rsa.PrivateKey) (string, error) {
+	privBytes := x509.MarshalPKCS1PrivateKey(privateKey)
+	return encodePEM(PrivateKeyType, privBytes), nil
+}
+
+// ExportRsaPublicKeyToPEM 将 RSA 公钥导出为 PEM 格式
+func ExportRsaPublicKeyToPEM(publicKey *rsa.PublicKey) (string, error) {
+	pubBytes, err := x509.MarshalPKIXPublicKey(publicKey)
+	if err != nil {
+		return "", errorx.WrapError("导出公钥失败", err)
+	}
+	return encodePEM(PublicKeyType, pubBytes), nil
+}
+
+// NewRsaCryptoFromKeys 根据公钥和私钥创建RSA加解密器
+func NewRsaCryptoFromKeys(privateKey *rsa.PrivateKey, publicKey *rsa.PublicKey, hashFunc func() hash.Hash) RsaCrypto {
+	return &rsaCryptoImpl{
+		privateKey: privateKey,
+		publicKey:  publicKey,
+		hashFunc:   hashFunc,
+	}
+}
+
+// Decrypt 实现了解密功能，使用 OAEP
+func (r *rsaCryptoImpl) Decrypt(input []byte) ([]byte, error) {
+	hash := r.hashFunc() // 获取 hash.Hash 实例
+	return rsa.DecryptOAEP(hash, rand.Reader, r.privateKey, input, nil)
+}
+
+// DecryptBase64 先将Base64编码的字符串解码，然后解密
+func (r *rsaCryptoImpl) DecryptBase64(input string) ([]byte, error) {
+	decoded, err := base64.StdEncoding.DecodeString(input)
+	if err != nil {
+		return nil, errorx.WrapError("Base64 解码失败", err)
+	}
+	return r.Decrypt(decoded)
+}
+
+// Encrypt 实现了加密功能，使用 OAEP
+func (r *rsaCryptoImpl) Encrypt(input []byte, salt []byte) ([]byte, error) {
+	if len(salt) == 0 {
+		return nil, ErrSaltEmpty // 使用常量错误
+	}
+	saltedInput := append(salt, input...)
+	hash := r.hashFunc() // 获取 hash.Hash 实例
+	return rsa.EncryptOAEP(hash, rand.Reader, r.publicKey, saltedInput, nil)
+}
+
+// GetPrivateKey 返回 rsaCryptoImpl 中的私钥
+func (r *rsaCryptoImpl) GetPrivateKey() *rsa.PrivateKey {
+	return r.privateKey
+}
+
+// GetPublicKey 返回 rsaCryptoImpl 中的公钥
+func (r *rsaCryptoImpl) GetPublicKey() *rsa.PublicKey {
+	return r.publicKey
+}
+
+// NewRsaCryptoFromPrivateFile 根据私钥文件创建RSA加解密器
+func NewRsaCryptoFromPrivateFile(filePath string, hashFunc func() hash.Hash) (RsaCrypto, error) {
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, errorx.WrapError("读取私钥文件失败", err)
+	}
+
+	privateKey, err := ParsePrivateKey(content)
+	if err != nil {
+		return nil, err // 直接返回 ParsePrivateKey 的错误
+	}
+
+	publicKey := &privateKey.PublicKey
+	return NewRsaCryptoFromKeys(privateKey, publicKey, hashFunc), nil
+}
+
+// ParsePrivateKey 解析PEM格式的私钥
+func ParsePrivateKey(content []byte) (*rsa.PrivateKey, error) {
+	block, _ := pem.Decode(content)
+	if block == nil {
+		return nil, ErrPrivateKey
+	}
+
+	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, errorx.WrapError("解析私钥失败", err)
+	}
+
+	return privateKey, nil
+}
+
+// NewRsaCryptoFromPublicPEM 从 PEM 格式的公钥创建 RSA 加解密器
+func NewRsaCryptoFromPublicPEM(pemData []byte, hashFunc func() hash.Hash) (RsaCrypto, error) {
+	publicKey, err := ParsePublicKey(pemData)
+	if err != nil {
+		return nil, errorx.WrapError("解析公钥失败", err)
+	}
+
+	return NewRsaCryptoFromKeys(nil, publicKey, hashFunc), nil
+}
+
+// ParsePublicKey 解析 PEM 格式的公钥
+func ParsePublicKey(pemData []byte) (*rsa.PublicKey, error) {
+	block, _ := pem.Decode(pemData)
+	if block == nil {
+		return nil, ErrPublicKey
+	}
+
+	if block.Type != PublicKeyType {
+		return nil, ErrPemBlockTypeFail
+	}
+
+	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		return nil, errorx.WrapError("解析公钥失败", err)
+	}
+
+	rsaPub, ok := pub.(*rsa.PublicKey)
+	if !ok {
+		return nil, ErrNotRsaPublicKeyKey
+	}
+
+	return rsaPub, nil
+}

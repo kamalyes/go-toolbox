@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-06 13:05:55
+ * @LastEditTime: 2024-11-11 10:28:33
  * @FilePath: \go-toolbox\pkg\random\rand.go
  * @Description:
  *
@@ -11,7 +11,6 @@
 package random
 
 import (
-	"fmt"
 	"math"
 	"math/rand"
 	"reflect"
@@ -112,7 +111,6 @@ func RandFloat(min, max float64) (v float64) {
  */
 func initASCII() {
 	once.Do(func() {
-		fmt.Println("初始化ASCII码列表")
 		// 大写字母
 		c := make([]int, 26)
 		for i := 0; i < 26; i++ {

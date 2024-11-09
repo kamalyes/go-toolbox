@@ -1,9 +1,9 @@
 /*
  * @Author: kamalyes 501893067@qq.com
- * @Date: 2023-07-28 00:50:58
+ * @Date: 2024-11-10 21:51:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-07-28 09:37:00
- * @FilePath: \go-middleware\pkg\sign\sign.go
+ * @LastEditTime: 2024-11-11 00:55:15
+ * @FilePath: \go-toolbox\pkg\sign\hmac.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
