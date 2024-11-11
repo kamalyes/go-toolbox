@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-10 00:18:15
+ * @LastEditTime: 2024-11-11 17:20:33
  * @FilePath: \go-toolbox\pkg\mathx\number.go
  * @Description:
  *
@@ -10,23 +10,11 @@
  */
 package mathx
 
-import "errors"
-
-// MaxInt 返回a和b中较大的一个。
-func MaxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-// MinInt 返回a和b中较小的一个。
-func MinInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
+import (
+	"bytes"
+	"errors"
+	"strings"
+)
 
 // MinMaxFunc 是用于计算最小值或最大值的函数类型，接收两个interface{}类型的参数，返回一个interface{}类型的结果。
 type MinMaxFunc func(a, b interface{}) interface{}
@@ -104,4 +92,45 @@ func Between[T Numerical](x, lower, upper T) T {
 		return upper
 	}
 	return x
+}
+
+// LongestCommonPrefix 返回两个字符串的最长公共前缀的长度。
+func LongestCommonPrefix(a, b string) int {
+	maxNumber := AtLeast(len(a), len(b))
+	for i := 0; i < maxNumber; i++ {
+		if a[i] != b[i] {
+			return i
+		}
+	}
+	return maxNumber
+}
+
+// CountPathVariables 计算路径中 ':' 和 '*' 参数的数量。
+func CountPathVariables(path string) int {
+	varCount := 0
+	segments := strings.Split(path, "/")
+
+	for _, segment := range segments {
+		if strings.HasPrefix(segment, ":") || strings.HasPrefix(segment, "*") {
+			varCount++
+		}
+	}
+
+	return varCount
+}
+
+// CountPathSegments 计算路径中以 '/' 分隔的部分数量。
+func CountPathSegments(path string) int {
+	if path == "/" {
+		return 0 // 根路径返回0
+	}
+	// 将路径以 '/' 分隔，然后过滤掉空段
+	segments := bytes.Split([]byte(path), []byte("/"))
+	count := 0
+	for _, segment := range segments {
+		if len(segment) > 0 { // 只计算非空段
+			count++
+		}
+	}
+	return count
 }

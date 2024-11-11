@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-09 01:15:05
+ * @LastEditTime: 2024-11-11 13:08:58
  * @FilePath: \go-toolbox\pkg\syncx\map.go
  * @Description:
  *
@@ -61,8 +61,48 @@ func (m *Map[K, V]) LoadOrStore(key K, new V) (V, bool) {
 // Range 遍历 Map 中的所有键值对。
 func (m *Map[K, V]) Range(run func(key K, value V) bool) {
 	m.mp.Range(func(k, v any) bool {
-		return run(k.(K), v.(V)) // 调用用户提供的函数
+		key := k.(K)           // 将 k 转换为 K 类型
+		value := v.(V)         // 将 v 转换为 V 类型
+		return run(key, value) // 调用用户提供的函数
 	})
+}
+
+// Size 返回当前 Map 中元素的数量
+func (m *Map[K, V]) Size() int {
+	count := 0
+	m.Range(func(_ K, _ V) bool {
+		count++
+		return true // 继续遍历
+	})
+	return count
+}
+
+// Clear 清空 Map 中的所有键值对
+func (m *Map[K, V]) Clear() {
+	m.Range(func(key K, _ V) bool {
+		m.Delete(key) // 删除每个键
+		return true   // 继续遍历
+	})
+}
+
+// Keys 返回所有键的切片
+func (m *Map[K, V]) Keys() []K {
+	var keys []K
+	m.Range(func(key K, _ V) bool {
+		keys = append(keys, key) // 添加键到切片中
+		return true              // 继续遍历
+	})
+	return keys
+}
+
+// Values 返回所有值的切片
+func (m *Map[K, V]) Values() []V {
+	var values []V
+	m.Range(func(_ K, value V) bool {
+		values = append(values, value) // 添加值到切片中
+		return true                    // 继续遍历
+	})
+	return values
 }
 
 // Store 设置指定键的值。

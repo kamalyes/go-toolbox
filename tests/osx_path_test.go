@@ -95,3 +95,24 @@ func TestCopy(t *testing.T) {
 		t.Error("File content does not match")
 	}
 }
+
+func TestJoinPaths(t *testing.T) {
+	tests := []struct {
+		absolutePath string
+		relativePath string
+		expected     string
+	}{
+		{"/usr/local", "bin", "/usr/local/bin"},
+		{"/usr/local/", "bin", "/usr/local/bin"},
+		{"/usr/local", "/bin", "/usr/local/bin"},
+		{"/usr/local/", "/bin", "/usr/local/bin"},
+		{"/usr/local", "", "/usr/local"},
+		{"", "bin", "bin"},
+		{"", "", ""},
+	}
+
+	for _, test := range tests {
+		result := osx.JoinPaths(test.absolutePath, test.relativePath)
+		assert.Equal(t, test.expected, result, fmt.Sprintf("JoinPaths(%q, %q) = %q; want %q", test.absolutePath, test.relativePath, result, test.expected))
+	}
+}

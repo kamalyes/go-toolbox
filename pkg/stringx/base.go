@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-01 22:06:35
+ * @LastEditTime: 2024-11-11 13:08:58
  * @FilePath: \go-toolbox\pkg\stringx\base.go
  * @Description:
  *
@@ -15,6 +15,7 @@ import (
 	"encoding/hex"
 	"reflect"
 	"strings"
+	"unicode"
 
 	"github.com/kamalyes/go-toolbox/pkg/validator"
 )
@@ -147,4 +148,89 @@ func ExtractValue(extra string, key string, searchPrefix string) string {
 func CalculateMD5Hash(input string) string {
 	hash := md5.Sum([]byte(input))
 	return hex.EncodeToString(hash[:])
+}
+
+// Coalesce 高性能字符串拼接
+func Coalesce(s ...string) string {
+	if len(s) == 0 {
+		return "" // 如果没有输入，则返回空字符串
+	}
+	var str strings.Builder
+	for _, v := range s {
+		str.WriteString(v)
+	}
+
+	return str.String() // 返回拼接后的字符串
+}
+
+type CharacterStyle int
+
+const (
+	SnakeCharacterStyle  CharacterStyle = iota // 表示蛇形命名法（例如：hello_world）
+	StudlyCharacterStyle                       // 表示每个单词首字母大写的风格（例如：HelloWorld）
+	CamelCharacterStyle                        // 表示驼峰命名法（例如：helloWorld）
+)
+
+// ConvertCharacterStyle 根据指定的 CharacterStyle 将字符串转换为相应的格式
+func ConvertCharacterStyle(input string, caseType CharacterStyle) string {
+	trimmedStr := strings.TrimSpace(input)
+	if trimmedStr == "" {
+		return trimmedStr // 如果输入为空，直接返回
+	}
+
+	converters := map[CharacterStyle]func(string) string{
+		SnakeCharacterStyle:  toSnakeCase,
+		StudlyCharacterStyle: toStudlyCase,
+		CamelCharacterStyle:  toCamelCase,
+	}
+
+	if converter, exists := converters[caseType]; exists {
+		return converter(trimmedStr)
+	}
+	return trimmedStr // 默认返回原字符串
+}
+
+// toSnakeCase 将字符串转换为蛇形命名法
+func toSnakeCase(s string) string {
+	var builder strings.Builder
+	for i, r := range s {
+		if unicode.IsUpper(r) {
+			if i > 0 && (s[i-1] != '_' && s[i-1] != ' ') {
+				builder.WriteRune('_') // 在大写字母前添加下划线
+			}
+			builder.WriteRune(unicode.ToLower(r)) // 转为小写
+		} else if r == '_' {
+			if builder.Len() == 0 || builder.String()[builder.Len()-1] != '_' {
+				builder.WriteRune('_') // 添加下划线，但避免重复
+			}
+		} else if r == ' ' {
+			if builder.Len() > 0 && builder.String()[builder.Len()-1] != '_' {
+				builder.WriteRune('_') // 将空格转换为下划线
+			}
+		} else {
+			builder.WriteRune(r) // 直接添加小写字母或其他字符
+		}
+	}
+	return builder.String()
+}
+
+// toStudlyCase 将字符串转换为每个单词首字母大写的风格
+func toStudlyCase(s string) string {
+	var builder strings.Builder
+	s = strings.ReplaceAll(s, "_", " ") // 将下划线替换为空格
+	words := strings.Fields(s)          // 按空格分割单词
+
+	for _, word := range words {
+		if len(word) > 0 {
+			builder.WriteRune(unicode.ToUpper(rune(word[0]))) // 首字母大写
+			builder.WriteString(word[1:])                     // 追加剩余部分
+		}
+	}
+	return builder.String()
+}
+
+// toCamelCase 将字符串转换为驼峰命名法
+func toCamelCase(s string) string {
+	studly := toStudlyCase(s)                                    // 首先转换为 Studly Case
+	return string(unicode.ToLower(rune(studly[0]))) + studly[1:] // 将首字母转换为小写
 }

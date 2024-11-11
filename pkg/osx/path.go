@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-10 00:15:15
+ * @LastEditTime: 2024-11-11 17:08:09
  * @FilePath: \go-toolbox\pkg\osx\path.go
  * @Description:
  *
@@ -14,6 +14,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
 )
 
@@ -87,4 +88,9 @@ func MkdirTemp() string {
 		log.Fatalln(err)
 	}
 	return dir
+}
+
+// JoinPaths 连接绝对路径和相对路径。
+func JoinPaths(absolutePath, relativePath string) string {
+	return path.Join(absolutePath, relativePath)
 }

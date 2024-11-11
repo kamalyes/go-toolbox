@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 10:50:50
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-09 12:28:17
+ * @LastEditTime: 2024-11-11 15:15:07
  * @FilePath: \go-toolbox\tests\syncx_map_test.go
  * @Description:
  *
@@ -11,6 +11,7 @@
 package tests
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/kamalyes/go-toolbox/pkg/syncx"
@@ -69,6 +70,37 @@ func TestMap(t *testing.T) {
 	m.Delete("key2")
 	_, ok = m.Load("key2")
 	assert.False(t, ok, "expected key2 to be deleted")
+
+	// 测试 Size
+	if size := m.Size(); size != 2 {
+		t.Errorf("Expected size 2, got %d", size)
+	}
+
+	// 测试 Keys
+	keys := m.Keys()
+	if len(keys) != 2 || (keys[0] != "key3" && keys[1] != "key3") {
+		t.Errorf("Expected keys to contain 'key3' and 'key4', got %v", keys)
+	}
+
+	// 测试 Values
+	values := m.Values()
+	if len(values) != 2 {
+		t.Errorf("Expected 2 values, got %d", len(values))
+	}
+
+	// 对返回的值进行排序
+	sort.Ints(values)
+
+	// 检查值是否为预期的内容
+	expectedValues := []int{3, 4}
+	sort.Ints(expectedValues)
+	assert.Equal(t, expectedValues, values, "expected values to contain 3 and 4, got %v", values)
+
+	// 测试 Clear
+	m.Clear()
+	if size := m.Size(); size != 0 {
+		t.Errorf("Expected size 0 after clear, got %d", size)
+	}
 }
 
 func TestCopyMetaWithExistingKeys(t *testing.T) {

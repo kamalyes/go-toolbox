@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-08 16:53:49
+ * @LastEditTime: 2024-11-11 13:08:58
  * @FilePath: \go-toolbox\pkg\array\array.go
  * @Description:
  *
@@ -170,4 +170,30 @@ func RemoveZeroInInterfaceSlice(arr []interface{}) []interface{} {
 		}
 	}
 	return result
+}
+
+// Chunk 将一个切片分割成多个子切片
+// i := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+// size := 3
+// output: [[0 1 2] [3 4 5] [6 7 8] [9]]
+func Chunk(j []int, size int) [][]int {
+	if size <= 0 {
+		return nil // 如果 size <= 0，则返回 nil
+	}
+
+	var batches [][]int
+	for i := 0; i < len(j); i += size {
+		end := i + size
+		if end > len(j) {
+			end = len(j) // 确保不超出边界
+		}
+		batches = append(batches, j[i:end]) // 直接切片而不复制
+	}
+
+	// 如果 batches 为空，返回一个空的切片而不是 nil
+	if len(batches) == 0 {
+		return [][]int{}
+	}
+
+	return batches
 }

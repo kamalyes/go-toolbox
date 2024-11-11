@@ -70,7 +70,10 @@ func SliceByteToString(b []byte) string {
 
 // StringToSliceByte 将字符串转换为字节切片
 func StringToSliceByte(s string) []byte {
-	x := (*[2]uintptr)(unsafe.Pointer(&s))
-	h := [3]uintptr{x[0], x[1], x[1]}
-	return *(*[]byte)(unsafe.Pointer(&h))
+	return *(*[]byte)(unsafe.Pointer(
+		&struct {
+			string
+			Cap int
+		}{s, len(s)},
+	))
 }

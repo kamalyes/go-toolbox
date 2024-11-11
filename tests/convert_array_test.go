@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-08-02 09:50:23
+ * @LastEditTime: 2024-11-11 15:56:07
  * @FilePath: \go-toolbox\tests\array_test.go
  * @Description:
  *
@@ -11,10 +11,12 @@
 package tests
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
 	"github.com/kamalyes/go-toolbox/pkg/array"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestArrayAllFunctions(t *testing.T) {
@@ -216,4 +218,42 @@ func TestRemoveZeroInInterfaceSlice(t *testing.T) {
 			t.Errorf("RemoveZeroInInterfaceSlice(%v) returned %v, expected %v", tc.array, result, tc.expected)
 		}
 	}
+}
+
+// TestArrayChunk 测试 ArrayChunk 函数的基本功能
+func TestArrayChunk(t *testing.T) {
+	tests := []struct {
+		input    []int
+		size     int
+		expected [][]int
+	}{
+		{[]int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, 3, [][]int{{0, 1, 2}, {3, 4, 5}, {6, 7, 8}, {9}}},
+		{[]int{1, 2, 3}, 1, [][]int{{1}, {2}, {3}}},
+		{[]int{1, 2, 3}, 5, [][]int{{1, 2, 3}}},
+		{[]int{}, 2, [][]int{}},
+		{[]int{1, 2, 3}, 0, nil},
+	}
+
+	for _, test := range tests {
+		result := array.Chunk(test.input, test.size)
+		assert.Equal(t, test.expected, result, fmt.Sprintf("ArrayChunk(%v, %d) = %v; expected %v", test.input, test.size, result, test.expected))
+	}
+}
+
+// equal 比较两个切片是否相等
+func equal(a, b [][]int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if len(a[i]) != len(b[i]) {
+			return false
+		}
+		for j := range a[i] {
+			if a[i][j] != b[i][j] {
+				return false
+			}
+		}
+	}
+	return true
 }
