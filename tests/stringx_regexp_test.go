@@ -24,16 +24,16 @@ func init() {
 	r = stringx.NewAnyRegs()
 }
 
-// TestData 结构表示测试数据的格式
-type TestData struct {
+// TestRegexpData 结构表示测试数据的格式
+type TestRegexpData struct {
 	name     string
 	input    string
 	expected bool
 }
 
-func runTests(t *testing.T, testData []TestData, matchFunc func(string) bool) {
+func runTests(t *testing.T, TestRegexpData []TestRegexpData, matchFunc func(string) bool) {
 	// 对每个测试数据进行迭代
-	for _, data := range testData {
+	for _, data := range TestRegexpData {
 		// 使用测试数据的名称创建子测试
 		t.Run(data.name, func(t *testing.T) {
 			// 断言匹配函数处理输入数据后的结果与期望值是否一致
@@ -342,7 +342,7 @@ func TestAnyRegs_RegMNNovelsOfRealNumber(t *testing.T) {
 }
 
 func TestAnyRegs_RegNanZeroNumber(t *testing.T) {
-	tests := []TestData{
+	tests := []TestRegexpData{
 		{"MatchNaN", "NaN", false},
 		{"MatchInf", "+Inf", false},
 		{"MatchPositiveZero", "+0", false},
@@ -355,7 +355,7 @@ func TestAnyRegs_RegNanZeroNumber(t *testing.T) {
 }
 
 func TestAnyRegs_RegMatchNanZeroNegNumber(t *testing.T) {
-	tests := []TestData{
+	tests := []TestRegexpData{
 		{"MatchNaN", "NaN", false},
 		{"MatchInf", "+Inf", false},
 		{"MatchPositiveZero", "+0", false},
