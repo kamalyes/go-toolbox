@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-08-03 21:32:26
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-10 16:11:02
+ * @LastEditTime: 2024-11-12 22:26:27
  * @FilePath: \go-toolbox\pkg\convert\must.go
  * @Description:
  *
@@ -12,11 +12,9 @@ package convert
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/kamalyes/go-toolbox/pkg/stringx"
@@ -69,44 +67,39 @@ func convertToString[T any](v T, timeLayout ...string) string {
 	return string(b)
 }
 
-// MustInt 强制转换为整数 (int)
-func MustInt[T any](v T) (int, error) {
-	val := reflect.ValueOf(v)
-	switch val.Kind() {
-	case reflect.String:
-		return parseStringToInt(val.String())
-	case reflect.Bool:
-		if val.Bool() {
-			return 1, nil
-		}
-		return 0, nil
-	case reflect.Invalid:
-		return 0, nil
-	default:
-		return convertToInt(val)
-	}
+// Number 是一个接口，限制了可以作为类型参数的数值类型
+type Number interface {
+	int | int8 | int16 | int32 | int64 | uint | uint8 | uint16 | uint32 | uint64
 }
 
-// parseStringToInt 解析字符串为整数
-func parseStringToInt(s string) (int, error) {
-	i, err := strconv.Atoi(strings.TrimSpace(s))
-	if err != nil {
-		return 0, errors.New("invalid string to int conversion")
-	}
-	return i, nil
-}
-
-// convertToInt 将其他类型转换为 int
-func convertToInt(val reflect.Value) (int, error) {
-	switch val.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return int(val.Int()), nil
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return int(val.Uint()), nil
-	case reflect.Float32, reflect.Float64:
-		return int(val.Float()), nil
+// MustIntT 将 any 转换为 T 类型
+func MustIntT[T Number](value any) (T, error) {
+	const exceedsIntRange = "value exceeds int range"
+	const unsupportedConversion = "unsupported conversion"
+	switch v := value.(type) {
+	case int:
+		return T(v), nil
+	case int8:
+		return T(v), nil
+	case int16:
+		return T(v), nil
+	case int32:
+		return T(v), nil
+	case int64:
+		return T(v), nil
+	case uint:
+		return T(v), nil
+	case uint8:
+		return T(v), nil
+	case uint16:
+		return T(v), nil
+	case uint32:
+		return T(v), nil
+	case uint64:
+		return T(v), nil
 	default:
-		return 0, errors.New("unsupported type for conversion to int")
+		var zero T
+		return zero, fmt.Errorf("%s: %v (type %T)", unsupportedConversion, value, value)
 	}
 }
 
@@ -119,7 +112,7 @@ func MustBool[T any](v T) bool {
 	case reflect.String:
 		return stringx.IsTrueString(val.String())
 	default:
-		flag, err := MustInt(v)
+		flag, err := MustIntT[int](v)
 		return err == nil && flag != 0
 	}
 }

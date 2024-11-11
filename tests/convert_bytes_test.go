@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 10:50:50
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-11 17:21:21
+ * @LastEditTime: 2024-11-11 18:00:08
  * @FilePath: \go-toolbox\tests\convert_bytes_test.go
  * @Description:
  *
@@ -21,7 +21,6 @@ import (
 
 	"github.com/kamalyes/go-toolbox/pkg/convert"
 	"github.com/kamalyes/go-toolbox/pkg/mathx"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestBytesToBCC(t *testing.T) {
@@ -169,44 +168,24 @@ func TestStringToSliceByte(t *testing.T) {
 	}
 }
 
-func TestCountPathVariables(t *testing.T) {
-	tests := []struct {
-		path     string // 路径字符串
-		expected int    // 预期的变量数量
-	}{
-		{"/users/:id", 1},                     // 测试路径中有一个路径变量 :id
-		{"/products/*", 1},                    // 测试路径中有一个通配符 *
-		{"/users/:id/products/:productId", 2}, // 测试路径中有两个路径变量 :id 和 :productId
-		{"/no/params/here", 0},                // 测试路径中没有任何变量和通配符
-		{"/wildcard/*/path", 1},               // 测试路径中有一个通配符 *
-		{"/mixed/:param1/*/param2", 2},        // 测试路径中有一个路径变量 :param1 和一个通配符 *
-	}
-
-	for _, test := range tests {
-		got := mathx.CountPathVariables(test.path) // 调用 CountPathVariables 函数计算变量数量
-		assert.Equal(t, test.expected, got, "对于路径 %q，期望 %d，但得到 %d", test.path, test.expected, got)
-		// 断言实际结果与预期结果相等，如果不相等，输出错误信息
-	}
-}
-
 func TestCountPathSegments(t *testing.T) {
 	tests := []struct {
 		path     string
+		prefixes []string
 		expected int
 	}{
-
-		{"/users/:id", 2},                     // /users 和 :id
-		{"/products/*", 2},                    // /products 和 *
-		{"/users/:id/products/:productId", 4}, // /users, :id, /products, :productId
-		{"/no/params/here", 3},                // /no, /params, /here
-		{"/wildcard/*/path", 3},               // /wildcard, *, /path
-		{"/mixed/:param1/*/param2", 4},        // /mixed, :param1, *, /param2
-		{"/", 0},                              // 根路径返回0
-		{"/a/b/c/", 3},                        // /a, /b, /c
+		{"/users/:id/products/*", nil, 2},                     // 默认前缀 ":" AND "*"
+		{"/users/:id/products/*", []string{":"}, 1},           // 自定义前缀 ":"
+		{"/users/:id/products/*", []string{"*"}, 1},           // 自定义前缀 "*"
+		{"/users/:id/products/*", []string{":", "*"}, 2},      // 自定义前缀 ":"
+		{"/users/:id/products/*", []string{"users"}, 1},       // 自定义前缀 "users"
+		{"/users/:id/products/*", []string{"nonexistent"}, 0}, // 不存在的前缀
 	}
 
 	for _, test := range tests {
-		got := mathx.CountPathSegments(test.path)
-		assert.Equal(t, test.expected, got, "对于路径 %q,期望 %d,但得到 %d", test.path, test.expected, got)
+		result := mathx.CountPathSegments(test.path, test.prefixes...)
+		if result != test.expected {
+			t.Errorf("For path %q with prefixes %v, expected %d, got %d", test.path, test.prefixes, test.expected, result)
+		}
 	}
 }

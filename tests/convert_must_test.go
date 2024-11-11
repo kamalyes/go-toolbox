@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 10:50:50
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-09 10:50:50
+ * @LastEditTime: 2024-11-12 22:29:55
  * @FilePath: \go-toolbox\tests\convert_must_test.go
  * @Description:
  *
@@ -39,21 +39,44 @@ func TestMustString(t *testing.T) {
 	}
 }
 
+func TestMustIntT_ErrorCases(t *testing.T) {
+	// 定义一些不支持的类型进行测试
+	unsupportedValues := []any{
+		"string",         // 字符串
+		3.14,             // 浮点数
+		true,             // 布尔值
+		[]int{1, 2, 3},   // 切片
+		map[string]int{}, // 映射
+		nil,              // nil 值
+	}
+
+	for _, val := range unsupportedValues {
+		result, err := convert.MustIntT[int](val)
+		if err == nil {
+			t.Errorf("Expected an error for input %v, but got result %d", val, result)
+		}
+	}
+}
+
 func TestMustInt(t *testing.T) {
 	tests := []struct {
 		input    interface{}
 		expected int
 	}{
-		{"123", 123},
-		{123, 123},
-		{nil, 0},
-		{true, 1},
-		{false, 0},
-		{3.14, 3},
+		{int(10), 10},
+		{int8(20), 20},
+		{int16(30), 30},
+		{int32(40), 40},
+		{int64(50), 50},
+		{uint(60), 60},
+		{uint8(70), 70},
+		{uint16(80), 80},
+		{uint32(90), 90},
+		{uint64(100), 100},
 	}
 
 	for _, test := range tests {
-		result, _ := convert.MustInt(test.input)
+		result, _ := convert.MustIntT[int](test.input)
 		if result != test.expected {
 			t.Errorf("MustInt(%v) = %d; want %d", test.input, result, test.expected)
 		}
