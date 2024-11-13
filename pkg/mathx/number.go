@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-12 22:09:26
+ * @LastEditTime: 2024-11-13 15:55:18
  * @FilePath: \go-toolbox\pkg\mathx\number.go
  * @Description:
  *
@@ -14,14 +14,8 @@ import (
 	"bytes"
 
 	"github.com/kamalyes/go-toolbox/pkg/convert"
+	"github.com/kamalyes/go-toolbox/pkg/types"
 )
-
-// Numerical 是一个接口，表示一系列数值类型，包括有符号和无符号的整数以及浮点数。
-type Numerical interface {
-	~int | ~int8 | ~int16 | ~int32 | ~int64 |
-		~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 |
-		~float32 | ~float64
-}
 
 // AtLeast 返回 x 和 lower 中的较大值。
 // 参数:
@@ -29,7 +23,7 @@ type Numerical interface {
 // lower - 要比较的第二个数值（下限）
 // 返回值:
 // 返回 x 和 lower 中的较大值。
-func AtLeast[T Numerical](x, lower T) T {
+func AtLeast[T types.Numerical](x, lower T) T {
 	if x < lower {
 		return lower
 	}
@@ -42,7 +36,7 @@ func AtLeast[T Numerical](x, lower T) T {
 // upper - 要比较的第二个数值（上限）
 // 返回值:
 // 返回 x 和 upper 中的较小值。
-func AtMost[T Numerical](x, upper T) T {
+func AtMost[T types.Numerical](x, upper T) T {
 	if x > upper {
 		return upper
 	}
@@ -59,7 +53,7 @@ func AtMost[T Numerical](x, upper T) T {
 // upper - 范围的上限
 // 返回值:
 // 返回 x 被限制在 [lower, upper] 范围内的值。
-func Between[T Numerical](x, lower, upper T) T {
+func Between[T types.Numerical](x, lower, upper T) T {
 	if x < lower {
 		return lower
 	}

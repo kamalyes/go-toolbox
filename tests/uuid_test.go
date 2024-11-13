@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-01 02:31:56
+ * @LastEditTime: 2024-11-13 18:09:25
  * @FilePath: \go-toolbox\tests\uuid_test.go
  * @Description:
  *
@@ -41,6 +41,8 @@ func TestUUID(t *testing.T) {
 
 func TestUniqueID(t *testing.T) {
 	id := uuid.UniqueID("hello", "world")
+	assert.NotEmpty(t, id)
+	id = uuid.UniqueID()
 	assert.NotEmpty(t, id)
 }
 

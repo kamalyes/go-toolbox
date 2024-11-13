@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-08-05 09:16:55
+ * @LastEditTime: 2024-11-13 18:15:29
  * @FilePath: \go-toolbox\pkg\random\model.go
  * @Description:
  *
@@ -11,12 +11,3 @@
 package random
 
 type RandType int
-
-// RandOptions
-type RandOptions struct {
-}
-
-// NewRandOptions 创建带有默认值的 RandOptions
-func NewRandOptions() RandOptions {
-	return RandOptions{}
-}

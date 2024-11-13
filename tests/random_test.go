@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-08 13:54:05
+ * @LastEditTime: 2024-11-13 18:23:03
  * @FilePath: \go-toolbox\tests\random_test.go
  * @Description:
  *
@@ -22,15 +22,6 @@ import (
 	"github.com/kamalyes/go-toolbox/pkg/random"
 	"github.com/stretchr/testify/assert"
 )
-
-func TestAllRandomFunctions(t *testing.T) {
-	t.Run("TestRandInt", TestRandInt)
-	t.Run("TestRandFloat", TestRandFloat)
-	t.Run("TestRandString", TestRandString)
-	t.Run("TestRandomStr", TestRandomStr)
-	t.Run("TestRandomNum", TestRandomNum)
-	t.Run("TestRandomHex", TestRandomHex)
-}
 
 func TestRandInt(t *testing.T) {
 	min := 10
@@ -58,11 +49,68 @@ func TestRandString(t *testing.T) {
 	assert.Len(t, str, 10, "Expected string length to be 10")
 }
 
-func TestRandomStr(t *testing.T) {
-	length := 8
-	str := random.RandomStr(length)
+func TestRandomNumber(t *testing.T) {
+	length := 10
+	result := random.RandomNumber(length)
 
-	assert.Len(t, str, length, "Expected string length to be 8")
+	// 使用 assert 检查长度和内容
+	assert.Len(t, result, length, "Expected length should be %d", length)
+
+	// 检查结果是否只包含数字
+	digitMap := make(map[rune]bool)
+	for _, char := range random.DEC_BYTES {
+		digitMap[char] = true
+	}
+
+	for _, char := range result {
+		assert.True(t, digitMap[char], "Result contains non-digit character: %c", char)
+	}
+
+	// 测试自定义字节集
+	customBytes := "1234567890"
+	resultCustom := random.RandomNumber(length, customBytes)
+	assert.Len(t, resultCustom, length, "Expected length should be %d for custom bytes", length)
+
+	customDigitMap := make(map[rune]bool)
+	for _, char := range customBytes {
+		customDigitMap[char] = true
+	}
+
+	for _, char := range resultCustom {
+		assert.True(t, customDigitMap[char], "Result contains character not in custom bytes: %c", char)
+	}
+}
+
+func TestRandomHex(t *testing.T) {
+	bytesLen := 5
+	result := random.RandomHex(bytesLen)
+
+	// 使用 assert 检查长度和内容
+	assert.Len(t, result, bytesLen*2, "Expected length should be %d", bytesLen*2)
+
+	// 检查结果是否只包含 hex 字符
+	hexMap := make(map[rune]bool)
+	for _, char := range random.HEX_BYTES {
+		hexMap[char] = true
+	}
+
+	for _, char := range result {
+		assert.True(t, hexMap[char], "Result contains non-hex character: %c", char)
+	}
+
+	// 测试自定义字节集
+	customHexBytes := "abcdef"
+	resultCustom := random.RandomHex(bytesLen, customHexBytes)
+	assert.Len(t, resultCustom, bytesLen*2, "Expected length should be %d for custom bytes", bytesLen*2)
+
+	customHexMap := make(map[rune]bool)
+	for _, char := range customHexBytes {
+		customHexMap[char] = true
+	}
+
+	for _, char := range resultCustom {
+		assert.True(t, customHexMap[char], "Result contains character not in custom bytes: %c", char)
+	}
 }
 
 func TestRandomNum(t *testing.T) {
@@ -70,13 +118,6 @@ func TestRandomNum(t *testing.T) {
 	num := random.RandomNumber(length)
 
 	assert.Len(t, num, length, "Expected number length to be 6")
-}
-
-func TestRandomHex(t *testing.T) {
-	bytesLen := 4
-	hex := random.RandomHex(bytesLen)
-
-	assert.Len(t, hex, bytesLen*2, "Expected hex length to be twice the bytes length")
 }
 
 func TestNewRand(t *testing.T) {
@@ -323,4 +364,28 @@ func TestGenerateRandomModelComplex(t *testing.T) {
 
 	// 可选：打印输出以便调试
 	t.Logf("Generated JSON: %s", jsonOutput)
+}
+
+func TestRngSource(t *testing.T) {
+	rng := random.NewRand()
+
+	// 测试 Seed 方法
+	rng.Seed(42) // 这里我们不验证任何状态，因为 Seed 方法是空的
+
+	// 测试 Uint64 方法
+	nims := make(map[uint64]struct{})
+	for i := 0; i < 100; i++ { // 多次调用以增加不同结果的可能性
+		num := rng.Uint64()
+		nims[num] = struct{}{}
+	}
+
+	// 验证生成的随机数是否在 uint64 的范围内
+	for num := range nims {
+		assert.LessOrEqual(t, num, ^uint64(0), "Generated number out of uint64 range")
+	}
+
+	// 验证至少生成了两个不同的随机数
+	if len(nims) < 2 {
+		t.Error("Expected at least two different random numbers on multiple calls")
+	}
 }

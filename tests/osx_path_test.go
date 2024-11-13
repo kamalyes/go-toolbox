@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-10 00:15:15
+ * @LastEditTime: 2024-11-13 18:59:53
  * @FilePath: \go-toolbox\tests\osx_path_test.go
  * @Description:
  *
@@ -115,4 +115,89 @@ func TestJoinPaths(t *testing.T) {
 		result := osx.JoinPaths(test.absolutePath, test.relativePath)
 		assert.Equal(t, test.expected, result, fmt.Sprintf("JoinPaths(%q, %q) = %q; want %q", test.absolutePath, test.relativePath, result, test.expected))
 	}
+}
+
+// 公共测试数据
+var (
+	osxTestRootPath         = "testdata/osx"
+	osxSourceFilePath       = osxTestRootPath + "/source.txt"
+	osxReadOnlyDestFilePath = osxTestRootPath + "/readonly_dest.txt"
+)
+
+// TestCopyFail 测试 Copy 函数的异常情况
+func TestCopyFail(t *testing.T) {
+	// 先创建测试数据
+	setup()
+	defer teardown() // 确保在测试后清理环境
+	// 测试数据结构体
+	type testCase struct {
+		name      string
+		src       string
+		dest      string
+		expectErr bool
+	}
+
+	// 公共测试用例
+	testCases := []testCase{
+		{
+			name:      "Source file does not exist",
+			src:       "non_existent_file.txt", // 源文件不存在
+			dest:      "dest.txt",
+			expectErr: true,
+		},
+		{
+			name:      "Destination path is empty",
+			src:       osxSourceFilePath, // 使用公共的源文件路径
+			dest:      "",                // 目标路径为空
+			expectErr: true,
+		},
+		{
+			name:      "Read-only destination file",
+			src:       osxSourceFilePath,       // 使用公共的源文件路径
+			dest:      osxReadOnlyDestFilePath, // 使用公共的只读目标文件路径
+			expectErr: true,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			err := osx.Copy(tt.src, tt.dest)
+			if tt.expectErr {
+				assert.Error(t, err) // 断言应该返回错误
+			} else {
+				assert.NoError(t, err) // 断言不应该返回错误
+			}
+		})
+	}
+}
+
+// 在测试之前创建一个源文件
+func setup() {
+	err := os.MkdirAll(osxTestRootPath, os.ModePerm)
+	if err != nil {
+		panic(err)
+	}
+	err = os.WriteFile(osxSourceFilePath, []byte("Hello, World!"), 0644)
+	if err != nil {
+		panic(err)
+	}
+
+	// 检查只读目标文件是否存在，如果不存在则创建
+	if _, err := os.Stat(osxReadOnlyDestFilePath); os.IsNotExist(err) {
+		err = os.WriteFile(osxReadOnlyDestFilePath, []byte("Initial content"), 0444) // 只读权限
+		if err != nil {
+			panic(err)
+		}
+	}
+}
+
+// 在测试之后清理创建的文件
+func teardown() {
+	os.RemoveAll(osxTestRootPath)
+}
+
+// TestMain 用于在测试运行前后执行 setup 和 teardown
+func TestMain(m *testing.M) {
+	code := m.Run()
+	os.Exit(code)
 }

@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-10-15 15:55:10
+ * @LastEditTime: 2024-11-13 18:55:56
  * @FilePath: \go-toolbox\pkg\moment\base.go
  * @Description:
  *
@@ -23,11 +23,14 @@ type TimeDifference struct {
 
 // CalculateTimeDifference 计算给定的 time.Duration，并返回 TimeDifference
 func CalculateTimeDifference(duration time.Duration) TimeDifference {
-	years := int(duration.Hours() / 24 / 365) // 计算年数
-	days := int(duration.Hours()/24) % 365    // 计算天数
-	hours := int(duration.Hours()) % 24       // 计算小时数
-	minutes := int(duration.Minutes()) % 60   // 计算分钟数
-	seconds := int(duration.Seconds()) % 60   // 计算秒数
+	totalSeconds := int(duration.Seconds())
+
+	// 使用常量计算年、天、小时、分钟和秒
+	years := totalSeconds / int(Year.Seconds())
+	days := (totalSeconds / int(Day.Seconds())) % 365
+	hours := (totalSeconds / int(Hour.Seconds())) % 24
+	minutes := (totalSeconds / int(Minute.Seconds())) % 60
+	seconds := totalSeconds % 60
 
 	return TimeDifference{
 		Years:   years,

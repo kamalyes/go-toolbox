@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/kamalyes/go-toolbox/pkg/stringx"
+	"github.com/kamalyes/go-toolbox/pkg/types"
 )
 
 // MustString 强制转为字符串
@@ -68,11 +69,6 @@ func convertToString[T any](v T, timeLayout ...string) string {
 	return string(b)
 }
 
-// Number 是一个接口，限制了可以作为类型参数的数值类型
-type Number interface {
-	int | int8 | int16 | int32 | int64 | uint | uint8 | uint16 | uint32 | uint64 | float32 | float64
-}
-
 // RoundMode 是一个枚举类型，用于指定取整的方式
 type RoundMode int
 
@@ -82,7 +78,7 @@ const (
 )
 
 // MustIntT 将 any 转换为 T 类型
-func MustIntT[T Number](value any, mode *RoundMode) (T, error) {
+func MustIntT[T types.Numerical](value any, mode *RoundMode) (T, error) {
 	const unsupportedConversion = "unsupported conversion"
 	// 默认取整模式为向下取整
 	if mode == nil {
@@ -137,7 +133,7 @@ func MustIntT[T Number](value any, mode *RoundMode) (T, error) {
 }
 
 // Float64ToInt 将浮点数转换为整数类型，并进行取整
-func Float64ToInt[T Number](value float64, mode RoundMode) (T, error) {
+func Float64ToInt[T types.Numerical](value float64, mode RoundMode) (T, error) {
 	var resultFloatValue T
 
 	var convertedValue float64
@@ -159,12 +155,8 @@ func Float64ToInt[T Number](value float64, mode RoundMode) (T, error) {
 	return resultFloatValue, nil
 }
 
-type Float interface {
-	float32 | float64
-}
-
 // ParseFloat 尝试将字符串解析为指定类型的浮点数
-func ParseFloat[T Float](v string, value *T) error {
+func ParseFloat[T types.Float](v string, value *T) error {
 	f, err := strconv.ParseFloat(v, 64) // 先解析为 float64
 	if err != nil {
 		return fmt.Errorf("failed to parse %q: %v", v, err)
@@ -202,7 +194,7 @@ func MustJSON(v interface{}) ([]byte, error) {
 }
 
 // NumberSliceToStringSlice Number切片转String
-func NumberSliceToStringSlice[T Number](numbers []T) []string {
+func NumberSliceToStringSlice[T types.Numerical](numbers []T) []string {
 	if numbers == nil {
 		return nil // 处理 nil 切片
 	}
@@ -214,7 +206,7 @@ func NumberSliceToStringSlice[T Number](numbers []T) []string {
 }
 
 // StringSliceToNumberSlice 将字符串切片转换为数字切片
-func StringSliceToNumberSlice[T Number](strs []string, mode *RoundMode) ([]T, error) {
+func StringSliceToNumberSlice[T types.Numerical](strs []string, mode *RoundMode) ([]T, error) {
 	if strs == nil {
 		return nil, nil // 处理 nil 切片
 	}

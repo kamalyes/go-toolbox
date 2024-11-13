@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-10 17:21:35
+ * @LastEditTime: 2024-11-13 19:08:03
  * @FilePath: \go-toolbox\tests\osx_base_test.go
  * @Description:
  *
@@ -119,4 +119,18 @@ func TestGetCallerInfo(t *testing.T) {
 
 	caller = osx.GetCallerInfo(2)
 	assert.Equal(t, caller.FuncName, "tRunner")
+}
+
+// TestCommand 测试 Command 函数
+func TestCommand(t *testing.T) {
+	// 使用 echo 命令进行测试
+	output, err := osx.Command("echo", []string{"Hello, World!"}, "")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	expectedOutput := "Hello, World!\n"
+	if string(output) != expectedOutput {
+		t.Errorf("expected %q, got %q", expectedOutput, string(output))
+	}
 }

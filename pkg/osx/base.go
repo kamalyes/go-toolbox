@@ -11,11 +11,13 @@
 package osx
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"runtime"
 	"strings"
 	"sync"
@@ -212,4 +214,24 @@ func GetCallerInfo(skip int) *RunTimeCaller {
 	}
 
 	return caller
+}
+
+// Command 执行系统命令
+func Command(bin string, argv []string, baseDir string) ([]byte, error) {
+	cmd := exec.Command(bin, argv...)
+
+	if baseDir != "" {
+		cmd.Dir = baseDir
+	}
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		return stdout.Bytes(), fmt.Errorf("command failed: %s: %s", err, stderr.String())
+	}
+
+	return stdout.Bytes(), nil
 }
