@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-11 15:55:06
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-13 23:20:55
+ * @LastEditTime: 2024-11-13 13:20:15
  * @FilePath: \go-toolbox\tests\mathx_array_test.go
  * @Description:
  *
@@ -80,6 +80,25 @@ func TestArrayUnion(t *testing.T) {
 			result := mathx.ArrayUnion(tt.a, tt.b)
 			assert.ElementsMatch(t, tt.want, result)
 		})
+	}
+}
+
+// 测试 ArrayFisherYates 函数
+func TestArrayFisherYates(t *testing.T) {
+
+	tests := [][]int{
+		{1, 2, 3, 4, 5},
+		{10, 20, 30, 40, 50},
+	}
+
+	for _, input := range tests {
+		original := make([]int, len(input))
+		copy(original, input) // 复制输入以便后续比较
+
+		mathx.ArrayFisherYates(input) // 调用洗牌函数
+
+		// 使用 assert 检查数组是否被打乱
+		assert.NotEqual(t, original, input, "ArrayFisherYates did not shuffle the array: original %v, got %v", original, input)
 	}
 }
 
@@ -206,89 +225,55 @@ func TestArrayChunk(t *testing.T) {
 	}
 }
 
-func TestArrayDiffSet(t *testing.T) {
+func TestArrayDiffSetStrings(t *testing.T) {
 	cases := []struct {
-		arr1 interface{}
-		arr2 interface{}
+		arr1 []string
+		arr2 []string
 		want []interface{}
 	}{
-		// 测试字符串切片
 		{[]string{"a", "b", "c"}, []string{"b", "c", "d"}, []interface{}{"a", "d"}},
 		{[]string{}, []string{"b", "c", "d"}, []interface{}{"b", "c", "d"}},
 		{[]string{"a", "b", "c"}, []string{}, []interface{}{"a", "b", "c"}},
 		{[]string{"apple", "banana"}, []string{"banana", "cherry"}, []interface{}{"apple", "cherry"}},
+	}
 
-		// 测试整数切片
+	for _, tc := range cases {
+		result := mathx.ArrayDiffSetSorted(tc.arr1, tc.arr2)
+		assert.ElementsMatch(t, tc.want, result, "ArrayDiffSet(%v, %v) = %v; want %v", tc.arr1, tc.arr2, result, tc.want)
+	}
+}
+
+func TestArrayDiffSetInts(t *testing.T) {
+	cases := []struct {
+		arr1 []int
+		arr2 []int
+		want []interface{}
+	}{
 		{[]int{1, 2, 3}, []int{2, 3, 4}, []interface{}{1, 4}},
 		{[]int{}, []int{2, 3, 4}, []interface{}{2, 3, 4}},
 		{[]int{1, 2, 3}, []int{}, []interface{}{1, 2, 3}},
 		{[]int{1, 2, 3, 3}, []int{2, 3, 4}, []interface{}{1, 4}},
-
-		// 测试浮点数切片
-		{[]float64{1.1, 2.2, 3.3}, []float64{2.2, 3.3, 4.4}, []interface{}{1.1, 4.4}},
-		{[]float64{}, []float64{2.2, 3.3}, []interface{}{2.2, 3.3}},
-		{[]float64{1.1, 2.2, 3.3}, []float64{}, []interface{}{1.1, 2.2, 3.3}},
-
-		// 测试布尔切片
-		{[]bool{true, false}, []bool{false, true}, []interface{}{}},
-		{[]bool{true, false}, []bool{true}, []interface{}{false}},
-		{[]bool{}, []bool{false}, []interface{}{false}},
-		{[]bool{true, true}, []bool{false}, []interface{}{true, false}},
 	}
 
 	for _, tc := range cases {
-		// 使用类型断言将 arr1 和 arr2 转换为具体的切片类型
-		var arr1, arr2 []interface{}
+		result := mathx.ArrayDiffSetSorted(tc.arr1, tc.arr2)
+		assert.ElementsMatch(t, tc.want, result, "ArrayDiffSet(%v, %v) = %v; want %v", tc.arr1, tc.arr2, result, tc.want)
+	}
+}
 
-		switch v := tc.arr1.(type) {
-		case []string:
-			arr1 = make([]interface{}, len(v))
-			for i, s := range v {
-				arr1[i] = s
-			}
-		case []int:
-			arr1 = make([]interface{}, len(v))
-			for i, n := range v {
-				arr1[i] = n
-			}
-		case []float64:
-			arr1 = make([]interface{}, len(v))
-			for i, f := range v {
-				arr1[i] = f
-			}
-		case []bool:
-			arr1 = make([]interface{}, len(v))
-			for i, b := range v {
-				arr1[i] = b
-			}
-		}
+func TestArrayDiffSetFloats(t *testing.T) {
+	cases := []struct {
+		arr1 []float64
+		arr2 []float64
+		want []interface{}
+	}{
+		{[]float64{1.1, 2.2, 3.3}, []float64{2.2, 3.3, 4.4}, []interface{}{1.1, 4.4}},
+		{[]float64{}, []float64{2.2, 3.3}, []interface{}{2.2, 3.3}},
+		{[]float64{1.1, 2.2, 3.3}, []float64{}, []interface{}{1.1, 2.2, 3.3}},
+	}
 
-		switch v := tc.arr2.(type) {
-		case []string:
-			arr2 = make([]interface{}, len(v))
-			for i, s := range v {
-				arr2[i] = s
-			}
-		case []int:
-			arr2 = make([]interface{}, len(v))
-			for i, n := range v {
-				arr2[i] = n
-			}
-		case []float64:
-			arr2 = make([]interface{}, len(v))
-			for i, f := range v {
-				arr2[i] = f
-			}
-		case []bool:
-			arr2 = make([]interface{}, len(v))
-			for i, b := range v {
-				arr2[i] = b
-			}
-		}
-
-		result := mathx.ArrayDiffSet(arr1, arr2)
-
-		// 使用 assert 进行结果验证
+	for _, tc := range cases {
+		result := mathx.ArrayDiffSetSorted(tc.arr1, tc.arr2)
 		assert.ElementsMatch(t, tc.want, result, "ArrayDiffSet(%v, %v) = %v; want %v", tc.arr1, tc.arr2, result, tc.want)
 	}
 }

@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-13 23:20:55
+ * @LastEditTime: 2024-11-13 13:08:28
  * @FilePath: \go-toolbox\pkg\mathx\array.go
  * @Description: 包含与数组相关的通用函数，例如计算最小值和最大值、差集、并集等。
  *
@@ -13,7 +13,9 @@ package mathx
 
 import (
 	"errors"
+	"math/rand"
 	"reflect"
+	"sync"
 
 	"github.com/kamalyes/go-toolbox/pkg/types"
 	"github.com/kamalyes/go-toolbox/pkg/validator"
@@ -36,46 +38,61 @@ func ArrayMinMax[T any](list []T, f types.MinMaxFunc[T]) (T, error) {
 	return result, nil // 返回最终结果和 nil 错误
 }
 
-// ArrayDiffSet 计算两个任意类型数组的差集。
-// 返回一个新数组，包含只在一个数组中出现的元素。
-func ArrayDiffSet(arr1, arr2 []interface{}) []interface{} {
-	// 使用 map 来存储 arr2 的元素，以便快速查找
-	set1 := make(map[interface{}]struct{}, len(arr1))
-	set2 := make(map[interface{}]struct{}, len(arr2))
-
-	// 将 arr1 的元素存入集合
-	for _, item := range arr1 {
-		set1[item] = struct{}{}
+// ArrayFisherYates 洗牌算法打乱数组
+func ArrayFisherYates[T types.Numerical](array []T) {
+	for i := len(array) - 1; i > 0; i-- {
+		j := rand.Intn(i + 1)                   // 生成 0 到 i 之间的随机数
+		array[i], array[j] = array[j], array[i] // 交换
 	}
+}
 
-	// 将 arr2 的元素存入集合
-	for _, item := range arr2 {
-		set2[item] = struct{}{}
-	}
+// ArrayDiffSetSorted 计算两个已排序数组的差集
+func ArrayDiffSetSorted[T types.Ordered](arr1, arr2 []T) []T {
+	diff := []T{}
+	i, j := 0, 0
 
-	// 计算只在 arr1 中的元素
-	diff := make([]interface{}, 0, len(arr1)+len(arr2)) // 预分配空间
-
-	for item := range set1 {
-		if _, found := set2[item]; !found {
-			diff = append(diff, item)
+	// 使用双指针遍历两个已排序的数组
+	for i < len(arr1) && j < len(arr2) {
+		if arr1[i] < arr2[j] {
+			diff = append(diff, arr1[i])
+			i++
+		} else if arr1[i] > arr2[j] {
+			diff = append(diff, arr2[j])
+			j++
+		} else {
+			// 遇到相等的元素，跳过
+			i++
+			j++
 		}
 	}
 
-	// 计算只在 arr2 中的元素
-	for item := range set2 {
-		if _, found := set1[item]; !found {
-			diff = append(diff, item)
+	// 添加 arr1 中剩余的元素
+	for i < len(arr1) {
+		diff = append(diff, arr1[i])
+		i++
+	}
+
+	// 添加 arr2 中剩余的元素
+	for j < len(arr2) {
+		diff = append(diff, arr2[j])
+		j++
+	}
+
+	// 由于我们只想要差集，应该从结果中去掉在另一个数组中存在的元素
+	finalDiff := []T{}
+	for _, v := range diff {
+		if !ArrayContains(arr1, v) || !ArrayContains(arr2, v) {
+			finalDiff = append(finalDiff, v)
 		}
 	}
 
-	return diff
+	return finalDiff
 }
 
 // ArrayUnion 计算两个数组的并集。
 // 返回一个新的数组，包含所有元素，不包含重复元素。
 func ArrayUnion[T comparable](arr1, arr2 []T) []T {
-	unionMap := make(map[T]struct{}) // 使用映射去重
+	unionMap := make(map[T]struct{}, len(arr1)+len(arr2)) // 使用映射去重
 	for _, element := range arr1 {
 		unionMap[element] = struct{}{} // 将 arr1 中的元素加入到 unionMap
 	}
@@ -92,7 +109,21 @@ func ArrayUnion[T comparable](arr1, arr2 []T) []T {
 
 // ArrayContains 检查切片中是否包含某个元素。
 // 返回布尔值，表示元素是否存在于切片中。
-func ArrayContains[T comparable](array []T, element T) bool {
+func ArrayContains[T types.Ordered](array []T, element T) bool {
+	length := len(array)
+
+	switch {
+	case length <= 1000:
+		// 对于小于1000条数据，直接遍历切片
+		return containsLinear(array, element)
+	default:
+		// 大数据，使用哈希表
+		return containsHash(array, element)
+	}
+}
+
+// containsLinear 线性查找
+func containsLinear[T types.Ordered](array []T, element T) bool {
 	for _, a := range array {
 		if a == element {
 			return true // 找到元素，返回 true
@@ -101,17 +132,50 @@ func ArrayContains[T comparable](array []T, element T) bool {
 	return false // 未找到元素，返回 false
 }
 
+// containsHash 哈希表查找
+func containsHash[T types.Ordered](array []T, element T) bool {
+	elementMap := make(map[T]struct{})
+	for _, a := range array {
+		elementMap[a] = struct{}{}
+	}
+	_, found := elementMap[element]
+	return found // 返回是否找到该元素
+}
+
 // ArrayHasDuplicates 检查切片中是否存在重复对象。
 // 返回布尔值，表示是否存在重复元素。
 func ArrayHasDuplicates[T comparable](array []T) bool {
-	m := make(map[T]struct{}) // 使用映射存储已见元素
-	for _, v := range array {
-		if _, ok := m[v]; ok {
-			return true // 找到重复元素，返回 true
+	const chunkSize = 1000 // 每个 goroutine 处理的块大小
+	var wg sync.WaitGroup
+	m := make(map[T]struct{})
+	mu := sync.Mutex{}
+
+	for i := 0; i < len(array); i += chunkSize {
+		end := i + chunkSize
+		if end > len(array) {
+			end = len(array)
 		}
-		m[v] = struct{}{} // 添加新元素
+
+		wg.Add(1)
+		go func(subArray []T) {
+			defer wg.Done()
+			localMap := make(map[T]struct{})
+
+			for _, v := range subArray {
+				if _, ok := localMap[v]; ok {
+					mu.Lock()
+					m[v] = struct{}{}
+					mu.Unlock()
+					return // 找到重复，提前返回
+				}
+				localMap[v] = struct{}{}
+			}
+		}(array[i:end])
 	}
-	return false // 未找到重复元素，返回 false
+
+	wg.Wait()
+
+	return len(m) > 0 // 如果 map 非空，表示找到重复元素
 }
 
 // ArrayRemoveEmpty 移除切片中的空对象。
@@ -129,7 +193,7 @@ func ArrayRemoveEmpty[T any](array []T) []T {
 // ArrayRemoveDuplicates 移除切片中的重复值。
 // 返回一个新切片，包含所有唯一元素。
 func ArrayRemoveDuplicates[T comparable](numbers []T) []T {
-	m := make(map[T]struct{})                   // 使用映射去重
+	m := make(map[T]struct{}, len(numbers))     // 预分配 map 的容量
 	uniqueNumbers := make([]T, 0, len(numbers)) // 创建唯一元素切片
 	for _, num := range numbers {
 		if _, exists := m[num]; !exists {

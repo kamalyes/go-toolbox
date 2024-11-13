@@ -49,9 +49,9 @@ func TestRandString(t *testing.T) {
 	assert.Len(t, str, 10, "Expected string length to be 10")
 }
 
-func TestRandomNumber(t *testing.T) {
+func TestRandNumber(t *testing.T) {
 	length := 10
-	result := random.RandomNumber(length)
+	result := random.RandNumber(length)
 
 	// 使用 assert 检查长度和内容
 	assert.Len(t, result, length, "Expected length should be %d", length)
@@ -68,7 +68,7 @@ func TestRandomNumber(t *testing.T) {
 
 	// 测试自定义字节集
 	customBytes := "1234567890"
-	resultCustom := random.RandomNumber(length, customBytes)
+	resultCustom := random.RandNumber(length, customBytes)
 	assert.Len(t, resultCustom, length, "Expected length should be %d for custom bytes", length)
 
 	customDigitMap := make(map[rune]bool)
@@ -81,9 +81,9 @@ func TestRandomNumber(t *testing.T) {
 	}
 }
 
-func TestRandomHex(t *testing.T) {
+func TestRandHex(t *testing.T) {
 	bytesLen := 5
-	result := random.RandomHex(bytesLen)
+	result := random.RandHex(bytesLen)
 
 	// 使用 assert 检查长度和内容
 	assert.Len(t, result, bytesLen*2, "Expected length should be %d", bytesLen*2)
@@ -100,7 +100,7 @@ func TestRandomHex(t *testing.T) {
 
 	// 测试自定义字节集
 	customHexBytes := "abcdef"
-	resultCustom := random.RandomHex(bytesLen, customHexBytes)
+	resultCustom := random.RandHex(bytesLen, customHexBytes)
 	assert.Len(t, resultCustom, bytesLen*2, "Expected length should be %d for custom bytes", bytesLen*2)
 
 	customHexMap := make(map[rune]bool)
@@ -113,9 +113,9 @@ func TestRandomHex(t *testing.T) {
 	}
 }
 
-func TestRandomNum(t *testing.T) {
+func TestRandNum(t *testing.T) {
 	length := 6
-	num := random.RandomNumber(length)
+	num := random.RandNumber(length)
 
 	assert.Len(t, num, length, "Expected number length to be 6")
 }
@@ -218,7 +218,7 @@ func TestB2S(t *testing.T) {
 func TestS2B(t *testing.T) {
 	t.Parallel()
 	for i := 0; i < 100; i++ {
-		s := random.RandomNumber(64)
+		s := random.RandNumber(64)
 		expected := []byte(s)
 		actual := convert.S2B(s)
 		assert.Equal(t, expected, actual)
@@ -274,13 +274,13 @@ func TestRandStringSlice(t *testing.T) {
 	assert.Equal(t, count, len(result), "生成的切片长度应与请求的 count 相等")
 }
 
-// TestGenerateRandomModel 测试 GenerateRandomModel 函数
-func TestGenerateRandomModel(t *testing.T) {
+// TestGenerateRandModel 测试 GenerateRandModel 函数
+func TestGenerateRandModel(t *testing.T) {
 	// 创建一个 TestModel 的实例
 	model := &TestModel{}
 
-	// 调用 GenerateRandomModel
-	modelResult, jsonResult, err := random.GenerateRandomModel(model)
+	// 调用 GenerateRandModel
+	modelResult, jsonResult, err := random.GenerateRandModel(model)
 	if err != nil || modelResult == nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -316,12 +316,12 @@ type User struct {
 	Address    *Address       `json:"address"` // 指针类型
 }
 
-func TestGenerateRandomModelComplex(t *testing.T) {
+func TestGenerateRandModelComplex(t *testing.T) {
 	// 创建一个 User 结构体的指针
 	user := &User{}
 
 	// 生成随机模型
-	model, jsonOutput, err := random.GenerateRandomModel(user)
+	model, jsonOutput, err := random.GenerateRandModel(user)
 	if err != nil {
 		t.Fatalf("Error generating random model: %v", err)
 	}

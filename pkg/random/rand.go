@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-11 10:28:33
+ * @LastEditTime: 2024-11-13 13:55:01
  * @FilePath: \go-toolbox\pkg\random\rand.go
  * @Description:
  *
@@ -20,6 +20,7 @@ import (
 
 	"github.com/kamalyes/go-toolbox/pkg/convert"
 	"github.com/kamalyes/go-toolbox/pkg/json"
+	"github.com/kamalyes/go-toolbox/pkg/types"
 )
 
 // Implement Source and Source64 interfaces
@@ -176,23 +177,22 @@ func RandStringSlice(count, len int, mode RandType) (result []string) {
 	return result
 }
 
-// RandomStr 随机一个字符串
-func RandomStr(length int, customBytes ...string) string {
-	var sb strings.Builder
-	randBytes := ALPHA_BYTES
-	if len(customBytes) > 0 {
-		randBytes = customBytes[0]
+var defaultSliceSize = 1000
+
+// RandNumericalLargeSlice 随机生成大数据整数切片
+func RandNumericalLargeSlice[T types.Numerical](largeSize ...int) []T {
+	if len(largeSize) > 0 {
+		defaultSliceSize = largeSize[0]
 	}
-	if length > 0 {
-		for i := 0; i < length; i++ {
-			sb.WriteString(string(randBytes[rand.New(rand.NewSource(time.Now().UnixNano())).Intn(len(randBytes))]))
-		}
+	slice := make([]T, defaultSliceSize)
+	for i := 0; i < defaultSliceSize; i++ {
+		slice[i] = T(i % 100) // 重复一些值以测试去重和重复检查
 	}
-	return sb.String()
+	return slice
 }
 
-// RandomNumber 随机一个数字字符串
-func RandomNumber(length int, customBytes ...string) string {
+// RandNumber 随机一个数字字符串
+func RandNumber(length int, customBytes ...string) string {
 	var sb strings.Builder
 	randBytes := DEC_BYTES
 	if len(customBytes) > 0 {
@@ -206,8 +206,8 @@ func RandomNumber(length int, customBytes ...string) string {
 	return sb.String()
 }
 
-// RandomHex 随机一个hex字符串
-func RandomHex(bytesLen int, customBytes ...string) string {
+// RandHex 随机一个hex字符串
+func RandHex(bytesLen int, customBytes ...string) string {
 	var sb strings.Builder
 	randBytes := HEX_BYTES
 	if len(customBytes) > 0 {
@@ -339,8 +339,8 @@ func FRandTime() time.Time {
 	return time.Now().Add(time.Duration(FRandInt(1, 1000)) * time.Hour)
 }
 
-// GenerateRandomModel 生成随机模型的 JSON 格式
-func GenerateRandomModel(model interface{}) (interface{}, string, error) {
+// GenerateRandModel 生成随机模型的 JSON 格式
+func GenerateRandModel(model interface{}) (interface{}, string, error) {
 	v := reflect.ValueOf(model)
 
 	// 确保传入的是指针类型且非空
@@ -371,7 +371,7 @@ func populateFields(v reflect.Value) error {
 		// 仅处理导出字段
 		if field.CanSet() {
 			// 根据字段类型设置随机值
-			if err := setRandomValue(field, fieldType); err != nil {
+			if err := setRandValue(field, fieldType); err != nil {
 				return err
 			}
 		}
@@ -379,8 +379,8 @@ func populateFields(v reflect.Value) error {
 	return nil
 }
 
-// setRandomValue 根据字段类型设置随机值
-func setRandomValue(field reflect.Value, fieldType reflect.StructField) error {
+// setRandValue 根据字段类型设置随机值
+func setRandValue(field reflect.Value, fieldType reflect.StructField) error {
 	switch fieldType.Type.Kind() {
 	case reflect.String:
 		field.SetString(FRandString(10)) // 随机生成10个字符的字符串
@@ -400,9 +400,9 @@ func setRandomValue(field reflect.Value, fieldType reflect.StructField) error {
 			}
 		}
 	case reflect.Slice:
-		return setRandomSlice(field, fieldType) // 处理切片类型
+		return setRandSlice(field, fieldType) // 处理切片类型
 	case reflect.Map:
-		return setRandomMap(field, fieldType) // 处理映射类型
+		return setRandMap(field, fieldType) // 处理映射类型
 	case reflect.Ptr: // 处理指针类型
 		if field.IsNil() {
 			field.Set(reflect.New(fieldType.Type.Elem())) // 确保指针被分配
@@ -417,8 +417,8 @@ func setRandomValue(field reflect.Value, fieldType reflect.StructField) error {
 	return nil
 }
 
-// setRandomSlice 随机生成切片并设置到字段
-func setRandomSlice(field reflect.Value, fieldType reflect.StructField) error {
+// setRandSlice 随机生成切片并设置到字段
+func setRandSlice(field reflect.Value, fieldType reflect.StructField) error {
 	if fieldType.Type.Elem().Kind() == reflect.String {
 		length := FRandInt(1, 5) // 随机长度
 		slice := reflect.MakeSlice(fieldType.Type, length, length)
@@ -440,8 +440,8 @@ func setRandomSlice(field reflect.Value, fieldType reflect.StructField) error {
 	return nil
 }
 
-// setRandomMap 随机生成映射并设置到字段
-func setRandomMap(field reflect.Value, fieldType reflect.StructField) error {
+// setRandMap 随机生成映射并设置到字段
+func setRandMap(field reflect.Value, fieldType reflect.StructField) error {
 	if fieldType.Type.Key().Kind() == reflect.String && fieldType.Type.Elem().Kind() == reflect.Int {
 		m := reflect.MakeMap(fieldType.Type) // 创建映射
 		length := FRandInt(1, 5)             // 随机长度

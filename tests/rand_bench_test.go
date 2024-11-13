@@ -29,11 +29,11 @@ func BenchmarkFRandBytesJSON(b *testing.B) {
 	}
 }
 
-// BenchmarkGenerateRandomModel 性能测试 GenerateRandomModel 函数
-func BenchmarkGenerateRandomModel(b *testing.B) {
+// BenchmarkGenerateRandModel 性能测试 GenerateRandModel 函数
+func BenchmarkGenerateRandModel(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		model := &TestModel{}
-		_, _, err := random.GenerateRandomModel(model)
+		_, _, err := random.GenerateRandModel(model)
 		if err != nil {
 			b.Fatalf("Expected no error, got %v", err)
 		}
