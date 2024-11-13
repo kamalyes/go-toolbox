@@ -2,8 +2,8 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-12 21:51:15
- * @FilePath: \go-toolbox\tests\mathx_NUMBER_test.go
+ * @LastEditTime: 2024-11-13 11:27:15
+ * @FilePath: \go-toolbox\tests\mathx_number_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
@@ -242,5 +242,33 @@ func TestEqualBoolSlices(t *testing.T) {
 	for _, test := range tests {
 		result := mathx.EqualSlices(test.a, test.b)
 		assert.Equal(t, test.expected, result, "EqualSlices(%v, %v) = %v; expected %v", test.a, test.b, result, test.expected)
+	}
+}
+
+func TestLongestCommonPrefix(t *testing.T) {
+	tests := []struct {
+		a        string
+		b        string
+		expected int
+	}{
+		{"flower", "flow", 4},         // 正常情况
+		{"dog", "racecar", 0},         // 无公共前缀
+		{"", "", 0},                   // 空字符串
+		{"", "abc", 0},                // 一个空字符串
+		{"abc", "", 0},                // 一个空字符串
+		{"abcde", "abcfg", 3},         // 部分公共前缀
+		{"prefix", "prefixsuffix", 6}, // 完全相同的前缀
+		{"abcdef", "abcxyz", 3},       // 部分公共前缀
+		{"same", "same", 4},           // 完全相同的字符串
+		{"abc", "abcd", 3},            // 另一个边界情况
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.a+"_"+tt.b, func(t *testing.T) {
+			got := mathx.LongestCommonPrefix(tt.a, tt.b)
+			if got != tt.expected {
+				t.Errorf("LongestCommonPrefix(%q, %q) = %d; want %d", tt.a, tt.b, got, tt.expected)
+			}
+		})
 	}
 }

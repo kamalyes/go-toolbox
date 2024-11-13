@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-11 13:08:58
+ * @LastEditTime: 2024-11-13 11:22:22
  * @FilePath: \go-toolbox\pkg\array\array.go
  * @Description:
  *
@@ -12,12 +12,38 @@
 package array
 
 import (
+	"errors"
 	"math"
 	"reflect"
 	"strconv"
 
 	"github.com/kamalyes/go-toolbox/pkg/validator"
 )
+
+// MinMaxFunc 是用于计算最小值或最大值的函数类型，接收两个interface{}类型的参数，返回一个interface{}类型的结果。
+type MinMaxFunc func(a, b interface{}) interface{}
+
+// MinMax 是一个通用的函数，用于计算列表中元素的最小值或最大值。
+// 它接收一个interface{}类型的切片和一个MinMaxFunc类型的函数，
+// 根据提供的函数决定是计算最小值还是最大值。
+// 如果列表为空，则返回错误。
+func MinMax(list []interface{}, f MinMaxFunc) (interface{}, error) {
+	// 检查列表是否为空
+	if len(list) == 0 {
+		return nil, errors.New("列表为空") // 优化注释，使其更简洁明了
+	}
+
+	// 初始化结果为列表的第一个元素
+	result := list[0]
+
+	// 遍历列表中的其余元素，使用提供的函数更新结果
+	for _, v := range list[1:] {
+		result = f(result, v)
+	}
+
+	// 返回最终的结果和nil错误（表示无错误）
+	return result, nil
+}
 
 // InterfaceArrayDiffSet 计算两个任意类型数组的差集，返回一个新数组包含只在一个数组中出现的元素
 /**
