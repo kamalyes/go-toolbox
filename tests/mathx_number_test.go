@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-13 11:27:15
+ * @LastEditTime: 2024-11-13 23:32:32
  * @FilePath: \go-toolbox\tests\mathx_number_test.go
  * @Description:
  *
@@ -16,6 +16,32 @@ import (
 	"github.com/kamalyes/go-toolbox/pkg/mathx"
 	"github.com/stretchr/testify/assert"
 )
+
+// Decimals 测试
+func TestDecimals(t *testing.T) {
+	tests := []struct {
+		name  string
+		num   float64
+		digit int
+		want  string
+	}{
+		{"PositiveInteger", 12345, 2, "123.45"},
+		{"PositiveFloat", 12345.6789, 3, "12.346"},
+		{"NegativeInteger", -12345, 2, "-123.45"},
+		{"NegativeFloat", -12345.6789, 4, "-1.2346"},
+		{"Zero", 0, 3, "0.000"},
+		{"SmallNumber", 0.12345, 4, "0.0000"},
+		{"LargeNumber", 123456789, 5, "1234.56789"},
+		{"NegativeSmallNumber", -0.12345, 4, "-0.0000"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := mathx.Decimals(tt.num, tt.digit)
+			assert.Equal(t, tt.want, result)
+		})
+	}
+}
 
 func TestMathxAtLeast(t *testing.T) {
 	assert := assert.New(t)

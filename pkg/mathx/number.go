@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-13 15:55:18
+ * @LastEditTime: 2024-11-13 23:20:55
  * @FilePath: \go-toolbox\pkg\mathx\number.go
  * @Description:
  *
@@ -12,10 +12,23 @@ package mathx
 
 import (
 	"bytes"
+	"fmt"
+	"math"
 
 	"github.com/kamalyes/go-toolbox/pkg/convert"
 	"github.com/kamalyes/go-toolbox/pkg/types"
 )
+
+// Decimals 转换为包含小数点后指定位数的字符串
+func Decimals[T types.Numerical](num T, digit int) string {
+	// 计算除数
+	divisor := T(math.Pow10(digit))
+	// 将整数转换为浮点数，然后除以除数
+	flt := float64(num) / float64(divisor)
+	// 格式化为字符串，保留小数点后指定位数
+	result := fmt.Sprintf("%.*f", digit, flt)
+	return result
+}
 
 // AtLeast 返回 x 和 lower 中的较大值。
 // 参数:
@@ -64,14 +77,22 @@ func Between[T types.Numerical](x, lower, upper T) T {
 }
 
 // LongestCommonPrefix 返回两个字符串的最长公共前缀的长度。
+// 参数:
+// a - 第一个字符串
+// b - 第二个字符串
+// 返回值:
+// 返回两个字符串的最长公共前缀的长度。
 func LongestCommonPrefix(a, b string) int {
-	maxNumber := AtMost(len(a), len(b))
-	for i := 0; i < maxNumber; i++ {
+	// 计算两个字符串的最小长度
+	maxLength := AtMost(len(a), len(b))
+
+	// 遍历两个字符串，比较字符
+	for i := 0; i < maxLength; i++ {
 		if a[i] != b[i] {
-			return i
+			return i // 返回公共前缀的长度
 		}
 	}
-	return maxNumber
+	return maxLength // 如果完全相同，返回最小长度
 }
 
 // CountPathSegments 计算路径中指定前缀的参数数量，默认为 ":" 和 "*"。

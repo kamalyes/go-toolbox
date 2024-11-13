@@ -30,9 +30,9 @@
 
 - **moment**: One that parses, validates, manipulates, and displays dates and times, simplifying date and time processing.
 
-- **next**: ip region and so on
+- **location**: ip region and so on
 
-- **numberx**: A library of tools for working with numbers that provides extensions to numbers.
+- **mathx**: A library of tools for performing calculations with numbers that offers extensions for numerical operations.
 
 - **random**: Random number generators are used in a variety of applications, such as games, simulations, and security protocols.
 
