@@ -126,3 +126,16 @@ func ZeroValue[T any]() T {
 	var t T
 	return t
 }
+
+// EqualSlices 比较两个切片是否相等，支持任意类型
+func EqualSlices[T comparable](a, b []T) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}

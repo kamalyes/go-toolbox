@@ -160,3 +160,87 @@ func TestZeroValue(t *testing.T) {
 		})
 	}
 }
+
+func TestEqualIntSlices(t *testing.T) {
+	tests := []struct {
+		a        []int
+		b        []int
+		expected bool
+	}{
+		{[]int{1, 2, 3}, []int{1, 2, 3}, true},
+		{[]int{1, 2, 3}, []int{3, 2, 1}, false},
+		{[]int{1, 2, 3}, []int{1, 2}, false},
+		{[]int{}, []int{}, true},
+		{nil, nil, true},
+		{[]int{1, 2, 3}, nil, false},
+		{nil, []int{1, 2, 3}, false},
+	}
+
+	for _, test := range tests {
+		result := mathx.EqualSlices(test.a, test.b)
+		assert.Equal(t, test.expected, result, "EqualSlices(%v, %v) = %v; expected %v", test.a, test.b, result, test.expected)
+	}
+}
+
+func TestEqualFloatSlices(t *testing.T) {
+	tests := []struct {
+		a        []float64
+		b        []float64
+		expected bool
+	}{
+		{[]float64{1.1, 2.2, 3.3}, []float64{1.1, 2.2, 3.3}, true},
+		{[]float64{1.1, 2.2, 3.3}, []float64{3.3, 2.2, 1.1}, false},
+		{[]float64{1.1, 2.2, 3.3}, []float64{1.1, 2.2}, false},
+		{[]float64{}, []float64{}, true},
+		{nil, nil, true},
+		{[]float64{1.1, 2.2, 3.3}, nil, false},
+		{nil, []float64{1.1, 2.2, 3.3}, false},
+	}
+
+	for _, test := range tests {
+		result := mathx.EqualSlices(test.a, test.b)
+		assert.Equal(t, test.expected, result, "EqualSlices(%v, %v) = %v; expected %v", test.a, test.b, result, test.expected)
+	}
+}
+
+func TestEqualStringSlices(t *testing.T) {
+	tests := []struct {
+		a        []string
+		b        []string
+		expected bool
+	}{
+		{[]string{"a", "b", "c"}, []string{"a", "b", "c"}, true},
+		{[]string{"a", "b", "c"}, []string{"c", "b", "a"}, false},
+		{[]string{"a", "b", "c"}, []string{"a", "b"}, false},
+		{[]string{}, []string{}, true},
+		{nil, nil, true},
+		{[]string{"a", "b"}, nil, false},
+		{nil, []string{"a", "b"}, false},
+	}
+
+	for _, test := range tests {
+		result := mathx.EqualSlices(test.a, test.b)
+		assert.Equal(t, test.expected, result, "EqualSlices(%v, %v) = %v; expected %v", test.a, test.b, result, test.expected)
+	}
+}
+
+func TestEqualBoolSlices(t *testing.T) {
+	tests := []struct {
+		a        []bool
+		b        []bool
+		expected bool
+	}{
+		{[]bool{true, false, true}, []bool{true, false, true}, true},
+		{[]bool{true, false, true}, []bool{false, true, true}, false},
+		{[]bool{true, false}, []bool{true, false, true}, false},
+		{[]bool{}, []bool{}, true},
+		{nil, nil, true},
+		{[]bool{true, false}, nil, false},
+		{nil, []bool{true, false}, false},
+	}
+
+	for _, test := range tests {
+		result := mathx.EqualSlices(test.a, test.b)
+		assert.Equal(t, test.expected, result, "EqualSlices(%v, %v) = %v; expected %v", test.a, test.b, result, test.expected)
+	}
+}

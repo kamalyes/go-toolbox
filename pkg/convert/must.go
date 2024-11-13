@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-08-03 21:32:26
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-12 22:26:27
+ * @LastEditTime: 2024-11-13 11:23:25
  * @FilePath: \go-toolbox\pkg\convert\must.go
  * @Description:
  *
@@ -13,6 +13,7 @@ package convert
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"reflect"
 	"strconv"
 	"time"
@@ -69,13 +70,26 @@ func convertToString[T any](v T, timeLayout ...string) string {
 
 // Number 是一个接口，限制了可以作为类型参数的数值类型
 type Number interface {
-	int | int8 | int16 | int32 | int64 | uint | uint8 | uint16 | uint32 | uint64
+	int | int8 | int16 | int32 | int64 | uint | uint8 | uint16 | uint32 | uint64 | float32 | float64
 }
 
+// RoundMode 是一个枚举类型，用于指定取整的方式
+type RoundMode int
+
+const (
+	RoundDown RoundMode = iota // 向下取整
+	RoundUp                    // 向上取整
+)
+
 // MustIntT 将 any 转换为 T 类型
-func MustIntT[T Number](value any) (T, error) {
-	const exceedsIntRange = "value exceeds int range"
+func MustIntT[T Number](value any, mode *RoundMode) (T, error) {
 	const unsupportedConversion = "unsupported conversion"
+	// 默认取整模式为向下取整
+	if mode == nil {
+		defaultMode := RoundDown
+		mode = &defaultMode
+	}
+	var zero T
 	switch v := value.(type) {
 	case int:
 		return T(v), nil
@@ -97,10 +111,70 @@ func MustIntT[T Number](value any) (T, error) {
 		return T(v), nil
 	case uint64:
 		return T(v), nil
+	case float32:
+		if *mode == RoundUp {
+			return T(math.Ceil(float64(v))), nil
+		}
+		return T(math.Floor(float64(v))), nil
+	case float64:
+		if *mode == RoundUp {
+			return T(math.Ceil(v)), nil
+		}
+		return T(math.Floor(v)), nil
+	case string:
+		// 需要特殊处理下, 坑注意go版本不一致 越界返回的结果不一样
+		// GO WIN 1.21.13 input := []string{"9223372036854775807", "9223372036854775806"} actual  : []int64{-9223372036854775808, -9223372036854775808}
+		// GO LINUX 1.21.13 input := []string{"9223372036854775807", "9223372036854775806"} actual  : []int64{9223372036854775807, 9223372036854775807}
+		var floatValue float64
+		err := ParseFloat(v, &floatValue) // 尝试将字符串解析为浮点数
+		if err != nil {
+			return zero, fmt.Errorf("failed to parse %q: %v", v, err)
+		}
+		return Float64ToInt[T](floatValue, *mode)
 	default:
-		var zero T
 		return zero, fmt.Errorf("%s: %v (type %T)", unsupportedConversion, value, value)
 	}
+}
+
+// Float64ToInt 将浮点数转换为整数类型，并进行取整
+func Float64ToInt[T Number](value float64, mode RoundMode) (T, error) {
+	var resultFloatValue T
+
+	var convertedValue float64
+	if mode == RoundUp {
+		convertedValue = math.Ceil(value)
+	} else {
+		convertedValue = math.Floor(value)
+	}
+
+	// 检查转换后的值是否超出 T 的范围
+	switch any(convertedValue).(type) {
+	case int64:
+		if convertedValue < float64(math.MinInt64) || convertedValue > float64(math.MaxInt64) {
+			return resultFloatValue, fmt.Errorf("value %f out of range for type %T", convertedValue, resultFloatValue)
+		}
+	}
+
+	resultFloatValue = T(convertedValue)
+	return resultFloatValue, nil
+}
+
+type Float interface {
+	float32 | float64
+}
+
+// ParseFloat 尝试将字符串解析为指定类型的浮点数
+func ParseFloat[T Float](v string, value *T) error {
+	f, err := strconv.ParseFloat(v, 64) // 先解析为 float64
+	if err != nil {
+		return fmt.Errorf("failed to parse %q: %v", v, err)
+	}
+	// 检查是否是 NaN 或无穷大
+	if math.IsNaN(f) || math.IsInf(f, 0) {
+		return fmt.Errorf("invalid float value: %q", v)
+	}
+	*value = T(f) // 转换为目标类型
+	return nil
 }
 
 // MustBool 强制转为 bool
@@ -112,7 +186,7 @@ func MustBool[T any](v T) bool {
 	case reflect.String:
 		return stringx.IsTrueString(val.String())
 	default:
-		flag, err := MustIntT[int](v)
+		flag, err := MustIntT[int](v, nil)
 		return err == nil && flag != 0
 	}
 }
@@ -125,4 +199,33 @@ func MustJSONIndent(v interface{}) ([]byte, error) {
 // MustJSON 转 json 返回 []byte
 func MustJSON(v interface{}) ([]byte, error) {
 	return json.Marshal(v)
+}
+
+// NumberSliceToStringSlice Number切片转String
+func NumberSliceToStringSlice[T Number](numbers []T) []string {
+	if numbers == nil {
+		return nil // 处理 nil 切片
+	}
+	var result []string
+	for _, number := range numbers {
+		result = append(result, fmt.Sprintf("%v", number)) // 使用 %v 格式化输出
+	}
+	return result
+}
+
+// StringSliceToNumberSlice 将字符串切片转换为数字切片
+func StringSliceToNumberSlice[T Number](strs []string, mode *RoundMode) ([]T, error) {
+	if strs == nil {
+		return nil, nil // 处理 nil 切片
+	}
+	result := make([]T, 0, len(strs))
+	for _, str := range strs {
+		num, err := MustIntT[T](str, mode) // 使用 MustIntT 进行转换
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, num)
+	}
+
+	return result, nil
 }
