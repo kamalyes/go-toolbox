@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-13 18:23:03
+ * @LastEditTime: 2024-11-17 01:55:18
  * @FilePath: \go-toolbox\tests\random_test.go
  * @Description:
  *
@@ -13,7 +13,9 @@ package tests
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
+	"net"
 	"strings"
 	"testing"
 	"time"
@@ -388,4 +390,52 @@ func TestRngSource(t *testing.T) {
 	if len(nims) < 2 {
 		t.Error("Expected at least two different random numbers on multiple calls")
 	}
+}
+
+const testTimeout = 5 * time.Second
+
+func TestGenerateAvailablePort_DefaultRange(t *testing.T) {
+	done := make(chan bool, 1)
+	go func() {
+		port, err := random.GenerateAvailablePort()
+		assert.NoError(t, err, "Failed to generate an available port")
+
+		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+		assert.NoError(t, err, fmt.Sprintf("Failed to bind to port %d", port))
+		listener.Close()
+
+		done <- true
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(testTimeout):
+		t.Error("Test timed out waiting for an available port")
+	}
+}
+
+func TestGenerateAvailablePort_CustomRange(t *testing.T) {
+	done := make(chan bool, 1)
+	go func() {
+		port, err := random.GenerateAvailablePort(2000, 3000)
+		assert.NoError(t, err, "Failed to generate an available port within the custom range")
+		assert.True(t, port >= 2000 && port <= 3000, fmt.Sprintf("Port %d is not within the range [2000, 3000]", port))
+
+		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+		assert.NoError(t, err, fmt.Sprintf("Failed to bind to port %d", port))
+		listener.Close()
+
+		done <- true
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(testTimeout):
+		t.Error("Test timed out waiting for an available port within the custom range")
+	}
+}
+
+func TestGenerateAvailablePort_InvalidRange(t *testing.T) {
+	_, err := random.GenerateAvailablePort(65536, 1024)
+	assert.Error(t, err, "Expected an error for an invalid port range")
 }

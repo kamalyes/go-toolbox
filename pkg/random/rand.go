@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-13 13:55:01
+ * @LastEditTime: 2024-11-17 01:10:01
  * @FilePath: \go-toolbox\pkg\random\rand.go
  * @Description:
  *
@@ -11,8 +11,10 @@
 package random
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
+	"net"
 	"reflect"
 	"strings"
 	"sync"
@@ -453,4 +455,32 @@ func setRandMap(field reflect.Value, fieldType reflect.StructField) error {
 		field.Set(m) // 设置生成的映射
 	}
 	return nil
+}
+
+// GenerateAvailablePort 返回一个随机的可用端口号
+// 如果未提供ports参数或提供的参数长度不为2，则使用默认端口范围1024到65535
+func GenerateAvailablePort(ports ...int) (int, error) {
+	// 设置默认端口范围
+	minPort, maxPort := 1024, 65535
+
+	// 检查是否提供了有效的ports参数
+	if len(ports) == 2 {
+		minPort = ports[0]
+		maxPort = ports[1]
+		// 验证提供的端口范围是否有效
+		if minPort > maxPort {
+			return 0, fmt.Errorf("minimum port cannot be greater than maximum port")
+		}
+	}
+
+	for {
+		port := RandInt(minPort, maxPort)
+		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+		if err == nil {
+			// 成功监听端口，关闭监听器并返回端口号
+			listener.Close()
+			return port, nil
+		}
+		// 如果端口已被使用或发生其他错误，则尝试下一个端口
+	}
 }
