@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-01 01:52:15
+ * @LastEditTime: 2024-11-20 18:15:32
  * @FilePath: \go-toolbox\tests\moment_base_test.go
  * @Description:
  *
@@ -143,4 +143,47 @@ func TestConvertStringToTimestamp(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, expectedTimestamp, timestamp, "Timestamps should match")
+}
+
+// 测试计算年龄的函数
+func TestCalculateAge(t *testing.T) {
+	tests := []struct {
+		birthday    string
+		currentTime time.Time
+		expected    int
+	}{
+		{"1990-05-15", time.Date(2023, 5, 15, 0, 0, 0, 0, time.UTC), 33}, // 生日当天
+		{"2000-01-01", time.Date(2023, 5, 15, 0, 0, 0, 0, time.UTC), 23}, // 生日已过
+		{"1985-12-31", time.Date(2023, 5, 15, 0, 0, 0, 0, time.UTC), 37}, // 生日未到
+		{"2020-01-01", time.Date(2023, 5, 15, 0, 0, 0, 0, time.UTC), 3},  // 生日未到
+		{"2000-02-29", time.Date(2023, 5, 15, 0, 0, 0, 0, time.UTC), 23}, // 闰年出生
+	}
+
+	for _, test := range tests {
+		age, err := moment.CalculateAge(test.birthday, test.currentTime)
+		assert.NoError(t, err, "计算 %s 的年龄时出错", test.birthday)
+		assert.Equal(t, test.expected, age, "对于生日 %s,期望年龄 %d,但得到 %d", test.birthday, test.expected, age)
+	}
+}
+
+// 测试异常用例
+func TestCalculateAgeErrors(t *testing.T) {
+	// 异常用例
+	invalidTests := []struct {
+		birthday    string
+		currentTime time.Time
+		expected    int
+	}{
+		{"invalid-date", time.Date(2023, 5, 15, 0, 0, 0, 0, time.UTC), 0}, // 无效的日期格式
+		{"2023-02-30", time.Date(2023, 5, 15, 0, 0, 0, 0, time.UTC), 0},   // 不存在的日期
+		{"2023-13-01", time.Date(2023, 5, 15, 0, 0, 0, 0, time.UTC), 0},   // 无效的月份
+		{"2023-00-01", time.Date(2023, 5, 15, 0, 0, 0, 0, time.UTC), 0},   // 无效的月份
+		{"2023-01-32", time.Date(2023, 5, 15, 0, 0, 0, 0, time.UTC), 0},   // 不存在的日期
+	}
+
+	for _, test := range invalidTests {
+		age, err := moment.CalculateAge(test.birthday, test.currentTime)
+		assert.Error(t, err, "对于生日 %s,期望返回错误", test.birthday)
+		assert.Equal(t, test.expected, age, "对于生日 %s,期望年龄 %d,但得到 %d", test.birthday, test.expected, age)
+	}
 }

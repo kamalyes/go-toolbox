@@ -2,9 +2,9 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-13 13:08:28
- * @FilePath: \go-toolbox\pkg\mathx\array.go
- * @Description: 包含与数组相关的通用函数，例如计算最小值和最大值、差集、并集等。
+ * @LastEditTime: 2024-11-20 19:15:55
+ * @FilePath: \go-toolbox\pkg\mathx\slice.go
+ * @Description: 包含与切片相关的通用函数，例如计算最小值和最大值、差集、并集等。
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
@@ -21,11 +21,11 @@ import (
 	"github.com/kamalyes/go-toolbox/pkg/validator"
 )
 
-// ArrayMinMax 计算列表中元素的最小值或最大值。
+// SliceMinMax 计算列表中元素的最小值或最大值。
 // 接收一个切片和一个 MinMaxFunc 类型的函数，
 // 根据提供的函数决定是计算最小值还是最大值。
 // 如果列表为空，则返回错误。
-func ArrayMinMax[T any](list []T, f types.MinMaxFunc[T]) (T, error) {
+func SliceMinMax[T any](list []T, f types.MinMaxFunc[T]) (T, error) {
 	if len(list) == 0 {
 		var zero T
 		return zero, errors.New("列表为空") // 返回错误信息
@@ -38,16 +38,29 @@ func ArrayMinMax[T any](list []T, f types.MinMaxFunc[T]) (T, error) {
 	return result, nil // 返回最终结果和 nil 错误
 }
 
-// ArrayFisherYates 洗牌算法打乱数组
-func ArrayFisherYates[T types.Numerical](array []T) {
-	for i := len(array) - 1; i > 0; i-- {
-		j := rand.Intn(i + 1)                   // 生成 0 到 i 之间的随机数
-		array[i], array[j] = array[j], array[i] // 交换
+// SliceFisherYates 洗牌算法打乱数组
+func SliceFisherYates[T comparable](slice []T, maxRetries int) error {
+	original := make([]T, len(slice))
+	copy(original, slice)
+
+	for retries := 0; retries < maxRetries; retries++ {
+		for i := len(slice) - 1; i > 0; i-- {
+			j := rand.Intn(i + 1)                   // 生成 0 到 i 之间的随机数
+			slice[i], slice[j] = slice[j], slice[i] // 交换
+		}
+
+		// 校验洗牌后的切片是否与原始切片相同
+		if !SliceEqual(original, slice) {
+			return nil // 如果不同，返回 nil 表示成功
+		}
 	}
+
+	// 如果达到最大重试次数，返回错误
+	return errors.New("failed to shuffle slice after max retries")
 }
 
-// ArrayDiffSetSorted 计算两个已排序数组的差集
-func ArrayDiffSetSorted[T types.Ordered](arr1, arr2 []T) []T {
+// SliceDiffSetSorted 计算两个已排序数组的差集
+func SliceDiffSetSorted[T types.Ordered](arr1, arr2 []T) []T {
 	diff := []T{}
 	i, j := 0, 0
 
@@ -81,7 +94,7 @@ func ArrayDiffSetSorted[T types.Ordered](arr1, arr2 []T) []T {
 	// 由于我们只想要差集，应该从结果中去掉在另一个数组中存在的元素
 	finalDiff := []T{}
 	for _, v := range diff {
-		if !ArrayContains(arr1, v) || !ArrayContains(arr2, v) {
+		if !SliceContains(arr1, v) || !SliceContains(arr2, v) {
 			finalDiff = append(finalDiff, v)
 		}
 	}
@@ -89,9 +102,9 @@ func ArrayDiffSetSorted[T types.Ordered](arr1, arr2 []T) []T {
 	return finalDiff
 }
 
-// ArrayUnion 计算两个数组的并集。
+// SliceUnion 计算两个数组的并集。
 // 返回一个新的数组，包含所有元素，不包含重复元素。
-func ArrayUnion[T comparable](arr1, arr2 []T) []T {
+func SliceUnion[T comparable](arr1, arr2 []T) []T {
 	unionMap := make(map[T]struct{}, len(arr1)+len(arr2)) // 使用映射去重
 	for _, element := range arr1 {
 		unionMap[element] = struct{}{} // 将 arr1 中的元素加入到 unionMap
@@ -107,24 +120,103 @@ func ArrayUnion[T comparable](arr1, arr2 []T) []T {
 	return union
 }
 
-// ArrayContains 检查切片中是否包含某个元素。
+// SliceUniq 集合去重
+func SliceUniq[T ~[]E, E comparable](list T) T {
+	if len(list) == 0 {
+		return list
+	}
+
+	ret := make(T, 0, len(list))
+	m := make(map[E]struct{}, len(list))
+	for _, v := range list {
+		if _, exists := m[v]; !exists {
+			ret = append(ret, v)
+			m[v] = struct{}{}
+		}
+	}
+	return ret
+}
+
+// SliceDiff 返回两个集合之间的差异
+func SliceDiff[T ~[]E, E comparable](list1 T, list2 T) (ret1 T, ret2 T) {
+	m1 := make(map[E]struct{}, len(list1))
+	m2 := make(map[E]struct{}, len(list2))
+
+	for _, v := range list1 {
+		m1[v] = struct{}{}
+	}
+	for _, v := range list2 {
+		m2[v] = struct{}{}
+	}
+
+	// 计算差异
+	for _, v := range list1 {
+		if _, exists := m2[v]; !exists {
+			ret1 = append(ret1, v)
+		}
+	}
+	for _, v := range list2 {
+		if _, exists := m1[v]; !exists {
+			ret2 = append(ret2, v)
+		}
+	}
+	return ret1, ret2
+}
+
+// SliceWithout 返回不包括所有给定值的切片
+func SliceWithout[T ~[]E, E comparable](list T, exclude ...E) T {
+	if len(list) == 0 {
+		return list
+	}
+
+	m := make(map[E]struct{}, len(exclude))
+	for _, v := range exclude {
+		m[v] = struct{}{}
+	}
+
+	ret := make(T, 0, len(list))
+	for _, v := range list {
+		if _, exists := m[v]; !exists {
+			ret = append(ret, v)
+		}
+	}
+	return ret
+}
+
+// SliceIntersect 返回两个集合的交集
+func SliceIntersect[T ~[]E, E comparable](list1 T, list2 T) T {
+	m := make(map[E]struct{}, len(list1))
+	for _, v := range list1 {
+		m[v] = struct{}{}
+	}
+
+	ret := make(T, 0, len(list1)) // 预分配内存
+	for _, v := range list2 {
+		if _, exists := m[v]; exists {
+			ret = append(ret, v)
+		}
+	}
+	return ret
+}
+
+// SliceContains 检查切片中是否包含某个元素。
 // 返回布尔值，表示元素是否存在于切片中。
-func ArrayContains[T types.Ordered](array []T, element T) bool {
-	length := len(array)
+func SliceContains[T types.Ordered](slice []T, element T) bool {
+	length := len(slice)
 
 	switch {
 	case length <= 1000:
 		// 对于小于1000条数据，直接遍历切片
-		return containsLinear(array, element)
+		return containsLinear(slice, element)
 	default:
 		// 大数据，使用哈希表
-		return containsHash(array, element)
+		return containsHash(slice, element)
 	}
 }
 
 // containsLinear 线性查找
-func containsLinear[T types.Ordered](array []T, element T) bool {
-	for _, a := range array {
+func containsLinear[T types.Ordered](slice []T, element T) bool {
+	for _, a := range slice {
 		if a == element {
 			return true // 找到元素，返回 true
 		}
@@ -133,35 +225,35 @@ func containsLinear[T types.Ordered](array []T, element T) bool {
 }
 
 // containsHash 哈希表查找
-func containsHash[T types.Ordered](array []T, element T) bool {
+func containsHash[T types.Ordered](slice []T, element T) bool {
 	elementMap := make(map[T]struct{})
-	for _, a := range array {
+	for _, a := range slice {
 		elementMap[a] = struct{}{}
 	}
 	_, found := elementMap[element]
 	return found // 返回是否找到该元素
 }
 
-// ArrayHasDuplicates 检查切片中是否存在重复对象。
+// SliceHasDuplicates 检查切片中是否存在重复对象。
 // 返回布尔值，表示是否存在重复元素。
-func ArrayHasDuplicates[T comparable](array []T) bool {
+func SliceHasDuplicates[T comparable](slice []T) bool {
 	const chunkSize = 1000 // 每个 goroutine 处理的块大小
 	var wg sync.WaitGroup
 	m := make(map[T]struct{})
 	mu := sync.Mutex{}
 
-	for i := 0; i < len(array); i += chunkSize {
+	for i := 0; i < len(slice); i += chunkSize {
 		end := i + chunkSize
-		if end > len(array) {
-			end = len(array)
+		if end > len(slice) {
+			end = len(slice)
 		}
 
 		wg.Add(1)
-		go func(subArray []T) {
+		go func(subSlice []T) {
 			defer wg.Done()
 			localMap := make(map[T]struct{})
 
-			for _, v := range subArray {
+			for _, v := range subSlice {
 				if _, ok := localMap[v]; ok {
 					mu.Lock()
 					m[v] = struct{}{}
@@ -170,7 +262,7 @@ func ArrayHasDuplicates[T comparable](array []T) bool {
 				}
 				localMap[v] = struct{}{}
 			}
-		}(array[i:end])
+		}(slice[i:end])
 	}
 
 	wg.Wait()
@@ -178,11 +270,11 @@ func ArrayHasDuplicates[T comparable](array []T) bool {
 	return len(m) > 0 // 如果 map 非空，表示找到重复元素
 }
 
-// ArrayRemoveEmpty 移除切片中的空对象。
+// SliceRemoveEmpty 移除切片中的空对象。
 // 返回一个新切片，包含所有非空元素。
-func ArrayRemoveEmpty[T any](array []T) []T {
-	result := make([]T, 0, len(array)) // 创建结果切片
-	for _, v := range array {
+func SliceRemoveEmpty[T any](slice []T) []T {
+	result := make([]T, 0, len(slice)) // 创建结果切片
+	for _, v := range slice {
 		if !validator.IsEmptyValue(reflect.ValueOf(v)) {
 			result = append(result, v) // 仅添加非空元素
 		}
@@ -190,9 +282,9 @@ func ArrayRemoveEmpty[T any](array []T) []T {
 	return result
 }
 
-// ArrayRemoveDuplicates 移除切片中的重复值。
+// SliceRemoveDuplicates 移除切片中的重复值。
 // 返回一个新切片，包含所有唯一元素。
-func ArrayRemoveDuplicates[T comparable](numbers []T) []T {
+func SliceRemoveDuplicates[T comparable](numbers []T) []T {
 	m := make(map[T]struct{}, len(numbers))     // 预分配 map 的容量
 	uniqueNumbers := make([]T, 0, len(numbers)) // 创建唯一元素切片
 	for _, num := range numbers {
@@ -204,9 +296,9 @@ func ArrayRemoveDuplicates[T comparable](numbers []T) []T {
 	return uniqueNumbers
 }
 
-// ArrayRemoveZero 移除切片中的零值。
+// SliceRemoveZero 移除切片中的零值。
 // 返回一个新切片，包含所有非零元素。
-func ArrayRemoveZero(arr []int) []int {
+func SliceRemoveZero(arr []int) []int {
 	result := make([]int, 0, len(arr)) // 创建结果切片
 	for _, val := range arr {
 		if val != 0 {
@@ -216,10 +308,10 @@ func ArrayRemoveZero(arr []int) []int {
 	return result
 }
 
-// ArrayChunk 将一个切片分割成多个子切片。
+// SliceChunk 将一个切片分割成多个子切片。
 // size 参数指定每个子切片的大小。
 // 返回一个包含子切片的切片。
-func ArrayChunk[T any](slice []T, size int) [][]T {
+func SliceChunk[T any](slice []T, size int) [][]T {
 	if size <= 0 {
 		return nil // 如果 size <= 0，则返回 nil
 	}
@@ -233,4 +325,17 @@ func ArrayChunk[T any](slice []T, size int) [][]T {
 		batches = append(batches, slice[i:end]) // 切片而不复制
 	}
 	return batches
+}
+
+// SliceEqual 比较两个切片是否相等，支持任何类型
+func SliceEqual[T comparable](a, b []T) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

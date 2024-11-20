@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-13 18:55:56
+ * @LastEditTime: 2024-11-20 18:55:55
  * @FilePath: \go-toolbox\pkg\moment\base.go
  * @Description:
  *
@@ -103,4 +103,23 @@ func ConvertStringToTimestamp(dateString, layout string, timeZone string) (int64
 	// 转换时间为时间戳
 	timestamp := t.Unix()
 	return timestamp, nil
+}
+
+// 计算年龄的函数，currentTime 为计算年龄时的参考时间
+func CalculateAge(birthday string, currentTime time.Time) (int, error) {
+	// 解析生日字符串为 time.Time 对象
+	birthDate, err := time.Parse("2006-01-02", birthday)
+	if err != nil {
+		return 0, err // 如果解析失败，返回错误
+	}
+
+	// 计算年龄
+	age := currentTime.Year() - birthDate.Year()
+
+	// 检查是否已经过了生日
+	if currentTime.YearDay() < birthDate.YearDay() {
+		age-- // 如果还没到生日，年龄减一
+	}
+
+	return age, nil
 }

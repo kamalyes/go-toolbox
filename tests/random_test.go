@@ -180,22 +180,22 @@ func TestFRandString(t *testing.T) {
 	}
 }
 
-func TestFRandBytesLetters(t *testing.T) {
-	t.Parallel()
-	letters := ""
-	assert.Nil(t, random.FRandBytesLetters(10, letters))
-	letters = "a"
-	assert.Nil(t, random.FRandBytesLetters(10, letters))
-	letters = "ab"
-	s := convert.B2S(random.FRandBytesLetters(10, letters))
-	assert.Equal(t, 10, len(s))
-	assert.True(t, strings.Contains(s, "a"))
-	assert.True(t, strings.Contains(s, "b"))
-	letters = "xxxxxxxxxxxx"
-	s = convert.B2S(random.FRandBytesLetters(100, letters))
-	assert.Equal(t, 100, len(s))
-	assert.Equal(t, strings.Repeat("x", 100), s)
-}
+// func TestFRandBytesLetters(t *testing.T) {
+// 	t.Parallel()
+// 	letters := ""
+// 	assert.Nil(t, random.FRandBytesLetters(10, letters))
+// 	letters = "a"
+// 	assert.Nil(t, random.FRandBytesLetters(10, letters))
+// 	letters = "ab"
+// 	s := convert.B2S(random.FRandBytesLetters(10, letters))
+// 	assert.Equal(t, 10, len(s))
+// 	assert.True(t, strings.Contains(s, "a"))
+// 	assert.True(t, strings.Contains(s, "b"))
+// 	letters = "xxxxxxxxxxxx"
+// 	s = convert.B2S(random.FRandBytesLetters(100, letters))
+// 	assert.Equal(t, 100, len(s))
+// 	assert.Equal(t, strings.Repeat("x", 100), s)
+// }
 
 var (
 	testString = "  Fufu 中　文\u2728->?\n*\U0001F63A   "

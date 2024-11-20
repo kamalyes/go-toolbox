@@ -2,8 +2,8 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-11 15:55:06
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-13 13:20:15
- * @FilePath: \go-toolbox\tests\mathx_array_test.go
+ * @LastEditTime: 2024-11-20 19:15:50
+ * @FilePath: \go-toolbox\tests\mathx_slice_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
@@ -18,8 +18,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestArrayMinMax 测试 ArrayMinMax 函数
-func TestArrayMinMax(t *testing.T) {
+// TestSliceMinMax 测试 SliceMinMax 函数
+func TestSliceMinMax(t *testing.T) {
 	tests := []struct {
 		name      string
 		list      []int
@@ -61,8 +61,8 @@ func TestArrayMinMax(t *testing.T) {
 	}
 }
 
-// TestArrayUnion 测试 ArrayUnion 函数
-func TestArrayUnion(t *testing.T) {
+// TestSliceUnion 测试 SliceUnion 函数
+func TestSliceUnion(t *testing.T) {
 	tests := []struct {
 		name string
 		a    []int
@@ -77,36 +77,81 @@ func TestArrayUnion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := mathx.ArrayUnion(tt.a, tt.b)
+			result := mathx.SliceUnion(tt.a, tt.b)
 			assert.ElementsMatch(t, tt.want, result)
 		})
 	}
 }
 
-// 测试 ArrayFisherYates 函数
-func TestArrayFisherYates(t *testing.T) {
+func TestSliceEqual(t *testing.T) {
+	// 测试整数切片
+	intSlice1 := []int{1, 2, 3, 4, 5}
+	intSlice2 := []int{1, 2, 3, 4, 5}
+	intSlice3 := []int{1, 2, 3, 4, 6}
 
+	assert.True(t, mathx.SliceEqual(intSlice1, intSlice2), "Expected slices to be equal")
+	assert.False(t, mathx.SliceEqual(intSlice1, intSlice3), "Expected slices to be different")
+
+	// 测试字符串切片
+	strSlice1 := []string{"a", "b", "c"}
+	strSlice2 := []string{"a", "b", "c"}
+	strSlice3 := []string{"a", "b", "d"}
+
+	assert.True(t, mathx.SliceEqual(strSlice1, strSlice2), "Expected slices to be equal")
+	assert.False(t, mathx.SliceEqual(strSlice1, strSlice3), "Expected slices to be different")
+
+	// 测试自定义结构体切片
+	type Person struct {
+		Name string
+		Age  int
+	}
+
+	personSlice1 := []Person{{Name: "Alice", Age: 30}, {Name: "Bob", Age: 25}}
+	personSlice2 := []Person{{Name: "Alice", Age: 30}, {Name: "Bob", Age: 25}}
+	personSlice3 := []Person{{Name: "Charlie", Age: 35}}
+
+	assert.True(t, mathx.SliceEqual(personSlice1, personSlice2), "Expected slices to be equal")
+	assert.False(t, mathx.SliceEqual(personSlice1, personSlice3), "Expected slices to be different")
+}
+
+// TestSliceFisherYates 测试 Fisher-Yates 洗牌算法
+func TestSliceFisherYates(t *testing.T) {
 	tests := [][]int{
 		{1, 2, 3, 4, 5},
 		{10, 20, 30, 40, 50},
 	}
 
-	for _, input := range tests {
-		original := make([]int, len(input))
-		copy(original, input) // 复制输入以便后续比较
+	for _, original := range tests {
+		// 进行多次洗牌测试
+		shuffledCount := 0
+		for i := 0; i < 100; i++ {
+			// 复制原始数组以便每次测试都有相同的输入
+			testSlice := make([]int, len(original))
+			copy(testSlice, original)
 
-		mathx.ArrayFisherYates(input) // 调用洗牌函数
+			// 调用洗牌函数，设置最大重试次数为 100
+			err := mathx.SliceFisherYates(testSlice, 100)
+			if err != nil {
+				t.Errorf("Error during shuffling: %v", err)
+				continue // 继续进行下一个测试
+			}
 
-		// 使用 assert 检查数组是否被打乱
-		assert.NotEqual(t, original, input, "ArrayFisherYates did not shuffle the array: original %v, got %v", original, input)
+			// 检查洗牌后的数组是否与原数组相同
+			if !mathx.SliceEqual(original, testSlice) {
+				shuffledCount++
+			}
+		}
+
+		// 断言至少有一次洗牌结果与原数组不同
+		assert.Greater(t, shuffledCount, 0, "SliceFisherYates did not shuffle the slice: original %v", original)
 	}
 }
 
-// TestArrayContains 测试 ArrayContains 函数
-func TestArrayContains(t *testing.T) {
+// TestSliceContains 测试 SliceContains 函数
+func TestSliceContains(t *testing.T) {
 	tests := []struct {
 		name     string
-		array    []int
+		slice    []int
 		element  int
 		expected bool
 	}{
@@ -117,17 +162,17 @@ func TestArrayContains(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := mathx.ArrayContains(tt.array, tt.element)
+			result := mathx.SliceContains(tt.slice, tt.element)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
-// TestArrayHasDuplicates 测试 ArrayHasDuplicates 函数
-func TestArrayHasDuplicates(t *testing.T) {
+// TestSliceHasDuplicates 测试 SliceHasDuplicates 函数
+func TestSliceHasDuplicates(t *testing.T) {
 	tests := []struct {
 		name     string
-		array    []int
+		slice    []int
 		expected bool
 	}{
 		{"HasDuplicatesTrue", []int{1, 2, 2, 3}, true},
@@ -137,17 +182,17 @@ func TestArrayHasDuplicates(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := mathx.ArrayHasDuplicates(tt.array)
+			result := mathx.SliceHasDuplicates(tt.slice)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
-// TestArrayRemoveEmpty 测试 ArrayRemoveEmpty 函数
-func TestArrayRemoveEmpty(t *testing.T) {
+// TestSliceRemoveEmpty 测试 SliceRemoveEmpty 函数
+func TestSliceRemoveEmpty(t *testing.T) {
 	tests := []struct {
 		name     string
-		array    []interface{}
+		slice    []interface{}
 		expected []interface{}
 	}{
 		{"RemoveEmpty", []interface{}{1, "", nil, 2}, []interface{}{1, 2}},
@@ -157,17 +202,17 @@ func TestArrayRemoveEmpty(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := mathx.ArrayRemoveEmpty(tt.array)
+			result := mathx.SliceRemoveEmpty(tt.slice)
 			assert.ElementsMatch(t, tt.expected, result)
 		})
 	}
 }
 
-// TestArrayRemoveDuplicates 测试 ArrayRemoveDuplicates 函数
-func TestArrayRemoveDuplicates(t *testing.T) {
+// TestSliceRemoveDuplicates 测试 SliceRemoveDuplicates 函数
+func TestSliceRemoveDuplicates(t *testing.T) {
 	tests := []struct {
 		name     string
-		array    []int
+		slice    []int
 		expected []int
 	}{
 		{"RemoveDuplicates", []int{1, 2, 2, 3}, []int{1, 2, 3}},
@@ -177,17 +222,17 @@ func TestArrayRemoveDuplicates(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := mathx.ArrayRemoveDuplicates(tt.array)
+			result := mathx.SliceRemoveDuplicates(tt.slice)
 			assert.ElementsMatch(t, tt.expected, result)
 		})
 	}
 }
 
-// TestArrayRemoveZero 测试 ArrayRemoveZero 函数
-func TestArrayRemoveZero(t *testing.T) {
+// TestSliceRemoveZero 测试 SliceRemoveZero 函数
+func TestSliceRemoveZero(t *testing.T) {
 	tests := []struct {
 		name     string
-		array    []int
+		slice    []int
 		expected []int
 	}{
 		{"RemoveZeros", []int{0, 1, 2, 0, 3}, []int{1, 2, 3}},
@@ -197,14 +242,14 @@ func TestArrayRemoveZero(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := mathx.ArrayRemoveZero(tt.array)
+			result := mathx.SliceRemoveZero(tt.slice)
 			assert.ElementsMatch(t, tt.expected, result)
 		})
 	}
 }
 
-// TestArrayChunk 测试 ArrayChunk 函数
-func TestArrayChunk(t *testing.T) {
+// TestSliceChunk 测试 SliceChunk 函数
+func TestSliceChunk(t *testing.T) {
 	tests := []struct {
 		name     string
 		slice    []int
@@ -219,13 +264,13 @@ func TestArrayChunk(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := mathx.ArrayChunk(tt.slice, tt.size)
+			result := mathx.SliceChunk(tt.slice, tt.size)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
-func TestArrayDiffSetStrings(t *testing.T) {
+func TestSliceDiffSetStrings(t *testing.T) {
 	cases := []struct {
 		arr1 []string
 		arr2 []string
@@ -238,12 +283,12 @@ func TestArrayDiffSetStrings(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		result := mathx.ArrayDiffSetSorted(tc.arr1, tc.arr2)
-		assert.ElementsMatch(t, tc.want, result, "ArrayDiffSet(%v, %v) = %v; want %v", tc.arr1, tc.arr2, result, tc.want)
+		result := mathx.SliceDiffSetSorted(tc.arr1, tc.arr2)
+		assert.ElementsMatch(t, tc.want, result, "SliceDiffSet(%v, %v) = %v; want %v", tc.arr1, tc.arr2, result, tc.want)
 	}
 }
 
-func TestArrayDiffSetInts(t *testing.T) {
+func TestSliceDiffSetInts(t *testing.T) {
 	cases := []struct {
 		arr1 []int
 		arr2 []int
@@ -256,12 +301,12 @@ func TestArrayDiffSetInts(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		result := mathx.ArrayDiffSetSorted(tc.arr1, tc.arr2)
-		assert.ElementsMatch(t, tc.want, result, "ArrayDiffSet(%v, %v) = %v; want %v", tc.arr1, tc.arr2, result, tc.want)
+		result := mathx.SliceDiffSetSorted(tc.arr1, tc.arr2)
+		assert.ElementsMatch(t, tc.want, result, "SliceDiffSet(%v, %v) = %v; want %v", tc.arr1, tc.arr2, result, tc.want)
 	}
 }
 
-func TestArrayDiffSetFloats(t *testing.T) {
+func TestSliceDiffSetFloats(t *testing.T) {
 	cases := []struct {
 		arr1 []float64
 		arr2 []float64
@@ -273,7 +318,7 @@ func TestArrayDiffSetFloats(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		result := mathx.ArrayDiffSetSorted(tc.arr1, tc.arr2)
-		assert.ElementsMatch(t, tc.want, result, "ArrayDiffSet(%v, %v) = %v; want %v", tc.arr1, tc.arr2, result, tc.want)
+		result := mathx.SliceDiffSetSorted(tc.arr1, tc.arr2)
+		assert.ElementsMatch(t, tc.want, result, "SliceDiffSet(%v, %v) = %v; want %v", tc.arr1, tc.arr2, result, tc.want)
 	}
 }
