@@ -18,19 +18,22 @@ import (
 )
 
 // 辅助函数，创建测试用例
-func newTestCase(originalJSON string, pairs *json.KeyValuePairs, expected map[string]interface{}) struct {
+func newTestCase(originalJSON string, pairs *json.KeyValuePairs, expected map[string]interface{}, expectError bool) struct {
 	originalJSON string
 	pairs        *json.KeyValuePairs
 	expected     map[string]interface{}
+	expectError  bool
 } {
 	return struct {
 		originalJSON string
 		pairs        *json.KeyValuePairs
 		expected     map[string]interface{}
+		expectError  bool
 	}{
 		originalJSON: originalJSON,
 		pairs:        pairs,
 		expected:     expected,
+		expectError:  expectError,
 	}
 }
 
@@ -44,9 +47,9 @@ func checkJSONEquality(t testing.TB, result, expected map[string]interface{}) {
 }
 
 // 辅助函数，解析 JSON 字符串并返回 map
-func parseJSON(t testing.TB, jsonStr string) map[string]interface{} {
+func parseJSON(t testing.TB, jsonStr []byte) map[string]interface{} {
 	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
+	if err := json.Unmarshal(jsonStr, &result); err != nil {
 		t.Fatalf("解析 JSON 失败: %v", err)
 	}
 	return result
@@ -58,6 +61,7 @@ func TestAppendKeysToJSON(t *testing.T) {
 		originalJSON string
 		pairs        *json.KeyValuePairs
 		expected     map[string]interface{}
+		expectError  bool // 新增字段，指示是否期望错误
 	}{
 		newTestCase(
 			`{"name": "Alice", "age": 30}`,
@@ -68,6 +72,7 @@ func TestAppendKeysToJSON(t *testing.T) {
 				"city":    "New York",
 				"country": "USA",
 			},
+			false,
 		),
 		newTestCase(
 			`{}`,
@@ -75,6 +80,7 @@ func TestAppendKeysToJSON(t *testing.T) {
 			map[string]interface{}{
 				"key1": "value1",
 			},
+			false,
 		),
 		newTestCase(
 			`{"existing": "value"}`,
@@ -83,6 +89,7 @@ func TestAppendKeysToJSON(t *testing.T) {
 				"existing": "value",
 				"newKey":   "newValue",
 			},
+			false,
 		),
 		newTestCase(
 			`{"a": 1}`,
@@ -92,12 +99,36 @@ func TestAppendKeysToJSON(t *testing.T) {
 				"b": float64(2),
 				"c": float64(3),
 			},
+			false,
+		),
+		// 无效的 JSON 字符串
+		newTestCase(
+			`{"name": "Alice", "age": 30,}`,
+			json.NewKeyValuePairs().Add("city", "New York"),
+			nil,  // 预期返回 nil
+			true, // 期望错误
+		),
+		// 传入 nil 的 JSON 字符串
+		newTestCase(
+			`nil`,
+			json.NewKeyValuePairs().Add("key", "value"),
+			nil,  // 预期返回 nil
+			true, // 期望错误
 		),
 	}
 
 	// 遍历测试用例
 	for _, tt := range tests {
-		updatedJSON, err := json.AppendKeysToJSON(tt.originalJSON, tt.pairs)
+		updatedJSON, err := json.AppendKeysToJSONMarshal(tt.originalJSON, tt.pairs)
+		if tt.expectError {
+			// 如果期望错误，检查是否返回了错误
+			if err == nil {
+				t.Fatalf("期望错误，但没有返回错误")
+			}
+			continue // 继续下一个测试用例
+		}
+
+		// 如果不期望错误，检查返回的 JSON
 		if err != nil {
 			t.Fatalf("期望没有错误，实际错误为 %v", err)
 		}

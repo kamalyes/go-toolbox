@@ -350,3 +350,89 @@ func TestSliceDiffSetFloats(t *testing.T) {
 		assert.ElementsMatch(t, tc.want, result, "SliceDiffSet(%v, %v) = %v; want %v", tc.arr1, tc.arr2, result, tc.want)
 	}
 }
+
+// TestSliceUniq 测试 SliceUniq 函数
+func TestSliceUniq(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []int
+		expected []int
+	}{
+		{"Empty slice", []int{}, []int{}},
+		{"No duplicates", []int{1, 2, 3}, []int{1, 2, 3}},
+		{"With duplicates", []int{1, 2, 2, 3, 1}, []int{1, 2, 3}},
+		{"All duplicates", []int{1, 1, 1}, []int{1}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := mathx.SliceUniq(test.input)
+			assert.Equal(t, test.expected, result)
+		})
+	}
+}
+
+// TestSliceDiff 测试 SliceDiff 函数
+func TestSliceDiff(t *testing.T) {
+	tests := []struct {
+		name      string
+		list1     []int
+		list2     []int
+		expected1 []int
+		expected2 []int
+	}{
+		{"No difference", []int{1, 2}, []int{1, 2}, []int{}, []int{}},
+		{"Some difference", []int{1, 2, 3}, []int{2, 3, 4}, []int{1}, []int{4}},
+		{"All different", []int{1, 2}, []int{3, 4}, []int{1, 2}, []int{3, 4}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result1, result2 := mathx.SliceDiff(test.list1, test.list2)
+			assert.Equal(t, test.expected1, result1)
+			assert.Equal(t, test.expected2, result2)
+		})
+	}
+}
+
+// TestSliceWithout 测试 SliceWithout 函数
+func TestSliceWithout(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []int
+		exclude  []int
+		expected []int
+	}{
+		{"No exclude", []int{1, 2, 3}, []int{}, []int{1, 2, 3}},
+		{"Some excluded", []int{1, 2, 3}, []int{2}, []int{1, 3}},
+		{"All excluded", []int{1, 2, 3}, []int{1, 2, 3}, []int{}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := mathx.SliceWithout(test.input, test.exclude...)
+			assert.Equal(t, test.expected, result)
+		})
+	}
+}
+
+// TestSliceIntersect 测试 SliceIntersect 函数
+func TestSliceIntersect(t *testing.T) {
+	tests := []struct {
+		name     string
+		list1    []int
+		list2    []int
+		expected []int
+	}{
+		{"No intersection", []int{1, 2}, []int{3, 4}, []int{}},
+		{"Some intersection", []int{1, 2, 3}, []int{2, 3, 4}, []int{2, 3}},
+		{"All intersecting", []int{1, 2}, []int{1, 2}, []int{1, 2}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := mathx.SliceIntersect(test.list1, test.list2)
+			assert.Equal(t, test.expected, result)
+		})
+	}
+}

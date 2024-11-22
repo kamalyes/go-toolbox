@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-03 22:55:31
+ * @LastEditTime: 2024-11-22 11:50:50
  * @FilePath: \go-toolbox\pkg\json\base.go
  * @Description:
  *
@@ -28,23 +28,18 @@ func (kv *KeyValuePairs) Add(key string, value interface{}) *KeyValuePairs {
 	return kv
 }
 
-// AppendKeysToJSON 将键值对追加到 JSON 字符串中
-func AppendKeysToJSON(originalJSON string, pairs *KeyValuePairs) (string, error) {
+// AppendKeysToJSONMarshal 将键值对追加到 JSON 中
+func AppendKeysToJSONMarshal(originalJSON string, pairs *KeyValuePairs) ([]byte, error) {
 	var originalMap map[string]interface{}
 	if err := Unmarshal([]byte(originalJSON), &originalMap); err != nil {
-		return "", err
+		return []byte{}, err
 	}
 
 	for key, value := range pairs.pairs {
 		originalMap[key] = value
 	}
 
-	updatedJSON, err := Marshal(originalMap)
-	if err != nil {
-		return "", err
-	}
-
-	return string(updatedJSON), nil
+	return Marshal(originalMap)
 }
 
 // ReplaceKeys 替换 JSON 中的键（key）中的指定字符串为目标字符串

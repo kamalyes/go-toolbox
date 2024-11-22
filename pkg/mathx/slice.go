@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-22 11:07:52
+ * @LastEditTime: 2024-11-22 11:17:55
  * @FilePath: \go-toolbox\pkg\mathx\slice.go
  * @Description: 包含与切片相关的通用函数，例如计算最小值和最大值、差集、并集等。
  *
@@ -175,6 +175,14 @@ func SliceDiff[T ~[]E, E comparable](list1 T, list2 T) (ret1 T, ret2 T) {
 		if _, exists := m1[v]; !exists {
 			ret2 = append(ret2, v)
 		}
+	}
+
+	// 确保返回的切片不是 nil
+	if ret1 == nil {
+		ret1 = make(T, 0)
+	}
+	if ret2 == nil {
+		ret2 = make(T, 0)
 	}
 	return ret1, ret2
 }

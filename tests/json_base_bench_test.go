@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-08 11:25:16
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-08 11:25:16
+ * @LastEditTime: 2024-11-22 11:51:55
  * @FilePath: \go-toolbox\tests\json_base_bench_test.go
  * @Description:
  *
@@ -36,7 +36,7 @@ func BenchmarkAppendKeysToJSON(b *testing.B) {
 
 	// 运行基准测试
 	for i := 0; i < b.N; i++ {
-		updatedJSON, err := json.AppendKeysToJSON(originalJSON, pairs)
+		updatedJSON, err := json.AppendKeysToJSONMarshal(originalJSON, pairs)
 		if err != nil {
 			b.Fatalf("期望没有错误，实际错误为 %v", err)
 		}
