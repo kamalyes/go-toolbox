@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-10-16 08:57:23
+ * @LastEditTime: 2024-11-22 15:17:25
  * @FilePath: \go-toolbox\tests\stringx_replace_test.go
  * @Description:
  *
@@ -11,6 +11,7 @@
 package tests
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/kamalyes/go-toolbox/pkg/stringx"
@@ -28,8 +29,31 @@ func TestReplaceAll(t *testing.T) {
 }
 
 func TestReplaceWithIndex(t *testing.T) {
-	result := stringx.ReplaceWithIndex("abcdefghij", 2, 6, "****")
-	assert.Equal(t, "ab****ghij", result)
+	tests := []struct {
+		input       string
+		startIndex  int
+		endIndex    int
+		replacedStr string
+		expected    string
+	}{
+		{"hello world", 6, 11, "*", "hello *****"},
+		{"hello world", 0, 5, "*", "***** world"},
+		{"hello world", 0, 0, "*", "hello world"}, // 替换长度为0
+		{"hello world", 5, 5, "*", "hello world"}, // 替换长度为0
+		{"hello world", 5, 6, "*", "hello*world"}, // 替换单个字符
+		{"hello", 1, 4, "X", "hXXXo"},             // 替换多个字符
+		{"", 0, 1, "*", ""},                       // 空字符串
+		{"test", -1, 2, "#", "##st"},              // startIndex < 0
+		{"test", 1, 10, "#", "t###"},              // endIndex 超出范围
+		{"test", 3, 1, "#", "test"},               // startIndex > endIndex
+	}
+
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("input: %s, start: %d, end: %d", test.input, test.startIndex, test.endIndex), func(t *testing.T) {
+			result := stringx.ReplaceWithIndex(test.input, test.startIndex, test.endIndex, test.replacedStr)
+			assert.Equal(t, test.expected, result)
+		})
+	}
 }
 
 func TestPad(t *testing.T) {

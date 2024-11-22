@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 10:50:50
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-09 10:50:50
+ * @LastEditTime: 2024-11-22 15:55:59
  * @FilePath: \go-toolbox\tests\stringx_regexp_test.go
  * @Description:
  *
@@ -1027,4 +1027,18 @@ func TestAnyRegs_MatchIPv6(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestMatchPass2Valid 测试 MatchPass2 的有效情况
+func TestMatchPass2Valid(t *testing.T) {
+	input := "Valid1@Password"
+	result := r.MatchPass2(input)
+	assert.True(t, result, "Expected true for valid password")
+}
+
+// TestMatchPass2Invalid 测试 MatchPass2 的无效情况
+func TestMatchPass2Invalid(t *testing.T) {
+	input := "short"
+	result := r.MatchPass2(input)
+	assert.False(t, result, "Expected false for invalid password")
 }

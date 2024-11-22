@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-22 10:07:57
+ * @LastEditTime: 2024-11-22 15:15:18
  * @FilePath: \go-toolbox\pkg\stringx\replace.go
  * @Description:
  *
@@ -42,23 +42,22 @@ func (s *StringX) ReplaceAllChain(searchStr string, replacement string) *StringX
 // startIndex 开始位置（包含）
 // endIndex 结束位置（不包含）
 func ReplaceWithIndex(str string, startIndex int, endIndex int, replacedStr string) string {
-	if startIndex < 0 || endIndex > len(str) || startIndex > endIndex {
-		return str // 如果索引无效，返回原始字符串
-	}
-	runes := []rune(str)
-	strLen := Length(str)
-
-	// 检查并调整 startIndex 和 endIndex 的有效性
+	// 如果 startIndex 小于0，设置为0
 	if startIndex < 0 {
 		startIndex = 0
 	}
-	if endIndex > strLen {
-		endIndex = strLen
+
+	// 如果 endIndex 超出字符串长度，设置为字符串长度
+	if endIndex > len(str) {
+		endIndex = len(str)
 	}
-	if startIndex >= endIndex {
+
+	// 如果 startIndex 大于 endIndex，返回原始字符串
+	if startIndex > endIndex {
 		return str
 	}
 
+	runes := []rune(str)
 	replaceCount := endIndex - startIndex
 
 	return string(runes[:startIndex]) + RepeatByLength(replacedStr, replaceCount) + string(runes[endIndex:])
@@ -122,10 +121,6 @@ const (
 
 type Paddler struct {
 	Position PadPosition
-}
-
-func SetPadPosition(p *Paddler, position PadPosition) {
-	p.Position = position
 }
 
 // Pad 输入的字符长度<minLength时自动补位*

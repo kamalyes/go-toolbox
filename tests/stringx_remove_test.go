@@ -63,3 +63,17 @@ func TestRemoveSuffixIgnoreCase(t *testing.T) {
 	result = stringx.RemovePrefixIgnoreCase("heLlo", "he")
 	assert.Equal(t, "Llo", result)
 }
+
+// TestRemoveSymbols 测试 RemoveSymbols
+func TestRemoveSymbols(t *testing.T) {
+	input := "Hello, World! 123"
+	result := stringx.RemoveSymbols(input)
+	assert.Equal(t, "HelloWorld123", result, "Expected cleaned string")
+}
+
+// TestRemoveSymbolsChain 测试 RemoveSymbols 的有效情况
+func TestRemoveSymbolsChain(t *testing.T) {
+	input := stringx.New("Hello, World! 123")
+	result := input.RemoveSymbolsChain().Value()
+	assert.Equal(t, "HelloWorld123", result, "Expected cleaned string")
+}

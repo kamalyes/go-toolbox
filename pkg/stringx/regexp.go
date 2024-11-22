@@ -195,11 +195,6 @@ func (g *AnyRegs) MatchEnCharacter(str string) bool {
 	return g.match(g.regEnCharacter, str)
 }
 
-// MatchEnCharacterDotUnderLine 检查字符串是否只包含字母、数字、点号和下划线
-func MatchEnCharacterDotUnderLine(str string) bool {
-	return regexp.MustCompile(`^[a-zA-Z0-9._]+`).MatchString(str)
-}
-
 // MatchUpEnCharacter 检查字符串是否为纯大写英文字符串
 func (g *AnyRegs) MatchUpEnCharacter(str string) bool {
 	return g.match(g.regUpEnCharacter, str)
@@ -332,12 +327,6 @@ func (g *AnyRegs) MatchIPv4(input string) bool {
 // MatchIPv6 检查字符串是否为有效的IPv6地址
 func (g *AnyRegs) MatchIPv6(input string) bool {
 	return net.ParseIP(input) != nil && net.ParseIP(input).To4() == nil
-}
-
-// RemoveSymbols 使用正则表达式去掉字符串中的所有符号
-func RemoveSymbols(s string) string {
-	reg := regexp.MustCompile(`[^\w]+`)
-	return reg.ReplaceAllString(s, "")
 }
 
 // MatchTime 检查字符串是否符合时间格式

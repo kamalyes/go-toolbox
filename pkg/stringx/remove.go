@@ -11,6 +11,7 @@
 package stringx
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/kamalyes/go-toolbox/pkg/validator"
@@ -27,6 +28,18 @@ func RemoveAll(str string, strToRemove string) string {
 // RemoveAllChain 移除字符串中所有给定字符串（链式调用）
 func (s *StringX) RemoveAllChain(strToRemove string) *StringX {
 	s.value = RemoveAll(s.value, strToRemove)
+	return s
+}
+
+// RemoveSymbols 使用正则表达式去掉字符串中的所有符号
+func RemoveSymbols(str string) string {
+	reg := regexp.MustCompile(`[^\w]+`)
+	return reg.ReplaceAllString(str, "")
+}
+
+// RemoveSymbolsChain 使用正则表达式去掉字符串中的所有符号（链式调用）
+func (s *StringX) RemoveSymbolsChain() *StringX {
+	s.value = RemoveSymbols(s.value)
 	return s
 }
 
