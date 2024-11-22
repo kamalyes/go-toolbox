@@ -2,8 +2,8 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-10 01:58:19
- * @FilePath: \go-toolbox\tests\stringx_chain_test.go
+ * @LastEditTime: 2024-11-22 12:57:21
+ * @FilePath: \go-toolbox\tests\stringx_base_chain_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
@@ -111,4 +111,32 @@ func TestConvertCharacterStyleChain(t *testing.T) {
 		result := stringx.New(test.input).ConvertCharacterStyleChain(test.style).Value()
 		assert.Equal(t, test.expected, result, "ConvertCharacterStyle(%q, %v) = %q; want %q", test.input, test.style, result, test.expected)
 	}
+}
+
+func TestToLowerChain(t *testing.T) {
+	s := stringx.New("Hello World")
+	result := s.ToLowerChain().Value()
+	expected := "hello world"
+	assert.Equal(t, expected, result, "ToLowerChain() = %v; want %v", result, expected)
+}
+
+func TestToUpperChain(t *testing.T) {
+	s := stringx.New("hello world")
+	result := s.ToUpperChain().Value()
+	expected := "HELLO WORLD"
+	assert.Equal(t, expected, result, "ToUpperChain() = %v; want %v", result, expected)
+}
+
+func TestToTitleChain(t *testing.T) {
+	s := stringx.New("hello world")
+	result := s.ToTitleChain().Value()
+	expected := "Hello World"
+	assert.Equal(t, expected, result, "ToTitleChain() = %v; want %v", result, expected)
+}
+
+func TestChainedMethods(t *testing.T) {
+	s := stringx.New("gO LaNg")
+	result := s.ToLowerChain().ToUpperChain().ToTitleChain().Value()
+	expected := "Go Lang"
+	assert.Equal(t, expected, result, "Chained methods = %v; want %v", result, expected)
 }

@@ -175,6 +175,75 @@ func TestSliceFisherYates(t *testing.T) {
 	}
 }
 
+func TestSliceQuickSortInPlace(t *testing.T) {
+	tests := []struct {
+		input    []int
+		expected []int
+	}{
+		{[]int{3, 6, 8, 10, 1, 2, 1}, []int{1, 1, 2, 3, 6, 8, 10}},
+		{[]int{5, 4, 3, 2, 1}, []int{1, 2, 3, 4, 5}},
+		{[]int{1}, []int{1}},
+		{[]int{}, []int{}},               // 测试空切片
+		{[]int{2, 2, 2}, []int{2, 2, 2}}, // 测试所有元素相同
+	}
+
+	for _, test := range tests {
+		// 调用快速排序
+		mathx.InsertionSort(test.input)
+
+		// 使用 assert 验证排序结果
+		assert.Equal(t, test.expected, test.input, "InsertionSort(%v) = %v; expected %v", test.input, test.input, test.expected)
+	}
+}
+
+// 测试快速排序的正确性
+func TestQuickSort(t *testing.T) {
+	tests := []struct {
+		input    []int
+		expected []int
+	}{
+		{[]int{3, 2, 1}, []int{1, 2, 3}},
+		{[]int{5, 3, 8, 4, 2}, []int{2, 3, 4, 5, 8}},
+		{[]int{1, 1, 1}, []int{1, 1, 1}},
+		{[]int{}, []int{}}, // 测试空数组
+	}
+
+	for _, test := range tests {
+		// 复制输入数组以避免修改原始数据
+		arr := make([]int, len(test.input))
+		copy(arr, test.input)
+
+		mathx.QuickSort(arr, 0, len(arr)-1)
+
+		// 使用 assert 进行验证
+		assert.Equal(t, test.expected, arr, "对于输入 %v，期望 %v，但得到 %v", test.input, test.expected, arr)
+	}
+}
+
+// 测试冒泡排序的正确性
+func TestBubbleSort(t *testing.T) {
+	tests := []struct {
+		input    []int
+		expected []int
+	}{
+		{[]int{3, 2, 1}, []int{1, 2, 3}},
+		{[]int{5, 3, 8, 4, 2}, []int{2, 3, 4, 5, 8}},
+		{[]int{1, 1, 1}, []int{1, 1, 1}},
+		{[]int{}, []int{}}, // 测试空数组
+	}
+
+	for _, test := range tests {
+		// 复制输入数组以避免修改原始数据
+		arr := make([]int, len(test.input))
+		copy(arr, test.input)
+
+		mathx.BubbleSort(arr)
+
+		// 使用 assert 进行验证
+		assert.Equal(t, test.expected, arr, "对于输入 %v，期望 %v，但得到 %v", test.input, test.expected, arr)
+	}
+}
+
 // TestSliceContains 测试 SliceContains 函数
 func TestSliceContains(t *testing.T) {
 	tests := []struct {

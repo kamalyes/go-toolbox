@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-22 10:07:57
+ * @LastEditTime: 2024-11-22 13:02:50
  * @FilePath: \go-toolbox\pkg\stringx\base.go
  * @Description:
  *
@@ -35,11 +35,78 @@ func (s *StringX) Value() string {
 	return s.value
 }
 
+// ToLower 将字符串转换为小写
+func ToLower(str string) string {
+	// 预分配结果切片，避免多次内存分配
+	result := make([]rune, len(str))
+	resultIndex := 0 // 结果切片的索引
+
+	for _, r := range str {
+		result[resultIndex] = unicode.ToLower(r)
+		resultIndex++
+	}
+
+	return string(result[:resultIndex]) // 返回有效部分
+}
+
+// ToLowerChain 将字符串转换为小写（链式调用）
+func (s *StringX) ToLowerChain() *StringX {
+	s.value = ToLower(s.value)
+	return s
+}
+
+// ToUpper 将字符串转换为大写
+func ToUpper(str string) string {
+	// 预分配结果切片，避免多次内存分配
+	result := make([]rune, len(str))
+	resultIndex := 0
+
+	for _, r := range str {
+		result[resultIndex] = unicode.ToUpper(r)
+		resultIndex++
+	}
+
+	return string(result[:resultIndex])
+}
+
+// ToUpperChain 将字符串转换为大写（链式调用）
+func (s *StringX) ToUpperChain() *StringX {
+	s.value = ToUpper(s.value)
+	return s
+}
+
+// ToTitle 将字符串转换为标题格式（每个单词首字母大写）
+func ToTitle(str string) string {
+	// 预分配结果切片，避免多次内存分配
+	result := make([]rune, len(str))
+	resultIndex := 0
+	space := true // 用于标记是否在单词的开头
+
+	for _, r := range str {
+		if space {
+			result[resultIndex] = unicode.ToUpper(r) // 首字母大写
+			space = false
+		} else {
+			result[resultIndex] = unicode.ToLower(r) // 其他字符小写
+		}
+		resultIndex++
+
+		if unicode.IsSpace(r) {
+			space = true // 遇到空格，标记为下一个单词的开头
+		}
+	}
+
+	return string(result[:resultIndex]) // 返回有效部分
+}
+
+// ToTitleChain 将字符串转换为标题格式（链式调用）
+func (s *StringX) ToTitleChain() *StringX {
+	s.value = ToTitle(s.value)
+	return s
+}
+
 // Length 计算长度
 func Length(str string) int {
-	if validator.IsEmptyValue(reflect.ValueOf(str)) {
-		return 0
-	}
 	strRune := []rune(str)
 	return len(strRune)
 }

@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-10 11:03:53
+ * @LastEditTime: 2024-11-22 12:55:59
  * @FilePath: \go-toolbox\tests\stringx_base_bench_test.go
  * @Description:
  *
@@ -42,5 +42,33 @@ func BenchmarkToCamelCase(b *testing.B) {
 	input := "this_is_a_test_string_for_benchmarking"
 	for i := 0; i < b.N; i++ {
 		stringx.ConvertCharacterStyle(input, stringx.CamelCharacterStyle)
+	}
+}
+
+func BenchmarkToLowerChain(b *testing.B) {
+	s := stringx.New("Hello World")
+	for i := 0; i < b.N; i++ {
+		_ = s.ToLowerChain().Value()
+	}
+}
+
+func BenchmarkToUpperChain(b *testing.B) {
+	s := stringx.New("hello world")
+	for i := 0; i < b.N; i++ {
+		_ = s.ToUpperChain().Value()
+	}
+}
+
+func BenchmarkToTitleChain(b *testing.B) {
+	s := stringx.New("hello world")
+	for i := 0; i < b.N; i++ {
+		_ = s.ToTitleChain().Value()
+	}
+}
+
+func BenchmarkChainedMethods(b *testing.B) {
+	s := stringx.New("gO LaNg")
+	for i := 0; i < b.N; i++ {
+		_ = s.ToLowerChain().ToUpperChain().ToTitleChain().Value()
 	}
 }

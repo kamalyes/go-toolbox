@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-22 11:17:55
+ * @LastEditTime: 2024-11-22 13:55:18
  * @FilePath: \go-toolbox\pkg\mathx\slice.go
  * @Description: 包含与切片相关的通用函数，例如计算最小值和最大值、差集、并集等。
  *
@@ -362,4 +362,64 @@ func SliceEqual[T comparable](a, b []T) bool {
 		}
 	}
 	return true
+}
+
+// InsertionSort 对小规模数组使用插入排序
+func InsertionSort(arr []int) {
+	if len(arr) < 2 {
+		return
+	}
+	low := 0
+	high := len(arr) - 1
+
+	for currentIndex := low + 1; currentIndex <= high; currentIndex++ {
+		key := arr[currentIndex]
+		sortedIndex := currentIndex - 1
+		for sortedIndex >= low && arr[sortedIndex] > key {
+			arr[sortedIndex+1] = arr[sortedIndex]
+			sortedIndex--
+		}
+		arr[sortedIndex+1] = key
+	}
+}
+
+// QuickSort 实现快速排序算法
+func QuickSort(arr []int, low, high int) {
+	if low < high {
+		// 获取分区索引
+		pi := partition(arr, low, high)
+
+		// 递归排序分区
+		QuickSort(arr, low, pi-1)  // 排序基准左侧
+		QuickSort(arr, pi+1, high) // 排序基准右侧
+	}
+}
+
+// partition 进行分区操作
+func partition(arr []int, low, high int) int {
+	pivot := arr[high]     // 选择最后一个元素作为基准
+	sortedIndex := low - 1 // 小于基准的元素的索引
+
+	for currentIndex := low; currentIndex < high; currentIndex++ {
+		if arr[currentIndex] < pivot { // 如果当前元素小于基准
+			sortedIndex++                                                             // 增加小于基准的元素索引
+			arr[sortedIndex], arr[currentIndex] = arr[currentIndex], arr[sortedIndex] // 交换
+		}
+	}
+	// 将基准放到正确的位置
+	arr[sortedIndex+1], arr[high] = arr[high], arr[sortedIndex+1]
+	return sortedIndex + 1 // 返回基准的索引
+}
+
+// BubbleSort 实现冒泡排序算法
+func BubbleSort(arr []int) {
+	n := len(arr)
+
+	for currentIndex := 0; currentIndex < n-1; currentIndex++ {
+		for sortedIndex := 0; sortedIndex < n-currentIndex-1; sortedIndex++ {
+			if arr[sortedIndex] > arr[sortedIndex+1] { // 如果当前元素大于下一个元素，则交换
+				arr[sortedIndex], arr[sortedIndex+1] = arr[sortedIndex+1], arr[sortedIndex]
+			}
+		}
+	}
 }
