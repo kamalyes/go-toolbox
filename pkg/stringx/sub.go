@@ -40,6 +40,12 @@ func SubBefore(str string, separator string, isLastSeparator bool) string {
 	return str[:pos]
 }
 
+// SubBeforeChain 截取分隔字符串之前的字符串（链式调用）
+func (s *StringX) SubBeforeChain(separator string, isLastSeparator bool) *StringX {
+	s.value = SubBefore(s.value, separator, isLastSeparator)
+	return s
+}
+
 // SubAfter 截取分隔字符串之后的字符串，不包括分隔字符串
 func SubAfter(str string, separator string, isLastSeparator bool) string {
 	hasEmpty, _ := validator.HasEmpty([]interface{}{str, separator})
@@ -58,7 +64,13 @@ func SubAfter(str string, separator string, isLastSeparator bool) string {
 		return ""
 	}
 
-	return str[pos:]
+	return str[pos+len(separator):]
+}
+
+// SubAfterChain 截取分隔字符串之后的字符串（链式调用）
+func (s *StringX) SubAfterChain(separator string, isLastSeparator bool) *StringX {
+	s.value = SubAfter(s.value, separator, isLastSeparator)
+	return s
 }
 
 // SubBetween 截取指定字符串中间部分，不包括标识字符串
@@ -80,6 +92,12 @@ func SubBetween(str string, before string, after string) string {
 	}
 
 	return str[startIndex:endIndex]
+}
+
+// SubBetweenChain 截取指定字符串中间部分（链式调用）
+func (s *StringX) SubBetweenChain(before string, after string) *StringX {
+	s.value = SubBetween(s.value, before, after)
+	return s
 }
 
 // SubBetweenAll 截取指定字符串多段中间部分，不包括标识字符串

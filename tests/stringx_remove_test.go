@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-01 02:25:56
+ * @LastEditTime: 2024-11-22 10:57:11
  * @FilePath: \go-toolbox\tests\stringx_remove_test.go
  * @Description:
  *
@@ -16,16 +16,6 @@ import (
 	"github.com/kamalyes/go-toolbox/pkg/stringx"
 	"github.com/stretchr/testify/assert"
 )
-
-func TestAllRemoveFunctions(t *testing.T) {
-	t.Run("TestRemoveAll", TestRemoveAll)
-	t.Run("TestRemoveAny", TestRemoveAny)
-	t.Run("TestRemoveAllLineBreaks", TestRemoveAllLineBreaks)
-	t.Run("TestRemovePrefix", TestRemovePrefix)
-	t.Run("TestRemovePrefixIgnoreCase", TestRemovePrefixIgnoreCase)
-	t.Run("TestRemoveSuffix", TestRemoveSuffix)
-	t.Run("TestRemoveSuffixIgnoreCase", TestRemoveSuffixIgnoreCase)
-}
 
 func TestRemoveAll(t *testing.T) {
 	result := stringx.RemoveAll("aa-bb-cc-dd", "-")
@@ -60,7 +50,7 @@ func TestRemovePrefixIgnoreCase(t *testing.T) {
 
 func TestRemoveSuffix(t *testing.T) {
 	result := stringx.RemoveSuffix("hello", "lo")
-	assert.Equal(t, "he", result)
+	assert.Equal(t, "hel", result)
 }
 
 func TestRemoveSuffixIgnoreCase(t *testing.T) {

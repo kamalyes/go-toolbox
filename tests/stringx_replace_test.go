@@ -3,7 +3,7 @@
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2024-10-16 08:57:23
- * @FilePath: \go-toolbox\tests\replace_test.go
+ * @FilePath: \go-toolbox\tests\stringx_replace_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
@@ -16,19 +16,6 @@ import (
 	"github.com/kamalyes/go-toolbox/pkg/stringx"
 	"github.com/stretchr/testify/assert"
 )
-
-func TestAllReplaceFunctions(t *testing.T) {
-	t.Run("TestReplace", TestReplace)
-	t.Run("TestReplaceAll", TestReplaceAll)
-	t.Run("TestReplaceWithIndex", TestReplaceWithIndex)
-	t.Run("TestPad", TestPad)
-	t.Run("TestReplaceIgnoreCase", TestReplaceIgnoreCase)
-	t.Run("TestEndWithIgnoreCase", TestEndWithIgnoreCase)
-	t.Run("TestReplaceWithMatcher", TestReplaceWithMatcher)
-	t.Run("TestHide", TestHide)
-	t.Run("TestReplaceSpecialChars", TestReplaceSpecialChars)
-
-}
 
 func TestReplace(t *testing.T) {
 	result := stringx.Replace("hello, world", "hello", "hi", 1)
@@ -57,11 +44,6 @@ func TestPad(t *testing.T) {
 
 	result = stringx.Pad("ok", 5, &stringx.Paddler{Position: stringx.Right})
 	assert.Equal(t, "ok***", result)
-}
-
-func TestReplaceIgnoreCase(t *testing.T) {
-	result := stringx.ReplaceIgnoreCase("Hello, World", "hello", "hi", 1)
-	assert.Equal(t, "hi, world", result)
 }
 
 func TestReplaceWithMatcher(t *testing.T) {

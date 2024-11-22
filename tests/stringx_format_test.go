@@ -3,7 +3,7 @@
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2024-08-03 23:10:59
- * @FilePath: \go-toolbox\tests\format_test.go
+ * @FilePath: \go-toolbox\tests\stringx_format_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
@@ -16,17 +16,6 @@ import (
 	"github.com/kamalyes/go-toolbox/pkg/stringx"
 	"github.com/stretchr/testify/assert"
 )
-
-func TestAllFormatFunctions(t *testing.T) {
-	t.Run("TestFillBefore", TestFillBefore)
-	t.Run("TestFillAfter", TestFillAfter)
-	t.Run("TestFormat", TestFormat)
-	t.Run("TestIndexedFormat", TestIndexedFormat)
-	t.Run("TestTruncateAppendEllipsis", TestTruncateAppendEllipsis)
-	t.Run("TestTruncate", TestTruncate)
-	t.Run("TestAddPrefixIfNot", TestAddPrefixIfNot)
-	t.Run("TestAddSuffixIfNot", TestAddSuffixIfNot)
-}
 
 func TestFillBefore(t *testing.T) {
 	result := stringx.FillBefore("hello", ".", 10)
@@ -53,8 +42,22 @@ func TestIndexedFormat(t *testing.T) {
 }
 
 func TestTruncateAppendEllipsis(t *testing.T) {
-	result := stringx.TruncateAppendEllipsis("This is a very long string", 10)
-	assert.Equal(t, "This is...", result)
+	tests := []struct {
+		input    string
+		maxChars int
+		expected string
+	}{
+		{"这是一个测试字符串12356789@#￥￥", 10, "这是一个测试字符串1..."},
+		{"这是一个测试字符串12356789@#￥￥", 50, "这是一个测试字符串12356789@#￥￥"},
+		{"", 10, ""},
+	}
+
+	for _, test := range tests {
+		result := stringx.TruncateAppendEllipsis(test.input, test.maxChars)
+		if result != test.expected {
+			t.Errorf("TruncateAppendEllipsis(%q, %d) = %q; want %q", test.input, test.maxChars, result, test.expected)
+		}
+	}
 }
 
 func TestTruncate(t *testing.T) {

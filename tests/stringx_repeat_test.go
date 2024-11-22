@@ -3,7 +3,7 @@
  * @Date: 2024-11-13 11:57:23
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2024-11-13 19:57:23
- * @FilePath: \go-toolbox\tests\replace_test.go
+ * @FilePath: \go-toolbox\tests\stringx_repeat_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.

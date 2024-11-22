@@ -3,7 +3,7 @@
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2024-08-03 10:39:01
- * @FilePath: \go-toolbox\tests\sub_test.go
+ * @FilePath: \go-toolbox\tests\stringx_sub_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
@@ -40,7 +40,7 @@ func TestSubBefore(t *testing.T) {
 
 func TestSubAfter(t *testing.T) {
 	result := stringx.SubAfter("abcdef", "d", true)
-	assert.Equal(t, "def", result)
+	assert.Equal(t, "ef", result)
 
 	result = stringx.SubAfter("abcdef", "x", false)
 	assert.Equal(t, "", result)

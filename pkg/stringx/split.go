@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-07-30 17:26:07
+ * @LastEditTime: 2024-11-22 10:15:50
  * @FilePath: \go-toolbox\pkg\stringx\split.go
  * @Description:
  *
@@ -57,11 +57,11 @@ func SplitAfterMapping[T any](str string, separator string, mapping func(s strin
 	splitLimit := Split(str, separator)
 	var result []T
 	for _, s := range splitLimit {
-		mapping, err := mapping(s)
+		mapped, err := mapping(s)
 		if err != nil {
 			panic(err.Error())
 		}
-		result = append(result, mapping)
+		result = append(result, mapped)
 	}
 	return result
 }

@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-11 13:08:58
+ * @LastEditTime: 2024-11-22 10:07:57
  * @FilePath: \go-toolbox\pkg\stringx\base.go
  * @Description:
  *
@@ -20,6 +20,21 @@ import (
 	"github.com/kamalyes/go-toolbox/pkg/validator"
 )
 
+// StringX 是一个结构体，用于封装字符串值并提供操作方法。
+type StringX struct {
+	value string
+}
+
+// New 创建一个新的 StringX 实例。
+func New(value string) *StringX {
+	return &StringX{value: value}
+}
+
+// Get 返回当前字符串的值
+func (s *StringX) Value() string {
+	return s.value
+}
+
 // Length 计算长度
 func Length(str string) int {
 	if validator.IsEmptyValue(reflect.ValueOf(str)) {
@@ -29,19 +44,25 @@ func Length(str string) int {
 	return len(strRune)
 }
 
+// LengthChain 计算长度（链式调用）
+func (s *StringX) LengthChain() int {
+	return Length(s.value)
+}
+
 // Reverse 反转给定的字符串
 func Reverse(str string) string {
-	// 将字符串转换为 rune 切片，以处理 Unicode 字符
 	runes := []rune(str)
 	n := len(runes)
-
-	// 反转 rune 切片
 	for i := 0; i < n/2; i++ {
 		runes[i], runes[n-i-1] = runes[n-i-1], runes[i]
 	}
-
-	// 返回反转后的字符串
 	return string(runes)
+}
+
+// ReverseChain 反转字符串（链式调用）
+func (s *StringX) ReverseChain() *StringX {
+	s.value = Reverse(s.value)
+	return s
 }
 
 // Equals 比较2个字符串（大小写敏感）
@@ -49,12 +70,21 @@ func Equals(str1 string, str2 string) bool {
 	return str1 == str2
 }
 
+// EqualsChain 比较2个字符串（链式调用）
+func (s *StringX) EqualsChain(str2 string) bool {
+	return Equals(s.value, str2)
+}
+
 // EqualsIgnoreCase 比较2个字符串（大小写不敏感）
 func EqualsIgnoreCase(str1 string, str2 string) bool {
 	return strings.EqualFold(str1, str2)
 }
 
-// InsertSpaces 插入空值
+// EqualsIgnoreCaseChain 比较2个字符串（链式调用，忽略大小写）
+func (s *StringX) EqualsIgnoreCaseChain(str2 string) bool {
+	return EqualsIgnoreCase(s.value, str2)
+}
+
 // InsertSpaces 插入空值
 func InsertSpaces(str string, interval int) string {
 	var buffer strings.Builder
@@ -77,8 +107,13 @@ func InsertSpaces(str string, interval int) string {
 	return buffer.String()
 }
 
-// EqualsAny 给定字符串是否与提供的中任一字符串相同，相同则返回true，没有相同的返回false;
-// 如果参与比对的字符串列表为空，返回false
+// InsertSpacesChain 插入空值（链式调用）
+func (s *StringX) InsertSpacesChain(interval int) *StringX {
+	s.value = InsertSpaces(s.value, interval)
+	return s
+}
+
+// EqualsAny 给定字符串是否与提供的中任一字符串相同
 func EqualsAny(str1 string, str2 []string) bool {
 	if len(str2) == 0 {
 		return false
@@ -91,8 +126,12 @@ func EqualsAny(str1 string, str2 []string) bool {
 	return false
 }
 
-// EqualsAnyIgnoreCase 给定字符串是否与提供的中任一字符串相同（忽略大小写），相同则返回true，没有相同的返回false;
-// 如果参与比对的字符串列表为空，返回false
+// EqualsAnyChain 给定字符串是否与提供的中任一字符串相同（链式调用）
+func (s *StringX) EqualsAnyChain(strs []string) bool {
+	return EqualsAny(s.value, strs)
+}
+
+// EqualsAnyIgnoreCase 给定字符串是否与提供的中任一字符串相同（忽略大小写）
 func EqualsAnyIgnoreCase(str1 string, str2 []string) bool {
 	if len(str2) == 0 {
 		return false
@@ -105,12 +144,22 @@ func EqualsAnyIgnoreCase(str1 string, str2 []string) bool {
 	return false
 }
 
+// EqualsAnyIgnoreCaseChain 给定字符串是否与提供的中任一字符串相同（链式调用，忽略大小写）
+func (s *StringX) EqualsAnyIgnoreCaseChain(strs []string) bool {
+	return EqualsAnyIgnoreCase(s.value, strs)
+}
+
 // EqualsAt 字符串指定位置的字符是否与给定字符相同
 func EqualsAt(value string, position int, subStr string) bool {
 	if validator.IsEmptyValue(reflect.ValueOf(value)) || position < 0 {
 		return false
 	}
 	return len(value) > position && Equals(subStr, string(value[position]))
+}
+
+// EqualsAtChain 字符串指定位置的字符是否与给定字符相同（链式调用）
+func (s *StringX) EqualsAtChain(position int, subStr string) bool {
+	return EqualsAt(s.value, position, subStr)
 }
 
 // Count 统计指定内容中包含指定字符串的数量
@@ -122,16 +171,23 @@ func Count(str string, searchStr string) int {
 	return strings.Count(str, searchStr)
 }
 
+// CountChain 统计指定内容中包含指定字符串的数量（链式调用）
+func (s *StringX) CountChain(searchStr string) int {
+	return Count(s.value, searchStr)
+}
+
 // CompareIgnoreCase 比较两个字符串，用于排序(大小写不敏感)
-//
-//	0 相等；<0 小于； >0 大于
 func CompareIgnoreCase(str1 string, str2 string) int {
 	return strings.Compare(strings.ToLower(str1), strings.ToLower(str2))
 }
 
+// CompareIgnoreCaseChain 比较两个字符串（链式调用，用于排序，忽略大小写）
+func (s *StringX) CompareIgnoreCaseChain(str2 string) int {
+	return CompareIgnoreCase(s.value, str2)
+}
+
 // ExtractValue 从给定的字符串中提取指定的键的值
 func ExtractValue(extra string, key string, searchPrefix string) string {
-	// 构造要查找的键名
 	searchKey := key + "="
 	if strings.Contains(extra, searchKey) {
 		start := strings.Index(extra, searchKey) + len(searchKey)
@@ -159,8 +215,13 @@ func Coalesce(s ...string) string {
 	for _, v := range s {
 		str.WriteString(v)
 	}
-
 	return str.String() // 返回拼接后的字符串
+}
+
+// CoalesceChain 高性能字符串拼接（链式调用）
+func (s *StringX) CoalesceChain(strs ...string) *StringX {
+	s.value = Coalesce(append([]string{s.value}, strs...)...)
+	return s
 }
 
 type CharacterStyle int
@@ -188,6 +249,12 @@ func ConvertCharacterStyle(input string, caseType CharacterStyle) string {
 		return converter(trimmedStr)
 	}
 	return trimmedStr // 默认返回原字符串
+}
+
+// ConvertCharacterStyleChain 根据指定的 CharacterStyle 将字符串转换为相应的格式（链式调用）
+func (s *StringX) ConvertCharacterStyleChain(caseType CharacterStyle) *StringX {
+	s.value = ConvertCharacterStyle(s.value, caseType)
+	return s
 }
 
 // toSnakeCase 将字符串转换为蛇形命名法

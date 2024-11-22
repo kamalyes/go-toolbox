@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-10-16 19:49:20
+ * @LastEditTime: 2024-11-22 10:07:57
  * @FilePath: \go-toolbox\pkg\stringx\replace.go
  * @Description:
  *
@@ -21,9 +21,21 @@ func Replace(source string, searchStr string, replacement string, replaceCount i
 	return strings.Replace(source, searchStr, replacement, replaceCount)
 }
 
+// ReplaceChain 替换字符串（链式调用）
+func (s *StringX) ReplaceChain(searchStr string, replacement string, replaceCount int) *StringX {
+	s.value = Replace(s.value, searchStr, replacement, replaceCount)
+	return s
+}
+
 // ReplaceAll 替换字符串
 func ReplaceAll(source string, searchStr string, replacement string) string {
 	return Replace(source, searchStr, replacement, -1)
+}
+
+// ReplaceAllChain 替换字符串（链式调用）
+func (s *StringX) ReplaceAllChain(searchStr string, replacement string) *StringX {
+	s.value = ReplaceAll(s.value, searchStr, replacement)
+	return s
 }
 
 // ReplaceWithIndex 按照指定区间替换字符串
@@ -50,6 +62,54 @@ func ReplaceWithIndex(str string, startIndex int, endIndex int, replacedStr stri
 	replaceCount := endIndex - startIndex
 
 	return string(runes[:startIndex]) + RepeatByLength(replacedStr, replaceCount) + string(runes[endIndex:])
+}
+
+// ReplaceWithMatcher 通过正则表达式替换字符串
+func ReplaceWithMatcher(str string, regex string, replaceFun func(string) string) string {
+	re := regexp.MustCompile(regex)
+	return re.ReplaceAllStringFunc(str, replaceFun)
+}
+
+// ReplaceWithMatcherChain 通过正则表达式替换字符串（链式调用）
+func (s *StringX) ReplaceWithMatcherChain(regex string, replaceFun func(string) string) *StringX {
+	s.value = ReplaceWithMatcher(s.value, regex, replaceFun)
+	return s
+}
+
+// Hide 替换指定字符串的指定区间内字符为"*" 俗称：脱敏功能
+func Hide(str string, startInclude int, endExclude int) string {
+	return ReplaceWithIndex(str, startInclude, endExclude, "*")
+}
+
+// HideChain 替换指定字符串的指定区间内字符为"*"（链式调用）
+func (s *StringX) HideChain(startInclude int, endExclude int) *StringX {
+	s.value = Hide(s.value, startInclude, endExclude)
+	return s
+}
+
+// ReplaceSpecialChars 去掉特殊符号、转为自定义
+func ReplaceSpecialChars(str string, replaceValue rune) string {
+	// 定义不同类别的特殊字符
+	englishPunctuation := `!"#$%&'()*+,-./:;<=>?@[\\]^_` + "`" + `{|}~`
+	chinesePunctuation := `，。！？；：“”‘’《》`
+	otherSpecialChars := `【】〔〕…· `
+
+	// 将所有特殊字符组合在一起
+	specialChars := englishPunctuation + chinesePunctuation + otherSpecialChars
+	// 使用 Map 函数将标点符号和特殊字符替换为自定义
+	cleanedStr := strings.Map(func(r rune) rune {
+		if strings.ContainsRune(specialChars, r) {
+			return replaceValue
+		}
+		return r // 保留非特殊字符
+	}, str)
+	return cleanedStr
+}
+
+// ReplaceSpecialCharsChain 去掉特殊符号、转为自定义（链式调用）
+func (s *StringX) ReplaceSpecialCharsChain(replaceValue rune) *StringX {
+	s.value = ReplaceSpecialChars(s.value, replaceValue)
+	return s
 }
 
 type PadPosition int
@@ -97,44 +157,4 @@ func Pad(input string, minLength int, paddler ...*Paddler) string {
 
 	// 默认为中间填充
 	return input[:leftPadLen] + strings.Repeat("*", padLen) + input[leftPadLen:]
-}
-
-// ReplaceIgnoreCase 替换字符串
-func ReplaceIgnoreCase(source string, searchStr string, replacement string, replaceCount int) string {
-	return Replace(strings.ToLower(source), strings.ToLower(searchStr), replacement, replaceCount)
-}
-
-// ReplaceAllIgnoreCase 替换字符串
-func ReplaceAllIgnoreCase(source string, searchStr string, replacement string) string {
-	return Replace(strings.ToLower(source), strings.ToLower(searchStr), replacement, -1)
-}
-
-// ReplaceWithMatcher 通过正则表达式替换字符串
-func ReplaceWithMatcher(str string, regex string, replaceFun func(string) string) string {
-	re := regexp.MustCompile(regex)
-	return re.ReplaceAllStringFunc(str, replaceFun)
-}
-
-// Hide 替换指定字符串的指定区间内字符为"*" 俗称：脱敏功能
-func Hide(str string, startInclude int, endExclude int) string {
-	return ReplaceWithIndex(str, startInclude, endExclude, "*")
-}
-
-// ReplaceSpecialChars 去掉特殊符号、转为自定义
-func ReplaceSpecialChars(str string, replaceValue rune) string {
-	// 定义不同类别的特殊字符
-	englishPunctuation := `!"#$%&'()*+,-./:;<=>?@[\\]^_` + "`" + `{|}~`
-	chinesePunctuation := `，。！？；：“”‘’《》`
-	otherSpecialChars := `【】〔〕…· `
-
-	// 将所有特殊字符组合在一起
-	specialChars := englishPunctuation + chinesePunctuation + otherSpecialChars
-	// 使用 Map 函数将标点符号和特殊字符替换为自定义
-	cleanedStr := strings.Map(func(r rune) rune {
-		if strings.ContainsRune(specialChars, r) {
-			return replaceValue
-		}
-		return r // 保留非特殊字符
-	}, str)
-	return cleanedStr
 }

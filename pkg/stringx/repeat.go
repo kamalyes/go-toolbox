@@ -22,6 +22,12 @@ func Repeat(str string, count int) string {
 	return strings.Repeat(str, count)
 }
 
+// RepeatChain 重复字符串（链式调用）
+func (s *StringX) RepeatChain(count int) *StringX {
+	s.value = Repeat(s.value, count)
+	return s
+}
+
 // RepeatByLength 重复某个字符串到指定长度
 func RepeatByLength(str string, padLen int) string {
 	if validator.IsEmptyValue(reflect.ValueOf(str)) {
@@ -44,6 +50,12 @@ func RepeatByLength(str string, padLen int) string {
 	return string(padding)
 }
 
+// RepeatByLengthChain 重复某个字符串到指定长度（链式调用）
+func (s *StringX) RepeatByLengthChain(padLen int) *StringX {
+	s.value = RepeatByLength(s.value, padLen)
+	return s
+}
+
 // RepeatAndJoin 重复某个字符串并通过分界符连接
 func RepeatAndJoin(str string, delimiter string, count int) string {
 	if count <= 0 {
@@ -58,4 +70,10 @@ func RepeatAndJoin(str string, delimiter string, count int) string {
 
 	// 使用 strings.Join 函数将切片中的字符串通过 delimiter 连接
 	return strings.Join(repeatedStrings, delimiter)
+}
+
+// RepeatAndJoinChain 重复某个字符串并通过分界符连接（链式调用）
+func (s *StringX) RepeatAndJoinChain(delimiter string, count int) *StringX {
+	s.value = RepeatAndJoin(s.value, delimiter, count)
+	return s
 }
