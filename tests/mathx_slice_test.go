@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-11 15:55:06
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-20 19:15:50
+ * @LastEditTime: 2024-11-22 11:09:17
  * @FilePath: \go-toolbox\tests\mathx_slice_test.go
  * @Description:
  *
@@ -15,11 +15,39 @@ import (
 	"testing"
 
 	"github.com/kamalyes/go-toolbox/pkg/mathx"
+	"github.com/kamalyes/go-toolbox/pkg/types"
 	"github.com/stretchr/testify/assert"
 )
 
 // TestSliceMinMax 测试 SliceMinMax 函数
 func TestSliceMinMax(t *testing.T) {
+	tests := []struct {
+		name      string
+		list      []int
+		f         types.MinMaxFunc[int]
+		expected  int
+		expectErr bool
+	}{
+		{"Empty list", []int{}, mathx.MinFunc[int], 0, true},
+		{"Single element", []int{5}, mathx.MinFunc[int], 5, false},
+		{"Multiple elements - Min", []int{3, 1, 4, 1, 5, 9}, mathx.MinFunc[int], 1, false},
+		{"Multiple elements - Max", []int{3, 1, 4, 1, 5, 9}, mathx.MaxFunc[int], 9, false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result, err := mathx.SliceMinMax(test.list, test.f)
+			if test.expectErr {
+				assert.Error(t, err) // 断言期望错误
+			} else {
+				assert.NoError(t, err)                 // 断言没有错误
+				assert.Equal(t, test.expected, result) // 断言结果相等
+			}
+		})
+	}
+}
+
+func TestSliceAtMostAtLeast(t *testing.T) {
 	tests := []struct {
 		name      string
 		list      []int

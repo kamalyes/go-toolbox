@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-20 19:15:55
+ * @LastEditTime: 2024-11-22 11:07:52
  * @FilePath: \go-toolbox\pkg\mathx\slice.go
  * @Description: 包含与切片相关的通用函数，例如计算最小值和最大值、差集、并集等。
  *
@@ -21,11 +21,27 @@ import (
 	"github.com/kamalyes/go-toolbox/pkg/validator"
 )
 
+// MinFunc 类型的实现，用于计算最小值
+func MinFunc[T types.Numerical](a, b T) T {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// MaxFunc 类型的实现，用于计算最大值
+func MaxFunc[T types.Numerical](a, b T) T {
+	if a > b {
+		return a
+	}
+	return b
+}
+
 // SliceMinMax 计算列表中元素的最小值或最大值。
 // 接收一个切片和一个 MinMaxFunc 类型的函数，
 // 根据提供的函数决定是计算最小值还是最大值。
 // 如果列表为空，则返回错误。
-func SliceMinMax[T any](list []T, f types.MinMaxFunc[T]) (T, error) {
+func SliceMinMax[T types.Numerical](list []T, f types.MinMaxFunc[T]) (T, error) {
 	if len(list) == 0 {
 		var zero T
 		return zero, errors.New("列表为空") // 返回错误信息
