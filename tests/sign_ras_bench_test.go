@@ -46,7 +46,7 @@ func BenchmarkRsaEncryption(b *testing.B) {
 	// 5. 执行基准测试
 	b.ResetTimer() // 重置计时器
 	for i := 0; i < b.N; i++ {
-		_, err := rsaCrypto.Encrypt(data, salt)
+		_, err := rsaCrypto.EncryptSalt(data, salt)
 		if err != nil {
 			b.Fatalf("加密失败: %v", err)
 		}
@@ -70,7 +70,7 @@ func BenchmarkRsaDecryption(b *testing.B) {
 	}
 
 	// 5. 先加密以获取加密数据
-	encrypted, err := rsaCrypto.Encrypt(data, salt)
+	encrypted, err := rsaCrypto.EncryptSalt(data, salt)
 	if err != nil {
 		b.Fatalf("加密失败: %v", err)
 	}

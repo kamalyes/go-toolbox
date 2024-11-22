@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-10 21:51:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-11 00:55:15
+ * @LastEditTime: 2024-11-22 15:05:55
  * @FilePath: \go-toolbox\pkg\sign\rsa.go
  * @Description:
  *
@@ -59,7 +59,8 @@ type RsaKeyPair struct {
 
 // RsaCrypto 定义了RSA加解密器的接口
 type RsaCrypto interface {
-	Encrypt(input []byte, salt []byte) ([]byte, error)
+	EncryptSalt(input []byte, salt []byte) ([]byte, error)
+	EncryptRandSalt(input []byte, saltLength ...int) ([]byte, []byte, error)
 	Decrypt(input []byte) ([]byte, error)
 	DecryptBase64(input string) ([]byte, error)
 	GetPrivateKey() *rsa.PrivateKey
@@ -133,14 +134,41 @@ func (r *rsaCryptoImpl) DecryptBase64(input string) ([]byte, error) {
 	return r.Decrypt(decoded)
 }
 
-// Encrypt 实现了加密功能，使用 OAEP
-func (r *rsaCryptoImpl) Encrypt(input []byte, salt []byte) ([]byte, error) {
+// EncryptSalt 实现了加密功能，使用 OAEP
+func (r *rsaCryptoImpl) EncryptSalt(input []byte, salt []byte) ([]byte, error) {
 	if len(salt) == 0 {
 		return nil, ErrSaltEmpty // 使用常量错误
 	}
 	saltedInput := append(salt, input...)
 	hash := r.hashFunc() // 获取 hash.Hash 实例
 	return rsa.EncryptOAEP(hash, rand.Reader, r.publicKey, saltedInput, nil)
+}
+
+// EncryptRandSalt 实现了加密功能，使用 OAEP，并生成随机盐
+func (r *rsaCryptoImpl) EncryptRandSalt(input []byte, saltLength ...int) ([]byte, []byte, error) {
+	var salt []byte
+	var err error
+
+	// 检查是否传入盐长度，如果没有，则使用默认长度
+	if len(saltLength) > 0 && saltLength[0] > 0 {
+		salt = make([]byte, saltLength[0]) // 使用传入的盐长度
+	} else {
+		salt = make([]byte, 16) // 默认盐长度为 16 字节
+	}
+
+	_, err = rand.Read(salt) // 使用随机数生成器填充盐
+	if err != nil {
+		return nil, nil, err // 返回生成盐时的错误
+	}
+
+	saltedInput := append(salt, input...)                                                   // 将盐与输入数据连接
+	hash := r.hashFunc()                                                                    // 获取 hash.Hash 实例
+	encryptedData, err := rsa.EncryptOAEP(hash, rand.Reader, r.publicKey, saltedInput, nil) // 使用 OAEP 加密
+	if err != nil {
+		return nil, nil, err // 返回加密时的错误
+	}
+
+	return encryptedData, salt, nil // 返回加密数据和生成的盐
 }
 
 // GetPrivateKey 返回 rsaCryptoImpl 中的私钥

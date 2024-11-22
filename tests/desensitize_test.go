@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-22 15:08:07
+ * @LastEditTime: 2024-11-22 15:50:08
  * @FilePath: \go-toolbox\tests\desensitize_test.go
  * @Description:
  *
@@ -48,6 +48,12 @@ func TestDesensitizeAllTypes(t *testing.T) {
 			expected:        "123456********5678",
 			desensitizeType: desensitize.IDCard,
 			option:          desensitize.DesensitizeOptions{IdCardStartIndex: 6, IdCardEndIndex: 14},
+		},
+		"TestPassWord": {
+			input:           "12678",
+			expected:        "1****",
+			desensitizeType: desensitize.Password,
+			option:          desensitize.DesensitizeOptions{},
 		},
 		"TestPhoneNumber": {
 			input:           "18175698789",
@@ -104,11 +110,13 @@ func TestDesensitizeAllTypes(t *testing.T) {
 }
 
 func TestPhoneNumber(t *testing.T) {
+	assert.Equal(t, "", desensitize.SensitizePhoneNumber("", 3, 7))
 	assert.Equal(t, "181****8789", desensitize.SensitizePhoneNumber("18175698789", 3, 7))
 	assert.Equal(t, "181*****789", desensitize.SensitizePhoneNumber("1817789", 3, 7))
 }
 
 func TestCarLicense(t *testing.T) {
+	assert.Equal(t, "深B1***B", desensitize.SensitizeCarLicense("深B1234B"))
 	assert.Equal(t, "浙A1****B", desensitize.SensitizeCarLicense("浙A12345B"))
 	assert.Equal(t, "浙A1****Z", desensitize.SensitizeCarLicense("浙A12345Z"))
 	assert.Equal(t, "", desensitize.SensitizeCarLicense(""))

@@ -52,13 +52,13 @@ func testRsaCryptoEncryptDecryptWithHashFunc(keyPair *sign.RsaKeyPair, hashFuncs
 
 		originalText := []byte("Hello, RSA!") // 原始文本
 		salt := []byte("salt")                // 盐值
-		encryptedText, err := rsaCrypto.Encrypt(originalText, salt)
+		encryptedText, err := rsaCrypto.EncryptSalt(originalText, salt)
 		assert.NoError(t, err, "加密时发生错误")
 		assert.NotNil(t, encryptedText, "加密后的文本不应为 nil")
 
 		decryptedText, err := rsaCrypto.Decrypt(encryptedText)
 		assert.NoError(t, err, "解密时发生错误")
-		assert.Equal(t, originalText, decryptedText[4:], "解密后的文本应与原文本匹配")
+		assert.Equal(t, originalText, decryptedText[len(salt):], "解密后的文本应与原文本匹配")
 	}
 }
 
@@ -69,7 +69,7 @@ func testRsaCryptoDecryptBase64WithHashFunc(keyPair *sign.RsaKeyPair, hashFuncs 
 
 		originalText := []byte("Hello, RSA!") // 原始文本
 		salt := []byte("salt")                // 盐值
-		encryptedText, err := rsaCrypto.Encrypt(originalText, salt)
+		encryptedText, err := rsaCrypto.EncryptSalt(originalText, salt)
 		assert.NoError(t, err)
 
 		// 将加密文本转换为 Base64
@@ -78,8 +78,49 @@ func testRsaCryptoDecryptBase64WithHashFunc(keyPair *sign.RsaKeyPair, hashFuncs 
 		// 测试 Base64 解密
 		decryptedText, err := rsaCrypto.DecryptBase64(encryptedBase64)
 		assert.NoError(t, err, "Base64 解密时发生错误")
-		assert.Equal(t, originalText, decryptedText[4:], "解密后的文本应与原文本匹配")
+		assert.Equal(t, originalText, decryptedText[len(salt):], "解密后的文本应与原文本匹配")
 	}
+}
+
+// 测试 EncryptRandSalt 函数
+func TestEncryptRandSalt(t *testing.T) {
+	keyPair := generateAndAssertRsaKeyPair(sign.RsaKeySize2048, t)
+
+	hashFuncs := []func() hash.Hash{
+		sha256.New,
+		sha512.New,
+		sha1.New,
+	}
+	for _, hashFunc := range hashFuncs {
+		// 生成 RSA 密钥对
+		rsaCrypto := sign.NewRsaCryptoFromKeys(keyPair.PrivateKey, keyPair.PublicKey, hashFunc)
+
+		input := []byte("Hello, World!")
+
+		// 测试默认盐长度
+		encryptedData, salt, err := rsaCrypto.EncryptRandSalt(input)
+		assert.NoError(t, err, "加密失败")
+		assert.Equal(t, 16, len(salt), "默认盐长度应为 16")
+		assert.NotEmpty(t, encryptedData, "加密数据应不为空")
+
+		// 解密测试
+		decryptedData, err := rsaCrypto.Decrypt(encryptedData)
+		assert.NoError(t, err, "解密失败")
+		assert.Equal(t, input, decryptedData[16:], "解密后的数据应与原始数据匹配")
+
+		// 测试自定义盐长度
+		customSaltLength := 32
+		encryptedData, salt, err = rsaCrypto.EncryptRandSalt(input, customSaltLength)
+		assert.NoError(t, err, "加密失败")
+		assert.Equal(t, customSaltLength, len(salt), "自定义盐长度应为 %d", customSaltLength)
+		assert.NotEmpty(t, encryptedData, "加密数据应不为空")
+
+		// 解密测试
+		decryptedData, err = rsaCrypto.Decrypt(encryptedData)
+		assert.NoError(t, err, "解密失败")
+		assert.Equal(t, input, decryptedData[customSaltLength:], "解密后的数据应与原始数据匹配")
+	}
+
 }
 
 // 测试生成 RSA 密钥对
