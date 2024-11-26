@@ -1042,3 +1042,115 @@ func TestMatchPass2Invalid(t *testing.T) {
 	result := r.MatchPass2(input)
 	assert.False(t, result, "Expected false for invalid password")
 }
+
+func TestParseWeek(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected int
+		err      bool
+	}{
+		{"M", 1, false},
+		{"T", 2, false},
+		{"W", 3, false},
+		{"R", 4, false},
+		{"F", 5, false},
+		{"S", 6, false},
+		{"U", 7, false},
+		{"MON", 1, false},
+		{"TUE", 2, false},
+		{"WED", 3, false},
+		{"THU", 4, false},
+		{"FRI", 5, false},
+		{"SAT", 6, false},
+		{"SUN", 7, false},
+		{"Monday", 1, false},
+		{"Tuesday", 2, false},
+		{"Wednesday", 3, false},
+		{"Thursday", 4, false},
+		{"Friday", 5, false},
+		{"Saturday", 6, false},
+		{"Sunday", 7, false},
+		{"1", 1, false},
+		{"2", 2, false},
+		{"3", 3, false},
+		{"4", 4, false},
+		{"5", 5, false},
+		{"6", 6, false},
+		{"7", 7, false},
+		{"8", 0, true},
+		{"0", 0, true},
+		{"Invalid", 0, true},
+		{"  Tue  ", 2, false}, // 测试空格
+	}
+
+	for _, test := range tests {
+		result, err := stringx.ParseWeek(test.input)
+		if (err != nil) != test.err {
+			t.Errorf("IsWeek(%q) error = %v, expected error = %v", test.input, err, test.err)
+		}
+		if result != test.expected {
+			t.Errorf("IsWeek(%q) = %d, expected = %d", test.input, result, test.expected)
+		}
+	}
+}
+
+func TestIsMonth(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected int
+		err      bool
+	}{
+		{"JAN", 1, false},
+		{"FEB", 2, false},
+		{"MAR", 3, false},
+		{"APR", 4, false},
+		{"MAY", 5, false},
+		{"JUN", 6, false},
+		{"JUL", 7, false},
+		{"AUG", 8, false},
+		{"SEP", 9, false},
+		{"OCT", 10, false},
+		{"NOV", 11, false},
+		{"DEC", 12, false},
+		{"0", 0, true},
+		{"1", 1, false},
+		{"2", 2, false},
+		{"3", 3, false},
+		{"4", 4, false},
+		{"5", 5, false},
+		{"6", 6, false},
+		{"7", 7, false},
+		{"8", 8, false},
+		{"9", 9, false},
+		{"10", 10, false},
+		{"11", 11, false},
+		{"12", 12, false},
+		{"Invalid", 0, true},
+		{"January", 1, false},
+		{"February", 2, false},
+		{"  JUL  ", 7, false}, // 测试空格
+		{"J", 1, false},       // 单字母缩写
+		{"F", 2, false},       // 单字母缩写
+		{"M", 3, false},       // 单字母缩写
+		{"A", 4, false},       // 单字母缩写
+		{"Y", 5, false},       // 单字母缩写
+		{"N", 6, false},       // 单字母缩写
+		{"L", 7, false},       // 单字母缩写
+		{"G", 8, false},       // 单字母缩写
+		{"S", 9, false},       // 单字母缩写
+		{"T", 10, false},      // 单字母缩写
+		{"V", 11, false},      // 单字母缩写
+		{"C", 12, false},      // 单字母缩写
+		{"Invalid", 0, true},
+	}
+
+	for _, test := range tests {
+		result, err := stringx.ParseMonth(test.input)
+		if (err != nil) != test.err {
+			t.Errorf("IsMonth(%q) error = %v, expected error = %v", test.input, err, test.err)
+		}
+		if result != test.expected {
+			t.Errorf("IsMonth(%q) = %d, expected = %d", test.input, result, test.expected)
+		}
+	}
+}
