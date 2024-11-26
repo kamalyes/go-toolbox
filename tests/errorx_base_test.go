@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-13 11:27:59
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-13 11:29:10
+ * @LastEditTime: 2024-11-30 16:48:27
  * @FilePath: \go-toolbox\tests\errorx_base_test.go
  * @Description:
  *
@@ -12,6 +12,7 @@ package tests
 
 import (
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/kamalyes/go-toolbox/pkg/errorx"
@@ -41,4 +42,30 @@ func TestWrapError(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestConcurrentErrorCreation(t *testing.T) {
+	// 清除之前的错误计数
+	errorx.ResetErrorMap()
+	// 使用 WaitGroup 来等待多个 goroutine 完成
+	var wg sync.WaitGroup
+	const numGoroutines = 100
+
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(i int) { // 将 i 作为参数传递到 goroutine 中
+			defer wg.Done()
+			errType := errorx.ErrorType(i)
+			// 注册错误类型
+			errorx.RegisterError(errType, "resource not found")
+			errorx.NewError(errType)
+		}(i)
+	}
+
+	// 等待所有 goroutine 完成
+	wg.Wait()
+
+	// 获取当前错误数量
+	count := len(errorx.GetErrorMap())
+	assert.Equal(t, numGoroutines, count, "错误计数不正确")
 }

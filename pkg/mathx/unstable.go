@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-10 15:19:08
+ * @LastEditTime: 2024-12-06 09:15:55
  * @FilePath: \go-toolbox\pkg\mathx\unstable.go
  * @Description:
  *
@@ -12,6 +12,7 @@ package mathx
 
 import (
 	"math/rand"
+	"reflect"
 	"sync"
 	"time"
 )
@@ -55,4 +56,63 @@ func (u Unstable) AroundInt(base int64) int64 {
 	val := int64((1 + u.deviation - 2*u.deviation*u.r.Float64()) * float64(base))
 	u.lock.Unlock() // 解锁
 	return val
+}
+
+// Clone 深拷贝任意类型的值
+func Clone(value interface{}, seen map[uintptr]interface{}) interface{} {
+	if value == nil {
+		return nil
+	}
+
+	v := reflect.ValueOf(value)
+
+	// 检查是否已经克隆过
+	if v.Kind() == reflect.Ptr {
+		ptrAddr := v.Pointer()
+		if existing, found := seen[ptrAddr]; found {
+			return existing
+		}
+	}
+
+	// 创建一个新的映射以存储克隆的对象
+	if seen == nil {
+		seen = make(map[uintptr]interface{})
+	}
+
+	switch v.Kind() {
+	case reflect.Ptr:
+		if v.IsNil() {
+			return nil
+		}
+		newValue := reflect.New(v.Elem().Type())
+		seen[v.Pointer()] = newValue.Interface()
+		newValue.Elem().Set(reflect.ValueOf(Clone(v.Elem().Interface(), seen)))
+		return newValue.Interface()
+
+	case reflect.Slice:
+		clone := reflect.MakeSlice(v.Type(), v.Len(), v.Cap())
+		for i := 0; i < v.Len(); i++ {
+			clone.Index(i).Set(reflect.ValueOf(Clone(v.Index(i).Interface(), seen)))
+		}
+		return clone.Interface()
+
+	case reflect.Map:
+		clone := reflect.MakeMap(v.Type())
+		for _, key := range v.MapKeys() {
+			value := v.MapIndex(key)
+			clone.SetMapIndex(reflect.ValueOf(Clone(key.Interface(), seen)), reflect.ValueOf(Clone(value.Interface(), seen)))
+		}
+		return clone.Interface()
+
+	case reflect.Struct:
+		clone := reflect.New(v.Type()).Elem()
+		for i := 0; i < v.NumField(); i++ {
+			field := v.Field(i)
+			clone.Field(i).Set(reflect.ValueOf(Clone(field.Interface(), seen)))
+		}
+		return clone.Interface()
+
+	default:
+		return value
+	}
 }

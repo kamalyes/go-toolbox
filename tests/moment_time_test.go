@@ -3,7 +3,7 @@
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2024-10-17 15:05:55
- * @FilePath: \go-toolbox\tests\time_test.go
+ * @FilePath: \go-toolbox\tests\moment_time_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.

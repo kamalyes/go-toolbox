@@ -143,6 +143,16 @@ func (m *Map[K, V]) Equals(key K, value V, cmpFunc func(existing V) bool) bool {
 	return cmpFunc(existing) // 使用用户提供的比较函数进行比较
 }
 
+// Clone 克隆当前 Map 实例，返回一个新的 Map 实例
+func (m *Map[K, V]) Clone() *Map[K, V] {
+	newMap := NewMap[K, V]() // 创建一个新的 Map 实例
+	m.Range(func(key K, value V) bool {
+		newMap.Store(key, value) // 将每个键值对存储到新实例中
+		return true              // 继续遍历
+	})
+	return newMap // 返回新的 Map 实例
+}
+
 // CopyMeta 复制 src 中的所有键值对到 dst 中。
 // 如果 dst 为 nil，则不进行任何操作。
 func CopyMeta(src, dst map[string]string) {

@@ -170,3 +170,35 @@ func mapsEqual(a, b map[string]string) bool {
 	}
 	return true
 }
+
+func TestMap_Clone(t *testing.T) {
+	// 创建一个新的 Map 实例并添加一些键值对
+	originalMap := syncx.NewMap[string, int]()
+	originalMap.Store("key1", 1)
+	originalMap.Store("key2", 2)
+	originalMap.Store("key3", 3)
+
+	// 克隆原始 Map
+	clonedMap := originalMap.Clone()
+
+	// 验证克隆后的 Map 是否与原始 Map 相同
+	clonedMap.Range(func(key string, value int) bool {
+		originalValue, ok := originalMap.Load(key)
+		assert.True(t, ok, "Key %s should exist in the original map", key)
+		assert.Equal(t, originalValue, value, "Value for key %s should match", key)
+		return true
+	})
+
+	// 验证克隆后的 Map 是否是独立的
+	clonedMap.Store("key4", 4) // 在克隆的 Map 中添加新键
+	_, originalExists := originalMap.Load("key4")
+	assert.False(t, originalExists, "Original map should not contain key4 after cloning")
+
+	// 验证原始 Map 的值未被改变
+	originalMap.Range(func(key string, value int) bool {
+		if key == "key4" {
+			assert.Fail(t, "Original map should not contain key4")
+		}
+		return true
+	})
+}
