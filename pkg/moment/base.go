@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-20 18:55:55
+ * @LastEditTime: 2024-12-05 17:55:55
  * @FilePath: \go-toolbox\pkg\moment\base.go
  * @Description:
  *
@@ -122,4 +122,18 @@ func CalculateAge(birthday string, currentTime time.Time) (int, error) {
 	}
 
 	return age, nil
+}
+
+// DaysInMonth 获取指定年份和月份的天数
+func DaysInMonth(month, year int) int {
+	if month == 2 {
+		if (year%4 == 0 && year%100 != 0) || (year%400 == 0) {
+			return 29 // 闰年
+		}
+		return 28 // 平年
+	}
+	if month == 4 || month == 6 || month == 9 || month == 11 {
+		return 30 // 30天的月份
+	}
+	return 31 // 31天的月份
 }

@@ -11,6 +11,7 @@
 package stringx
 
 import (
+	"fmt"
 	"net"
 	"regexp"
 	"strconv"
@@ -427,13 +428,110 @@ func IsGlobalUnicast(ip string) bool {
 	}
 
 	if ip6 := parsedIP.To16(); ip6 != nil {
-		return !parsedIP.IsUnspecified() && !parsedIP.IsLoopback() && !IsLinkLocal(parsedIP) && !parsedIP.IsPrivate() && !isDocumentationAddress(ip6)
+		return !parsedIP.IsUnspecified() && !parsedIP.IsLoopback() && !IsLinkLocal(parsedIP) && !parsedIP.IsPrivate() && !IsDocumentationAddress(ip6)
 	}
 
 	return false
 }
 
-// isDocumentationAddress 检查是否是文档专用地址
-func isDocumentationAddress(ip net.IP) bool {
+// IsDocumentationAddress 检查是否是文档专用地址
+func IsDocumentationAddress(ip net.IP) bool {
 	return ip[0] == 0x20 && ip[1] == 0x01 && ip[2] == 0x0d && ip[3] == 0xb8
+}
+
+// ParseWeek 解析星期字段
+func ParseWeek(week string) (int, error) {
+	weeks := map[string]int{
+		"M":      1, // Monday
+		"T":      2, // Tuesday
+		"W":      3, // Wednesday
+		"R":      4, // Thursday (使用 R 以避免与 T 冲突)
+		"F":      5, // Friday
+		"S":      6, // Saturday
+		"U":      7, // Sunday
+		"MONDAY": 1, "MON": 1,
+		"TUESDAY": 2, "TUE": 2,
+		"WEDNESDAY": 3, "WED": 3,
+		"THURSDAY": 4, "THU": 4,
+		"FRIDAY": 5, "FRI": 5,
+		"SATURDAY": 6, "SAT": 6,
+		"SUNDAY": 7, "SUN": 7,
+	}
+
+	// 尝试将输入字符串转换为整数
+	if val, err := strconv.Atoi(week); err == nil && val >= 1 && val <= 7 {
+		return val, nil // 直接返回有效的整数
+	}
+
+	// 转换输入为大写并去除空格
+	upperWeek := strings.ToUpper(strings.TrimSpace(week))
+
+	// 尝试从字符串映射中获取对应的星期
+	if val, exists := weeks[upperWeek]; exists {
+		return val, nil
+	}
+
+	// 使用正则表达式匹配全名
+	re := regexp.MustCompile(`(?i)^(mon(day)?|tue(sday)?|wed(nesday)?|thu(rsday)?|fri(day)?|sat(urday)?|sun(day)?)$`)
+	if re.MatchString(upperWeek) {
+		for k, v := range weeks {
+			if strings.HasPrefix(upperWeek, k) {
+				return v, nil
+			}
+		}
+	}
+
+	// 无效的输入
+	return 0, fmt.Errorf("invalid week: %s", week)
+}
+
+// ParseMonth 解析月份字段
+func ParseMonth(month string) (int, error) {
+	months := map[string]int{
+		"JAN": 1, "FEB": 2, "MAR": 3, "APR": 4,
+		"MAY": 5, "JUN": 6, "JUL": 7, "AUG": 8,
+		"SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12,
+		"JANUARY":   1,
+		"FEBRUARY":  2,
+		"MARCH":     3,
+		"APRIL":     4,
+		"JUNE":      6,
+		"JULY":      7,
+		"AUGUST":    8,
+		"SEPTEMBER": 9,
+		"OCTOBER":   10,
+		"NOVEMBER":  11,
+		"DECEMBER":  12,
+		// 添加单字母缩写
+		"J": 1,  // January
+		"F": 2,  // February
+		"M": 3,  // March
+		"A": 4,  // April
+		"Y": 5,  // May
+		"N": 6,  // June
+		"L": 7,  // July
+		"G": 8,  // August
+		"S": 9,  // September
+		"T": 10, // October
+		"V": 11, // November
+		"C": 12, // December
+	}
+
+	// 转换输入为大写并去除空格
+	upperMonth := strings.ToUpper(strings.TrimSpace(month))
+
+	// 尝试将输入字符串转换为整数
+	if val, err := strconv.Atoi(upperMonth); err == nil {
+		if val >= 1 && val <= 12 {
+			return val, nil // 直接返回有效的整数
+		}
+	}
+
+	// 尝试从字符串映射中获取对应的月份
+	if val, exists := months[upperMonth]; exists {
+		return val, nil
+	}
+
+	// 无效的输入
+	return 0, fmt.Errorf("invalid month: %s", month)
 }
