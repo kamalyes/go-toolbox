@@ -13,6 +13,7 @@ package tests
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/kamalyes/go-toolbox/pkg/stringx"
 	"github.com/stretchr/testify/assert"
@@ -1046,111 +1047,110 @@ func TestMatchPass2Invalid(t *testing.T) {
 func TestParseWeek(t *testing.T) {
 	tests := []struct {
 		input    string
-		expected int
+		expected time.Weekday
 		err      bool
 	}{
-		{"M", 1, false},
-		{"T", 2, false},
-		{"W", 3, false},
-		{"R", 4, false},
-		{"F", 5, false},
-		{"S", 6, false},
-		{"U", 7, false},
-		{"MON", 1, false},
-		{"TUE", 2, false},
-		{"WED", 3, false},
-		{"THU", 4, false},
-		{"FRI", 5, false},
-		{"SAT", 6, false},
-		{"SUN", 7, false},
-		{"Monday", 1, false},
-		{"Tuesday", 2, false},
-		{"Wednesday", 3, false},
-		{"Thursday", 4, false},
-		{"Friday", 5, false},
-		{"Saturday", 6, false},
-		{"Sunday", 7, false},
-		{"1", 1, false},
-		{"2", 2, false},
-		{"3", 3, false},
-		{"4", 4, false},
-		{"5", 5, false},
-		{"6", 6, false},
-		{"7", 7, false},
-		{"8", 0, true},
-		{"0", 0, true},
+		{"M", time.Monday, false},
+		{"T", time.Tuesday, false},
+		{"W", time.Wednesday, false},
+		{"R", time.Thursday, false},
+		{"F", time.Friday, false},
+		{"S", time.Saturday, false},
+		{"U", time.Sunday, false},
+		{"MON", time.Monday, false},
+		{"TUE", time.Tuesday, false},
+		{"WED", time.Wednesday, false},
+		{"THU", time.Thursday, false},
+		{"FRI", time.Friday, false},
+		{"SAT", time.Saturday, false},
+		{"SUN", time.Sunday, false},
+		{"Monday", time.Monday, false},
+		{"Tuesday", time.Tuesday, false},
+		{"Wednesday", time.Wednesday, false},
+		{"Thursday", time.Thursday, false},
+		{"Friday", time.Friday, false},
+		{"Saturday", time.Saturday, false},
+		{"Sunday", time.Sunday, false},
+		{"1", time.Monday, false},
+		{"2", time.Tuesday, false},
+		{"3", time.Wednesday, false},
+		{"4", time.Thursday, false},
+		{"5", time.Friday, false},
+		{"6", time.Saturday, false},
+		{"0", time.Sunday, false},
+		{"7", 0, true}, // 超出范围
 		{"Invalid", 0, true},
-		{"  Tue  ", 2, false}, // 测试空格
+		{"  Tue  ", time.Tuesday, false}, // 测试空格
 	}
 
 	for _, test := range tests {
 		result, err := stringx.ParseWeek(test.input)
-		if (err != nil) != test.err {
-			t.Errorf("IsWeek(%q) error = %v, expected error = %v", test.input, err, test.err)
-		}
-		if result != test.expected {
-			t.Errorf("IsWeek(%q) = %d, expected = %d", test.input, result, test.expected)
+		if test.err {
+			assert.Error(t, err, "ParseWeek Expected an error for input: %q", test.input)
+		} else {
+			assert.NoError(t, err, "ParseWeek Did not expect an error for input: %q", test.input)
+			assert.Equal(t, test.expected, result, "ParseWeek Expected %v for input %q", test.expected, test.input)
 		}
 	}
 }
 
-func TestIsMonth(t *testing.T) {
+func TestIsValidMonth(t *testing.T) {
 	tests := []struct {
 		input    string
-		expected int
+		expected time.Month
 		err      bool
 	}{
-		{"JAN", 1, false},
-		{"FEB", 2, false},
-		{"MAR", 3, false},
-		{"APR", 4, false},
-		{"MAY", 5, false},
-		{"JUN", 6, false},
-		{"JUL", 7, false},
-		{"AUG", 8, false},
-		{"SEP", 9, false},
-		{"OCT", 10, false},
-		{"NOV", 11, false},
-		{"DEC", 12, false},
+		{"JAN", time.January, false},
+		{"FEB", time.February, false},
+		{"MAR", time.March, false},
+		{"APR", time.April, false},
+		{"MAY", time.May, false},
+		{"JUN", time.June, false},
+		{"JUL", time.July, false},
+		{"AUG", time.August, false},
+		{"SEP", time.September, false},
+		{"OCT", time.October, false},
+		{"NOV", time.November, false},
+		{"DEC", time.December, false},
 		{"0", 0, true},
-		{"1", 1, false},
-		{"2", 2, false},
-		{"3", 3, false},
-		{"4", 4, false},
-		{"5", 5, false},
-		{"6", 6, false},
-		{"7", 7, false},
-		{"8", 8, false},
-		{"9", 9, false},
-		{"10", 10, false},
-		{"11", 11, false},
-		{"12", 12, false},
+		{"1", time.January, false},
+		{"2", time.February, false},
+		{"3", time.March, false},
+		{"4", time.April, false},
+		{"5", time.May, false},
+		{"6", time.June, false},
+		{"7", time.July, false},
+		{"8", time.August, false},
+		{"9", time.September, false},
+		{"10", time.October, false},
+		{"11", time.November, false},
+		{"12", time.December, false},
 		{"Invalid", 0, true},
-		{"January", 1, false},
-		{"February", 2, false},
-		{"  JUL  ", 7, false}, // 测试空格
-		{"J", 1, false},       // 单字母缩写
-		{"F", 2, false},       // 单字母缩写
-		{"M", 3, false},       // 单字母缩写
-		{"A", 4, false},       // 单字母缩写
-		{"Y", 5, false},       // 单字母缩写
-		{"N", 6, false},       // 单字母缩写
-		{"L", 7, false},       // 单字母缩写
-		{"G", 8, false},       // 单字母缩写
-		{"S", 9, false},       // 单字母缩写
-		{"T", 10, false},      // 单字母缩写
-		{"V", 11, false},      // 单字母缩写
-		{"C", 12, false},      // 单字母缩写
+		{"January", time.January, false},
+		{"February", time.February, false},
+		{"  JUL  ", time.July, false}, // 测试空格
+		{"J", time.January, false},    // 单字母缩写
+		{"F", time.February, false},   // 单字母缩写
+		{"M", time.March, false},      // 单字母缩写
+		{"A", time.April, false},      // 单字母缩写
+		{"Y", time.May, false},        // 单字母缩写
+		{"N", time.June, false},       // 单字母缩写
+		{"L", time.July, false},       // 单字母缩写
+		{"G", time.August, false},     // 单字母缩写
+		{"S", time.September, false},  // 单字母缩写
+		{"T", time.October, false},    // 单字母缩写
+		{"V", time.November, false},   // 单字母缩写
+		{"C", time.December, false},   // 单字母缩写
 		{"Invalid", 0, true},
 	}
 
 	for _, test := range tests {
 		result, err := stringx.ParseMonth(test.input)
-		if (err != nil) != test.err {
-			t.Errorf("IsMonth(%q) error = %v, expected error = %v", test.input, err, test.err)
-		}
-		if result != test.expected {
-			t.Errorf("IsMonth(%q) = %d, expected = %d", test.input, result, test.expected)
+		if test.err {
+			assert.Error(t, err, "ParseMonth Expected an error for input: %q", test.input)
+		} else {
+			assert.NoError(t, err, "ParseMonth Did not expect an error for input: %q", test.input)
+			assert.Equal(t, test.expected, result, "ParseMonth Expected %v for input %q", test.expected, test.input)
 		}
 	}
 }

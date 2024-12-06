@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-09 20:06:12
+ * @LastEditTime: 2024-12-06 16:08:20
  * @FilePath: \go-toolbox\pkg\stringx\regexp.go
  * @Description: 字符串正则表达式工具包
  *
@@ -16,6 +16,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -439,28 +440,21 @@ func IsDocumentationAddress(ip net.IP) bool {
 	return ip[0] == 0x20 && ip[1] == 0x01 && ip[2] == 0x0d && ip[3] == 0xb8
 }
 
-// ParseWeek 解析星期字段
-func ParseWeek(week string) (int, error) {
-	weeks := map[string]int{
-		"M":      1, // Monday
-		"T":      2, // Tuesday
-		"W":      3, // Wednesday
-		"R":      4, // Thursday (使用 R 以避免与 T 冲突)
-		"F":      5, // Friday
-		"S":      6, // Saturday
-		"U":      7, // Sunday
-		"MONDAY": 1, "MON": 1,
-		"TUESDAY": 2, "TUE": 2,
-		"WEDNESDAY": 3, "WED": 3,
-		"THURSDAY": 4, "THU": 4,
-		"FRIDAY": 5, "FRI": 5,
-		"SATURDAY": 6, "SAT": 6,
-		"SUNDAY": 7, "SUN": 7,
+// ParseWeek 解析星期字段，返回 time.Weekday
+func ParseWeek(week string) (time.Weekday, error) {
+	weeks := map[string]time.Weekday{
+		"M": time.Monday, "MON": time.Monday, "MONDAY": time.Monday,
+		"T": time.Tuesday, "TUE": time.Tuesday, "TUESDAY": time.Tuesday,
+		"W": time.Wednesday, "WED": time.Wednesday, "WEDNESDAY": time.Wednesday,
+		"R": time.Thursday, "THU": time.Thursday, "THURSDAY": time.Thursday,
+		"F": time.Friday, "FRI": time.Friday, "FRIDAY": time.Friday,
+		"S": time.Saturday, "SAT": time.Saturday, "SATURDAY": time.Saturday,
+		"U": time.Sunday, "SUN": time.Sunday, "SUNDAY": time.Sunday,
 	}
 
 	// 尝试将输入字符串转换为整数
-	if val, err := strconv.Atoi(week); err == nil && val >= 1 && val <= 7 {
-		return val, nil // 直接返回有效的整数
+	if val, err := strconv.Atoi(week); err == nil && val >= 0 && val <= 6 {
+		return time.Weekday(val), nil // 直接返回有效的 time.Weekday
 	}
 
 	// 转换输入为大写并去除空格
@@ -471,50 +465,49 @@ func ParseWeek(week string) (int, error) {
 		return val, nil
 	}
 
-	// 使用正则表达式匹配全名
-	re := regexp.MustCompile(`(?i)^(mon(day)?|tue(sday)?|wed(nesday)?|thu(rsday)?|fri(day)?|sat(urday)?|sun(day)?)$`)
-	if re.MatchString(upperWeek) {
-		for k, v := range weeks {
-			if strings.HasPrefix(upperWeek, k) {
-				return v, nil
-			}
-		}
-	}
-
 	// 无效的输入
 	return 0, fmt.Errorf("invalid week: %s", week)
 }
 
 // ParseMonth 解析月份字段
-func ParseMonth(month string) (int, error) {
-	months := map[string]int{
-		"JAN": 1, "FEB": 2, "MAR": 3, "APR": 4,
-		"MAY": 5, "JUN": 6, "JUL": 7, "AUG": 8,
-		"SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12,
-		"JANUARY":   1,
-		"FEBRUARY":  2,
-		"MARCH":     3,
-		"APRIL":     4,
-		"JUNE":      6,
-		"JULY":      7,
-		"AUGUST":    8,
-		"SEPTEMBER": 9,
-		"OCTOBER":   10,
-		"NOVEMBER":  11,
-		"DECEMBER":  12,
+func ParseMonth(month string) (time.Month, error) {
+	months := map[string]time.Month{
+		"JAN":       time.January,
+		"FEB":       time.February,
+		"MAR":       time.March,
+		"APR":       time.April,
+		"MAY":       time.May,
+		"JUN":       time.June,
+		"JUL":       time.July,
+		"AUG":       time.August,
+		"SEP":       time.September,
+		"OCT":       time.October,
+		"NOV":       time.November,
+		"DEC":       time.December,
+		"JANUARY":   time.January,
+		"FEBRUARY":  time.February,
+		"MARCH":     time.March,
+		"APRIL":     time.April,
+		"JUNE":      time.June,
+		"JULY":      time.July,
+		"AUGUST":    time.August,
+		"SEPTEMBER": time.September,
+		"OCTOBER":   time.October,
+		"NOVEMBER":  time.November,
+		"DECEMBER":  time.December,
 		// 添加单字母缩写
-		"J": 1,  // January
-		"F": 2,  // February
-		"M": 3,  // March
-		"A": 4,  // April
-		"Y": 5,  // May
-		"N": 6,  // June
-		"L": 7,  // July
-		"G": 8,  // August
-		"S": 9,  // September
-		"T": 10, // October
-		"V": 11, // November
-		"C": 12, // December
+		"J": time.January,   // January
+		"F": time.February,  // February
+		"M": time.March,     // March
+		"A": time.April,     // April
+		"Y": time.May,       // May
+		"N": time.June,      // June
+		"L": time.July,      // July
+		"G": time.August,    // August
+		"S": time.September, // September
+		"T": time.October,   // October
+		"V": time.November,  // November
+		"C": time.December,  // December
 	}
 
 	// 转换输入为大写并去除空格
@@ -523,7 +516,7 @@ func ParseMonth(month string) (int, error) {
 	// 尝试将输入字符串转换为整数
 	if val, err := strconv.Atoi(upperMonth); err == nil {
 		if val >= 1 && val <= 12 {
-			return val, nil // 直接返回有效的整数
+			return time.Month(val), nil // 直接返回有效的月份
 		}
 	}
 
