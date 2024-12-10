@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-09 12:15:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-12-09 13:50:55
+ * @LastEditTime: 2024-12-10 09:21:55
  * @FilePath: \go-toolbox\tests\imgix_base_test.go
  * @Description:
  *
@@ -36,6 +36,44 @@ func mockServer(responseBody []byte, statusCode int) *httptest.Server {
 	return httptest.NewServer(handler) // 返回一个新的测试服务器
 }
 
+// createImgixTestImage 创建一个简单的图像用于测试
+func createImgixTestImage(format imgix.ImageFormat, width, height int, color color.Color) (image.Image, *bytes.Buffer, error) {
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+	for x := 0; x < width; x++ {
+		for y := 0; y < height; y++ {
+			img.Set(x, y, color) // 填充指定颜色
+		}
+	}
+
+	var buf bytes.Buffer
+	var err error
+	switch format {
+	case imgix.JPEG:
+		err = jpeg.Encode(&buf, img, nil)
+	case imgix.PNG:
+		err = png.Encode(&buf, img)
+	case imgix.GIF:
+		err = gif.Encode(&buf, img, nil)
+	default:
+		err = nil // 不支持的格式
+	}
+	return img, &buf, err
+}
+
+// createTempFile 创建一个临时文件并返回文件路径
+func createTempFile(data []byte) (string, error) {
+	tempFile, err := os.CreateTemp("", "test_image_*.jpg")
+	if err != nil {
+		return "", err
+	}
+	defer tempFile.Close() // 确保文件在函数结束时关闭
+
+	if _, err := tempFile.Write(data); err != nil {
+		return "", err
+	}
+	return tempFile.Name(), nil
+}
+
 // TestLoadImageFromURL 测试加载图片的主函数
 func TestLoadImageFromURL(t *testing.T) {
 	t.Run("Valid PNG Image", testValidPNGImage)
@@ -48,9 +86,11 @@ func TestLoadImageFromURL(t *testing.T) {
 
 // testValidPNGImage 测试有效的 PNG 图片
 func testValidPNGImage(t *testing.T) {
-	pngImage := createTestPNGImage()              // 创建测试用的 PNG 图片
-	server := mockServer(pngImage, http.StatusOK) // 启动模拟服务器
-	defer server.Close()                          // 确保服务器在测试结束后关闭
+	_, buf, err := createImgixTestImage(imgix.PNG, 1, 1, image.White)
+	assert.NoError(t, err)
+
+	server := mockServer(buf.Bytes(), http.StatusOK) // 启动模拟服务器
+	defer server.Close()                             // 确保服务器在测试结束后关闭
 
 	img, err := imgix.LoadImageFromURL(server.URL) // 调用函数加载图片
 	assert.NoError(t, err)                         // 期望没有错误
@@ -59,9 +99,11 @@ func testValidPNGImage(t *testing.T) {
 
 // testValidJPEGImage 测试有效的 JPEG 图片
 func testValidJPEGImage(t *testing.T) {
-	jpegImage := createTestJPEGImage()             // 创建测试用的 JPEG 图片
-	server := mockServer(jpegImage, http.StatusOK) // 启动模拟服务器
-	defer server.Close()                           // 确保服务器在测试结束后关闭
+	_, buf, err := createImgixTestImage(imgix.JPEG, 1, 1, image.White)
+	assert.NoError(t, err)
+
+	server := mockServer(buf.Bytes(), http.StatusOK) // 启动模拟服务器
+	defer server.Close()                             // 确保服务器在测试结束后关闭
 
 	img, err := imgix.LoadImageFromURL(server.URL) // 调用函数加载图片
 	assert.NoError(t, err)                         // 期望没有错误
@@ -98,53 +140,29 @@ func testNetworkError(t *testing.T) {
 	assert.Error(t, err)                                      // 期望返回错误
 }
 
-// createTestPNGImage 创建一个简单的 PNG 图片用于测试
-func createTestPNGImage() []byte {
-	img := image.NewRGBA(image.Rect(0, 0, 1, 1)) // 创建一个 1x1 像素的 RGBA 图片
-	img.Set(0, 0, image.White)                   // 将像素设置为白色
-	var buf bytes.Buffer
-	if err := png.Encode(&buf, img); err != nil { // 编码为 PNG 格式
-		panic(err) // 如果编码失败，抛出错误
-	}
-	return buf.Bytes() // 返回 PNG 图片的字节切片
-}
-
-// createTestJPEGImage 创建一个简单的 JPEG 图片用于测试
-func createTestJPEGImage() []byte {
-	img := image.NewRGBA(image.Rect(0, 0, 1, 1)) // 创建一个 1x1 像素的 RGBA 图片
-	img.Set(0, 0, image.White)                   // 将像素设置为白色
-	var buf bytes.Buffer
-	if err := jpeg.Encode(&buf, img, nil); err != nil { // 编码为 JPEG 格式
-		panic(err) // 如果编码失败，抛出错误
-	}
-	return buf.Bytes() // 返回 JPEG 图片的字节切片
-}
-
 func TestWriterImage(t *testing.T) {
 	// 创建一个测试用的图像
-	img := image.NewRGBA(image.Rect(0, 0, 100, 100))
-	for x := 0; x < 100; x++ {
-		for y := 0; y < 100; y++ {
-			img.Set(x, y, color.RGBA{255, 0, 0, 255}) // 填充红色
-		}
-	}
-
-	// 创建一个缓冲区用于保存压缩后的图像
-	var buf bytes.Buffer
+	img, _, err := createImgixTestImage(imgix.JPEG, 100, 100, color.RGBA{255, 0, 0, 255})
+	assert.NoError(t, err)
 
 	// 测试 JPEG
-	err := imgix.WriterImage(img, 80, imgix.JPEG, &buf)
+	var buf bytes.Buffer
+	err = imgix.WriterImage(img, 80, imgix.JPEG, &buf)
 	assert.NoError(t, err)          // 期望没有错误
 	assert.Greater(t, buf.Len(), 0) // 期望输出不为空
 
 	// 测试 PNG
 	buf.Reset() // 清空缓冲区
+	img, _, err = createImgixTestImage(imgix.PNG, 100, 100, color.RGBA{255, 0, 0, 255})
+	assert.NoError(t, err)
 	err = imgix.WriterImage(img, 0, imgix.PNG, &buf)
 	assert.NoError(t, err)          // 期望没有错误
 	assert.Greater(t, buf.Len(), 0) // 期望输出不为空
 
 	// 测试 GIF
 	buf.Reset() // 清空缓冲区
+	img, _, err = createImgixTestImage(imgix.GIF, 100, 100, color.RGBA{255, 0, 0, 255})
+	assert.NoError(t, err)
 	err = imgix.WriterImage(img, 0, imgix.GIF, &buf)
 	assert.NoError(t, err)          // 期望没有错误
 	assert.Greater(t, buf.Len(), 0) // 期望输出不为空
@@ -152,11 +170,12 @@ func TestWriterImage(t *testing.T) {
 
 func TestWriterImageFromBytes(t *testing.T) {
 	// 创建一个测试用的 JPEG 图像
-	jpegImage := createTestJPEGImage()
+	_, jpegImageBuf, err := createImgixTestImage(imgix.JPEG, 1, 1, image.White)
+	assert.NoError(t, err)
 
 	// 测试 WriterImageFromBytes 函数
 	var buf bytes.Buffer
-	err := imgix.WriterImageFromBytes(jpegImage, 80, imgix.PNG, &buf)
+	err = imgix.WriterImageFromBytes(jpegImageBuf.Bytes(), 80, imgix.PNG, &buf)
 	assert.NoError(t, err)          // 期望没有错误
 	assert.Greater(t, buf.Len(), 0) // 期望输出不为空
 
@@ -165,39 +184,12 @@ func TestWriterImageFromBytes(t *testing.T) {
 	assert.Error(t, err) // 期望返回错误
 }
 
-func createTestImageBuf(format imgix.ImageFormat) (*bytes.Buffer, error) {
-	// 创建一个测试用的图像
-	img := image.NewRGBA(image.Rect(0, 0, 100, 100))
-	for x := 0; x < 100; x++ {
-		for y := 0; y < 100; y++ {
-			img.Set(x, y, color.RGBA{0, 255, 0, 255}) // 填充绿色
-		}
-	}
-
-	// 将图像编码到缓冲区
-	buf := new(bytes.Buffer)
-	var err error
-	switch format {
-	case imgix.JPEG:
-		err = jpeg.Encode(buf, img, nil)
-	case imgix.PNG:
-		err = png.Encode(buf, img)
-	case imgix.GIF:
-		err = gif.Encode(buf, img, nil)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-	return buf, nil
-}
-
 func TestSaveBufToImageFile(t *testing.T) {
 	formats := []imgix.ImageFormat{imgix.JPEG, imgix.PNG, imgix.GIF}
 
 	for _, format := range formats {
 		t.Run(format.String(), func(t *testing.T) {
-			buf, err := createTestImageBuf(format)
+			_, buf, err := createImgixTestImage(format, 100, 100, image.White)
 			assert.NoError(t, err) // 期望没有错误
 
 			// 测试保存有效的图像数据
@@ -219,14 +211,13 @@ func TestSaveBufToImageFile(t *testing.T) {
 	err := imgix.SaveBufToImageFile(invalidBuf, "test_invalid_image.png", imgix.PNG)
 	assert.Error(t, err) // 期望返回错误
 
-	buf, err := createTestImageBuf(imgix.JPEG)
+	_, buf, err := createImgixTestImage(imgix.JPEG, 100, 100, image.White)
 
 	// 测试使用不支持的格式
 	err = imgix.SaveBufToImageFile(buf, "test_image.invalid", imgix.ImageFormat(100))
 	assert.Error(t, err) // 期望返回错误
 
 	// 测试文件创建失败的情况
-	// 这里我们可以模拟文件创建失败，可以通过创建一个只读的目录来实现
 	os.Mkdir("readonly_dir", 0755)
 	defer os.Remove("readonly_dir")
 
@@ -239,4 +230,93 @@ func TestSaveBufToImageFile(t *testing.T) {
 	// 恢复目录权限
 	os.Chmod("readonly_dir", 0755)
 	os.Remove("readonly_dir")
+}
+
+// TestLoadImageFromFile 测试从文件加载图像的功能
+func TestLoadImageFromFile(t *testing.T) {
+	// 创建一个测试用的 JPEG 图像文件
+	_, buf, err := createImgixTestImage(imgix.JPEG, 10, 10, color.RGBA{255, 0, 0, 255})
+	assert.NoError(t, err)
+
+	filePath, err := createTempFile(buf.Bytes())
+	assert.NoError(t, err)    // 期望没有错误
+	defer os.Remove(filePath) // 确保测试结束后删除文件
+
+	// 测试加载有效的图像文件
+	loadedImg, err := imgix.LoadImageFromFile(filePath)
+	assert.NoError(t, err)      // 期望没有错误
+	assert.NotNil(t, loadedImg) // 期望返回有效的图像
+}
+
+// TestLoadImageFromFileInvalidPath 测试无效文件路径
+func TestLoadImageFromFileInvalidPath(t *testing.T) {
+	_, err := imgix.LoadImageFromFile("invalid/path/to/image.jpg") // 调用函数加载无效路径
+	assert.Error(t, err)                                           // 期望返回错误
+}
+
+// TestLoadImageFromFileUnsupportedFormat 测试不支持的图像格式
+func TestLoadImageFromFileUnsupportedFormat(t *testing.T) {
+	// 创建一个临时文件并写入无效数据
+	tempFile, err := os.CreateTemp("", "test_invalid_image_*.txt")
+	assert.NoError(t, err)           // 期望没有错误
+	defer os.Remove(tempFile.Name()) // 确保测试结束后删除文件
+
+	_, err = tempFile.WriteString("this is not an image") // 写入非图像数据
+	assert.NoError(t, err)                                // 期望没有错误
+	tempFile.Close()                                      // 关闭文件
+
+	// 测试加载无效的图像文件
+	_, err = imgix.LoadImageFromFile(tempFile.Name())
+	assert.Error(t, err) // 期望返回错误
+}
+
+func TestEncodeImageToBase64(t *testing.T) {
+	// 创建一个测试用的图像
+	img, _, err := createImgixTestImage(imgix.JPEG, 100, 100, color.RGBA{255, 0, 0, 255})
+	assert.NoError(t, err) // 期望没有错误
+
+	// 测试有效的图像编码为 Base64
+	base64Str, err := imgix.EncodeImageToBase64(img, imgix.JPEG, 80)
+	assert.NoError(t, err)                                   // 期望没有错误
+	assert.NotEmpty(t, base64Str)                            // 期望返回的字符串不为空
+	assert.Contains(t, base64Str, "data:image/jpeg;base64,") // 确保包含正确的前缀
+}
+
+func TestLoadImageFromFileAndEncodeToBase64(t *testing.T) {
+	// 创建一个测试用的 JPEG 图像文件
+	_, buf, err := createImgixTestImage(imgix.JPEG, 10, 10, color.RGBA{255, 0, 0, 255})
+	assert.NoError(t, err)
+
+	filePath, err := createTempFile(buf.Bytes())
+	assert.NoError(t, err)    // 期望没有错误
+	defer os.Remove(filePath) // 确保测试结束后删除文件
+
+	// 测试加载有效的图像文件并编码为 Base64
+	base64Str, err := imgix.LoadImageFromFileAndEncodeToBase64(filePath, imgix.JPEG, 80)
+	assert.NoError(t, err)                                   // 期望没有错误
+	assert.NotEmpty(t, base64Str)                            // 期望返回的字符串不为空
+	assert.Contains(t, base64Str, "data:image/jpeg;base64,") // 确保包含正确的前缀
+}
+
+func TestLoadImageFromFileAndEncodeToBase64InvalidPath(t *testing.T) {
+	// 测试加载无效文件路径
+	base64Str, err := imgix.LoadImageFromFileAndEncodeToBase64("invalid/path/to/image.jpg", imgix.JPEG, 80)
+	assert.Error(t, err)       // 期望返回错误
+	assert.Empty(t, base64Str) // 期望返回的字符串为空
+}
+
+func TestLoadImageFromFileAndEncodeToBase64UnsupportedFormat(t *testing.T) {
+	// 创建一个临时文件并写入无效数据
+	tempFile, err := os.CreateTemp("", "test_invalid_image_*.txt")
+	assert.NoError(t, err)           // 期望没有错误
+	defer os.Remove(tempFile.Name()) // 确保测试结束后删除文件
+
+	_, err = tempFile.WriteString("this is not an image") // 写入非图像数据
+	assert.NoError(t, err)                                // 期望没有错误
+	tempFile.Close()                                      // 关闭文件
+
+	// 测试加载无效的图像文件并编码为 Base64
+	base64Str, err := imgix.LoadImageFromFileAndEncodeToBase64(tempFile.Name(), imgix.JPEG, 80)
+	assert.Error(t, err)       // 期望返回错误
+	assert.Empty(t, base64Str) // 期望返回的字符串为空
 }

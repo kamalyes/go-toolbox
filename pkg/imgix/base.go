@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-09 12:15:51
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-12-09 13:58:58
+ * @LastEditTime: 2024-12-10 09:30:55
  * @FilePath: \go-toolbox\pkg\imgix\base.go
  * @Description:
  *
@@ -12,6 +12,7 @@ package imgix
 
 import (
 	"bytes"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"image"
@@ -35,18 +36,26 @@ func LoadImageFromURL(url string) (image.Image, error) {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	// 读取响应体到内存
-	buf, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
-	}
+	return decodeImage(resp.Body)
+}
 
-	// 使用 image 包来解码图片
-	img, _, err := image.Decode(bytes.NewReader(buf))
+// LoadImageFromFile 从给定的文件路径加载图片并返回 image.Image 对象
+func LoadImageFromFile(filePath string) (image.Image, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open image file: %w", err)
+	}
+	defer file.Close()
+
+	return decodeImage(file)
+}
+
+// decodeImage 解码给定的 io.Reader 并返回 image.Image 对象
+func decodeImage(reader io.Reader) (image.Image, error) {
+	img, _, err := image.Decode(reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode image: %w", err)
 	}
-
 	return img, nil
 }
 
@@ -54,7 +63,6 @@ func LoadImageFromURL(url string) (image.Image, error) {
 type ImageFormat int
 
 // 定义支持的图像格式常量
-
 const (
 	JPEG ImageFormat = iota
 	JPG
@@ -78,28 +86,45 @@ func (f ImageFormat) String() string {
 
 // WriterImage 将图像写入输出
 func WriterImage(img image.Image, quality int, format ImageFormat, output io.Writer) error {
-	// 使用类型来处理不同的图像格式
 	switch format {
 	case JPEG, JPG:
 		if quality < 1 || quality > 100 {
 			return errors.New("quality must be between 1 and 100 for JPEG")
 		}
-		return jpeg.Encode(output, img, &jpeg.Options{Quality: quality}) // 编码为 JPEG 格式
+		return jpeg.Encode(output, img, &jpeg.Options{Quality: quality})
 	case PNG:
-		return png.Encode(output, img) // 编码为 PNG 格式
+		return png.Encode(output, img)
 	case GIF:
-		return gif.Encode(output, img, nil) // 编码为 GIF 格式
+		return gif.Encode(output, img, nil)
 	default:
-		return fmt.Errorf("unsupported format: %s", format) // 不支持的格式
+		return fmt.Errorf("unsupported format: %s", format)
 	}
+}
+
+// EncodeImageToBase64 将图像编码为 Base64 字符串
+func EncodeImageToBase64(img image.Image, format ImageFormat, quality int) (string, error) {
+	var buf bytes.Buffer
+	if err := WriterImage(img, quality, format, &buf); err != nil {
+		return "", fmt.Errorf("failed to encode image to buffer: %w", err)
+	}
+	return "data:image/" + format.String() + ";base64," + base64.StdEncoding.EncodeToString(buf.Bytes()), nil
+}
+
+// LoadImageFromFileAndEncodeToBase64 从文件加载图片并返回 Base64 编码字符串
+func LoadImageFromFileAndEncodeToBase64(filePath string, format ImageFormat, quality int) (string, error) {
+	img, err := LoadImageFromFile(filePath)
+	if err != nil {
+		return "", err
+	}
+	return EncodeImageToBase64(img, format, quality)
 }
 
 // WriterImageFromBytes 将字节切片转换为图像并写入输出
 func WriterImageFromBytes(data []byte, quality int, format ImageFormat, output io.Writer) error {
 	// 解码字节切片为图像
-	img, _, err := image.Decode(bytes.NewReader(data))
+	img, err := decodeImage(bytes.NewReader(data))
 	if err != nil {
-		return errors.New("failed to decode image: " + err.Error())
+		return fmt.Errorf("failed to decode image from bytes: %w", err)
 	}
 
 	// 使用 WriterImage 函数将图像写入输出
@@ -108,41 +133,16 @@ func WriterImageFromBytes(data []byte, quality int, format ImageFormat, output i
 
 // SaveBufToImageFile 将Buf数据保存到本地文件
 func SaveBufToImageFile(buf *bytes.Buffer, filePath string, format ImageFormat) error {
-	var img image.Image
-	var err error
-
-	// 根据格式解码图像
-	switch format {
-	case JPEG:
-		img, err = jpeg.Decode(buf)
-	case PNG:
-		img, err = png.Decode(buf)
-	case GIF:
-		img, err = gif.Decode(buf)
-	default:
-		return errors.New("unsupported image format")
-	}
-
+	img, err := decodeImage(buf)
 	if err != nil {
 		return err
 	}
 
-	// 创建文件
 	outFile, err := os.Create(filePath)
 	if err != nil {
 		return err
 	}
 	defer outFile.Close()
 
-	// 根据格式编码图像并写入文件
-	switch format {
-	case JPEG:
-		err = jpeg.Encode(outFile, img, nil)
-	case PNG:
-		err = png.Encode(outFile, img)
-	case GIF:
-		err = gif.Encode(outFile, img, nil)
-	}
-
-	return err
+	return WriterImage(img, 100, format, outFile) // 默认质量为 100
 }
