@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 10:50:50
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-13 09:15:59
+ * @LastEditTime: 2024-12-10 12:15:07
  * @FilePath: \go-toolbox\tests\convert_must_test.go
  * @Description:
  *
@@ -247,7 +247,7 @@ func TestStringSliceToNumberSlice_EmptySlice(t *testing.T) {
 
 func TestStringSliceToNumberSlice_NilSlice(t *testing.T) {
 	var input []string
-	expected := []int(nil)
+	expected := []int{}
 
 	result, err := convert.StringSliceToNumberSlice[int](input, nil)
 	assert.NoError(t, err)
@@ -362,6 +362,81 @@ func TestParseFloatFloat32(t *testing.T) {
 		} else {
 			assert.NoError(t, err, "unexpected error for input %q", test.input)
 			assert.Equal(t, test.expected, result, "expected %v for input %q, got %v", test.expected, test.input, result)
+		}
+	}
+}
+
+func TestMustFloatT(t *testing.T) {
+	tests := []struct {
+		input    any // 修改为 any 以支持不同类型
+		mode     convert.RoundMode
+		expected float64
+		hasError bool
+	}{
+		{"3.14", convert.RoundNone, 3.14, false},
+		{"3.14", convert.RoundNearest, 3.0, false},
+		{"3.6", convert.RoundNearest, 4.0, false},
+		{"3.1", convert.RoundUp, 4.0, false},
+		{"3.9", convert.RoundDown, 3.0, false},
+		{"-3.14", convert.RoundNone, -3.14, false},
+		{"-3.6", convert.RoundNearest, -4.0, false},
+		{"invalid", convert.RoundNone, 0, true},          // 无效字符串
+		{float64(5.5), convert.RoundNone, 5.5, false},    // 测试 float64 类型
+		{float32(5.5), convert.RoundNone, 5.5, false},    // 测试 float32 类型
+		{float32(5.5), convert.RoundNearest, 6.0, false}, // 测试 float32 类型与取整
+	}
+
+	for _, test := range tests {
+		result, err := convert.MustFloatT[float64](test.input, test.mode)
+		if test.hasError {
+			assert.Error(t, err, "输入: %s, 预期错误: %v", test.input, test.hasError)
+		} else {
+			assert.NoError(t, err, "输入: %s, 实际错误: %v", test.input, err)
+			assert.Equal(t, test.expected, result, "输入: %s, 预期: %v, 实际: %v", test.input, test.expected, result)
+		}
+	}
+}
+
+func TestStringSliceToFloatSlice(t *testing.T) {
+	tests := []struct {
+		input    []string
+		mode     convert.RoundMode
+		expected []float64
+		hasError bool
+	}{
+		// 测试 float64 类型
+		{[]string{"3.14", "2.71"}, convert.RoundNone, []float64{3.14, 2.71}, false},
+		{[]string{"3.14", "2.71"}, convert.RoundNearest, []float64{3.0, 3.0}, false},
+		{[]string{"3.6", "3.1"}, convert.RoundUp, []float64{4.0, 4.0}, false},
+		{[]string{"3.9", "3.2"}, convert.RoundDown, []float64{3.0, 3.0}, false},
+		{nil, convert.RoundNone, []float64{}, false},                               // 处理 nil 切片
+		{[]string{"invalid"}, convert.RoundNone, nil, true},                        // 包含无效字符串
+		{[]string{"1.5", "2.5"}, convert.RoundNearest, []float64{2.0, 3.0}, false}, // 更新四舍五入预期
+	}
+
+	for _, test := range tests {
+		// 测试 float64
+		result, err := convert.StringSliceToFloatSlice[float64](test.input, test.mode)
+		if test.hasError {
+			assert.Error(t, err, "输入: %v, 预期错误: %v", test.input, test.hasError)
+		} else {
+			assert.NoError(t, err, "输入: %v, 实际错误: %v", test.input, err)
+			assert.Equal(t, test.expected, result, "输入: %v, 预期: %v, 实际: %v", test.input, test.expected, result)
+		}
+
+		// 测试 float32
+		result32, err32 := convert.StringSliceToFloatSlice[float32](test.input, test.mode)
+		if test.hasError {
+			assert.Error(t, err32, "输入: %v, 预期错误: %v", test.input, test.hasError)
+		} else {
+			assert.NoError(t, err32, "输入: %v, 实际错误: %v", test.input, err32)
+
+			// 将期望的 float64 转换为 float32
+			expected32 := make([]float32, len(test.expected))
+			for i, v := range test.expected {
+				expected32[i] = float32(v) // 转换为 float32
+			}
+			assert.Equal(t, expected32, result32, "输入: %v, 预期: %v, 实际: %v", test.input, expected32, result32)
 		}
 	}
 }

@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-08-03 21:32:26
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-13 09:06:59
+ * @LastEditTime: 2024-12-10 12:15:07
  * @FilePath: \go-toolbox\pkg\convert\must.go
  * @Description:
  *
@@ -73,9 +73,50 @@ func convertToString[T any](v T, timeLayout ...string) string {
 type RoundMode int
 
 const (
-	RoundDown RoundMode = iota // 向下取整
-	RoundUp                    // 向上取整
+	RoundNone    RoundMode = iota // 不进行四舍五入，保持原值
+	RoundNearest                  // 四舍五入到最接近的整数
+	RoundDown                     // 向下取整
+	RoundUp                       // 向上取整
 )
+
+// MustFloatT 将字符串转换为指定类型的浮点数
+func MustFloatT[T types.Float](value any, mode RoundMode) (T, error) {
+	var f float64
+
+	// 根据输入的类型进行处理
+	switch v := value.(type) {
+	case string:
+		var err error
+		f, err = strconv.ParseFloat(v, 64) // 解析为 float64
+		if err != nil {
+			return 0, fmt.Errorf("无法将字符串转换为浮点数: %v", err)
+		}
+	case float64:
+		f = v // 直接使用 float64 值
+	case float32:
+		f = float64(v) // 将 float32 转换为 float64
+	default:
+		return 0, fmt.Errorf("不支持的输入类型: %T", v)
+	}
+
+	var result float64
+
+	// 根据取整模式进行处理
+	switch mode {
+	case RoundNone:
+		result = f // 保持原值不变
+	case RoundNearest:
+		result = math.Round(f) // 使用 math.Round 处理四舍五入
+	case RoundUp:
+		result = math.Ceil(f) // 向上取整
+	case RoundDown:
+		result = math.Floor(f) // 向下取整
+	default:
+		return 0, fmt.Errorf("未知的四舍五入模式")
+	}
+
+	return T(result), nil // 将结果转换为 T 类型并返回
+}
 
 // MustIntT 将 any 转换为 T 类型
 func MustIntT[T types.Numerical](value any, mode *RoundMode) (T, error) {
@@ -206,13 +247,30 @@ func NumberSliceToStringSlice[T types.Numerical](numbers []T) []string {
 }
 
 // StringSliceToNumberSlice 将字符串切片转换为数字切片
-func StringSliceToNumberSlice[T types.Numerical](strs []string, mode *RoundMode) ([]T, error) {
-	if strs == nil {
-		return nil, nil // 处理 nil 切片
+func StringSliceToNumberSlice[T types.Numerical](input []string, mode *RoundMode) ([]T, error) {
+	if input == nil {
+		return []T{}, nil // 返回一个空切片而不是 nil
 	}
-	result := make([]T, 0, len(strs))
-	for _, str := range strs {
+	result := make([]T, 0, len(input))
+	for _, str := range input {
 		num, err := MustIntT[T](str, mode) // 使用 MustIntT 进行转换
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, num)
+	}
+
+	return result, nil
+}
+
+// StringSliceToFloatSlice 将字符串切片转换为浮点数切片
+func StringSliceToFloatSlice[T types.Float](input []string, mode RoundMode) ([]T, error) {
+	if input == nil {
+		return []T{}, nil // 返回一个空切片而不是 nil
+	}
+	result := make([]T, 0, len(input))
+	for _, str := range input {
+		num, err := MustFloatT[T](str, mode) // 使用 MustFloatT 进行转换
 		if err != nil {
 			return nil, err
 		}
