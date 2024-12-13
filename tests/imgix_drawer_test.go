@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-13 01:15:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-12-13 13:00:21
+ * @LastEditTime: 2024-12-13 13:15:55
  * @FilePath: \go-toolbox\tests\imgix_drawer_test.go
  * @Description:
  *
@@ -80,6 +80,21 @@ func TestUseSolidLine(t *testing.T) {
 	err := saveImgixDrawerImage(ctx, "test_solid_line.png")
 	assert.NoError(t, err)
 	defer os.Remove("test_solid_line.png")
+}
+
+// TestDrawWithStroke 测试 DrawWithStroke 方法
+func TestDrawWithStroke(t *testing.T) {
+	ctx := gg.NewContext(800, 600)
+	renderer := imgix.NewGraphicsRenderer(ctx)
+
+	drawCalled := false
+	drawFunc := func() {
+		drawCalled = true
+	}
+
+	// 测试不调用 Stroke
+	renderer.DrawWithStroke(drawFunc, false)
+	assert.True(t, drawCalled, "Expected drawFunc to be called")
 }
 
 func TestSetDashed(t *testing.T) {

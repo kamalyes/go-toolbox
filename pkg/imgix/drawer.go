@@ -75,8 +75,8 @@ func NewGraphicsRenderer(ctx *gg.Context, dashOptions ...DashOptions) *GraphicsR
 	return &renderer
 }
 
-// drawWithStroke 是一个通用的绘图函数，接受一个绘图操作的函数作为参数
-func (g *GraphicsRenderer) drawWithStroke(drawFunc func(), isStroke bool) {
+// DrawWithStroke 是一个通用的绘图函数，接受一个绘图操作的函数作为参数
+func (g *GraphicsRenderer) DrawWithStroke(drawFunc func(), isStroke bool) {
 	syncx.WithLock(&g.mu, func() {
 		drawFunc() // 执行绘图操作
 		if isStroke {
@@ -87,14 +87,14 @@ func (g *GraphicsRenderer) drawWithStroke(drawFunc func(), isStroke bool) {
 
 // UseDefaultDashed 使用默认虚线
 func (g *GraphicsRenderer) UseDefaultDashed() {
-	g.drawWithStroke(func() {
+	g.DrawWithStroke(func() {
 		g.GgCtx.SetDash(float64(g.DashOptions.DashLength()), float64(g.DashOptions.GapLength()), 0.0)
 	}, false)
 }
 
 // UseSolidLine 使用实线
 func (g *GraphicsRenderer) UseSolidLine() {
-	g.drawWithStroke(func() {
+	g.DrawWithStroke(func() {
 		g.GgCtx.SetDash() // 恢复为实线样式
 	}, false)
 }
@@ -102,7 +102,7 @@ func (g *GraphicsRenderer) UseSolidLine() {
 // SetDashed 设置是否使用虚线
 // @param dashes
 func (g *GraphicsRenderer) SetDashed(dashes ...float64) {
-	g.drawWithStroke(func() {
+	g.DrawWithStroke(func() {
 		g.GgCtx.SetDash(dashes...)
 	}, false)
 }
@@ -114,7 +114,7 @@ func (g *GraphicsRenderer) SetDashed(dashes ...float64) {
 // @param endY 结束Y坐标
 // @param lineWidth 线条宽度
 func (g *GraphicsRenderer) DrawLine(startX, startY, endX, endY float64, lineWidth float64) {
-	g.drawWithStroke(func() {
+	g.DrawWithStroke(func() {
 		// 设置线条宽度
 		g.GgCtx.SetLineWidth(lineWidth)
 		// 绘制线条
@@ -140,7 +140,7 @@ func (g *GraphicsRenderer) CalculateFractionPoint(startPoint, endPoint *gg.Point
 // @param end 结束点
 // @param control 控制点
 func (g *GraphicsRenderer) DrawCurvedLine(start, end, control *gg.Point) {
-	g.drawWithStroke(func() {
+	g.DrawWithStroke(func() {
 		g.GgCtx.MoveTo(start.X, start.Y)
 		g.GgCtx.QuadraticTo(control.X, control.Y, end.X, end.Y)
 	}, true)
@@ -163,7 +163,7 @@ func (g *GraphicsRenderer) CalculateControlPoint(start, end *gg.Point, offset fl
 // @param bottom 矩形右下角的点
 // @param right 矩形右下角的点
 func (g *GraphicsRenderer) DrawRectangle(left, top, bottom, right *gg.Point) {
-	g.drawWithStroke(func() {
+	g.DrawWithStroke(func() {
 		width := right.X - left.X
 		height := bottom.Y - top.Y
 		g.GgCtx.DrawRectangle(left.X, top.Y, width, height)
@@ -173,7 +173,7 @@ func (g *GraphicsRenderer) DrawRectangle(left, top, bottom, right *gg.Point) {
 // DrawPolygon 绘制一个多边形
 // @param points 多边形顶点的切片
 func (g *GraphicsRenderer) DrawPolygon(points []gg.Point) {
-	g.drawWithStroke(func() {
+	g.DrawWithStroke(func() {
 		if len(points) > 0 {
 			g.GgCtx.MoveTo(points[0].X, points[0].Y)
 			for _, point := range points[1:] {
@@ -189,7 +189,7 @@ func (g *GraphicsRenderer) DrawPolygon(points []gg.Point) {
 // @param top 竖线的顶部Y坐标
 // @param bottom 竖线的底部Y坐标
 func (g *GraphicsRenderer) DrawVerticalLine(x float64, top, bottom float64) {
-	g.drawWithStroke(func() {
+	g.DrawWithStroke(func() {
 		g.GgCtx.DrawLine(x, top, x, bottom)
 	}, true)
 }
@@ -199,7 +199,7 @@ func (g *GraphicsRenderer) DrawVerticalLine(x float64, top, bottom float64) {
 // @param left 横线的左侧X坐标
 // @param right 横线的右侧X坐标
 func (g *GraphicsRenderer) DrawHorizontalLine(y float64, left, right float64) {
-	g.drawWithStroke(func() {
+	g.DrawWithStroke(func() {
 		g.GgCtx.DrawLine(left, y, right, y)
 	}, true)
 }
@@ -209,7 +209,7 @@ func (g *GraphicsRenderer) DrawHorizontalLine(y float64, left, right float64) {
 // @param centerY 圆心的Y坐标
 // @param radius 圆的半径
 func (g *GraphicsRenderer) DrawCircle(centerX, centerY, radius float64) {
-	g.drawWithStroke(func() {
+	g.DrawWithStroke(func() {
 		g.GgCtx.DrawCircle(centerX, centerY, radius)
 	}, true)
 }
@@ -220,7 +220,7 @@ func (g *GraphicsRenderer) DrawCircle(centerX, centerY, radius float64) {
 // @param width 椭圆的宽度
 // @param height 椭圆的高度
 func (g *GraphicsRenderer) DrawEllipse(centerX, centerY, width, height float64) {
-	g.drawWithStroke(func() {
+	g.DrawWithStroke(func() {
 		g.GgCtx.DrawEllipse(centerX, centerY, width/2, height/2)
 	}, true)
 }
@@ -233,7 +233,7 @@ func (g *GraphicsRenderer) DrawEllipse(centerX, centerY, width, height float64) 
 // @param x3 第三个顶点的X坐标
 // @param y3 第三个顶点的Y坐标
 func (g *GraphicsRenderer) DrawTriangle(x1, y1, x2, y2, x3, y3 float64) {
-	g.drawWithStroke(func() {
+	g.DrawWithStroke(func() {
 		g.GgCtx.MoveTo(x1, y1) // 移动到第一个顶点
 		g.GgCtx.LineTo(x2, y2) // 连接到第二个顶点
 		g.GgCtx.LineTo(x3, y3) // 连接到第三个顶点
