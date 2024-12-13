@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-13 09:55:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-12-13 13:26:09
+ * @LastEditTime: 2024-12-13 13:29:26
  * @FilePath: \go-toolbox\pkg\imgix\drawer.go
  * @Description:
  *
@@ -11,6 +11,7 @@
 package imgix
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"math"
@@ -24,6 +25,7 @@ import (
 type GraphicsRenderer struct {
 	GgCtx       *gg.Context
 	DashOptions DashOptions
+	bufferPool  *sync.Pool   // bufferPool 指针
 	mu          sync.RWMutex // 读写锁
 }
 
@@ -115,9 +117,16 @@ func NewGraphicsRenderer(ctx *gg.Context, dashOptions ...DashOptions) *GraphicsR
 	if len(dashOptions) > 0 {
 		defaultDashOptions = dashOptions[0]
 	}
+	// 初始化 bufferPool
+	bufferPool := &sync.Pool{
+		New: func() interface{} {
+			return new(bytes.Buffer)
+		},
+	}
 	renderer := GraphicsRenderer{
 		GgCtx:       ctx,
 		DashOptions: defaultDashOptions,
+		bufferPool:  bufferPool,
 	}
 	return &renderer
 }
@@ -152,6 +161,23 @@ func (g *GraphicsRenderer) SetDashed(dashes ...float64) {
 	g.DrawWithStroke(func() {
 		g.GgCtx.SetDash(dashes...)
 	}, false)
+}
+
+// SaveImage 存储图片
+// @param name 文件名名称
+// @param quality 图片质量
+// @param imageFormat 图片类型 (目前仅支持PNG/JPG/JPEG)
+func (g *GraphicsRenderer) SaveImage(name string, quality int, imageFormat ImageFormat) {
+	// 创建图像缓冲区 从池中获取一个 bytes.Buffer
+	imgBuffer := g.bufferPool.Get().(*bytes.Buffer)
+	defer g.bufferPool.Put(imgBuffer) // 使用完后放回池中
+
+	// 清空缓冲区以避免卵用
+	imgBuffer.Reset()
+	WriterImage(g.GgCtx.Image(), quality, imageFormat, imgBuffer)
+	// 保存生成的图像，使用策略名称
+	imageFileName := fmt.Sprintf("%s.%s", name, imageFormat.String())
+	SaveBufToImageFile(imgBuffer, imageFileName, imageFormat)
 }
 
 // DrawLine 绘制线条

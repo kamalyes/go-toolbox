@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-13 01:15:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-12-13 13:22:57
+ * @LastEditTime: 2024-12-13 13:29:26
  * @FilePath: \go-toolbox\tests\imgix_drawer_test.go
  * @Description:
  *
@@ -72,13 +72,41 @@ func TestNewGraphicsRenderer(t *testing.T) {
 	assert.Equal(t, dashOptions.GapLength(), renderXDashOptions.GapLength(), "GetDashOptions.GapLength should return the correct DashOptions")
 }
 
+func TestImgixGrSaveImage(t *testing.T) {
+	// 创建一个新的 gg.Context
+	width, height := 100, 100
+	ctx := gg.NewContext(width, height)
+
+	// 创建 GraphicsRenderer 实例
+	renderer := imgix.NewGraphicsRenderer(ctx)
+
+	// 使用 GraphicsRenderer 绘制一些图形
+	renderer.DrawRectangle(&gg.Point{X: 10, Y: 10}, &gg.Point{X: 90, Y: 10}, &gg.Point{X: 90, Y: 90}, &gg.Point{X: 10, Y: 90})
+
+	// 保存图像
+	imageName := "test_image"
+	imageFormat := imgix.PNG
+	quality := 100
+	renderer.SaveImage(imageName, quality, imageFormat)
+
+	// 5. 验证保存的图像文件是否存在
+	filePath := imageName + ".png"
+	_, err := os.Stat(filePath)
+	assert.NoError(t, err, "Expected image file to be created")
+
+	// 6. 清理测试生成的文件
+	err = os.Remove(filePath)
+	assert.NoError(t, err, "Expected to remove test image file")
+}
+
 func TestUseDefaultDashed(t *testing.T) {
 	ctx := gg.NewContext(800, 600)
 	renderer := imgix.NewGraphicsRenderer(ctx)
 	renderer.DrawLine(100, 100, 200, 200, 2)
-	err := saveImgixDrawerImage(ctx, "test_default_dashed.png")
+	filePath := "test_default_dashed.png"
+	err := saveImgixDrawerImage(ctx, filePath)
 	assert.NoError(t, err)
-	defer os.Remove("test_default_dashed.png")
+	defer os.Remove(filePath)
 }
 
 func TestUseSolidLine(t *testing.T) {
@@ -87,9 +115,10 @@ func TestUseSolidLine(t *testing.T) {
 
 	renderer.UseSolidLine() // 使用实线
 	renderer.DrawLine(100, 100, 200, 200, 2)
-	err := saveImgixDrawerImage(ctx, "test_solid_line.png")
+	filePath := "test_solid_line.png"
+	err := saveImgixDrawerImage(ctx, filePath)
 	assert.NoError(t, err)
-	defer os.Remove("test_solid_line.png")
+	defer os.Remove(filePath)
 }
 
 // TestDrawWithStroke 测试 DrawWithStroke 方法
@@ -113,9 +142,10 @@ func TestSetDashed(t *testing.T) {
 
 	renderer.SetDashed(5, 5) // 设置虚线样式
 	renderer.DrawLine(100, 100, 200, 200, 2)
-	err := saveImgixDrawerImage(renderer.GgCtx, "test_set_dashed.png")
+	filePath := "test_set_dashed.png"
+	err := saveImgixDrawerImage(renderer.GgCtx, filePath)
 	assert.NoError(t, err)
-	defer os.Remove("test_set_dashed.png")
+	defer os.Remove(filePath)
 }
 
 func TestDrawCurvedLine(t *testing.T) {
@@ -127,9 +157,10 @@ func TestDrawCurvedLine(t *testing.T) {
 	control := renderer.CalculateControlPoint(start, end, 50) // 计算控制点
 
 	renderer.DrawCurvedLine(start, end, control)
-	err := saveImgixDrawerImage(renderer.GgCtx, "test_curved_line.png")
+	filePath := "test_curved_line.png"
+	err := saveImgixDrawerImage(renderer.GgCtx, filePath)
 	assert.NoError(t, err)
-	defer os.Remove("test_curved_line.png")
+	defer os.Remove(filePath)
 }
 
 func TestDrawHorizontalLine(t *testing.T) {
@@ -143,9 +174,10 @@ func TestDrawHorizontalLine(t *testing.T) {
 	renderer := imgix.NewGraphicsRenderer(ctx)
 
 	renderer.DrawHorizontalLine(10, 0, 20)
-	err := saveImgixDrawerImage(renderer.GgCtx, "test_horizontal_line.png")
+	filePath := "test_horizontal_line.png"
+	err := saveImgixDrawerImage(renderer.GgCtx, filePath)
 	assert.NoError(t, err)
-	defer os.Remove("test_horizontal_line.png")
+	defer os.Remove(filePath)
 }
 
 func TestDrawPolygon(t *testing.T) {
@@ -158,9 +190,10 @@ func TestDrawPolygon(t *testing.T) {
 		{X: 150, Y: 200},
 	}
 	renderer.DrawPolygon(points)
-	err := saveImgixDrawerImage(renderer.GgCtx, "test_polygon.png")
+	filePath := "test_polygon.png"
+	err := saveImgixDrawerImage(renderer.GgCtx, filePath)
 	assert.NoError(t, err)
-	defer os.Remove("test_polygon.png")
+	defer os.Remove(filePath)
 }
 
 func TestDrawCenteredMultiLine(t *testing.T) {
@@ -176,9 +209,10 @@ func TestDrawCenteredMultiLine(t *testing.T) {
 	}
 
 	renderer.DrawCenteredMultiLine(startXs, endXs, startYs, endYs, textGroups, 0, true)
-	err := saveImgixDrawerImage(renderer.GgCtx, "test_centered_multiline.png")
+	filePath := "test_centered_multiline.png"
+	err := saveImgixDrawerImage(renderer.GgCtx, filePath)
 	assert.NoError(t, err)
-	defer os.Remove("test_centered_multiline.png")
+	defer os.Remove(filePath)
 }
 
 func TestDrawLine(t *testing.T) {
