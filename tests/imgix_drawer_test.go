@@ -61,7 +61,14 @@ func TestNewGraphicsRenderer(t *testing.T) {
 	assert.NotNil(t, renderer)
 	assert.Equal(t, ctx, renderer.GgCtx)
 
-	dashOptions := imgix.NewDashOptions(5, 7)
+	dashOptions := imgix.NewDashOptions(0, 0)
+	dashOptionsDashLength := dashOptions.DashLength()
+	dashOptionsGapLength := dashOptions.GapLength()
+
+	assert.Equal(t, dashOptionsDashLength, imgix.DashStyle(3), "dashOptionsDashLength should return the correct DashOptions")
+	assert.Equal(t, dashOptionsGapLength, imgix.DashStyle(6), "dashOptionsGapLength should return the correct DashOptions")
+
+	dashOptions = imgix.NewDashOptions(5, 7)
 
 	rendererX := imgix.NewGraphicsRenderer(ctx, dashOptions)
 	renderXDashOptions := rendererX.GetDashOptions()
