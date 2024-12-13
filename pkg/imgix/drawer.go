@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-13 09:55:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-12-13 13:23:35
+ * @LastEditTime: 2024-12-13 13:26:09
  * @FilePath: \go-toolbox\pkg\imgix\drawer.go
  * @Description:
  *
@@ -32,6 +32,28 @@ type DashStyle float64
 type DashOptions struct {
 	dashLength DashStyle // 虚线段长度
 	gapLength  DashStyle // 虚线间隔长度
+}
+
+const (
+	defaultDashLength = 3
+	defaultGapLength  = 6
+)
+
+// NewDashOptions 创建一个新的 DashOptions 实例
+// 如果提供了自定义的段长度和间隔长度，则使用它们；否则使用默认值
+func NewDashOptions(dashLength, gapLength DashStyle) DashOptions {
+	// 默认值
+	if dashLength <= 0 {
+		dashLength = defaultDashLength // 默认虚线段长度
+	}
+	if gapLength <= 0 {
+		gapLength = defaultGapLength // 默认虚线间隔长度
+	}
+
+	return DashOptions{
+		dashLength: dashLength,
+		gapLength:  gapLength,
+	}
 }
 
 // DashLength 返回虚线段长度的 float64 表示
@@ -89,10 +111,7 @@ func (ltrb ImageLTRB) String() string {
 // @param dashOptions
 // @return *GraphicsRenderer 返回一个新的 GraphicsRenderer 实例
 func NewGraphicsRenderer(ctx *gg.Context, dashOptions ...DashOptions) *GraphicsRenderer {
-	defaultDashOptions := DashOptions{
-		dashLength: 3,
-		gapLength:  6,
-	}
+	defaultDashOptions := NewDashOptions(defaultDashLength, defaultGapLength)
 	if len(dashOptions) > 0 {
 		defaultDashOptions = dashOptions[0]
 	}

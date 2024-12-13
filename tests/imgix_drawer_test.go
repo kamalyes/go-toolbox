@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-13 01:15:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-12-13 13:20:26
+ * @LastEditTime: 2024-12-13 13:22:57
  * @FilePath: \go-toolbox\tests\imgix_drawer_test.go
  * @Description:
  *
@@ -60,6 +60,16 @@ func TestNewGraphicsRenderer(t *testing.T) {
 
 	assert.NotNil(t, renderer)
 	assert.Equal(t, ctx, renderer.GgCtx)
+
+	dashOptions := imgix.NewDashOptions(5, 7)
+
+	rendererX := imgix.NewGraphicsRenderer(ctx, dashOptions)
+	renderXDashOptions := rendererX.GetDashOptions()
+
+	assert.NotNil(t, rendererX, "NewGraphicsRenderer should return a non-nil renderer")
+	assert.Equal(t, dashOptions, rendererX.GetDashOptions(), "GetDashOptions() should return the correct DashOptions")
+	assert.Equal(t, dashOptions.DashLength(), renderXDashOptions.DashLength(), "GetDashOptions.DashLength should return the correct DashOptions")
+	assert.Equal(t, dashOptions.GapLength(), renderXDashOptions.GapLength(), "GetDashOptions.GapLength should return the correct DashOptions")
 }
 
 func TestUseDefaultDashed(t *testing.T) {
@@ -103,7 +113,7 @@ func TestSetDashed(t *testing.T) {
 
 	renderer.SetDashed(5, 5) // 设置虚线样式
 	renderer.DrawLine(100, 100, 200, 200, 2)
-	err := saveImgixDrawerImage(ctx, "test_set_dashed.png")
+	err := saveImgixDrawerImage(renderer.GgCtx, "test_set_dashed.png")
 	assert.NoError(t, err)
 	defer os.Remove("test_set_dashed.png")
 }
@@ -117,9 +127,25 @@ func TestDrawCurvedLine(t *testing.T) {
 	control := renderer.CalculateControlPoint(start, end, 50) // 计算控制点
 
 	renderer.DrawCurvedLine(start, end, control)
-	err := saveImgixDrawerImage(ctx, "test_curved_line.png")
+	err := saveImgixDrawerImage(renderer.GgCtx, "test_curved_line.png")
 	assert.NoError(t, err)
 	defer os.Remove("test_curved_line.png")
+}
+
+func TestDrawHorizontalLine(t *testing.T) {
+	ctx := gg.NewContext(800, 600)
+	// 设置背景色为白色
+	ctx.SetColor(color.White)
+	ctx.Clear() // 填充背景色
+
+	// 设置线条颜色为黑色
+	ctx.SetColor(color.Black)
+	renderer := imgix.NewGraphicsRenderer(ctx)
+
+	renderer.DrawHorizontalLine(10, 0, 20)
+	err := saveImgixDrawerImage(renderer.GgCtx, "test_horizontal_line.png")
+	assert.NoError(t, err)
+	defer os.Remove("test_horizontal_line.png")
 }
 
 func TestDrawPolygon(t *testing.T) {
@@ -132,7 +158,7 @@ func TestDrawPolygon(t *testing.T) {
 		{X: 150, Y: 200},
 	}
 	renderer.DrawPolygon(points)
-	err := saveImgixDrawerImage(ctx, "test_polygon.png")
+	err := saveImgixDrawerImage(renderer.GgCtx, "test_polygon.png")
 	assert.NoError(t, err)
 	defer os.Remove("test_polygon.png")
 }
@@ -150,7 +176,7 @@ func TestDrawCenteredMultiLine(t *testing.T) {
 	}
 
 	renderer.DrawCenteredMultiLine(startXs, endXs, startYs, endYs, textGroups, 0, true)
-	err := saveImgixDrawerImage(ctx, "test_centered_multiline.png")
+	err := saveImgixDrawerImage(renderer.GgCtx, "test_centered_multiline.png")
 	assert.NoError(t, err)
 	defer os.Remove("test_centered_multiline.png")
 }
@@ -164,7 +190,7 @@ func TestDrawLine(t *testing.T) {
 
 	// 保存图像
 	testImagePath := "test_line.png"
-	err := saveImgixDrawerImage(ctx, testImagePath)
+	err := saveImgixDrawerImage(renderer.GgCtx, testImagePath)
 	assert.NoError(t, err)
 	defer os.Remove(testImagePath) // 测试结束后删除图像
 
@@ -200,7 +226,7 @@ func TestDrawRectangle(t *testing.T) {
 
 	// 保存图像
 	testImagePath := "test_rectangle.png"
-	err := saveImgixDrawerImage(ctx, testImagePath)
+	err := saveImgixDrawerImage(renderer.GgCtx, testImagePath)
 	assert.NoError(t, err)
 	defer os.Remove(testImagePath) // 测试结束后删除图像
 
@@ -229,7 +255,7 @@ func TestDrawCircle(t *testing.T) {
 
 	// 保存图像
 	testImagePath := "test_circle.png"
-	err := saveImgixDrawerImage(ctx, testImagePath)
+	err := saveImgixDrawerImage(renderer.GgCtx, testImagePath)
 	assert.NoError(t, err)
 	defer os.Remove(testImagePath) // 测试结束后删除图像
 
@@ -386,7 +412,7 @@ func TestConcurrentDrawLine(t *testing.T) {
 		}
 	}
 
-	err := saveImgixDrawerImage(ctx, "test_concurrent_draw_line.png")
+	err := saveImgixDrawerImage(renderer.GgCtx, "test_concurrent_draw_line.png")
 	assert.NoError(t, err)
 	defer os.Remove("test_concurrent_draw_line.png")
 }
@@ -411,19 +437,19 @@ func TestConcurrentGraphicsRenderer(t *testing.T) {
 				assert.Equal(t, ctx, renderer.GgCtx)
 			case 1:
 				renderer.DrawLine(100, 100, 200, 200, 2)
-				err := saveImgixDrawerImage(ctx, "test_default_dashed.png")
+				err := saveImgixDrawerImage(renderer.GgCtx, "test_default_dashed.png")
 				assert.NoError(t, err)
 				defer os.Remove("test_default_dashed.png")
 			case 2:
 				renderer.UseSolidLine()
 				renderer.DrawLine(100, 100, 200, 200, 2)
-				err := saveImgixDrawerImage(ctx, "test_solid_line.png")
+				err := saveImgixDrawerImage(renderer.GgCtx, "test_solid_line.png")
 				assert.NoError(t, err)
 				defer os.Remove("test_solid_line.png")
 			case 3:
 				renderer.SetDashed(5, 5)
 				renderer.DrawLine(100, 100, 200, 200, 2)
-				err := saveImgixDrawerImage(ctx, "test_set_dashed.png")
+				err := saveImgixDrawerImage(renderer.GgCtx, "test_set_dashed.png")
 				assert.NoError(t, err)
 				defer os.Remove("test_set_dashed.png")
 			case 4:
@@ -431,7 +457,7 @@ func TestConcurrentGraphicsRenderer(t *testing.T) {
 				end := &gg.Point{X: 200, Y: 200}
 				control := renderer.CalculateControlPoint(start, end, 50)
 				renderer.DrawCurvedLine(start, end, control)
-				err := saveImgixDrawerImage(ctx, "test_curved_line.png")
+				err := saveImgixDrawerImage(renderer.GgCtx, "test_curved_line.png")
 				assert.NoError(t, err)
 				defer os.Remove("test_curved_line.png")
 			case 5:
@@ -441,7 +467,7 @@ func TestConcurrentGraphicsRenderer(t *testing.T) {
 					{X: 150, Y: 200},
 				}
 				renderer.DrawPolygon(points)
-				err := saveImgixDrawerImage(ctx, "test_polygon.png")
+				err := saveImgixDrawerImage(renderer.GgCtx, "test_polygon.png")
 				assert.NoError(t, err)
 				defer os.Remove("test_polygon.png")
 			case 6:
@@ -453,12 +479,12 @@ func TestConcurrentGraphicsRenderer(t *testing.T) {
 					{"Hello", "World"},
 				}
 				renderer.DrawCenteredMultiLine(startXs, endXs, startYs, endYs, textGroups, 0, true)
-				err := saveImgixDrawerImage(ctx, "test_centered_multiline.png")
+				err := saveImgixDrawerImage(renderer.GgCtx, "test_centered_multiline.png")
 				assert.NoError(t, err)
 				defer os.Remove("test_centered_multiline.png")
 			case 7:
 				renderer.DrawLine(100, 100, 200, 200, 2)
-				err := saveImgixDrawerImage(ctx, "test_line.png")
+				err := saveImgixDrawerImage(renderer.GgCtx, "test_line.png")
 				assert.NoError(t, err)
 				defer os.Remove("test_line.png")
 			case 8:
@@ -467,12 +493,12 @@ func TestConcurrentGraphicsRenderer(t *testing.T) {
 				bottom := &gg.Point{X: 200, Y: 200}
 				right := &gg.Point{X: 200, Y: 200}
 				renderer.DrawRectangle(left, top, bottom, right)
-				err := saveImgixDrawerImage(ctx, "test_rectangle.png")
+				err := saveImgixDrawerImage(renderer.GgCtx, "test_rectangle.png")
 				assert.NoError(t, err)
 				defer os.Remove("test_rectangle.png")
 			case 9:
 				renderer.DrawCircle(400, 300, 50)
-				err := saveImgixDrawerImage(ctx, "test_circle.png")
+				err := saveImgixDrawerImage(renderer.GgCtx, "test_circle.png")
 				assert.NoError(t, err)
 				defer os.Remove("test_circle.png")
 			}
