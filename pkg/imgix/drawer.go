@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-13 09:55:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-12-13 13:05:56
+ * @LastEditTime: 2024-12-13 13:23:35
  * @FilePath: \go-toolbox\pkg\imgix\drawer.go
  * @Description:
  *
@@ -11,6 +11,7 @@
 package imgix
 
 import (
+	"fmt"
 	"log"
 	"math"
 	"sync"
@@ -54,6 +55,33 @@ type ImageLTRB struct {
 	Top    float64 // 上边界
 	Right  float64 // 右边界
 	Bottom float64 // 下边界
+}
+
+// Width 计算边界框的宽度
+func (ltrb ImageLTRB) Width() float64 {
+	return ltrb.Right - ltrb.Left
+}
+
+// Height 计算边界框的高度
+func (ltrb ImageLTRB) Height() float64 {
+	return ltrb.Bottom - ltrb.Top
+}
+
+// Center 返回边界框的中心点
+func (ltrb ImageLTRB) Center() (float64, float64) {
+	centerX := ltrb.Left + ltrb.Width()/2
+	centerY := ltrb.Top + ltrb.Height()/2
+	return centerX, centerY
+}
+
+// Contains 检查一个点是否在边界框内
+func (ltrb ImageLTRB) Contains(x, y float64) bool {
+	return x >= ltrb.Left && x <= ltrb.Right && y >= ltrb.Top && y <= ltrb.Bottom
+}
+
+// String 返回边界框的字符串表示
+func (ltrb ImageLTRB) String() string {
+	return fmt.Sprintf("ImageLTRB(Left: %f, Top: %f, Right: %f, Bottom: %f)", ltrb.Left, ltrb.Top, ltrb.Right, ltrb.Bottom)
 }
 
 // NewGraphicsRenderer 创建一个新的 GraphicsRenderer 实例

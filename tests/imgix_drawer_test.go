@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-13 01:15:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-12-13 13:15:55
+ * @LastEditTime: 2024-12-13 13:20:26
  * @FilePath: \go-toolbox\tests\imgix_drawer_test.go
  * @Description:
  *
@@ -279,6 +279,39 @@ func TestGetLTRB(t *testing.T) {
 	assert.Equal(t, 50.0, ltrb.Top)
 	assert.Equal(t, 200.0, ltrb.Right)
 	assert.Equal(t, 200.0, ltrb.Bottom)
+}
+
+func TestImageLTRB(t *testing.T) {
+	// 创建一个 ImageLTRB 实例
+	ltrb := imgix.ImageLTRB{
+		Left:   10,
+		Top:    20,
+		Right:  50,
+		Bottom: 80,
+	}
+
+	// 测试 Width 方法
+	expectedWidth := ltrb.Right - ltrb.Left // 40.0
+	assert.Equal(t, expectedWidth, ltrb.Width(), "Width() should be equal")
+
+	// 测试 Height 方法
+	expectedHeight := ltrb.Bottom - ltrb.Top // 60.0
+	assert.Equal(t, expectedHeight, ltrb.Height(), "Height() should be equal")
+
+	// 测试 Center 方法
+	expectedCenterX := ltrb.Left + (expectedWidth / 2.0) // 30.0
+	expectedCenterY := ltrb.Top + (expectedHeight / 2.0) // 50.0
+	gotX, gotY := ltrb.Center()
+	assert.Equal(t, expectedCenterX, gotX, "Center X should be equal")
+	assert.Equal(t, expectedCenterY, gotY, "Center Y should be equal")
+
+	// 测试 Contains 方法
+	pointInsideX, pointInsideY := 30.0, 30.0
+	assert.True(t, ltrb.Contains(pointInsideX, pointInsideY), "Contains should return true for point inside")
+
+	pointOutsideX, pointOutsideY := 5.0, 5.0
+	assert.False(t, ltrb.Contains(pointOutsideX, pointOutsideY), "Contains should return false for point outside")
+	assert.NotEmpty(t, ltrb.String(), "String() should return an empty string when all bounds are zero")
 }
 
 func TestGetFacialXYByKey(t *testing.T) {
