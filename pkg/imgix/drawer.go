@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-13 09:55:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-12-13 12:57:33
+ * @LastEditTime: 2024-12-13 13:05:56
  * @FilePath: \go-toolbox\pkg\imgix\drawer.go
  * @Description:
  *
@@ -16,6 +16,7 @@ import (
 	"sync"
 
 	"github.com/fogleman/gg"
+	"github.com/kamalyes/go-toolbox/pkg/syncx"
 )
 
 // GraphicsRenderer 结构体用于绘制面部特征
@@ -74,22 +75,9 @@ func NewGraphicsRenderer(ctx *gg.Context, dashOptions ...DashOptions) *GraphicsR
 	return &renderer
 }
 
-// setLock 是一个通用的设置写锁
-func (g *GraphicsRenderer) setLock(drawFunc func()) {
-	g.mu.Lock() // 使用写锁
-	drawFunc()
-	defer g.mu.Unlock()
-}
-
-// setRLock 是一个通用的设置读锁
-func (g *GraphicsRenderer) setRLock() {
-	g.mu.RLock() // 使用读锁
-	defer g.mu.RUnlock()
-}
-
 // drawWithStroke 是一个通用的绘图函数，接受一个绘图操作的函数作为参数
 func (g *GraphicsRenderer) drawWithStroke(drawFunc func(), isStroke bool) {
-	g.setLock(func() {
+	syncx.WithLock(&g.mu, func() {
 		drawFunc() // 执行绘图操作
 		if isStroke {
 			g.GgCtx.Stroke() // 在绘图操作完成后统一调用 Stroke
