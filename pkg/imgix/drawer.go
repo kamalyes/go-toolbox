@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-13 09:55:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-12-15 09:09:15
+ * @LastEditTime: 2024-12-16 10:08:55
  * @FilePath: \go-toolbox\pkg\imgix\drawer.go
  * @Description:
  *
@@ -601,9 +601,12 @@ type PointMaxMin int
 const (
 	PointMax PointMaxMin = iota // 最大值模式
 	PointMin                    // 最小值模式
-)
-
-// CalculatePoint 返回两个点中在指定维度上较大的或较小的点
+) // CalculatePoint 返回两个点中在指定维度上较大的或较小的点
+// @param a 第一个点
+// @param b 第二个点
+// @param mode 指定是取最大点还是最小点（PointMaxMin 枚举类型）
+// @param axis 指定比较的轴（AxisPointMode 枚举类型）
+// @return 返回在指定维度上较大的或较小的点
 func CalculatePoint(a, b *gg.Point, mode PointMaxMin, axis AxisPointMode) *gg.Point {
 	switch axis {
 	case AxisY: // 如果比较Y轴
@@ -622,6 +625,10 @@ func CalculatePoint(a, b *gg.Point, mode PointMaxMin, axis AxisPointMode) *gg.Po
 }
 
 // CalculateMultiplePoints 计算多个点中的最大或最小点
+// @param points 要比较的点的切片
+// @param mode 指定是取最大点还是最小点（PointMaxMin 枚举类型）
+// @param axis 指定比较的轴（AxisPointMode 枚举类型）
+// @return 返回在指定维度上较大的或较小的点
 func CalculateMultiplePoints(points []*gg.Point, mode PointMaxMin, axis AxisPointMode) *gg.Point {
 	if len(points) == 0 {
 		return nil // 如果没有点，返回nil
@@ -635,11 +642,15 @@ func CalculateMultiplePoints(points []*gg.Point, mode PointMaxMin, axis AxisPoin
 	return result // 返回最终结果
 }
 
-// 判断三个点是否能构成三角形
+// CanFormTriangle 判断三个点是否能构成三角形
+// @param points 三个点的切片，必须包含三个点
+// @return area 三角形的面积，如果能构成三角形则返回面积，
+//
+//	bool 表示是否能构成三角形，error 表示是否有错误
 func CanFormTriangle(points []*gg.Point) (float64, bool, error) {
 	maxPointLen := 3
 	if len(points) < maxPointLen || len(points) > maxPointLen {
-		return 0.0, false, fmt.Errorf("points length number must be %d", maxPointLen)
+		return 0.0, false, fmt.Errorf("points length number must be %d", maxPointLen) // 如果点的数量不等于3，返回错误
 	}
 
 	// 计算三角形的面积
@@ -656,26 +667,104 @@ func CanFormTriangle(points []*gg.Point) (float64, bool, error) {
 }
 
 // ResizeX 只缩放 x 坐标
+// @param point 要缩放的点
+// @param scaleFactor 缩放因子，>1 表示放大，<1 表示缩小
+// @return 返回经过 x 坐标缩放后的新点
 func ResizeX(point *gg.Point, scaleFactor float64) *gg.Point {
 	return &gg.Point{
-		X: point.X * scaleFactor,
-		Y: point.Y, // y 坐标保持不变
+		X: point.X * scaleFactor, // 将 x 坐标乘以缩放因子
+		Y: point.Y,               // y 坐标保持不变
 	}
 }
 
 // ResizeY 只缩放 y 坐标
+// @param point 要缩放的点
+// @param scaleFactor 缩放因子，>1 表示放大，<1 表示缩小
+// @return 返回经过 y 坐标缩放后的新点
 func ResizeY(point *gg.Point, scaleFactor float64) *gg.Point {
 	return &gg.Point{
-		Y: point.Y * scaleFactor,
-		X: point.X, // x 坐标保持不变
+		Y: point.Y * scaleFactor, // 将 y 坐标乘以缩放因子
+		X: point.X,               // x 坐标保持不变
 	}
 }
 
 // ResizePoint 单个坐标轴的等比例缩放
+// @param point 要缩放的点
+// @param resizeX x 坐标的缩放因子
+// @param resizeY y 坐标的缩放因子
+// @return 返回同时经过 x 和 y 坐标缩放后的新点
 func ResizePoint(point *gg.Point, resizeX, resizeY float64) *gg.Point {
 	return &gg.Point{
-		X: ResizeX(point, resizeX).X,
-		Y: ResizeY(point, resizeY).Y,
+		X: ResizeX(point, resizeX).X, // 先对 x 坐标进行缩放
+		Y: ResizeY(point, resizeY).Y, // 再对 y 坐标进行缩放
+	}
+}
+
+// ResizeOneselfX 根据指定的操作返回原始 x 坐标与缩放后的 x 坐标的结果
+// @param point 要缩放的点
+// @param scaleFactor 缩放因子，>1 表示放大，<1 表示缩小
+// @param operation 计算模式
+// @return 返回经过操作后的新点
+func ResizeOneselfX(point *gg.Point, scaleFactor float64, operation ...CalculateFractionPointMode) *gg.Point {
+	var newX float64
+	var operate = Subtract
+	if len(operation) > 0 {
+		operate = operation[0]
+	}
+	// 获取缩放后的 x 坐标
+	resizedX := ResizeX(point, scaleFactor).X
+
+	// 根据 operation 执行相应的运算
+	switch operate {
+	case Add:
+		newX = point.X + resizedX
+	case Multiply:
+		newX = point.X * resizedX
+	case Divide:
+		newX = point.X / resizedX
+	case Subtract:
+		fallthrough
+	default:
+		newX = point.X - resizedX
+	}
+
+	return &gg.Point{
+		X: newX,
+		Y: point.Y, // y 坐标保持不变
+	}
+}
+
+// ResizeOneselfY 根据指定的操作返回原始 y 坐标与缩放后的 y 坐标的结果
+// @param point 要缩放的点
+// @param scaleFactor 缩放因子，>1 表示放大，<1 表示缩小
+// @param operation 计算模式
+// @return 返回经过操作后的新点
+func ResizeOneselfY(point *gg.Point, scaleFactor float64, operation ...CalculateFractionPointMode) *gg.Point {
+	var newY float64
+	var operate = Subtract
+	if len(operation) > 0 {
+		operate = operation[0]
+	}
+	// 获取缩放后的 y 坐标
+	resizedY := ResizeY(point, scaleFactor).Y
+
+	// 根据 operation 执行相应的运算
+	switch operate {
+	case Add:
+		newY = point.Y + resizedY
+	case Multiply:
+		newY = point.Y * resizedY
+	case Divide:
+		newY = point.Y / resizedY
+	case Subtract:
+		fallthrough
+	default:
+		newY = point.Y - resizedY
+	}
+
+	return &gg.Point{
+		Y: newY,
+		X: point.X, // x 坐标保持不变
 	}
 }
 

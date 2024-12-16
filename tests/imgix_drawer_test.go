@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-13 01:15:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-12-15 15:20:55
+ * @LastEditTime: 2024-12-16 09:57:26
  * @FilePath: \go-toolbox\tests\imgix_drawer_test.go
  * @Description:
  *
@@ -724,6 +724,50 @@ func TestResizePoint(t *testing.T) {
 		scaledPoint := imgix.ResizePoint(test.point, test.resize, test.resize)
 		assert.Equal(t, test.expected.X, scaledPoint.X, "X coordinate mismatch")
 		assert.Equal(t, test.expected.Y, scaledPoint.Y, "Y coordinate mismatch")
+	}
+}
+
+// TestResizeOneselfX 测试 ResizeOneselfX 函数
+func TestResizeOneselfX(t *testing.T) {
+	point := &gg.Point{X: 10, Y: 20}
+
+	tests := []struct {
+		scaleFactor float64
+		operation   imgix.CalculateFractionPointMode
+		expectedX   float64
+	}{
+		{2.0, imgix.Add, 30.0},       // 10 + (10 * 2) = 30
+		{0.5, imgix.Subtract, 5.0},   // 10 - (10 * 0.5) = 5
+		{2.0, imgix.Multiply, 200.0}, // 10 * (10 * 2) = 200
+		{2.0, imgix.Divide, 0.5},     // 10 / (10 * 2) = 0.5
+		{1.0, imgix.Subtract, 0.0},   // 10 - (10 * 1) = 0
+	}
+
+	for _, test := range tests {
+		result := imgix.ResizeOneselfX(point, test.scaleFactor, test.operation)
+		assert.Equal(t, test.expectedX, result.X, "Expected X value did not match")
+	}
+}
+
+// TestResizeOneselfY 测试 ResizeOneselfY 函数
+func TestResizeOneselfY(t *testing.T) {
+	point := &gg.Point{X: 10, Y: 20}
+
+	tests := []struct {
+		scaleFactor float64
+		operation   imgix.CalculateFractionPointMode
+		expectedY   float64
+	}{
+		{2.0, imgix.Add, 60.0},       // 20 + (20 * 2) = 60
+		{0.5, imgix.Subtract, 10.0},  // 20 - (20 * 0.5) = 10
+		{2.0, imgix.Multiply, 800.0}, // 20 * (20 * 2) = 800
+		{2.0, imgix.Divide, 0.5},     // 20 / (20 * 2) = 0.5
+		{1.0, imgix.Subtract, 0.0},   // 20 - (20 * 1) = 0
+	}
+
+	for _, test := range tests {
+		result := imgix.ResizeOneselfY(point, test.scaleFactor, test.operation)
+		assert.Equal(t, test.expectedY, result.Y, "Expected Y value did not match")
 	}
 }
 
