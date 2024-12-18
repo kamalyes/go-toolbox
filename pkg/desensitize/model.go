@@ -39,7 +39,7 @@ func NewDesensitizeOptions() DesensitizeOptions {
 		IdCardEndIndex:            13,
 		IdCardLength:              19,
 		PhoneNumberStartIndex:     3,
-		PhoneNumberEndIndex:       6,
+		PhoneNumberEndIndex:       7,
 		MobilePhoneStartIndex:     3,
 		EmailStartIndex:           1,
 		AddressLength:             8,

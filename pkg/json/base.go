@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-22 11:50:50
+ * @LastEditTime: 2024-12-18 19:09:16
  * @FilePath: \go-toolbox\pkg\json\base.go
  * @Description:
  *
@@ -10,7 +10,9 @@
  */
 package json
 
-import "strings"
+import (
+	"strings"
+)
 
 // KeyValuePairs 是一个用于存储键值对的结构体
 type KeyValuePairs struct {

@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-09 12:15:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-12-10 09:21:55
+ * @LastEditTime: 2024-12-18 23:08:35
  * @FilePath: \go-toolbox\tests\imgix_base_test.go
  * @Description:
  *
@@ -215,6 +215,7 @@ func TestSaveBufToImageFile(t *testing.T) {
 
 	// 测试使用不支持的格式
 	err = imgix.SaveBufToImageFile(buf, "test_image.invalid", imgix.ImageFormat(100))
+	defer os.Remove("test_image.invalid")
 	assert.Error(t, err) // 期望返回错误
 
 	// 测试文件创建失败的情况
