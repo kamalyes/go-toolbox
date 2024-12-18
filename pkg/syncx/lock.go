@@ -22,3 +22,10 @@ func WithLock(lock Locker, operation func()) {
 	defer lock.Unlock() // 确保在操作完成后释放锁
 	operation()         // 执行操作
 }
+
+// WithLockReturn 是一个支持返回值的函数，用于在给定的锁上执行操作
+func WithLockReturn[T any](lock Locker, operation func() (T, error)) (T, error) {
+	lock.Lock()         // 获取锁
+	defer lock.Unlock() // 确保在操作完成后释放锁
+	return operation()  // 执行操作并返回结果
+}
