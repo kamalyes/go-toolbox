@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-13 09:55:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-12-16 10:08:55
+ * @LastEditTime: 2024-12-18 18:32:59
  * @FilePath: \go-toolbox\pkg\imgix\drawer.go
  * @Description:
  *
@@ -328,8 +328,8 @@ func (g *GraphicsRenderer) DrawTriangle(x1, y1, x2, y2, x3, y3 float64) {
 // @param textGroups 文本内容的二维数组
 // @param angle 旋转角度
 // @param drawDashed 是否绘制虚线
-// @param lineSpacing 行间距（可选）
-func (g *GraphicsRenderer) DrawCenteredMultiLine(startXs, endXs, startYs, endYs []float64, textGroups [][]string, angle float64, drawDashed bool, lineSpacing ...float64) {
+// @param isVertical 是否绘制竖线
+func (g *GraphicsRenderer) DrawCenteredMultiLine(startXs, endXs, startYs, endYs []float64, textGroups [][]string, angle float64, drawDashed bool, isVertical bool) {
 	log.Println("Starting DrawCenteredMultiLine")
 	if len(startXs) != len(textGroups) ||
 		len(endXs) != len(textGroups) ||
@@ -339,11 +339,6 @@ func (g *GraphicsRenderer) DrawCenteredMultiLine(startXs, endXs, startYs, endYs 
 		return
 	}
 
-	defaultLineSpacing := 0.0
-	if len(lineSpacing) > 0 {
-		defaultLineSpacing = lineSpacing[0]
-	}
-
 	for i, texts := range textGroups {
 		log.Printf("Drawing text group %d", i)
 		startX, endX := startXs[i], endXs[i]
@@ -351,26 +346,22 @@ func (g *GraphicsRenderer) DrawCenteredMultiLine(startXs, endXs, startYs, endYs 
 		midY := (startY + endY) / 2
 
 		if drawDashed {
-			g.DrawLineXYLineWidth(startX, midY, endX, midY)
+			if isVertical {
+				// 绘制竖线
+				g.DrawLineXYLineWidth(midY, startX, midY, endX)
+			} else {
+				// 绘制横线
+				g.DrawLineXYLineWidth(startX, midY, endX, midY)
+			}
 		}
 
 		totalHeight := 0.0
 		lineHeights := make([]float64, len(texts))
-		lineSpacings := make([]float64, len(texts))
 
 		for j, text := range texts {
 			_, height := g.GgCtx.MeasureString(text)
 			lineHeights[j] = height
-
-			if j < len(texts)-1 {
-				if defaultLineSpacing > 0 {
-					lineSpacings[j] = defaultLineSpacing
-				} else {
-					lineSpacings[j] = height * 0.5
-				}
-			}
-
-			totalHeight += height + lineSpacings[j]
+			totalHeight += height // 只计算文本的总高度，不再考虑行间距
 		}
 
 		posX := (startX + endX) / 2
@@ -390,7 +381,7 @@ func (g *GraphicsRenderer) DrawCenteredMultiLine(startXs, endXs, startYs, endYs 
 			g.GgCtx.DrawStringAnchored(text, 0, 0, 0.5, 0.5)
 			g.GgCtx.Pop()
 
-			posYStart += lineHeights[j] + lineSpacings[j]
+			posYStart += lineHeights[j] // 直接使用文本高度更新起始位置
 		}
 	}
 	log.Println("Finished DrawCenteredMultiLine")

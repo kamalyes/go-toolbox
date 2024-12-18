@@ -218,7 +218,8 @@ func TestDrawCenteredMultiLine(t *testing.T) {
 		{"Hello", "World"},
 	}
 
-	renderer.DrawCenteredMultiLine(startXs, endXs, startYs, endYs, textGroups, 0, true)
+	renderer.DrawCenteredMultiLine(startXs, endXs, startYs, endYs, textGroups, 0, true, false)
+	renderer.DrawCenteredMultiLine(startXs, endXs, startYs, endYs, textGroups, 0, true, true)
 	filePath := "test_centered_multiline.png"
 	err := saveImgixDrawerImage(renderer.GgCtx, filePath)
 	assert.NoError(t, err)
