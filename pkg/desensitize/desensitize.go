@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-01 01:55:28
+ * @LastEditTime: 2024-12-19 08:15:19
  * @FilePath: \go-toolbox\pkg\desensitize\desensitize.go
  * @Description:
  *
@@ -34,21 +34,21 @@ func Desensitize(str string, DesensitizeType DesensitizeType, options ...Desensi
 	case CustomExtension:
 		newStr = SensitiveData(str, opt.CustomExtensionStartIndex, opt.CustomExtensionEndIndex)
 	case ChineseName:
-		newStr = SensitiveData(str, opt.ChineseNameStartIndex, opt.ChineseNameEndIndex)
+		newStr = SensitiveData(str, opt.ChineseNameStartIndex, 1+(stringx.Length(str)-2)/2)
 	case IDCard:
-		newStr = SensitiveData(str, opt.IdCardStartIndex, opt.IdCardEndIndex)
+		newStr = SensitiveData(str, opt.IdCardStartIndex, stringx.Length(str)-4)
 	case PhoneNumber:
 		newStr = SensitizePhoneNumber(str, opt.PhoneNumberStartIndex, opt.PhoneNumberEndIndex)
 	case MobilePhone:
 		newStr = SensitiveData(str, opt.MobilePhoneStartIndex, stringx.Length(str)-4)
 	case Address:
-		newStr = SensitiveData(str, stringx.Length(str)-opt.AddressLength, stringx.Length(str))
+		newStr = SensitiveData(str, stringx.Length(str)/3, stringx.Length(str)-3)
 	case Email:
-		newStr = SensitiveData(str, opt.EmailStartIndex, stringx.IndexOf(str, "@"))
+		newStr = SensitiveData(str, opt.EmailStartIndex, stringx.IndexOf(str, "@")-2)
 	case Password:
 		newStr = SensitiveData(str, 0, stringx.Length(str))
 	case CarLicense:
-		newStr = SensitizeCarLicense(str)
+		newStr = SensitiveData(str, 3, stringx.Length(str)-2)
 	case BankCard:
 		newStr = SensitizeBankCard(str, opt.IdCardLength)
 	case IPV4:
@@ -100,23 +100,6 @@ func SensitizePhoneNumber(str string, start, end int) string {
 	return SensitiveData(stringx.Pad(str, 11), start, end)
 }
 
-// 车牌号脱敏
-func SensitizeCarLicense(str string) string {
-	// 空判断
-	if validator.IsEmptyValue(reflect.ValueOf(str)) {
-		return str
-	}
-
-	newCarNo := str
-	// 普通车牌
-	if stringx.Length(str) == 7 {
-		newCarNo = stringx.Hide(str, 3, 6)
-	} else if stringx.Length(str) == 8 { // 新能源
-		newCarNo = stringx.Hide(str, 3, 7)
-	}
-	return newCarNo
-}
-
 // 银行卡号脱敏
 func SensitizeBankCard(str string, cardLength int) string {
 	// 如果卡号为空，则直接返回原卡号
@@ -154,7 +137,7 @@ func SensitizeBankCard(str string, cardLength int) string {
 	// 在中间部分的最末尾插入一个空格
 	newCardNo = append(newCardNo, ' ')
 	// 添加卡号的最后4位
-	lastFour := cleanCardNo[len(cleanCardNo)-4:]
+	lastFour := cleanCardNo[stringx.Length(cleanCardNo)-4:]
 	newCardNo = append(newCardNo, []rune(lastFour)...)
 
 	// 返回格式化后的卡号

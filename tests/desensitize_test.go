@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-22 15:50:08
+ * @LastEditTime: 2024-12-19 11:19:10
  * @FilePath: \go-toolbox\tests\desensitize_test.go
  * @Description:
  *
@@ -26,6 +26,7 @@ func TestSensitiveData(t *testing.T) {
 }
 
 func TestDesensitizeAllTypes(t *testing.T) {
+	desensitizeOptions := desensitize.NewDesensitizeOptions()
 	testCases := map[string]struct {
 		input           string
 		expected        string
@@ -47,48 +48,47 @@ func TestDesensitizeAllTypes(t *testing.T) {
 			input:           "123456789012345678",
 			expected:        "123456********5678",
 			desensitizeType: desensitize.IDCard,
-			option:          desensitize.DesensitizeOptions{IdCardStartIndex: 6, IdCardEndIndex: 14},
+			option:          desensitizeOptions,
 		},
 		"TestPassWord": {
 			input:           "12678",
 			expected:        "1****",
 			desensitizeType: desensitize.Password,
-			option:          desensitize.DesensitizeOptions{},
 		},
 		"TestPhoneNumber": {
 			input:           "18175698789",
 			expected:        "181****8789",
 			desensitizeType: desensitize.PhoneNumber,
-			option:          desensitize.DesensitizeOptions{PhoneNumberStartIndex: 3, PhoneNumberEndIndex: 7},
+			option:          desensitizeOptions,
 		},
 		"TestMobilePhone": {
 			input:           "13812345678",
 			expected:        "138****5678",
 			desensitizeType: desensitize.MobilePhone,
-			option:          desensitize.DesensitizeOptions{MobilePhoneStartIndex: 3},
+			option:          desensitizeOptions,
 		},
 		"TestAddress": {
 			input:           "北京市朝阳区某某街道123号",
-			expected:        "北京市朝阳区某某街道****",
+			expected:        "北京市朝*******23号",
 			desensitizeType: desensitize.Address,
-			option:          desensitize.DesensitizeOptions{AddressLength: 4},
+			option:          desensitizeOptions,
 		},
 		"TestEmail": {
 			input:           "example@test.com",
-			expected:        "e******@test.com",
+			expected:        "e****le@test.com",
 			desensitizeType: desensitize.Email,
-			option:          desensitize.DesensitizeOptions{EmailStartIndex: 1},
+			option:          desensitizeOptions,
 		},
 		"TestCarLicense": {
 			input:           "浙A12345B",
-			expected:        "浙A1****B",
+			expected:        "浙A1***5B",
 			desensitizeType: desensitize.CarLicense,
 		},
 		"TestBankCard": {
 			input:           "1234567890123456",
-			expected:        "1234 **** **** *** 3456",
+			expected:        "1234 **** **** **** 3456",
 			desensitizeType: desensitize.BankCard,
-			option:          desensitize.DesensitizeOptions{IdCardLength: 16},
+			option:          desensitizeOptions,
 		},
 		"TestIPv4": {
 			input:           "192.168.1.1",
@@ -113,13 +113,6 @@ func TestPhoneNumber(t *testing.T) {
 	assert.Equal(t, "", desensitize.SensitizePhoneNumber("", 3, 7))
 	assert.Equal(t, "181****8789", desensitize.SensitizePhoneNumber("18175698789", 3, 7))
 	assert.Equal(t, "181*****789", desensitize.SensitizePhoneNumber("1817789", 3, 7))
-}
-
-func TestCarLicense(t *testing.T) {
-	assert.Equal(t, "深B1***B", desensitize.SensitizeCarLicense("深B1234B"))
-	assert.Equal(t, "浙A1****B", desensitize.SensitizeCarLicense("浙A12345B"))
-	assert.Equal(t, "浙A1****Z", desensitize.SensitizeCarLicense("浙A12345Z"))
-	assert.Equal(t, "", desensitize.SensitizeCarLicense(""))
 }
 
 func TestBankCard(t *testing.T) {

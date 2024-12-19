@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-01 22:23:03
+ * @LastEditTime: 2024-12-19 08:15:19
  * @FilePath: \go-toolbox\pkg\desensitize\model.go
  * @Description:
  *
@@ -17,15 +17,12 @@ type DesensitizeOptions struct {
 	CustomExtensionStartIndex int
 	CustomExtensionEndIndex   int
 	ChineseNameStartIndex     int
-	ChineseNameEndIndex       int
 	IdCardStartIndex          int
-	IdCardEndIndex            int
 	IdCardLength              int
 	PhoneNumberStartIndex     int
 	PhoneNumberEndIndex       int
 	MobilePhoneStartIndex     int
 	EmailStartIndex           int
-	AddressLength             int
 }
 
 // NewDesensitizeOptions 创建带有默认值的 DesensitizeOptions
@@ -34,14 +31,11 @@ func NewDesensitizeOptions() DesensitizeOptions {
 		CustomExtensionStartIndex: 1,
 		CustomExtensionEndIndex:   1,
 		ChineseNameStartIndex:     1,
-		ChineseNameEndIndex:       1,
-		IdCardStartIndex:          7,
-		IdCardEndIndex:            13,
+		IdCardStartIndex:          6,
 		IdCardLength:              19,
 		PhoneNumberStartIndex:     3,
 		PhoneNumberEndIndex:       7,
 		MobilePhoneStartIndex:     3,
 		EmailStartIndex:           1,
-		AddressLength:             8,
 	}
 }

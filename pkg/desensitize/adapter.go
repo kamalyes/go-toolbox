@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-18 18:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-12-18 23:05:29
+ * @LastEditTime: 2024-12-19 08:15:19
  * @FilePath: \go-toolbox\pkg\desensitize\adapter.go
  * @Description:
  * 该文件实现了数据脱敏的功能，包括注册脱敏器和执行脱敏操作。
@@ -77,62 +77,71 @@ func OperateByRule(desensitizerType string, in interface{}) (interface{}, error)
 // @returns
 //   - 返回可能的错误。
 func Desensitization(obj interface{}) error {
-	rt := reflect.TypeOf(obj)  // 获取对象的类型
-	rv := reflect.ValueOf(obj) // 获取对象的值
+	// 获取传入对象的反射值
+	fieldValue := reflect.ValueOf(obj)
 
-	if rv.Kind() == reflect.Ptr {
-		rv = rv.Elem() // 获取指针指向的值
-		rt = rt.Elem() // 获取指针指向的类型
+	// 检查是否为非空指针
+	if fieldValue.Kind() != reflect.Ptr || fieldValue.IsNil() {
+		return errors.New("expected a non-nil pointer to a struct")
 	}
 
-	if rv.Kind() != reflect.Struct {
-		return errors.New("expected a struct or pointer to a struct") // 仅支持结构体或指针
+	// 获取指针指向的值
+	fieldValue = fieldValue.Elem()
+
+	// 遍历结构体的每个字段
+	for i := 0; i < fieldValue.NumField(); i++ {
+		field := fieldValue.Type().Field(i) // 获取字段类型信息
+		tag := field.Tag.Get("desensitize") // 获取字段的脱敏标签
+		fieldType := fieldValue.Field(i)    // 获取字段的值
+
+		// 处理字段的脱敏
+		if err := processField(fieldType, tag); err != nil {
+			return err
+		}
 	}
+	return nil // 返回nil表示成功
+}
 
-	// 遍历结构体字段
-	for idx := 0; idx < rv.NumField(); idx++ {
-		fieldValue := rv.Field(idx) // 获取字段的值
-		fieldType := rt.Field(idx)  // 获取字段的类型
-
-		desensitizationTag := fieldType.Tag.Get("desensitize") // 获取脱敏标签
-
-		switch fieldValue.Kind() {
-		case reflect.Slice, reflect.Array:
-			// 处理切片或数组类型
-			if fieldType.Type.Elem().Kind() == reflect.Struct {
+// processField 处理字段的脱敏逻辑
+func processField(fieldValue reflect.Value, tag string) error {
+	switch fieldValue.Kind() {
+	case reflect.Slice, reflect.Array:
+		// 如果字段是切片或数组，处理每个元素
+		for j := 0; j < fieldValue.Len(); j++ {
+			elemValue := fieldValue.Index(j)
+			if elemValue.Kind() == reflect.Struct {
 				// 如果元素是结构体，递归处理
-				for i := 0; i < fieldValue.Len(); i++ {
-					if err := Desensitization(fieldValue.Index(i).Addr().Interface()); err != nil {
-						return err // 处理错误
-					}
+				if err := Desensitization(elemValue.Addr().Interface()); err != nil {
+					return err
 				}
 			} else {
-				// 对于基本类型的切片，执行脱敏
-				for i := 0; i < fieldValue.Len(); i++ {
-					elemValue := fieldValue.Index(i)
-					newValue, err := OperateByRule(desensitizationTag, elemValue.Interface()) // 执行脱敏
-					if err == nil {
-						elemValue.Set(reflect.ValueOf(newValue)) // 设置脱敏后的值
-					}
-				}
-			}
-		case reflect.Struct:
-			// 处理结构体类型，递归调用
-			if err := Desensitization(fieldValue.Addr().Interface()); err != nil {
-				return err // 处理错误
-			}
-		default:
-			// 处理其他基本类型
-			if desensitizationTag != "" {
-				newValue, err := OperateByRule(desensitizationTag, fieldValue.Interface()) // 执行脱敏
+				// 否则直接对每个元素应用脱敏规则
+				newValue, err := OperateByRule(tag, elemValue.Interface())
 				if err == nil {
-					fieldValue.Set(reflect.ValueOf(newValue)) // 设置脱敏后的值
+					elemValue.Set(reflect.ValueOf(newValue)) // 更新元素值
 				}
 			}
 		}
+	case reflect.Struct:
+		// 如果字段是结构体，递归处理
+		return Desensitization(fieldValue.Addr().Interface())
+	case reflect.Map:
+		// 如果字段是映射，遍历每个键值对
+		for _, key := range fieldValue.MapKeys() {
+			value := fieldValue.MapIndex(key)
+			newValue, err := OperateByRule(tag, value.Interface())
+			if err == nil {
+				fieldValue.SetMapIndex(key, reflect.ValueOf(newValue)) // 更新映射中的值
+			}
+		}
+	default:
+		// 对于其他类型，直接应用脱敏规则
+		newValue, err := OperateByRule(tag, fieldValue.Interface())
+		if err == nil {
+			fieldValue.Set(reflect.ValueOf(newValue)) // 更新字段值
+		}
 	}
-
-	return nil // 返回 nil 表示成功
+	return nil
 }
 
 // 初始化时注册现有的脱敏器

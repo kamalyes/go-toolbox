@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date:2024-12-18 22:53:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-12-18 22:50:29
+ * @LastEditTime: 2024-12-19 08:15:19
  * @FilePath: \go-toolbox\tests\desensitize_adapter_test.go
  * @Description:
  *
@@ -54,7 +54,7 @@ func TestDesensitization(t *testing.T) {
 	assert.NoError(t, err)
 
 	// 断言脱敏后的结果
-	assert.Equal(t, "t***@example.com", testObj.Email)
+	assert.Equal(t, "t*st@example.com", testObj.Email)
 	assert.Equal(t, "123****7890", testObj.PhoneNumber)
 	assert.Equal(t, "张*", testObj.Name)
 	assert.Equal(t, 30, testObj.Age) // 确保年龄没有被脱敏
@@ -64,15 +64,15 @@ func TestDesensitization_NonStruct(t *testing.T) {
 	// 测试非结构体输入
 	err := desensitize.Desensitization("not a struct")
 	assert.Error(t, err)
-	assert.Equal(t, "expected a struct or pointer to a struct", err.Error())
-}
-
-type TestEmptyDesensitizerStruct struct {
-	A string `desensitize:"abc"`
+	assert.Equal(t, "expected a non-nil pointer to a struct", err.Error())
 }
 
 func TestDesensitization_EmptyDesensitizer(t *testing.T) {
 	// 测试未注册脱敏器的情况
+	type TestEmptyDesensitizerStruct struct {
+		A string `desensitize:"abc"`
+	}
+
 	testObj := &TestEmptyDesensitizerStruct{
 		A: "10",
 	}
@@ -101,4 +101,124 @@ func TestDesensitization_CustomDesensitizer(t *testing.T) {
 
 	// 断言脱敏后的结果
 	assert.Equal(t, "*****", testObj.SecretField) // 应该被自定义脱敏器处理
+}
+
+func TestDesensitization_Slice(t *testing.T) {
+	// 定义一个包含切片的结构体
+	type TestSliceStruct struct {
+		Emails []string `desensitize:"email"`
+	}
+
+	testObj := &TestSliceStruct{
+		Emails: []string{"user123@example.com", "a123568@example.com"},
+	}
+
+	err := desensitize.Desensitization(testObj)
+	assert.NoError(t, err)
+
+	expectedEmails := []string{"u****23@example.com", "a****68@example.com"}
+	assert.Equal(t, expectedEmails, testObj.Emails)
+}
+
+func TestDesensitization_Array(t *testing.T) {
+	// 定义一个包含数组的结构体
+	type TestArrayStruct struct {
+		PhoneNumbers [2]string `desensitize:"phoneNumber"`
+	}
+
+	testObj := &TestArrayStruct{
+		PhoneNumbers: [2]string{"1234567890", "0987654321"},
+	}
+
+	err := desensitize.Desensitization(testObj)
+	assert.NoError(t, err)
+
+	expectedPhoneNumbers := [2]string{"123****7890", "098****4321"}
+	assert.Equal(t, expectedPhoneNumbers, testObj.PhoneNumbers)
+}
+
+func TestDesensitization_Map(t *testing.T) {
+	// 定义一个包含映射的结构体
+	type TestMapStruct struct {
+		Contacts map[string]string `desensitize:"phoneNumber"`
+	}
+
+	testObj := &TestMapStruct{
+		Contacts: map[string]string{
+			"John": "1234567890",
+			"Jane": "098321",
+		},
+	}
+
+	err := desensitize.Desensitization(testObj)
+	assert.NoError(t, err)
+
+	expectedContacts := map[string]string{
+		"John": "123****7890",
+		"Jane": "098******21",
+	}
+	assert.Equal(t, expectedContacts, testObj.Contacts)
+}
+
+func TestDesensitization_ComplexStruct(t *testing.T) {
+
+	// 定义嵌套结构体
+	type Other struct {
+		PhoneNumber string `desensitize:"phoneNumber"`
+	}
+
+	type UserProfile struct {
+		Username string `desensitize:"name"`
+		Email    string `desensitize:"email"`
+		Other    Other
+	}
+
+	// 定义包含用户资料的复合结构体
+	type ComplexStruct struct {
+		Profiles []UserProfile
+		Names    map[string]string `desensitize:"name"`
+	}
+
+	// 创建一个复杂结构体的测试对象
+	testObj := &ComplexStruct{
+		Profiles: []UserProfile{
+			{
+				Username: "jo",
+				Email:    "john@example.com",
+				Other: Other{
+					PhoneNumber: "18169967587",
+				},
+			},
+			{
+				Username: "jane_doe",
+				Email:    "ane12368@example.com",
+				Other: Other{
+					PhoneNumber: "18199687567",
+				},
+			},
+		},
+		Names: map[string]string{
+			"theme": "dark",
+			"lang":  "en",
+		},
+	}
+
+	// 执行脱敏操作
+	err := desensitize.Desensitization(testObj)
+
+	// 断言没有错误
+	assert.NoError(t, err)
+
+	// 断言脱敏后的结果
+	assert.Equal(t, "j*", testObj.Profiles[0].Username)
+	assert.Equal(t, "j*hn@example.com", testObj.Profiles[0].Email)
+	assert.Equal(t, "181****7587", testObj.Profiles[0].Other.PhoneNumber)
+
+	assert.Equal(t, "j***_doe", testObj.Profiles[1].Username)
+	assert.Equal(t, "a*****68@example.com", testObj.Profiles[1].Email)
+	assert.Equal(t, "181****7567", testObj.Profiles[1].Other.PhoneNumber)
+
+	// Settings 应该保持原值，因为没有注册脱敏器
+	assert.Equal(t, "d*rk", testObj.Names["theme"])
+	assert.Equal(t, "e*", testObj.Names["lang"])
 }
