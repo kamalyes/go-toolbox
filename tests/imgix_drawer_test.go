@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-13 01:15:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-12-16 09:57:26
+ * @LastEditTime: 2024-12-31 15:55:15
  * @FilePath: \go-toolbox\tests\imgix_drawer_test.go
  * @Description:
  *
@@ -13,11 +13,13 @@ package tests
 import (
 	"image"
 	"image/color"
+	"image/jpeg"
 	"image/png"
 	"os"
 	"sync"
 	"testing"
 
+	"github.com/disintegration/imaging"
 	"github.com/fogleman/gg"
 	"github.com/kamalyes/go-toolbox/pkg/imgix"
 	"github.com/stretchr/testify/assert"
@@ -82,33 +84,6 @@ func TestNewGraphicsRenderer(t *testing.T) {
 	assert.Equal(t, dashOptions.LineWidth(), renderXDashOptions.LineWidth(), "GetDashOptions.LineWidth should return the correct DashOptions")
 }
 
-func TestImgixGrSaveImage(t *testing.T) {
-	// 创建一个新的 gg.Context
-	width, height := 100, 100
-	ctx := gg.NewContext(width, height)
-
-	// 创建 GraphicsRenderer 实例
-	renderer := imgix.NewGraphicsRenderer(ctx)
-
-	// 使用 GraphicsRenderer 绘制一些图形
-	renderer.DrawRectangle(&gg.Point{X: 10, Y: 10}, &gg.Point{X: 90, Y: 10}, &gg.Point{X: 90, Y: 90}, &gg.Point{X: 10, Y: 90})
-
-	// 保存图像
-	imageName := "test_image"
-	imageFormat := imgix.PNG
-	quality := 100
-	renderer.SaveImage(imageName, quality, imageFormat)
-
-	// 5. 验证保存的图像文件是否存在
-	filePath := imageName + ".png"
-	_, err := os.Stat(filePath)
-	assert.NoError(t, err, "Expected image file to be created")
-
-	// 6. 清理测试生成的文件
-	err = os.Remove(filePath)
-	assert.NoError(t, err, "Expected to remove test image file")
-}
-
 func TestUseDefaultDashed(t *testing.T) {
 	ctx := gg.NewContext(800, 600)
 	renderer := imgix.NewGraphicsRenderer(ctx)
@@ -164,7 +139,7 @@ func TestDrawCurvedLine(t *testing.T) {
 
 	start := &gg.Point{X: 100, Y: 100}
 	end := &gg.Point{X: 200, Y: 200}
-	control := imgix.CalculateControlPoint(start, end, 50) // 计算控制点
+	control := imgix.CalculateControlPoint(start, end, 50, 0) // 计算控制点
 
 	renderer.DrawCurvedLine(start, end, control)
 	filePath := "test_curved_line.png"
@@ -183,7 +158,16 @@ func TestDrawHorizontalLine(t *testing.T) {
 	ctx.SetColor(color.Black)
 	renderer := imgix.NewGraphicsRenderer(ctx)
 
-	renderer.DrawHorizontalLine(10, 0, 20)
+	renderer.DrawHorizontalLine(imgix.HorizontalLine{
+		Y:      10,
+		LeftX:  0,
+		RightX: 20,
+	})
+	renderer.DrawVerticalLine(imgix.VerticalLine{
+		X:       10,
+		TopY:    0,
+		BottomY: 20,
+	})
 	filePath := "test_horizontal_line.png"
 	err := saveImgixDrawerImage(renderer.GgCtx, filePath)
 	assert.NoError(t, err)
@@ -201,26 +185,6 @@ func TestDrawPolygon(t *testing.T) {
 	}
 	renderer.DrawPolygon(points)
 	filePath := "test_polygon.png"
-	err := saveImgixDrawerImage(renderer.GgCtx, filePath)
-	assert.NoError(t, err)
-	defer os.Remove(filePath)
-}
-
-func TestDrawCenteredMultiLine(t *testing.T) {
-	ctx := gg.NewContext(800, 600)
-	renderer := imgix.NewGraphicsRenderer(ctx)
-
-	startXs := []float64{100}
-	endXs := []float64{300}
-	startYs := []float64{100}
-	endYs := []float64{100}
-	textGroups := [][]string{
-		{"Hello", "World"},
-	}
-
-	renderer.DrawCenteredMultiLine(startXs, endXs, startYs, endYs, textGroups, 0, true, false)
-	renderer.DrawCenteredMultiLine(startXs, endXs, startYs, endYs, textGroups, 0, true, true)
-	filePath := "test_centered_multiline.png"
 	err := saveImgixDrawerImage(renderer.GgCtx, filePath)
 	assert.NoError(t, err)
 	defer os.Remove(filePath)
@@ -261,12 +225,10 @@ func TestDrawRectangle(t *testing.T) {
 	renderer := imgix.NewGraphicsRenderer(ctx)
 
 	// 绘制矩形
-	left := &gg.Point{X: 100, Y: 100}
-	top := &gg.Point{X: 100, Y: 100}
-	bottom := &gg.Point{X: 200, Y: 200}
-	right := &gg.Point{X: 200, Y: 200}
-
-	renderer.DrawRectangle(left, top, bottom, right)
+	renderer.DrawRectangle(imgix.Rectangle{
+		TopLeft:     &gg.Point{X: 100, Y: 100},
+		BottomRight: &gg.Point{X: 200, Y: 200},
+	}, 0)
 
 	// 保存图像
 	testImagePath := "test_rectangle.png"
@@ -295,7 +257,7 @@ func TestDrawCircle(t *testing.T) {
 	renderer := imgix.NewGraphicsRenderer(ctx)
 
 	// 绘制圆形
-	renderer.DrawCircle(400, 300, 50)
+	renderer.DrawCircle(&gg.Point{X: 400, Y: 300}, 50)
 
 	// 保存图像
 	testImagePath := "test_circle.png"
@@ -572,35 +534,35 @@ func TestCalculatePoint(t *testing.T) {
 	tests := []struct {
 		a        *gg.Point
 		b        *gg.Point
-		mode     imgix.PointMaxMin
+		mode     imgix.CalculateMode
 		axis     imgix.AxisPointMode
 		expected *gg.Point
 	}{
 		{
 			a:        &gg.Point{X: 1, Y: 2},
 			b:        &gg.Point{X: 3, Y: 4},
-			mode:     imgix.PointMax,
+			mode:     imgix.CalculateMax,
 			axis:     imgix.AxisX,
 			expected: &gg.Point{X: 3, Y: 4},
 		},
 		{
 			a:        &gg.Point{X: 1, Y: 2},
 			b:        &gg.Point{X: 3, Y: 4},
-			mode:     imgix.PointMax,
+			mode:     imgix.CalculateMax,
 			axis:     imgix.AxisY,
 			expected: &gg.Point{X: 3, Y: 4},
 		},
 		{
 			a:        &gg.Point{X: 1, Y: 2},
 			b:        &gg.Point{X: 3, Y: 4},
-			mode:     imgix.PointMin,
+			mode:     imgix.CalculateMin,
 			axis:     imgix.AxisX,
 			expected: &gg.Point{X: 1, Y: 2},
 		},
 		{
 			a:        &gg.Point{X: 1, Y: 2},
 			b:        &gg.Point{X: 3, Y: 4},
-			mode:     imgix.PointMin,
+			mode:     imgix.CalculateMin,
 			axis:     imgix.AxisY,
 			expected: &gg.Point{X: 1, Y: 2},
 		},
@@ -623,12 +585,12 @@ func TestCalculateMultiplePoints(t *testing.T) {
 
 	// 测试最大值
 	expectedMax := &gg.Point{X: 5, Y: 1} // 在X轴上最大值
-	resultMax := imgix.CalculateMultiplePoints(points, imgix.PointMax, imgix.AxisX)
+	resultMax := imgix.CalculateMultiplePoints(points, imgix.CalculateMax, imgix.AxisX)
 	assert.Equal(t, expectedMax, resultMax, "Expected max point does not match")
 
 	// 测试最小值
 	expectedMin := &gg.Point{X: 0, Y: 6} // 在X轴上最小值
-	resultMin := imgix.CalculateMultiplePoints(points, imgix.PointMin, imgix.AxisX)
+	resultMin := imgix.CalculateMultiplePoints(points, imgix.CalculateMin, imgix.AxisX)
 	assert.Equal(t, expectedMin, resultMin, "Expected min point does not match")
 }
 
@@ -725,6 +687,67 @@ func TestResizePoint(t *testing.T) {
 		scaledPoint := imgix.ResizePoint(test.point, test.resize, test.resize)
 		assert.Equal(t, test.expected.X, scaledPoint.X, "X coordinate mismatch")
 		assert.Equal(t, test.expected.Y, scaledPoint.Y, "Y coordinate mismatch")
+	}
+}
+
+// TestResizePointBoth 测试 ResizePointBoth 函数
+func TestResizePointBoth(t *testing.T) {
+	tests := []struct {
+		name         string
+		point        *gg.Point
+		scaleFactorX float64
+		scaleFactorY float64
+		expectedX    float64
+		expectedY    float64
+	}{
+		{
+			name:         "Scale Up Both Axes",
+			point:        &gg.Point{X: 10, Y: 20},
+			scaleFactorX: 2.0,
+			scaleFactorY: 2.0,
+			expectedX:    20,
+			expectedY:    40,
+		},
+		{
+			name:         "Scale Down Both Axes",
+			point:        &gg.Point{X: 10, Y: 20},
+			scaleFactorX: 0.5,
+			scaleFactorY: 0.5,
+			expectedX:    5,
+			expectedY:    10,
+		},
+		{
+			name:         "Scale X Up and Y Down",
+			point:        &gg.Point{X: 10, Y: 20},
+			scaleFactorX: 2.0,
+			scaleFactorY: 0.5,
+			expectedX:    20,
+			expectedY:    10,
+		},
+		{
+			name:         "Scale X Down and Y Up",
+			point:        &gg.Point{X: 10, Y: 20},
+			scaleFactorX: 0.5,
+			scaleFactorY: 2.0,
+			expectedX:    5,
+			expectedY:    40,
+		},
+		{
+			name:         "No Scale",
+			point:        &gg.Point{X: 10, Y: 20},
+			scaleFactorX: 1.0,
+			scaleFactorY: 1.0,
+			expectedX:    10,
+			expectedY:    20,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := imgix.ResizePointBoth(tt.point, tt.scaleFactorX, tt.scaleFactorY)
+			assert.Equal(t, tt.expectedX, result.X, "X coordinate mismatch")
+			assert.Equal(t, tt.expectedY, result.Y, "Y coordinate mismatch")
+		})
 	}
 }
 
@@ -893,4 +916,63 @@ func TestResizeDownTriangle(t *testing.T) {
 		assert.Equal(t, test.expectedC.X, newVertexC.X, "vertexC X坐标不匹配")
 		assert.Equal(t, test.expectedC.Y, newVertexC.Y, "vertexC Y坐标不匹配")
 	}
+}
+
+// TestExtendLine 测试 ExtendLine 函数
+func TestExtendLine(t *testing.T) {
+	// 定义测试用例
+	tests := []struct {
+		p1     gg.Point
+		p2     gg.Point
+		length float64
+		expect gg.Point
+	}{
+		{gg.Point{X: 200, Y: 100}, gg.Point{X: 300, Y: 50}, 50, gg.Point{X: 244.72135954999578, Y: 77.63932022500211}},
+		{gg.Point{X: 0, Y: 0}, gg.Point{X: 3, Y: 4}, 5, gg.Point{X: 3.0, Y: 4.0}}, // 3-4-5 三角形
+		{gg.Point{X: 1, Y: 1}, gg.Point{X: 4, Y: 5}, 0, gg.Point{X: 1.0, Y: 1.0}}, // 不延长
+	}
+
+	// 执行测试
+	for _, test := range tests {
+		result := imgix.ExtendLine(&test.p1, &test.p2, test.length)
+		if result.X != test.expect.X || result.Y != test.expect.Y {
+			t.Errorf("ExtendLine(%v, %v, %v) = %v; want %v", test.p1, test.p2, test.length, result, test.expect)
+		}
+	}
+}
+
+// 测试 ResizeImage 函数
+func TestResizeImage(t *testing.T) {
+	// 创建一个简单的测试图片（100x100 的红色方块）
+	testImg := image.NewRGBA(image.Rect(0, 0, 100, 100))
+	for y := 0; y < 100; y++ {
+		for x := 0; x < 100; x++ {
+			testImg.Set(x, y, color.RGBA{255, 0, 0, 255}) // 红色
+		}
+	}
+
+	// 定义缩放选项
+	resizeOptions := &imgix.ResizeImgOptions{
+		Width:  50,
+		Height: 50,
+		Filter: imaging.Lanczos,
+	}
+
+	// 调用 ResizeImage 函数
+	resizedImg := imgix.ResizeImage(testImg, resizeOptions)
+
+	// 断言结果
+	assert.NotNil(t, resizedImg, "Resized image should not be nil")
+	assert.Equal(t, 50, resizedImg.Bounds().Dx(), "Resized image width should be 50")
+	assert.Equal(t, 50, resizedImg.Bounds().Dy(), "Resized image height should be 50")
+
+	// 可选：将结果保存到文件以便手动检查
+	filepath := "resized_test_image.jpg"
+	outFile, err := os.Create(filepath)
+	assert.NoError(t, err, "Error creating output file")
+	defer outFile.Close()
+	defer os.Remove(filepath)
+
+	err = jpeg.Encode(outFile, resizedImg, nil)
+	assert.NoError(t, err, "Error encoding image to JPEG")
 }

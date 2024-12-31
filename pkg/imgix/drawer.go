@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-13 09:55:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-12-18 18:32:59
+ * @LastEditTime: 2024-12-31 16:16:55
  * @FilePath: \go-toolbox\pkg\imgix\drawer.go
  * @Description:
  *
@@ -13,18 +13,20 @@ package imgix
 import (
 	"bytes"
 	"fmt"
+	"image"
 	"log"
 	"math"
 	"sync"
 
+	"github.com/disintegration/imaging"
 	"github.com/fogleman/gg"
 	"github.com/kamalyes/go-toolbox/pkg/syncx"
 )
 
 // GraphicsRenderer 结构体用于绘制面部特征
 type GraphicsRenderer struct {
-	GgCtx       *gg.Context
-	DashOptions DashOptions
+	GgCtx       *gg.Context  // Gg 上下文
+	DashOptions DashOptions  // 虚实线扩展
 	bufferPool  *sync.Pool   // bufferPool 指针
 	mu          sync.RWMutex // 读写锁
 }
@@ -62,6 +64,14 @@ func NewDashOptions(dashLength, gapLength, lineWidth DashStyle) DashOptions {
 		gapLength:  gapLength,
 		lineWidth:  lineWidth,
 	}
+}
+
+// SetDashed 设置线条
+// @param dashes
+func (g *GraphicsRenderer) SetDashed(dashes ...float64) {
+	g.DrawWithStroke(func() {
+		g.GgCtx.SetDash(dashes...)
+	}, false)
 }
 
 // DashLength 返回虚线段长度的 float64 表示
@@ -166,29 +176,42 @@ func (g *GraphicsRenderer) UseSolidLine() {
 	}, false)
 }
 
-// SetDashed 设置是否使用虚线
-// @param dashes
-func (g *GraphicsRenderer) SetDashed(dashes ...float64) {
-	g.DrawWithStroke(func() {
-		g.GgCtx.SetDash(dashes...)
-	}, false)
+// 缩放图扩展
+type ResizeImgOptions struct {
+	Width  int
+	Height int
+	Filter imaging.ResampleFilter
+}
+
+// ResizeImage 缩放图片
+func ResizeImage(img image.Image, resizeImgOptions *ResizeImgOptions) image.Image {
+	// 检查是否需要缩放，并确保 Width 和 Height 大于 0
+	if resizeImgOptions != nil && resizeImgOptions.Width > 0 && resizeImgOptions.Height > 0 {
+		img = imaging.Resize(img, resizeImgOptions.Width, resizeImgOptions.Height, resizeImgOptions.Filter)
+	}
+	return img
 }
 
 // SaveImage 存储图片
+// @param img 图像
 // @param name 文件名名称
 // @param quality 图片质量
 // @param imageFormat 图片类型 (目前仅支持PNG/JPG/JPEG)
-func (g *GraphicsRenderer) SaveImage(name string, quality int, imageFormat ImageFormat) {
-	// 创建图像缓冲区 从池中获取一个 bytes.Buffer
+func (g *GraphicsRenderer) SaveImage(img image.Image, name string, quality int, imageFormat ImageFormat) error {
+	// 从池中获取一个 bytes.Buffer，并在完成后放回
 	imgBuffer := g.bufferPool.Get().(*bytes.Buffer)
-	defer g.bufferPool.Put(imgBuffer) // 使用完后放回池中
+	defer g.bufferPool.Put(imgBuffer)
 
-	// 清空缓冲区
+	// 清空缓冲区并获取图像
 	imgBuffer.Reset()
-	WriterImage(g.GgCtx.Image(), quality, imageFormat, imgBuffer)
-	// 保存生成的图像，使用策略名称
+	// 写入图像
+	if err := WriterImage(img, quality, imageFormat, imgBuffer); err != nil {
+		return err
+	}
+
+	// 保存生成的图像
 	imageFileName := fmt.Sprintf("%s.%s", name, imageFormat.String())
-	SaveBufToImageFile(imgBuffer, imageFileName, imageFormat)
+	return SaveBufToImageFile(imgBuffer, imageFileName, imageFormat)
 }
 
 // DrawLineXYLineWidth 绘制线条
@@ -215,17 +238,44 @@ func (g *GraphicsRenderer) DrawCurvedLine(start, end, control *gg.Point) {
 	}, true)
 }
 
-// DrawRectangle 绘制矩形框
-// @param left 矩形左上角的点
-// @param top 矩形左上角的点
-// @param bottom 矩形右下角的点
-// @param right 矩形右下角的点
-func (g *GraphicsRenderer) DrawRectangle(left, top, bottom, right *gg.Point) {
+type Rectangle struct {
+	TopLeft     *gg.Point
+	BottomRight *gg.Point
+}
+
+// DrawRectangle 绘制矩形框，并可选地绘制延长线
+// @param rect 矩形的左上角和右下角
+// @param extendLength 延长线的长度，单位与坐标相同
+func (g *GraphicsRenderer) DrawRectangle(rect Rectangle, extendLength float64) {
 	g.DrawWithStroke(func() {
-		width := right.X - left.X
-		height := bottom.Y - top.Y
-		g.GgCtx.DrawRectangle(left.X, top.Y, width, height)
+		width := rect.BottomRight.X - rect.TopLeft.X
+		height := rect.BottomRight.Y - rect.TopLeft.Y
+
+		// 绘制矩形
+		g.GgCtx.DrawRectangle(rect.TopLeft.X, rect.TopLeft.Y, width, height)
+
+		// 绘制延长线
+		g.drawExtensionLines(rect, extendLength)
 	}, true)
+}
+
+// drawExtensionLines 绘制延长线
+func (g *GraphicsRenderer) drawExtensionLines(rect Rectangle, extendLength float64) {
+	// 向上延长线（左上角和右上角）
+	g.GgCtx.DrawLine(rect.TopLeft.X, rect.TopLeft.Y, rect.TopLeft.X, rect.TopLeft.Y-extendLength)         // 左上角
+	g.GgCtx.DrawLine(rect.BottomRight.X, rect.TopLeft.Y, rect.BottomRight.X, rect.TopLeft.Y-extendLength) // 右上角
+
+	// 向下延长线（左下角和右下角）
+	g.GgCtx.DrawLine(rect.BottomRight.X, rect.BottomRight.Y, rect.BottomRight.X, rect.BottomRight.Y+extendLength) // 右下角
+	g.GgCtx.DrawLine(rect.TopLeft.X, rect.BottomRight.Y, rect.TopLeft.X, rect.BottomRight.Y+extendLength)         // 左下角
+
+	// 向左延长线（左上角和左下角）
+	g.GgCtx.DrawLine(rect.TopLeft.X, rect.TopLeft.Y, rect.TopLeft.X-extendLength, rect.TopLeft.Y)         // 左上角
+	g.GgCtx.DrawLine(rect.TopLeft.X, rect.BottomRight.Y, rect.TopLeft.X-extendLength, rect.BottomRight.Y) // 左下角
+
+	// 向右延长线（右上角和右下角）
+	g.GgCtx.DrawLine(rect.BottomRight.X, rect.TopLeft.Y, rect.BottomRight.X+extendLength, rect.TopLeft.Y)         // 右上角
+	g.GgCtx.DrawLine(rect.BottomRight.X, rect.BottomRight.Y, rect.BottomRight.X+extendLength, rect.BottomRight.Y) // 右下角
 }
 
 // DrawPolygon 绘制一个多边形
@@ -242,28 +292,39 @@ func (g *GraphicsRenderer) DrawPolygon(points []gg.Point) {
 	}, true)
 }
 
+// VerticalLine 表示竖线的参数
+type VerticalLine struct {
+	X       float64 // 竖线的X坐标
+	TopY    float64 // 竖线的顶部Y坐标
+	BottomY float64 // 竖线的底部Y坐标
+}
+
+// HorizontalLine 表示横线的参数
+type HorizontalLine struct {
+	Y      float64 // 横线的Y坐标
+	LeftX  float64 // 横线的左侧X坐标
+	RightX float64 // 横线的右侧X坐标
+}
+
 // DrawVerticalLine 从面部顶部到底部绘制竖线
-// @param x 竖线的X坐标
-// @param top 竖线的顶部Y坐标
-// @param bottom 竖线的底部Y坐标
-func (g *GraphicsRenderer) DrawVerticalLine(x float64, top, bottom float64) {
+// @param line 竖线的参数
+func (g *GraphicsRenderer) DrawVerticalLine(line VerticalLine) {
 	g.DrawWithStroke(func() {
-		g.GgCtx.DrawLine(x, top, x, bottom)
+		g.GgCtx.DrawLine(line.X, line.TopY, line.X, line.BottomY)
 	}, true)
 }
 
 // DrawHorizontalLine 从面部左侧到右侧绘制横线
-// @param y 横线的Y坐标
-// @param left 横线的左侧X坐标
-// @param right 横线的右侧X坐标
-func (g *GraphicsRenderer) DrawHorizontalLine(y float64, left, right float64) {
+// @param line 横线的参数
+func (g *GraphicsRenderer) DrawHorizontalLine(line HorizontalLine) {
 	g.DrawWithStroke(func() {
-		g.GgCtx.DrawLine(left, y, right, y)
+		g.GgCtx.DrawLine(line.LeftX, line.Y, line.RightX, line.Y)
 	}, true)
 }
 
 // DrawLine 绘制从 startPoint 到 endPoint 的线条。
-// startPoint 和 endPoint: 线条的起始和结束点。
+// @param startPoint 线条的起始
+// @param endPoint: 线条的结束点
 func (g *GraphicsRenderer) DrawLine(startPoint, endPoint *gg.Point) {
 	g.DrawWithStroke(func() {
 		g.GgCtx.DrawLine(startPoint.X, startPoint.Y, endPoint.X, endPoint.Y)
@@ -271,36 +332,73 @@ func (g *GraphicsRenderer) DrawLine(startPoint, endPoint *gg.Point) {
 }
 
 // DrawCircle 绘制一个圆形
-// @param centerX 圆心的X坐标
-// @param centerY 圆心的Y坐标
+// @param point 圆心的X、Y坐标
 // @param radius 圆的半径
-func (g *GraphicsRenderer) DrawCircle(centerX, centerY, radius float64) {
+func (g *GraphicsRenderer) DrawCircle(point *gg.Point, radius float64) {
 	g.DrawWithStroke(func() {
-		g.GgCtx.DrawCircle(centerX, centerY, radius)
+		g.GgCtx.DrawCircle(point.X, point.Y, radius)
 	}, true)
 }
 
-// DrawArc 绘制一条弧线
-// @param startPoint 起始点的X坐标/起始点的Y坐标
-// @param endPoint 结束点的X坐标/结束点的Y坐标
+// DrawPoint 绘制一个圆点
+// @param point 圆心的X、Y坐标
 // @param radius 圆的半径
-// @param angleStart 起始角度（以度为单位）
-// @param angleExtent 角度范围（以度为单位）
-func (g *GraphicsRenderer) DrawArc(startPoint, endPoint *gg.Point, radius float64, angleStart, angleExtent float64) {
+func (g *GraphicsRenderer) DrawPoint(point *gg.Point, radius float64) {
 	g.DrawWithStroke(func() {
-		g.GgCtx.DrawArc(startPoint.X, startPoint.Y, radius, angleStart*(math.Pi/180), angleExtent*(math.Pi/180))
-		g.GgCtx.LineTo(endPoint.X, endPoint.Y) // 连接到结束点
+		g.GgCtx.DrawPoint(point.X, point.Y, radius)
+	}, true)
+}
+
+// DrawArc 绘制从 startPoint 到 endPoint 的弧形。
+// 控制点自动计算为起始点和结束点的中点向上偏移一定的高度。
+// @param startPoint 线条的起始
+// @param endPoint: 线条的结束点
+// @param offset 控制点的偏移量
+// @param clockwise 为 true 表示顺时针，false 表示逆时针。
+func (g *GraphicsRenderer) DrawArc(startPoint, endPoint *gg.Point, offset float64, clockwise bool) {
+	// 计算中点
+	midPoint := &gg.Point{
+		X: (startPoint.X + endPoint.X) / 2,
+		Y: (startPoint.Y + endPoint.Y) / 2,
+	}
+
+	// 计算控制点，向上偏移 offset
+	controlPoint := &gg.Point{
+		X: midPoint.X - offset,
+		Y: midPoint.Y - offset,
+	}
+
+	// 计算弧的起始角度和结束角度
+	startAngle := math.Atan2(float64(controlPoint.Y-startPoint.Y), float64(controlPoint.X-startPoint.X))
+	endAngle := math.Atan2(float64(controlPoint.Y-endPoint.Y), float64(controlPoint.X-endPoint.X))
+
+	// 计算半径
+	radius := math.Hypot(float64(endPoint.X-startPoint.X)/2, float64(endPoint.Y-startPoint.Y)/2)
+
+	// 如果是顺时针绘制，确保角度顺序正确
+	if clockwise {
+		if startAngle < endAngle {
+			endAngle -= 2 * math.Pi
+		}
+	} else {
+		if startAngle > endAngle {
+			endAngle += 2 * math.Pi
+		}
+	}
+
+	g.DrawWithStroke(func() {
+		// 使用 DrawArc 方法绘制弧形
+		g.GgCtx.DrawArc(midPoint.X, midPoint.Y, radius, startAngle, endAngle)
 	}, true)
 }
 
 // DrawEllipse 绘制一个椭圆
-// @param centerX 椭圆中心的X坐标
-// @param centerY 椭圆中心的Y坐标
+// @param point 椭圆中心的X、Y坐标
 // @param width 椭圆的宽度
 // @param height 椭圆的高度
-func (g *GraphicsRenderer) DrawEllipse(centerX, centerY, width, height float64) {
+func (g *GraphicsRenderer) DrawEllipse(point *gg.Point, width, height float64) {
 	g.DrawWithStroke(func() {
-		g.GgCtx.DrawEllipse(centerX, centerY, width/2, height/2)
+		g.GgCtx.DrawEllipse(point.X, point.Y, width/2, height/2)
 	}, true)
 }
 
@@ -320,70 +418,81 @@ func (g *GraphicsRenderer) DrawTriangle(x1, y1, x2, y2, x3, y3 float64) {
 	}, true) // 默认调用 Stroke
 }
 
-// DrawCenteredMultiLine 在多个指定的坐标区间内绘制多组文本
-// @param startXs 文本起始X坐标数组
-// @param endXs 文本结束X坐标数组
-// @param startYs 文本起始Y坐标数组
-// @param endYs 文本结束Y坐标数组
-// @param textGroups 文本内容的二维数组
-// @param angle 旋转角度
-// @param drawDashed 是否绘制虚线
-// @param isVertical 是否绘制竖线
-func (g *GraphicsRenderer) DrawCenteredMultiLine(startXs, endXs, startYs, endYs []float64, textGroups [][]string, angle float64, drawDashed bool, isVertical bool) {
+// LineSegment 表示线段的参数
+type LineSegment struct {
+	StartCoord    *gg.Point // 起始坐标
+	EndCoord      *gg.Point // 结束坐标
+	TextOffsetX   float64   // 文本X偏移量
+	TextOffsetY   float64   // 文本Y偏移量
+	Texts         []string  // 文本内容
+	DrawLine      bool      // 是否绘制线条
+	SkipDrawTexts bool      // 跳过绘制文字
+}
+
+// DrawCenteredMultiLine 在多个指定的线段内绘制多组文本
+// @param lines 线段的参数数组
+func (g *GraphicsRenderer) DrawCenteredMultiLine(lines []LineSegment) {
 	log.Println("Starting DrawCenteredMultiLine")
-	if len(startXs) != len(textGroups) ||
-		len(endXs) != len(textGroups) ||
-		len(startYs) != len(textGroups) ||
-		len(endYs) != len(textGroups) {
-		log.Printf("Length mismatch: startXs: %d, endXs: %d, startYs: %d, endYs: %d, textGroups: %d", len(startXs), len(endXs), len(startYs), len(endYs), len(textGroups))
-		return
-	}
 
-	for i, texts := range textGroups {
-		log.Printf("Drawing text group %d", i)
-		startX, endX := startXs[i], endXs[i]
-		startY, endY := startYs[i], endYs[i]
-		midY := (startY + endY) / 2
+	for i, line := range lines {
+		log.Printf("Drawing line group %d", i)
+		startX, endX := line.StartCoord.X, line.EndCoord.X
+		startY, endY := line.StartCoord.Y, line.EndCoord.Y
 
-		if drawDashed {
-			if isVertical {
-				// 绘制竖线
-				g.DrawLineXYLineWidth(midY, startX, midY, endX)
-			} else {
-				// 绘制横线
-				g.DrawLineXYLineWidth(startX, midY, endX, midY)
-			}
+		// 计算线段的长度和方向
+		deltaX := endX - startX
+		deltaY := endY - startY
+		length := math.Sqrt(deltaX*deltaX + deltaY*deltaY) // 线段的长度
+
+		// 若DrawLine为True绘制线条
+		if line.DrawLine {
+			g.DrawWithStroke(func() {
+				g.GgCtx.DrawLine(startX, startY, endX, endY)
+			}, true)
 		}
 
-		totalHeight := 0.0
-		lineHeights := make([]float64, len(texts))
+		// 若SkipDrawTexts为True绘制线条即跳过
+		if line.SkipDrawTexts {
+			continue
+		}
 
-		for j, text := range texts {
+		// 计算文本的起始位置
+		posX := startX + deltaX/2 + line.TextOffsetX
+		posY := startY + deltaY/2 + line.TextOffsetY
+
+		// 计算文本的高度和间隔
+		var textHeight float64
+		for j, text := range line.Texts {
+			// 测量文本高度
 			_, height := g.GgCtx.MeasureString(text)
-			lineHeights[j] = height
-			totalHeight += height // 只计算文本的总高度，不再考虑行间距
-		}
+			textHeight = height * 1.6 // 设定文本之间的间隔
 
-		posX := (startX + endX) / 2
-		posYStart := (startY + endY - totalHeight) / 2
-
-		for j, text := range texts {
-			posY := posYStart + lineHeights[j]/2
-			adjustedPosY := posY
-			if j == 0 {
-				adjustedPosY += 50
-				posYStart += 50
+			// 根据线段方向调整文本的 Y 偏移
+			var textOffsetX, textOffsetY float64
+			if deltaX == 0 { // 竖线
+				textOffsetX = posX // X 坐标固定
+				// 计算 Y 偏移，确保文本垂直对齐
+				textOffsetY = posY - (textHeight * float64(len(line.Texts)-1) / 2) + textHeight*float64(j)
+			} else if deltaY == 0 { // 横线
+				textOffsetX = posX
+				textOffsetY = posY + textHeight/2 + textHeight*float64(j)
+			} else { // 斜线
+				// 计算斜线的偏移量
+				offsetY := (textHeight * deltaY / length) * float64(len(line.Texts)) / 2
+				textOffsetX = posX
+				textOffsetY = posY - offsetY + textHeight*float64(j) - textHeight/2
 			}
 
-			g.GgCtx.Push()
-			g.GgCtx.Translate(posX, adjustedPosY)
-			g.GgCtx.Rotate(angle * (math.Pi / 180))
-			g.GgCtx.DrawStringAnchored(text, 0, 0, 0.5, 0.5)
-			g.GgCtx.Pop()
+			// 如果是第一条文本，添加额外的偏移
+			if j == 0 {
+				textOffsetY += 5
+			}
 
-			posYStart += lineHeights[j] // 直接使用文本高度更新起始位置
+			// 绘制文本
+			g.GgCtx.DrawStringAnchored(text, textOffsetX, textOffsetY, 0.5, 0.5)
 		}
 	}
+
 	log.Println("Finished DrawCenteredMultiLine")
 }
 
@@ -516,14 +625,15 @@ func UpdateBounds(x, y float64, left, top, right, bottom *float64) {
 }
 
 // CalculateControlPoint 计算控制点以实现弯曲效果
-// @param start 起始点
-// @param end 结束点
-// @param offset 偏移量
+// @param startPoint 起始点
+// @param endPoint 结束点
+// @param offsetX 坐标X偏移量
+// @param offsetY 坐标Y偏移量
 // @return *gg.Point 返回计算得到的控制点
-func CalculateControlPoint(start, end *gg.Point, offset float64) *gg.Point {
-	midX := (start.X + end.X) / 2
-	midY := (start.Y + end.Y) / 2
-	return &gg.Point{X: midX, Y: midY - offset}
+func CalculateControlPoint(startPoint, endPoint *gg.Point, offsetX, offsetY float64) *gg.Point {
+	midX := (startPoint.X + endPoint.X) / 2
+	midY := (startPoint.Y + endPoint.Y) / 2
+	return &gg.Point{X: midX + offsetX, Y: midY + offsetY}
 }
 
 // CalculateFractionPointMode 类型定义，用于表示计算模式
@@ -586,29 +696,32 @@ const (
 	AxisY                      // Y轴
 )
 
-// 定义最大值和最小值的模式
-type PointMaxMin int
+// 定义计算模式
+type CalculateMode int
 
 const (
-	PointMax PointMaxMin = iota // 最大值模式
-	PointMin                    // 最小值模式
-) // CalculatePoint 返回两个点中在指定维度上较大的或较小的点
+	CalculateMax CalculateMode = iota // 最大值模式
+	CalculateMin                      // 最小值模式
+	CalculateAvg                      // 平均值模式
+)
+
+// CalculatePoint 返回两个点中在指定维度上较大的或较小的点
 // @param a 第一个点
 // @param b 第二个点
-// @param mode 指定是取最大点还是最小点（PointMaxMin 枚举类型）
-// @param axis 指定比较的轴（AxisPointMode 枚举类型）
+// @param calculateMode 指定是取最大点还是最小点（CalculateMode 枚举类型）
+// @param axisMode 指定比较的轴（AxisPointMode 枚举类型）
 // @return 返回在指定维度上较大的或较小的点
-func CalculatePoint(a, b *gg.Point, mode PointMaxMin, axis AxisPointMode) *gg.Point {
-	switch axis {
+func CalculatePoint(a, b *gg.Point, calculateMode CalculateMode, axisMode AxisPointMode) *gg.Point {
+	switch axisMode {
 	case AxisY: // 如果比较Y轴
-		if (mode == PointMax && a.Y > b.Y) || (mode == PointMin && a.Y < b.Y) {
+		if (calculateMode == CalculateMax && a.Y > b.Y) || (calculateMode == CalculateMin && a.Y < b.Y) {
 			return a // 返回a点
 		}
 		return b // 返回b点
 	case AxisX: // 默认比较X轴
 		fallthrough // 允许使用fallthrough以简化代码
 	default:
-		if (mode == PointMax && a.X > b.X) || (mode == PointMin && a.X < b.X) {
+		if (calculateMode == CalculateMax && a.X > b.X) || (calculateMode == CalculateMin && a.X < b.X) {
 			return a // 返回a点
 		}
 		return b // 返回b点
@@ -617,18 +730,36 @@ func CalculatePoint(a, b *gg.Point, mode PointMaxMin, axis AxisPointMode) *gg.Po
 
 // CalculateMultiplePoints 计算多个点中的最大或最小点
 // @param points 要比较的点的切片
-// @param mode 指定是取最大点还是最小点（PointMaxMin 枚举类型）
-// @param axis 指定比较的轴（AxisPointMode 枚举类型）
+// @param calculateMode 指定是取最大点还是最小点（PointMaxMin 枚举类型）
+// @param axisMode 指定比较的轴（AxisPointMode 枚举类型、默认X）
 // @return 返回在指定维度上较大的或较小的点
-func CalculateMultiplePoints(points []*gg.Point, mode PointMaxMin, axis AxisPointMode) *gg.Point {
+func CalculateMultiplePoints(points []*gg.Point, calculateMode CalculateMode, axisMode ...AxisPointMode) *gg.Point {
+	// 如果模式是平均值，直接计算平均点
+	if calculateMode == CalculateAvg {
+		sumX, sumY := 0.0, 0.0
+		for _, point := range points {
+			sumX += point.X
+			sumY += point.Y
+		}
+		return &gg.Point{
+			X: sumX / float64(len(points)),
+			Y: sumY / float64(len(points)),
+		}
+	}
+
+	// 如果是比大小就需要校验数组长度是否正确
 	if len(points) == 0 {
 		return nil // 如果没有点，返回nil
+	}
+	var axis = AxisX
+	if len(axisMode) > 0 {
+		axis = axisMode[0]
 	}
 
 	// 初始化结果为第一个点
 	result := points[0]
 	for _, point := range points[1:] {
-		result = CalculatePoint(result, point, mode, axis) // 使用CalculatePoint逐个比较
+		result = CalculatePoint(result, point, calculateMode, axis) // 使用CalculatePoint逐个比较
 	}
 	return result // 返回最终结果
 }
@@ -688,6 +819,18 @@ func ResizePoint(point *gg.Point, resizeX, resizeY float64) *gg.Point {
 	return &gg.Point{
 		X: ResizeX(point, resizeX).X, // 先对 x 坐标进行缩放
 		Y: ResizeY(point, resizeY).Y, // 再对 y 坐标进行缩放
+	}
+}
+
+// ResizePointBoth 同时缩放 x 和 y 坐标
+// @param point 要缩放的点
+// @param scaleFactorX x 坐标的缩放因子
+// @param scaleFactorY y 坐标的缩放因子
+// @return 返回经过 x 和 y 坐标缩放后的新点
+func ResizePointBoth(point *gg.Point, scaleFactorX, scaleFactorY float64) *gg.Point {
+	return &gg.Point{
+		X: point.X * scaleFactorX, // 将 x 坐标乘以 x 缩放因子
+		Y: point.Y * scaleFactorY, // 将 y 坐标乘以 y 缩放因子
 	}
 }
 
@@ -819,4 +962,25 @@ func ResizePoints(points []*gg.Point, scaleX, scaleY float64) []*gg.Point {
 		resizedPoints[i] = ResizePoint(point, scaleX, scaleY) // 使用缩放函数逐个缩放点
 	}
 	return resizedPoints // 返回缩放后的点的切片
+}
+
+// ExtendLine 从起始点 p1 延长到 p2，返回延长线的终点坐标
+// p1 是起始点，p2 是终止点，length 是延长的长度
+func ExtendLine(p1, p2 *gg.Point, length float64) *gg.Point {
+	// 计算线段的方向向量
+	dx := p2.X - p1.X
+	dy := p2.Y - p1.Y
+
+	// 计算线段的长度
+	lineLength := math.Sqrt(dx*dx + dy*dy)
+
+	// 计算单位向量
+	unitDx := dx / lineLength
+	unitDy := dy / lineLength
+
+	// 计算延长后的终点坐标
+	newX := p1.X + unitDx*length
+	newY := p1.Y + unitDy*length
+
+	return &gg.Point{X: newX, Y: newY}
 }
