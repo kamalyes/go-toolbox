@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-13 01:15:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-12-31 15:55:15
+ * @LastEditTime: 2025-01-02 15:37:20
  * @FilePath: \go-toolbox\tests\imgix_drawer_test.go
  * @Description:
  *
@@ -690,111 +690,6 @@ func TestResizePoint(t *testing.T) {
 	}
 }
 
-// TestResizePointBoth 测试 ResizePointBoth 函数
-func TestResizePointBoth(t *testing.T) {
-	tests := []struct {
-		name         string
-		point        *gg.Point
-		scaleFactorX float64
-		scaleFactorY float64
-		expectedX    float64
-		expectedY    float64
-	}{
-		{
-			name:         "Scale Up Both Axes",
-			point:        &gg.Point{X: 10, Y: 20},
-			scaleFactorX: 2.0,
-			scaleFactorY: 2.0,
-			expectedX:    20,
-			expectedY:    40,
-		},
-		{
-			name:         "Scale Down Both Axes",
-			point:        &gg.Point{X: 10, Y: 20},
-			scaleFactorX: 0.5,
-			scaleFactorY: 0.5,
-			expectedX:    5,
-			expectedY:    10,
-		},
-		{
-			name:         "Scale X Up and Y Down",
-			point:        &gg.Point{X: 10, Y: 20},
-			scaleFactorX: 2.0,
-			scaleFactorY: 0.5,
-			expectedX:    20,
-			expectedY:    10,
-		},
-		{
-			name:         "Scale X Down and Y Up",
-			point:        &gg.Point{X: 10, Y: 20},
-			scaleFactorX: 0.5,
-			scaleFactorY: 2.0,
-			expectedX:    5,
-			expectedY:    40,
-		},
-		{
-			name:         "No Scale",
-			point:        &gg.Point{X: 10, Y: 20},
-			scaleFactorX: 1.0,
-			scaleFactorY: 1.0,
-			expectedX:    10,
-			expectedY:    20,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := imgix.ResizePointBoth(tt.point, tt.scaleFactorX, tt.scaleFactorY)
-			assert.Equal(t, tt.expectedX, result.X, "X coordinate mismatch")
-			assert.Equal(t, tt.expectedY, result.Y, "Y coordinate mismatch")
-		})
-	}
-}
-
-// TestResizeOneselfX 测试 ResizeOneselfX 函数
-func TestResizeOneselfX(t *testing.T) {
-	point := &gg.Point{X: 10, Y: 20}
-
-	tests := []struct {
-		scaleFactor float64
-		operation   imgix.CalculateFractionPointMode
-		expectedX   float64
-	}{
-		{2.0, imgix.Add, 30.0},       // 10 + (10 * 2) = 30
-		{0.5, imgix.Subtract, 5.0},   // 10 - (10 * 0.5) = 5
-		{2.0, imgix.Multiply, 200.0}, // 10 * (10 * 2) = 200
-		{2.0, imgix.Divide, 0.5},     // 10 / (10 * 2) = 0.5
-		{1.0, imgix.Subtract, 0.0},   // 10 - (10 * 1) = 0
-	}
-
-	for _, test := range tests {
-		result := imgix.ResizeOneselfX(point, test.scaleFactor, test.operation)
-		assert.Equal(t, test.expectedX, result.X, "Expected X value did not match")
-	}
-}
-
-// TestResizeOneselfY 测试 ResizeOneselfY 函数
-func TestResizeOneselfY(t *testing.T) {
-	point := &gg.Point{X: 10, Y: 20}
-
-	tests := []struct {
-		scaleFactor float64
-		operation   imgix.CalculateFractionPointMode
-		expectedY   float64
-	}{
-		{2.0, imgix.Add, 60.0},       // 20 + (20 * 2) = 60
-		{0.5, imgix.Subtract, 10.0},  // 20 - (20 * 0.5) = 10
-		{2.0, imgix.Multiply, 800.0}, // 20 * (20 * 2) = 800
-		{2.0, imgix.Divide, 0.5},     // 20 / (20 * 2) = 0.5
-		{1.0, imgix.Subtract, 0.0},   // 20 - (20 * 1) = 0
-	}
-
-	for _, test := range tests {
-		result := imgix.ResizeOneselfY(point, test.scaleFactor, test.operation)
-		assert.Equal(t, test.expectedY, result.Y, "Expected Y value did not match")
-	}
-}
-
 func TestResizePoints(t *testing.T) {
 	tests := []struct {
 		points   []*gg.Point
@@ -831,6 +726,94 @@ func TestResizePoints(t *testing.T) {
 			assert.Equal(t, test.expected[i].X, point.X, "X coordinate mismatch")
 			assert.Equal(t, test.expected[i].Y, point.Y, "Y coordinate mismatch")
 		}
+	}
+}
+
+// TestResizePointOneselfX 测试 ResizePointOneselfX 函数
+func TestResizePointOneselfX(t *testing.T) {
+	point := &gg.Point{X: 10, Y: 20}
+
+	tests := []struct {
+		scaleFactor float64
+		operation   imgix.CalculateFractionPointMode
+		expectedX   float64
+	}{
+		{2.0, imgix.Add, 30.0},       // 10 + (10 * 2) = 30
+		{0.5, imgix.Subtract, 5.0},   // 10 - (10 * 0.5) = 5
+		{2.0, imgix.Multiply, 200.0}, // 10 * (10 * 2) = 200
+		{2.0, imgix.Divide, 0.5},     // 10 / (10 * 2) = 0.5
+		{1.0, imgix.Subtract, 0.0},   // 10 - (10 * 1) = 0
+	}
+
+	for _, test := range tests {
+		result := imgix.ResizePointOneselfX(point, test.scaleFactor, test.operation)
+		assert.Equal(t, test.expectedX, result.X, "Expected X value did not match")
+	}
+}
+
+// TestResizePointOneselfY 测试 ResizePointOneselfY 函数
+func TestResizePointOneselfY(t *testing.T) {
+	point := &gg.Point{X: 10, Y: 20}
+
+	tests := []struct {
+		scaleFactor float64
+		operation   imgix.CalculateFractionPointMode
+		expectedY   float64
+	}{
+		{2.0, imgix.Add, 60.0},       // 20 + (20 * 2) = 60
+		{0.5, imgix.Subtract, 10.0},  // 20 - (20 * 0.5) = 10
+		{2.0, imgix.Multiply, 800.0}, // 20 * (20 * 2) = 800
+		{2.0, imgix.Divide, 0.5},     // 20 / (20 * 2) = 0.5
+		{1.0, imgix.Subtract, 0.0},   // 20 - (20 * 1) = 0
+	}
+
+	for _, test := range tests {
+		result := imgix.ResizePointOneselfY(point, test.scaleFactor, test.operation)
+		assert.Equal(t, test.expectedY, result.Y, "Expected Y value did not match")
+	}
+}
+
+// TestOffsetPointX 测试 OffsetPointX 函数
+func TestOffsetPointX(t *testing.T) {
+	point := &gg.Point{X: 10, Y: 20}
+
+	tests := []struct {
+		offset    float64
+		operation imgix.CalculateFractionPointMode
+		expectedX float64
+	}{
+		{5.0, imgix.Add, 15.0},      // 10 + 5 = 15
+		{3.0, imgix.Subtract, 7.0},  // 10 - 3 = 7
+		{2.0, imgix.Multiply, 20.0}, // 10 * 2 = 20
+		{2.0, imgix.Divide, 5.0},    // 10 / 2 = 5
+		{0.0, imgix.Subtract, 10.0}, // 10 - 0 = 10
+	}
+
+	for _, test := range tests {
+		result := imgix.OffsetPointX(point, test.offset, test.operation)
+		assert.Equal(t, test.expectedX, result.X, "Expected X value did not match")
+	}
+}
+
+// TestOffsetPointY 测试 OffsetPointY 函数
+func TestOffsetPointY(t *testing.T) {
+	point := &gg.Point{X: 10, Y: 20}
+
+	tests := []struct {
+		offset    float64
+		operation imgix.CalculateFractionPointMode
+		expectedY float64
+	}{
+		{5.0, imgix.Add, 25.0},      // 20 + 5 = 25
+		{3.0, imgix.Subtract, 17.0}, // 20 - 3 = 17
+		{2.0, imgix.Multiply, 40.0}, // 20 * 2 = 40
+		{2.0, imgix.Divide, 10.0},   // 20 / 2 = 10
+		{0.0, imgix.Subtract, 20.0}, // 20 - 0 = 20
+	}
+
+	for _, test := range tests {
+		result := imgix.OffsetPointY(point, test.offset, test.operation)
+		assert.Equal(t, test.expectedY, result.Y, "Expected Y value did not match")
 	}
 }
 
@@ -967,12 +950,42 @@ func TestResizeImage(t *testing.T) {
 	assert.Equal(t, 50, resizedImg.Bounds().Dy(), "Resized image height should be 50")
 
 	// 可选：将结果保存到文件以便手动检查
-	filepath := "resized_test_image.jpg"
-	outFile, err := os.Create(filepath)
+	outFile, err := os.Create("test_resize_mage.png")
 	assert.NoError(t, err, "Error creating output file")
 	defer outFile.Close()
-	defer os.Remove(filepath)
 
 	err = jpeg.Encode(outFile, resizedImg, nil)
 	assert.NoError(t, err, "Error encoding image to JPEG")
+}
+
+// TestCropImage 测试 CropImage 函数
+func TestCropImage(t *testing.T) {
+	// 创建并保存测试图像
+	filePath := "test_crop_image.png"
+	err := createTestImage(filePath)
+	if err != nil {
+		t.Fatalf("创建测试图像失败: %v", err)
+	}
+	defer os.Remove(filePath) // 测试完成后删除文件
+
+	// 读取生成的图像
+	testImg, err := imaging.Open(filePath)
+	if err != nil {
+		t.Fatalf("打开测试图像失败: %v", err)
+	}
+
+	// 定义裁剪选项
+	cropOptions := &imgix.CropImgOptions{
+		MinWidth:  10,
+		MinHeight: 10,
+		MaxWidth:  50,
+		MaxHeight: 50,
+	}
+
+	// 调用 CropImage 函数
+	croppedImg := imgix.CropImage(testImg, cropOptions)
+
+	// 断言裁剪后的图像尺寸
+	assert.Equal(t, 40, croppedImg.Bounds().Dx(), "裁剪后的宽度应为 40")
+	assert.Equal(t, 40, croppedImg.Bounds().Dy(), "裁剪后的高度应为 40")
 }

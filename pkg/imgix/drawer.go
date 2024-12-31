@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-13 09:55:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-12-31 16:16:55
+ * @LastEditTime: 2025-01-02 15:25:26
  * @FilePath: \go-toolbox\pkg\imgix\drawer.go
  * @Description:
  *
@@ -184,12 +184,42 @@ type ResizeImgOptions struct {
 }
 
 // ResizeImage 缩放图片
+// @param img: 要缩放的原始图像（image.Image类型）
+// @param resizeImgOptions: 缩放选项（*CropImgOptions类型），包含缩放的宽高
+// return
+//
+//	返回缩放后的图像（image.Image类型）
 func ResizeImage(img image.Image, resizeImgOptions *ResizeImgOptions) image.Image {
 	// 检查是否需要缩放，并确保 Width 和 Height 大于 0
 	if resizeImgOptions != nil && resizeImgOptions.Width > 0 && resizeImgOptions.Height > 0 {
 		img = imaging.Resize(img, resizeImgOptions.Width, resizeImgOptions.Height, resizeImgOptions.Filter)
 	}
 	return img
+}
+
+// CropImgOptions 定义裁剪图像的选项
+type CropImgOptions struct {
+	MinWidth  int // 最小裁剪宽度
+	MinHeight int // 最小裁剪高度
+	MaxWidth  int // 最大裁剪宽度
+	MaxHeight int // 最大裁剪高度
+}
+
+// CropImage 裁剪图片
+// @param img: 要裁剪的原始图像（image.Image类型）
+// @param cropImgOptions: 裁剪选项（*CropImgOptions类型），包含裁剪的最小和最大宽高
+// return
+//
+//	返回裁剪后的图像（image.Image类型）
+func CropImage(img image.Image, cropImgOptions *CropImgOptions) image.Image {
+	// 检查裁剪选项是否不为 nil 并确保 MaxWidth 和 MaxHeight 大于 0
+	if cropImgOptions != nil && cropImgOptions.MaxWidth > 0 && cropImgOptions.MaxHeight > 0 {
+		// 创建裁剪区域的矩形
+		cropRect := image.Rect(cropImgOptions.MinWidth, cropImgOptions.MinHeight, cropImgOptions.MaxWidth, cropImgOptions.MaxHeight)
+		// 使用 imaging 库裁剪图像
+		img = imaging.Crop(img, cropRect)
+	}
+	return img // 返回裁剪后的图像
 }
 
 // SaveImage 存储图片
@@ -238,44 +268,152 @@ func (g *GraphicsRenderer) DrawCurvedLine(start, end, control *gg.Point) {
 	}, true)
 }
 
+// DelayLine 表示每条延长线的绘制状态和是否使用虚线
+type DelayLine struct {
+	Enabled      bool    // 是否绘制该延长线
+	Dash         bool    // 是否使用虚线
+	extendLength float64 // 延长长度
+}
+
+// RectangleExtensionFlags 用于控制矩形每个角的延长线绘制状态
+type RectangleExtensions struct {
+	RightTop    DelayLine // 右上角的上方延长线
+	RightBottom DelayLine // 右下角的下方延长线
+	LeftTop     DelayLine // 左上角的上方延长线
+	LeftBottom  DelayLine // 左下角的下方延长线
+	TopLeft     DelayLine // 上方的左侧延长线
+	TopRight    DelayLine // 上方的右侧延长线
+	BottomLeft  DelayLine // 下方的左侧延长线
+	BottomRight DelayLine // 下方的右侧延长线
+}
+
+// NewRectangleExtensions 创建一个新的 RectangleExtensions 实例，所有字段默认为不绘制且不使用虚线
+func NewRectangleExtensions() *RectangleExtensions {
+	return &RectangleExtensions{
+		RightTop:    DelayLine{},
+		RightBottom: DelayLine{},
+		LeftTop:     DelayLine{},
+		LeftBottom:  DelayLine{},
+		TopLeft:     DelayLine{},
+		TopRight:    DelayLine{},
+		BottomLeft:  DelayLine{},
+		BottomRight: DelayLine{},
+	}
+}
+
+// NewRectangle 创建一个新的矩形，默认延长线不绘制
+func NewRectangle(topLeft, bottomRight *gg.Point, rectangleExtensions ...*RectangleExtensions) Rectangle {
+	rectExtensions := NewRectangleExtensions()
+	if len(rectangleExtensions) > 0 {
+		rectExtensions = rectangleExtensions[0]
+	}
+	return Rectangle{
+		TopLeft:     topLeft,
+		BottomRight: bottomRight,
+		Extensions:  rectExtensions, // 默认不绘制延长线
+	}
+}
+
+// Rectangle 表示一个矩形，包含左上角和右下角的坐标，以及控制延长线绘制的选项
 type Rectangle struct {
-	TopLeft     *gg.Point
-	BottomRight *gg.Point
+	TopLeft     *gg.Point            // 矩形的左上角坐标
+	BottomRight *gg.Point            // 矩形的右下角坐标
+	Extensions  *RectangleExtensions // 控制延长线的绘制状态，默认为不绘制
 }
 
 // DrawRectangle 绘制矩形框，并可选地绘制延长线
 // @param rect 矩形的左上角和右下角
 // @param extendLength 延长线的长度，单位与坐标相同
 func (g *GraphicsRenderer) DrawRectangle(rect Rectangle, extendLength float64) {
+	rectExtensions := NewRectangleExtensions()
+	if rect.Extensions == nil {
+		rect.Extensions = rectExtensions
+	}
 	g.DrawWithStroke(func() {
 		width := rect.BottomRight.X - rect.TopLeft.X
 		height := rect.BottomRight.Y - rect.TopLeft.Y
-
-		// 绘制矩形
 		g.GgCtx.DrawRectangle(rect.TopLeft.X, rect.TopLeft.Y, width, height)
-
-		// 绘制延长线
-		g.drawExtensionLines(rect, extendLength)
 	}, true)
+	// 绘制延长线
+	g.drawExtensionLines(rect, extendLength)
+}
+
+// setRectangleLineStyle 根据给定的 Extension 设置线条样式
+func (g *GraphicsRenderer) setRectangleLineStyle(extension DelayLine) {
+	if extension.Dash {
+		g.UseDefaultDashed() // 设置虚线样式
+	} else {
+		g.UseSolidLine() // 设置实线样式
+	}
+}
+
+// getRectangleExtendLength 获取延长线长度
+func (g *GraphicsRenderer) getRectangleExtendLength(parentExtendLength, sonExtendLength float64) float64 {
+	if sonExtendLength > 0 {
+		return sonExtendLength
+	}
+	return parentExtendLength
 }
 
 // drawExtensionLines 绘制延长线
-func (g *GraphicsRenderer) drawExtensionLines(rect Rectangle, extendLength float64) {
-	// 向上延长线（左上角和右上角）
-	g.GgCtx.DrawLine(rect.TopLeft.X, rect.TopLeft.Y, rect.TopLeft.X, rect.TopLeft.Y-extendLength)         // 左上角
-	g.GgCtx.DrawLine(rect.BottomRight.X, rect.TopLeft.Y, rect.BottomRight.X, rect.TopLeft.Y-extendLength) // 右上角
+func (g *GraphicsRenderer) drawExtensionLines(rect Rectangle, parentLength float64) {
+	// 根据 ExtensionFlags 决定是否绘制延长线
 
-	// 向下延长线（左下角和右下角）
-	g.GgCtx.DrawLine(rect.BottomRight.X, rect.BottomRight.Y, rect.BottomRight.X, rect.BottomRight.Y+extendLength) // 右下角
-	g.GgCtx.DrawLine(rect.TopLeft.X, rect.BottomRight.Y, rect.TopLeft.X, rect.BottomRight.Y+extendLength)         // 左下角
+	// 左上角的上方延长线
+	if rect.Extensions.TopLeft.Enabled {
+		g.setRectangleLineStyle(rect.Extensions.TopLeft)
+		extendLength := g.getRectangleExtendLength(parentLength, rect.Extensions.TopLeft.extendLength)
+		g.DrawLine(rect.TopLeft, OffsetPointY(rect.TopLeft, extendLength, Subtract))
+	}
 
-	// 向左延长线（左上角和左下角）
-	g.GgCtx.DrawLine(rect.TopLeft.X, rect.TopLeft.Y, rect.TopLeft.X-extendLength, rect.TopLeft.Y)         // 左上角
-	g.GgCtx.DrawLine(rect.TopLeft.X, rect.BottomRight.Y, rect.TopLeft.X-extendLength, rect.BottomRight.Y) // 左下角
+	// 右上角的上方延长线
+	if rect.Extensions.TopRight.Enabled {
+		g.setRectangleLineStyle(rect.Extensions.TopRight)
+		extendLength := g.getRectangleExtendLength(parentLength, rect.Extensions.TopRight.extendLength)
+		g.DrawLine(&gg.Point{X: rect.BottomRight.X, Y: rect.TopLeft.Y}, &gg.Point{X: rect.BottomRight.X, Y: rect.TopLeft.Y - extendLength})
+	}
 
-	// 向右延长线（右上角和右下角）
-	g.GgCtx.DrawLine(rect.BottomRight.X, rect.TopLeft.Y, rect.BottomRight.X+extendLength, rect.TopLeft.Y)         // 右上角
-	g.GgCtx.DrawLine(rect.BottomRight.X, rect.BottomRight.Y, rect.BottomRight.X+extendLength, rect.BottomRight.Y) // 右下角
+	// 左下角的下方延长线
+	if rect.Extensions.BottomLeft.Enabled {
+		g.setRectangleLineStyle(rect.Extensions.BottomLeft)
+		extendLength := g.getRectangleExtendLength(parentLength, rect.Extensions.BottomLeft.extendLength)
+		g.DrawLine(&gg.Point{X: rect.TopLeft.X, Y: rect.BottomRight.Y}, &gg.Point{X: rect.TopLeft.X, Y: rect.BottomRight.Y + extendLength})
+	}
+
+	// 右下角的下方延长线
+	if rect.Extensions.BottomRight.Enabled {
+		g.setRectangleLineStyle(rect.Extensions.BottomRight)
+		extendLength := g.getRectangleExtendLength(parentLength, rect.Extensions.BottomRight.extendLength)
+		g.DrawLine(rect.BottomRight, OffsetPointY(rect.BottomRight, extendLength, Add))
+	}
+
+	// 左上角的左侧延长线
+	if rect.Extensions.LeftTop.Enabled {
+		g.setRectangleLineStyle(rect.Extensions.LeftTop)
+		extendLength := g.getRectangleExtendLength(parentLength, rect.Extensions.LeftTop.extendLength)
+		g.DrawLine(rect.TopLeft, OffsetPointX(rect.TopLeft, extendLength, Subtract))
+	}
+
+	// 左下角的左侧延长线
+	if rect.Extensions.LeftBottom.Enabled {
+		g.setRectangleLineStyle(rect.Extensions.LeftBottom)
+		extendLength := g.getRectangleExtendLength(parentLength, rect.Extensions.LeftBottom.extendLength)
+		g.DrawLine(&gg.Point{X: rect.TopLeft.X, Y: rect.BottomRight.Y}, &gg.Point{X: rect.TopLeft.X - extendLength, Y: rect.BottomRight.Y})
+	}
+
+	// 右上角的右侧延长线
+	if rect.Extensions.RightTop.Enabled {
+		g.setRectangleLineStyle(rect.Extensions.RightTop)
+		extendLength := g.getRectangleExtendLength(parentLength, rect.Extensions.RightTop.extendLength)
+		g.DrawLine(&gg.Point{X: rect.BottomRight.X, Y: rect.TopLeft.Y}, &gg.Point{X: rect.BottomRight.X + extendLength, Y: rect.TopLeft.Y})
+	}
+
+	// 右下角的右侧延长线
+	if rect.Extensions.RightBottom.Enabled {
+		g.setRectangleLineStyle(rect.Extensions.RightBottom)
+		extendLength := g.getRectangleExtendLength(parentLength, rect.Extensions.RightBottom.extendLength)
+		g.DrawLine(rect.BottomRight, &gg.Point{X: rect.BottomRight.X + extendLength, Y: rect.BottomRight.Y})
+	}
 }
 
 // DrawPolygon 绘制一个多边形
@@ -822,84 +960,153 @@ func ResizePoint(point *gg.Point, resizeX, resizeY float64) *gg.Point {
 	}
 }
 
-// ResizePointBoth 同时缩放 x 和 y 坐标
-// @param point 要缩放的点
-// @param scaleFactorX x 坐标的缩放因子
-// @param scaleFactorY y 坐标的缩放因子
-// @return 返回经过 x 和 y 坐标缩放后的新点
-func ResizePointBoth(point *gg.Point, scaleFactorX, scaleFactorY float64) *gg.Point {
-	return &gg.Point{
-		X: point.X * scaleFactorX, // 将 x 坐标乘以 x 缩放因子
-		Y: point.Y * scaleFactorY, // 将 y 坐标乘以 y 缩放因子
+// ResizePoints 批量缩放多个点，支持不同的 x 和 y 缩放因子
+// @param points: 需要缩放的点的切片
+// @param scaleX: x 轴的缩放因子
+// @param scaleY: y 轴的缩放因子
+// @return []*gg.Point: 返回缩放后的点的切片
+func ResizePoints(points []*gg.Point, scaleX, scaleY float64) []*gg.Point {
+	resizedPoints := make([]*gg.Point, len(points)) // 创建一个新的切片用于存储缩放后的点
+	for i, point := range points {
+		resizedPoints[i] = ResizePoint(point, scaleX, scaleY) // 使用缩放函数逐个缩放点
 	}
+	return resizedPoints // 返回缩放后的点的切片
 }
 
-// ResizeOneselfX 根据指定的操作返回原始 x 坐标与缩放后的 x 坐标的结果
-// @param point 要缩放的点
-// @param scaleFactor 缩放因子，>1 表示放大，<1 表示缩小
-// @param operation 计算模式
-// @return 返回经过操作后的新点
-func ResizeOneselfX(point *gg.Point, scaleFactor float64, operation ...CalculateFractionPointMode) *gg.Point {
-	var newX float64
-	var operate = Subtract
-	if len(operation) > 0 {
-		operate = operation[0]
-	}
-	// 获取缩放后的 x 坐标
-	resizedX := ResizeX(point, scaleFactor).X
-
-	// 根据 operation 执行相应的运算
-	switch operate {
-	case Add:
-		newX = point.X + resizedX
-	case Multiply:
-		newX = point.X * resizedX
-	case Divide:
-		newX = point.X / resizedX
-	case Subtract:
-		fallthrough
-	default:
-		newX = point.X - resizedX
-	}
-
-	return &gg.Point{
-		X: newX,
-		Y: point.Y, // y 坐标保持不变
-	}
+// PointOperationStrategy 定义操作策略接口
+type PointOperationStrategy interface {
+	Apply(value, current float64) float64
 }
 
-// ResizeOneselfY 根据指定的操作返回原始 y 坐标与缩放后的 y 坐标的结果
-// @param point 要缩放的点
-// @param scaleFactor 缩放因子，>1 表示放大，<1 表示缩小
+// PointAddStrategy 实现加法操作
+type PointAddStrategy struct{}
+
+func (s *PointAddStrategy) Apply(value, current float64) float64 {
+	return current + value
+}
+
+// PointSubtractStrategy 实现减法操作
+type PointSubtractStrategy struct{}
+
+func (s *PointSubtractStrategy) Apply(value, current float64) float64 {
+	return current - value
+}
+
+// PointMultiplyStrategy 实现乘法操作
+type PointMultiplyStrategy struct{}
+
+func (s *PointMultiplyStrategy) Apply(value, current float64) float64 {
+	return current * value
+}
+
+// PointDivideStrategy 实现除法操作
+type PointDivideStrategy struct{}
+
+func (s *PointDivideStrategy) Apply(value, current float64) float64 {
+	return current / value
+}
+
+// ModifyPoint 根据指定的操作对点的某个坐标进行修改
+// @param point 要修改的点
+// @param value 要应用的值（缩放因子或偏移量）
 // @param operation 计算模式
+// @param isX true 表示修改 x 坐标，false 表示修改 y 坐标
 // @return 返回经过操作后的新点
-func ResizeOneselfY(point *gg.Point, scaleFactor float64, operation ...CalculateFractionPointMode) *gg.Point {
-	var newY float64
-	var operate = Subtract
-	if len(operation) > 0 {
-		operate = operation[0]
-	}
-	// 获取缩放后的 y 坐标
-	resizedY := ResizeY(point, scaleFactor).Y
+func ModifyPoint(point *gg.Point, value float64, operation CalculateFractionPointMode, isX bool) *gg.Point {
+	var strategy PointOperationStrategy
 
-	// 根据 operation 执行相应的运算
-	switch operate {
+	// 根据 operation 选择相应的策略
+	switch operation {
 	case Add:
-		newY = point.Y + resizedY
-	case Multiply:
-		newY = point.Y * resizedY
-	case Divide:
-		newY = point.Y / resizedY
+		strategy = &PointAddStrategy{}
 	case Subtract:
-		fallthrough
+		strategy = &PointSubtractStrategy{}
+	case Multiply:
+		strategy = &PointMultiplyStrategy{}
+	case Divide:
+		strategy = &PointDivideStrategy{}
 	default:
-		newY = point.Y - resizedY
+		strategy = &PointSubtractStrategy{} // 默认使用减法
 	}
 
+	// 选择要修改的坐标
+	current := point.X
+	if !isX {
+		current = point.Y
+	}
+
+	// 应用策略
+	newValue := strategy.Apply(value, current)
+
+	// 返回新的点
+	if isX {
+		return &gg.Point{
+			X: newValue,
+			Y: point.Y, // y 坐标保持不变
+		}
+	}
 	return &gg.Point{
-		Y: newY,
 		X: point.X, // x 坐标保持不变
+		Y: newValue,
 	}
+}
+
+// GetPointOperation 从可变参数中获取操作类型，默认为 Subtract
+// @param operation 计算模式
+// @return 返回操作类型
+func GetPointOperation(operation ...CalculateFractionPointMode) CalculateFractionPointMode {
+	if len(operation) > 0 {
+		return operation[0]
+	}
+	return Subtract
+}
+
+// ResizePointOneselfX 根据指定的操作返回原始 y 坐标与缩放后的 x 坐标的结果
+// @param point 要缩放的点
+// @param scaleFactor 缩放因子，>1 表示放大，<1 表示缩小
+// @param operation 计算模式
+// @return 返回经过操作后的新点
+func ResizePointOneselfX(point *gg.Point, scaleFactor float64, operation ...CalculateFractionPointMode) *gg.Point {
+	operate := GetPointOperation(operation...)
+	// 获取缩放后的 x 坐标
+	resizedX := point.X * scaleFactor
+	// 使用通用的 ModifyPoint 函数修改 x 坐标
+	return ModifyPoint(point, resizedX, operate, true)
+}
+
+// ResizePointOneselfY 根据指定的操作返回原始 x 坐标与缩放后的 y 坐标的结果
+// @param point 要缩放的点
+// @param scaleFactor 缩放因子，>1 表示放大，<1 表示缩小
+// @param operation 计算模式
+// @return 返回经过操作后的新点
+func ResizePointOneselfY(point *gg.Point, scaleFactor float64, operation ...CalculateFractionPointMode) *gg.Point {
+	operate := GetPointOperation(operation...)
+	// 获取缩放后的 y 坐标
+	resizedY := point.Y * scaleFactor
+	// 使用通用的 ModifyPoint 函数修改 y 坐标
+	return ModifyPoint(point, resizedY, operate, false)
+}
+
+// OffsetPointX 根据指定的操作返回原始 y 坐标与偏移后的 x 坐标的结果
+// @param point 要缩放的点
+// @param offset 偏移量
+// @param operation 计算模式
+// @return 返回经过操作后的新点
+func OffsetPointX(point *gg.Point, offset float64, operation ...CalculateFractionPointMode) *gg.Point {
+	operate := GetPointOperation(operation...)
+	// 使用通用的 ModifyPoint 函数修改 x 坐标
+	return ModifyPoint(point, offset, operate, true)
+}
+
+// OffsetPointY 根据指定的操作返回原始 x 坐标与偏移后的 y 坐标的结果
+// @param point 要缩放的点
+// @param offset 偏移量
+// @param operation 计算模式
+// @return 返回经过操作后的新点
+func OffsetPointY(point *gg.Point, offset float64, operation ...CalculateFractionPointMode) *gg.Point {
+	operate := GetPointOperation(operation...)
+	// 使用通用的 ModifyPoint 函数修改 y 坐标
+	return ModifyPoint(point, offset, operate, false)
 }
 
 // ResizeUpTriangle 根据固定点放大三角形的两个顶点
@@ -949,19 +1156,6 @@ func ResizeDownTriangle(vertexA, vertexB, vertexC *gg.Point, resizeXy float64) (
 	newVertexC := &gg.Point{X: vertexA.X + resizedVectorAC.X, Y: vertexA.Y + resizedVectorAC.Y}
 
 	return newVertexB, newVertexC
-}
-
-// ResizePoints 批量缩放多个点，支持不同的 x 和 y 缩放因子
-// @param points: 需要缩放的点的切片
-// @param scaleX: x 轴的缩放因子
-// @param scaleY: y 轴的缩放因子
-// @return []*gg.Point: 返回缩放后的点的切片
-func ResizePoints(points []*gg.Point, scaleX, scaleY float64) []*gg.Point {
-	resizedPoints := make([]*gg.Point, len(points)) // 创建一个新的切片用于存储缩放后的点
-	for i, point := range points {
-		resizedPoints[i] = ResizePoint(point, scaleX, scaleY) // 使用缩放函数逐个缩放点
-	}
-	return resizedPoints // 返回缩放后的点的切片
 }
 
 // ExtendLine 从起始点 p1 延长到 p2，返回延长线的终点坐标
