@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-09 12:15:51
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-12-10 09:30:55
+ * @LastEditTime: 2025-01-03 15:18:55
  * @FilePath: \go-toolbox\pkg\imgix\base.go
  * @Description:
  *
@@ -16,6 +16,8 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"image/color"
+	"image/draw"
 	"image/gif"
 	"image/jpeg"
 	"image/png"
@@ -145,4 +147,24 @@ func SaveBufToImageFile(buf *bytes.Buffer, filePath string, format ImageFormat) 
 	defer outFile.Close()
 
 	return WriterImage(img, 100, format, outFile) // 默认质量为 100
+}
+
+// AddOverlay 接受一个 img.Image 和一个颜色，返回添加了蒙层的 img.Image
+func AddOverlay(originalImg image.Image, overlayColor color.RGBA) image.Image {
+	// 获取原始图像的边界
+	bounds := originalImg.Bounds()
+
+	// 创建一个新的图像用于绘制蒙层
+	maskedImg := image.NewRGBA(bounds)
+
+	// 将原始图像绘制到新图像上
+	draw.Draw(maskedImg, bounds, originalImg, image.Point{}, draw.Src)
+
+	// 创建蒙层
+	overlay := image.NewUniform(overlayColor)
+
+	// 在原始图像上绘制蒙层
+	draw.Draw(maskedImg, bounds, overlay, image.Point{}, draw.Over)
+
+	return maskedImg
 }

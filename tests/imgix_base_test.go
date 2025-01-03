@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-09 12:15:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-12-18 23:08:35
+ * @LastEditTime: 2025-01-03 15:27:36
  * @FilePath: \go-toolbox\tests\imgix_base_test.go
  * @Description:
  *
@@ -320,4 +320,25 @@ func TestLoadImageFromFileAndEncodeToBase64UnsupportedFormat(t *testing.T) {
 	base64Str, err := imgix.LoadImageFromFileAndEncodeToBase64(tempFile.Name(), imgix.JPEG, 80)
 	assert.Error(t, err)       // 期望返回错误
 	assert.Empty(t, base64Str) // 期望返回的字符串为空
+}
+
+// TestAddOverlay 测试 AddOverlay 函数
+func TestAddOverlay(t *testing.T) {
+	// 创建一个简单的测试图像
+	testImg := image.NewRGBA(image.Rect(0, 0, 100, 100))
+	// 填充测试图像为白色
+	white := color.RGBA{255, 255, 255, 255}
+	for x := 0; x < 100; x++ {
+		for y := 0; y < 100; y++ {
+			testImg.Set(x, y, white)
+		}
+	}
+
+	// 定义蒙层颜色（红色，50%透明度）
+	overlayColor := color.RGBA{255, 0, 0, 128} // 红色，50%透明度
+
+	// 调用 AddOverlay 函数
+	maskedImg := imgix.AddOverlay(testImg, overlayColor)
+
+	assert.NotEqual(t, testImg, maskedImg, "无变化")
 }
