@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-13 09:55:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-01-02 15:25:26
+ * @LastEditTime: 2025-01-07 17:16:55
  * @FilePath: \go-toolbox\pkg\imgix\drawer.go
  * @Description:
  *
@@ -1177,4 +1177,27 @@ func ExtendLine(p1, p2 *gg.Point, length float64) *gg.Point {
 	newY := p1.Y + unitDy*length
 
 	return &gg.Point{X: newX, Y: newY}
+}
+
+// AdjustValues 根据目标值调整起始和结束值
+func AdjustValues(start, end, target float64) (float64, float64) {
+	// 确保 start 小于 end
+	if start > end {
+		start, end = end, start
+	}
+
+	// 计算当前差值
+	diff := end - start
+
+	// 计算待补充的差值
+	supplementalDifference := target - diff
+
+	// 如果差值小于目标值，则进行调整
+	if supplementalDifference > 0 {
+		increment := supplementalDifference / 2
+		start -= increment
+		end += increment
+	}
+
+	return start, end
 }

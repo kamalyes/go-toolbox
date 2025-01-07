@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-13 01:15:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-01-02 15:37:20
+ * @LastEditTime: 2025-01-07 17:27:17
  * @FilePath: \go-toolbox\tests\imgix_drawer_test.go
  * @Description:
  *
@@ -988,4 +988,55 @@ func TestCropImage(t *testing.T) {
 	// 断言裁剪后的图像尺寸
 	assert.Equal(t, 40, croppedImg.Bounds().Dx(), "裁剪后的宽度应为 40")
 	assert.Equal(t, 40, croppedImg.Bounds().Dy(), "裁剪后的高度应为 40")
+}
+
+func TestAdjustValues(t *testing.T) {
+	tests := []struct {
+		start     float64
+		end       float64
+		target    float64
+		wantStart float64
+		wantEnd   float64
+	}{
+		// 测试用例 1: 正常情况
+		{2.0, 3.0, 5.0, 0.0, 5.0}, // 输入: start=2.0, end=3.0, target=5.0
+		// 计算: diff = 3.0 - 2.0 = 1.0
+		// 补充差值: 5.0 - 1.0 = 4.0
+		// 增量: 4.0 / 2 = 2.0
+		// 更新: start = 2.0 - 2.0 = 0.0, end = 3.0 + 2.0 = 5.0
+
+		// 测试用例 2: 起始和结束相等
+		{3.0, 3.0, 5.0, 0.5, 5.5}, // 输入: start=3.0, end=3.0, target=5.0
+		// 计算: diff = 3.0 - 3.0 = 0.0
+		// 补充差值: 5.0 - 0.0 = 5.0
+		// 增量: 5.0 / 2 = 2.5
+		// 更新: start = 3.0 - 2.5 = 0.5, end = 3.0 + 2.5 = 5.5
+
+		// 测试用例 3: 差值大于目标值
+		{2.0, 7.0, 5.0, 2.0, 7.0}, // 输入: start=2.0, end=7.0, target=5.0
+		// 计算: diff = 7.0 - 2.0 = 5.0
+		// 补充差值: 5.0 - 5.0 = 0.0
+		// 不需要调整: start = 2.0, end = 7.0
+
+		// 测试用例 4: 应该颠倒
+		{8.0, 2.0, 5.0, 2.0, 8.0}, // 输入: start=8.0, end=2.0, target=5.0
+		// 颠倒: start = 2.0, end = 8.0
+		// 计算: diff = 8.0 - 2.0 = 6.0
+		// 补充差值: 5.0 - 6.0 = -1.0
+		// 不需要调整: start = 2.0, end = 8.0
+
+		// 测试用例 5: 颠倒并调整
+		{8.0, 2.0, 9.0, 0.5, 9.5}, // 输入: start=8.0, end=2.0, target=9.0
+		// 颠倒: start = 2.0, end = 8.0
+		// 计算: diff = 8.0 - 2.0 = 6.0
+		// 补充差值: 9.0 - 6.0 = 3.0
+		// 增量: 3.0 / 2 = 1.5
+		// 更新: start = 2.0 - 1.5 = 0.5, end = 8.0 + 1.5 = 9.5
+	}
+
+	for _, test := range tests {
+		start, end := imgix.AdjustValues(test.start, test.end, test.target)
+		assert.Equal(t, test.wantStart, start, "起始值不匹配")
+		assert.Equal(t, test.wantEnd, end, "结束值不匹配")
+	}
 }
