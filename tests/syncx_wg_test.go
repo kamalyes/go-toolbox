@@ -18,8 +18,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestNormalGoroutines 测试正常的 goroutine
-func TestNormalGoroutines(t *testing.T) {
+// TestWaitGroupNormalGoroutines 测试正常的 goroutine
+func TestWaitGroupNormalGoroutines(t *testing.T) {
 	var wg syncx.WaitGroup
 
 	wg.Go(func() {
@@ -35,15 +35,15 @@ func TestNormalGoroutines(t *testing.T) {
 	assert.NoError(t, err, "Expected no error from Wait()")
 }
 
-// TestPanicGoroutine 测试带有 panic 的 goroutine
-func TestPanicGoroutine(t *testing.T) {
-	var wg syncx.WaitGroup
+// TestWaitGroupPanicGoroutine 测试带有 panic 的 goroutine
+func TestWaitGroupPanicGoroutine(t *testing.T) {
+	wg := syncx.NewWaitGroup(true)
 
-	wg.GoTry(func() {
+	wg.Go(func() {
 		panic("This is a panic in goroutine 3")
 	})
 
-	wg.GoTry(func() {
+	wg.Go(func() {
 		fmt.Println("Goroutine 4 is running")
 	})
 
@@ -53,15 +53,15 @@ func TestPanicGoroutine(t *testing.T) {
 	assert.EqualError(t, err, "发生了未知错误: This is a panic in goroutine 3", "Expected error message to match")
 }
 
-// TestMultiplePanicGoroutines 测试多个 panic 的处理
-func TestMultiplePanicGoroutines(t *testing.T) {
-	var wg syncx.WaitGroup
+// TestWaitGroupMultiplePanicGoroutines 测试多个 panic 的处理
+func TestWaitGroupMultiplePanicGoroutines(t *testing.T) {
+	wg := syncx.NewWaitGroup(true)
 
-	wg.GoTry(func() {
+	wg.Go(func() {
 		panic("Panic in goroutine 1")
 	})
 
-	wg.GoTry(func() {
+	wg.Go(func() {
 		panic("Panic in goroutine 2")
 	})
 
@@ -71,18 +71,57 @@ func TestMultiplePanicGoroutines(t *testing.T) {
 	assert.Contains(t, err.Error(), "发生了未知错误:", "Expected error message to contain '发生了未知错误:'")
 }
 
-// TestMaxConcurrency 测试最大并发限制
-func TestMaxConcurrency(t *testing.T) {
-	maxConcurrency := uint(2)
-	wg := syncx.NewWaitGroup(maxConcurrency)
+// TestWaitGroupMaxConcurrency 测试最大并发限制
+func TestWaitGroupMaxConcurrency(t *testing.T) {
+	wg := syncx.NewWaitGroup(false, 2)
 
 	// 启动超过最大并发数量的 goroutine
 	for i := 0; i < 5; i++ {
 		wg.Go(func() {
-			fmt.Println("TestMaxConcurrency")
+			fmt.Println("TestWaitGroupMaxConcurrency")
 		})
 	}
 
 	// 等待所有 goroutine 完成
 	wg.Wait()
+}
+
+// TestWaitGroupGetError 测试 GetError 方法
+func TestWaitGroupGetError(t *testing.T) {
+	wg := syncx.NewWaitGroup(false, 2)
+
+	// Simulate an error
+	wg.Go(func() {
+		wg.SetError(fmt.Errorf("test error"))
+	})
+
+	// Wait for goroutines to finish
+	wg.Wait()
+
+	// Check if GetError returns the expected error
+	err := wg.GetError()
+	assert.Error(t, err, "Expected an error from GetError()")
+	assert.EqualError(t, err, "test error", "Expected error message to match")
+}
+
+// TestWaitGroupGetChannelSize 测试 GetChannelSize 方法
+func TestWaitGroupGetChannelSize(t *testing.T) {
+	wg := syncx.NewWaitGroup(false, 3)
+
+	// Check initial channel size
+	assert.Equal(t, 0, wg.GetChannelSize(), "Expected initial channel size to be 0")
+
+	// Start a goroutine to fill the channel
+	wg.Go(func() {
+		fmt.Println("TestWaitGroupGetChannelSize")
+	})
+
+	// Check channel size after starting a goroutine
+	assert.Equal(t, 1, wg.GetChannelSize(), "Expected channel size to be 1 after starting one goroutine")
+
+	// Release the channel position
+	wg.Wait() // Wait for the goroutine to finish
+
+	// Check final channel size
+	assert.Equal(t, 0, wg.GetChannelSize(), "Expected channel size to be 0 after goroutine completes")
 }
