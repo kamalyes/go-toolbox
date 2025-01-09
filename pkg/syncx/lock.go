@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-13 13:05:03
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-01-08 15:15:59
+ * @LastEditTime: 2025-01-09 13:23:29
  * @FilePath: \go-toolbox\pkg\syncx\lock.go
  * @Description:
  *
@@ -36,6 +36,13 @@ func WithLockReturn[T any](lock Locker, operation func() (T, error)) (T, error) 
 	return operation()  // 执行操作并返回结果
 }
 
+// WithLockReturnValue 是一个支持返回值的函数，用于在给定的锁上执行操作，不返回错误
+func WithLockReturnValue[T any](lock Locker, operation func() T) T {
+	lock.Lock()         // 获取锁
+	defer lock.Unlock() // 确保在操作完成后释放锁
+	return operation()  // 执行操作并返回结果
+}
+
 // WithRLock 是一个用于在给定的读锁上执行操作的函数
 func WithRLock(lock RLocker, operation func()) {
 	lock.RLock()         // 获取读锁
@@ -45,6 +52,13 @@ func WithRLock(lock RLocker, operation func()) {
 
 // WithRLockReturn 是一个支持返回值的函数，用于在给定的读锁上执行操作
 func WithRLockReturn[T any](lock RLocker, operation func() (T, error)) (T, error) {
+	lock.RLock()         // 获取读锁
+	defer lock.RUnlock() // 确保在操作完成后释放读锁
+	return operation()   // 执行操作并返回结果
+}
+
+// WithRLockReturnValue 是一个支持返回值的函数，用于在给定的读锁上执行操作，不返回错误
+func WithRLockReturnValue[T any](lock RLocker, operation func() T) T {
 	lock.RLock()         // 获取读锁
 	defer lock.RUnlock() // 确保在操作完成后释放读锁
 	return operation()   // 执行操作并返回结果

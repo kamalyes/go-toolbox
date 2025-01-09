@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-01-09 13:57:00
+ * @LastEditTime: 2025-01-09 17:15:16
  * @FilePath: \go-toolbox\pkg\random\rand.go
  * @Description:
  *
@@ -51,10 +51,10 @@ func (r *rngSource) Uint64() (n uint64) {
 // NewRand goroutine-safe rand.Rand, optional seed value
 func NewRand(seed ...int64) *rand.Rand {
 	n := time.Now().UnixMicro()
+	n += atomic.AddInt64(&randCounter, 1)
 	if len(seed) > 0 {
 		n = seed[0]
 	}
-	n += atomic.AddInt64(&randCounter, 1)
 	src := &rngSource{
 		p: sync.Pool{
 			New: func() interface{} {
@@ -108,34 +108,23 @@ func RandFloat(min, max float64) (v float64) {
 	return min + NewRand().Float64()*(max-min)
 }
 
-// initASCII
-/**
- *  @Description: 初始化ASCII码列表
- */
+// initASCII 初始化ASCII码列表
 func initASCII() {
 	once.Do(func() {
-		// 大写字母
-		c := make([]int, 26)
-		for i := 0; i < 26; i++ {
-			c[i] = 65 + i
-		}
-		// 小写字母
-		matchCapital = &c
-		l := make([]int, 26)
-		for i := 0; i < 26; i++ {
-			l[i] = 97 + i
-		}
-		matchLowercase = &l
-		// 数字
-		n := make([]int, 10)
-		for i := 0; i < 10; i++ {
-			n[i] = 48 + i
-		}
-		matchNumber = &n
-		// 特殊字符(. @$!%*#_~?&^)
-		s := []int{46, 64, 36, 33, 37, 42, 35, 95, 126, 63, 38, 94}
-		matchSpecial = &s
+		matchCapital = createASCIIList(65, 90)                                 // 大写字母
+		matchLowercase = createASCIIList(97, 122)                              // 小写字母
+		matchNumber = createASCIIList(48, 57)                                  // 数字
+		matchSpecial = &[]int{46, 64, 36, 33, 37, 42, 35, 95, 126, 63, 38, 94} // 特殊字符 (. @$!%*#_~?&^)
 	})
+}
+
+// createASCIIList 创建指定范围的ASCII码列表
+func createASCIIList(start, end int) *[]int {
+	list := make([]int, end-start+1)
+	for i := start; i <= end; i++ {
+		list[i-start] = i
+	}
+	return &list
 }
 
 // RandString

@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-13 13:06:30
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-12-18 19:25:49
+ * @LastEditTime: 2025-01-09 13:25:35
  * @FilePath: \go-toolbox\tests\syncx_lock_test.go
  * @Description:
  *
@@ -42,6 +42,18 @@ func TestWithLock(t *testing.T) {
 	})
 
 	assert.Equal(t, 1, counter, "Expected counter to be 1")
+}
+
+// TestWithLockReturnValue 测试 WithLockReturnValue 函数
+func TestWithLockReturnValue(t *testing.T) {
+	lock := &MockLocker{}
+
+	// 使用 WithLockReturnValue 执行操作
+	result := syncx.WithLockReturnValue(lock, func() int {
+		return 42 // 返回一个结果
+	})
+
+	assert.Equal(t, 42, result, "Expected result to be 42")
 }
 
 // TestWithLockConcurrent 测试 WithLock 在并发情况下的表现
@@ -219,4 +231,16 @@ func TestWithRLockReturnConcurrent(t *testing.T) {
 	for i := 0; i < goroutines; i++ {
 		assert.Equal(t, i, results[i], "Expected result at index %d to be %d", i, i)
 	}
+}
+
+// TestWithRLockReturnValue 测试 WithRLockReturnValue 函数
+func TestWithRLockReturnValue(t *testing.T) {
+	lock := &MockRWLocker{}
+
+	// 使用 WithRLockReturnValue 执行操作
+	result := syncx.WithRLockReturnValue(lock, func() int {
+		return 42 // 返回一个结果
+	})
+
+	assert.Equal(t, 42, result, "Expected result to be 42")
 }

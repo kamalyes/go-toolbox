@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-01-09 19:15:01
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-01-09 11:28:05
+ * @LastEditTime: 2025-01-09 13:26:00
  * @FilePath: \go-toolbox\pkg\moment\timer.go
  * @Description:
  *
@@ -108,58 +108,47 @@ func (t *Timer) Finish() {
 
 // GetTraceId 获取计时器的跟踪Id
 func (t *Timer) GetTraceId() string {
-	var traceId string
-	syncx.WithRLock(&t.mu, func() {
-		traceId = t.traceId
+	return syncx.WithRLockReturnValue(&t.mu, func() string {
+		return t.traceId
 	})
-	return traceId
 }
 
 // GetStartTime 获取计时器开始时间
 func (t *Timer) GetStartTime() time.Time {
-	var startTime time.Time
-	syncx.WithRLock(&t.mu, func() {
-		startTime = t.startTime
+	return syncx.WithRLockReturnValue(&t.mu, func() time.Time {
+		return t.startTime
 	})
-	return startTime
 }
 
 // GetEndTime 获取计时器的结束时间
 func (t *Timer) GetEndTime() time.Time {
-	var endTime time.Time
-	syncx.WithRLock(&t.mu, func() {
-		endTime = t.endTime
+	return syncx.WithRLockReturnValue(&t.mu, func() time.Time {
+		return t.endTime
 	})
-	return endTime
 }
 
 // GetDuration 获取计时器的实际持续时间
 func (t *Timer) GetDuration() time.Duration {
-	var duration time.Duration
-	syncx.WithRLock(&t.mu, func() {
-		duration = t.duration
+	return syncx.WithRLockReturnValue(&t.mu, func() time.Duration {
+		return t.duration
 	})
-	return duration
 }
 
 // GetPauseDuration 获取计时器的暂停持续时间
 func (t *Timer) GetPauseDuration() time.Duration {
-	var pauseDuration time.Duration
-	syncx.WithRLock(&t.mu, func() {
-		pauseDuration = t.pauseDuration
+	return syncx.WithRLockReturnValue(&t.mu, func() time.Duration {
+		return t.pauseDuration
 	})
-	return pauseDuration
 }
 
 // GetPaused 获取计时器的暂停状态
 func (t *Timer) GetPaused() bool {
-	var paused bool
-	syncx.WithRLock(&t.mu, func() {
-		paused = t.paused
+	return syncx.WithRLockReturnValue(&t.mu, func() bool {
+		return t.paused
 	})
-	return paused
 }
 
+// PrintLog 打印计时器的日志
 func (t *Timer) PrintLog() {
 	syncx.WithRLock(&t.mu, func() {
 		fmt.Printf("Trace ID: %s, Duration Run Time: %v\n", t.traceId, t.GetDuration())
