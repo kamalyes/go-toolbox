@@ -22,7 +22,7 @@ import (
 // 基准测试：并发设置值
 func BenchmarkConcurrentSet(b *testing.B) {
 	parentCtx := context.Background()
-	customCtx := contextx.NewCustomContext(parentCtx, nil)
+	customCtx := contextx.NewContext(parentCtx, nil)
 
 	// 使用 RunParallel 进行并发基准测试
 	b.RunParallel(func(pb *testing.PB) {
@@ -38,7 +38,7 @@ func BenchmarkConcurrentSet(b *testing.B) {
 // 基准测试：并发获取值
 func BenchmarkConcurrentGetValue(b *testing.B) {
 	parentCtx := context.Background()
-	customCtx := contextx.NewCustomContext(parentCtx, nil)
+	customCtx := contextx.NewContext(parentCtx, nil)
 
 	// 预先填充一些值到上下文中
 	const numValues = 100
@@ -67,7 +67,7 @@ func BenchmarkConcurrentGetValue(b *testing.B) {
 // 基准测试：并发删除键
 func BenchmarkConcurrentDeleteKey(b *testing.B) {
 	parentCtx := context.Background()
-	customCtx := contextx.NewCustomContext(parentCtx, nil)
+	customCtx := contextx.NewContext(parentCtx, nil)
 
 	// 预先填充一些值到上下文中
 	const numValues = 100
