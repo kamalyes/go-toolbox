@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-01-09 12:01:15
+ * @LastEditTime: 2025-01-09 13:57:00
  * @FilePath: \go-toolbox\pkg\random\rand.go
  * @Description:
  *
@@ -18,6 +18,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/kamalyes/go-toolbox/pkg/convert"
@@ -49,10 +50,11 @@ func (r *rngSource) Uint64() (n uint64) {
 
 // NewRand goroutine-safe rand.Rand, optional seed value
 func NewRand(seed ...int64) *rand.Rand {
-	n := time.Now().UnixNano()
+	n := time.Now().UnixMicro()
 	if len(seed) > 0 {
 		n = seed[0]
 	}
+	n += atomic.AddInt64(&randCounter, 1)
 	src := &rngSource{
 		p: sync.Pool{
 			New: func() interface{} {
@@ -75,7 +77,7 @@ var (
 
 	once sync.Once
 
-	newRandSend = NewRand()
+	randCounter int64
 )
 
 // RandInt
@@ -92,7 +94,7 @@ func RandInt(min, max int) (v int) {
 	if max < min {
 		min, max = max, min
 	}
-	return newRandSend.Intn(max-min) + min
+	return NewRand().Intn(max-min) + min
 }
 
 // RandFloat
@@ -103,7 +105,7 @@ func RandInt(min, max int) (v int) {
  *  @return v
  */
 func RandFloat(min, max float64) (v float64) {
-	return min + newRandSend.Float64()*(max-min)
+	return min + NewRand().Float64()*(max-min)
 }
 
 // initASCII
@@ -165,7 +167,7 @@ func RandString(n int, mode RandType) (str string) {
 		return
 	}
 	for i := 0; i < n; i++ {
-		build.WriteString(string(rune(ascii[newRandSend.Intn(len(ascii))])))
+		build.WriteString(string(rune(ascii[NewRand().Intn(len(ascii))])))
 	}
 	str = build.String()
 	return
@@ -202,7 +204,7 @@ func RandNumber(length int, customBytes ...string) string {
 	}
 	if length > 0 {
 		for i := 0; i < length; i++ {
-			sb.WriteString(string(randBytes[newRandSend.Intn(len(randBytes))]))
+			sb.WriteString(string(randBytes[NewRand().Intn(len(randBytes))]))
 		}
 	}
 	return sb.String()
@@ -216,7 +218,7 @@ func RandHex(bytesLen int, customBytes ...string) string {
 		randBytes = customBytes[0]
 	}
 	for i := 0; i < bytesLen<<1; i++ {
-		sb.WriteString(string(randBytes[newRandSend.Intn(len(randBytes))]))
+		sb.WriteString(string(randBytes[NewRand().Intn(len(randBytes))]))
 	}
 	return sb.String()
 }
@@ -253,7 +255,7 @@ func FastIntn(n int) int {
 	if n <= math.MaxUint32 {
 		return int(FastRandn(uint32(n)))
 	}
-	return int(newRandSend.Int63n(int64(n)))
+	return int(NewRand().Int63n(int64(n)))
 }
 
 // FRandString a random string, which may contain uppercase letters, lowercase letters and numbers.
