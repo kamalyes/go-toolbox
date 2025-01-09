@@ -72,43 +72,12 @@ type MockRWLocker struct {
 	mu sync.RWMutex
 }
 
-func (l *MockRWLocker) Lock() {
-	l.mu.Lock()
-}
-
-func (l *MockRWLocker) Unlock() {
-	l.mu.Unlock()
-}
-
 func (l *MockRWLocker) RLock() {
 	l.mu.RLock()
 }
 
 func (l *MockRWLocker) RUnlock() {
 	l.mu.RUnlock()
-}
-
-// TestWithRLock 测试 WithLock 函数在 RWMutex 下的表现
-func TestWithRLock(t *testing.T) {
-	counter := 0
-	lock := &MockRWLocker{}
-	const goroutines = 100
-
-	var wg sync.WaitGroup
-	wg.Add(goroutines)
-
-	for i := 0; i < goroutines; i++ {
-		go func() {
-			defer wg.Done()
-			syncx.WithLock(lock, func() {
-				counter++
-			})
-		}()
-	}
-
-	wg.Wait()
-
-	assert.Equal(t, goroutines, counter, "Expected counter to be %d", goroutines)
 }
 
 // TestWithLockReturn 测试 WithLockReturn 函数
@@ -182,6 +151,61 @@ func TestWithLockReturnConcurrent(t *testing.T) {
 		go func(index int) {
 			defer wg.Done()
 			result, err := syncx.WithLockReturn(lock, func() (int, error) {
+				return index, nil // 返回当前索引
+			})
+			assert.NoError(t, err, "Expected no error")
+			results[index] = result
+		}(i)
+	}
+
+	wg.Wait()
+
+	// 确保每个索引都有对应的结果
+	for i := 0; i < goroutines; i++ {
+		assert.Equal(t, i, results[i], "Expected result at index %d to be %d", i, i)
+	}
+}
+
+// TestWithRLock 测试 WithRLock 函数
+func TestWithRLock(t *testing.T) {
+	counter := 0
+	lock := &MockRWLocker{}
+
+	// 使用 WithRLock 执行操作
+	syncx.WithRLock(lock, func() {
+		counter++
+	})
+
+	assert.Equal(t, 1, counter, "Expected counter to be 1")
+}
+
+// TestWithRLockReturn 测试 WithRLockReturn 函数
+func TestWithRLockReturn(t *testing.T) {
+	lock := &MockRWLocker{}
+
+	// 使用 WithRLockReturn 执行操作
+	result, err := syncx.WithRLockReturn(lock, func() (int, error) {
+		return 42, nil // 返回一个结果
+	})
+
+	assert.NoError(t, err, "Expected no error")
+	assert.Equal(t, 42, result, "Expected result to be 42")
+}
+
+// TestWithRLockReturnConcurrent 测试 WithRLockReturn 在并发情况下的表现
+func TestWithRLockReturnConcurrent(t *testing.T) {
+	lock := &MockRWLocker{}
+	const goroutines = 100
+
+	var wg sync.WaitGroup
+	results := make([]int, goroutines)
+
+	wg.Add(goroutines)
+
+	for i := 0; i < goroutines; i++ {
+		go func(index int) {
+			defer wg.Done()
+			result, err := syncx.WithRLockReturn(lock, func() (int, error) {
 				return index, nil // 返回当前索引
 			})
 			assert.NoError(t, err, "Expected no error")

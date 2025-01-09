@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-17 01:10:01
+ * @LastEditTime: 2025-01-09 12:01:15
  * @FilePath: \go-toolbox\pkg\random\rand.go
  * @Description:
  *
@@ -64,8 +64,6 @@ func NewRand(seed ...int64) *rand.Rand {
 }
 
 var (
-	// 设置随机种子
-	mathRandSend = rand.New(rand.NewSource(time.Now().Unix()))
 	// 大写字母
 	matchCapital *[]int
 	// 小写字母
@@ -94,7 +92,7 @@ func RandInt(min, max int) (v int) {
 	if max < min {
 		min, max = max, min
 	}
-	return mathRandSend.Intn(max-min) + min
+	return newRandSend.Intn(max-min) + min
 }
 
 // RandFloat
@@ -105,7 +103,7 @@ func RandInt(min, max int) (v int) {
  *  @return v
  */
 func RandFloat(min, max float64) (v float64) {
-	return min + mathRandSend.Float64()*(max-min)
+	return min + newRandSend.Float64()*(max-min)
 }
 
 // initASCII
@@ -147,7 +145,10 @@ func initASCII() {
  */
 func RandString(n int, mode RandType) (str string) {
 	initASCII()
-	var ascii []int
+	var (
+		build strings.Builder
+		ascii []int
+	)
 	if mode&CAPITAL >= CAPITAL {
 		ascii = append(ascii, *matchCapital...)
 	}
@@ -163,9 +164,8 @@ func RandString(n int, mode RandType) (str string) {
 	if len(ascii) == 0 {
 		return
 	}
-	var build strings.Builder
 	for i := 0; i < n; i++ {
-		build.WriteString(string(rune(ascii[mathRandSend.Intn(len(ascii))])))
+		build.WriteString(string(rune(ascii[newRandSend.Intn(len(ascii))])))
 	}
 	str = build.String()
 	return
@@ -202,7 +202,7 @@ func RandNumber(length int, customBytes ...string) string {
 	}
 	if length > 0 {
 		for i := 0; i < length; i++ {
-			sb.WriteString(string(randBytes[rand.New(rand.NewSource(time.Now().UnixNano())).Intn(len(randBytes))]))
+			sb.WriteString(string(randBytes[newRandSend.Intn(len(randBytes))]))
 		}
 	}
 	return sb.String()
@@ -216,7 +216,7 @@ func RandHex(bytesLen int, customBytes ...string) string {
 		randBytes = customBytes[0]
 	}
 	for i := 0; i < bytesLen<<1; i++ {
-		sb.WriteString(string(randBytes[rand.New(rand.NewSource(time.Now().UnixNano())).Intn(len(randBytes))]))
+		sb.WriteString(string(randBytes[newRandSend.Intn(len(randBytes))]))
 	}
 	return sb.String()
 }

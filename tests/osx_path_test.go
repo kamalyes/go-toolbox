@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-13 18:59:53
+ * @LastEditTime: 2025-01-09 11:52:49
  * @FilePath: \go-toolbox\tests\osx_path_test.go
  * @Description:
  *
@@ -194,10 +194,4 @@ func setup() {
 // 在测试之后清理创建的文件
 func teardown() {
 	os.RemoveAll(osxTestRootPath)
-}
-
-// TestMain 用于在测试运行前后执行 setup 和 teardown
-func TestMain(m *testing.M) {
-	code := m.Run()
-	os.Exit(code)
 }

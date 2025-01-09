@@ -113,3 +113,34 @@ func TestConvertCase(t *testing.T) {
 		assert.Equal(t, test.expected, result, fmt.Sprintf("ConvertCase(%q, %v) = %q; want %q", test.input, test.style, result, test.expected))
 	}
 }
+
+func TestToInt(t *testing.T) {
+	// 定义测试用例
+	tests := []struct {
+		input    string // 输入字符串
+		expected int    // 预期输出
+		err      bool   // 预期错误
+	}{
+		{" 123 ", 123, false}, // 测试正常的正整数
+		{"-456", -456, false}, // 测试负整数
+		{"0", 0, false},       // 测试零
+		{"abc", 0, true},      // 测试非数字输入
+		{"", 0, true},         // 测试空字符串
+		{"   ", 0, true},      // 测试仅有空白的字符串
+	}
+
+	// 遍历每个测试用例
+	for _, test := range tests {
+		result, err := stringx.ToInt(test.input) // 调用 ToInt 函数
+
+		// 使用断言检查错误
+		if test.err {
+			assert.Error(t, err, "输入: %q 期望错误: %v", test.input, test.err)
+		} else {
+			assert.NoError(t, err, "输入: %q 不应返回错误", test.input)
+		}
+
+		// 使用断言检查返回值
+		assert.Equal(t, test.expected, result, "输入: %q 返回值不匹配", test.input)
+	}
+}

@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-22 13:02:50
+ * @LastEditTime: 2025-01-08 18:18:33
  * @FilePath: \go-toolbox\pkg\stringx\base.go
  * @Description:
  *
@@ -14,6 +14,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"reflect"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -367,4 +368,8 @@ func toStudlyCase(s string) string {
 func toCamelCase(s string) string {
 	studly := toStudlyCase(s)                                    // 首先转换为 Studly Case
 	return string(unicode.ToLower(rune(studly[0]))) + studly[1:] // 将首字母转换为小写
+}
+
+func ToInt(s string) (int, error) {
+	return strconv.Atoi(Trim(s))
 }

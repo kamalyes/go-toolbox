@@ -279,3 +279,12 @@ func StringSliceToFloatSlice[T types.Float](input []string, mode RoundMode) ([]T
 
 	return result, nil
 }
+
+// StringSliceToInterfaceSlice 将 []string 转换为 []interface{}
+func StringSliceToInterfaceSlice(slice []string) []interface{} {
+	interfaceSlice := make([]interface{}, len(slice))
+	for i, v := range slice {
+		interfaceSlice[i] = v
+	}
+	return interfaceSlice
+}
