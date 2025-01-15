@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 10:50:50
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-11 15:15:07
+ * @LastEditTime: 2025-01-15 11:55:15
  * @FilePath: \go-toolbox\tests\syncx_map_test.go
  * @Description:
  *
@@ -12,7 +12,9 @@ package tests
 
 import (
 	"sort"
+	"strconv"
 	"testing"
+	"time"
 
 	"github.com/kamalyes/go-toolbox/pkg/syncx"
 	"github.com/stretchr/testify/assert"
@@ -101,6 +103,117 @@ func TestMap(t *testing.T) {
 	if size := m.Size(); size != 0 {
 		t.Errorf("Expected size 0 after clear, got %d", size)
 	}
+}
+
+func TestMap_Swap(t *testing.T) {
+	m := syncx.NewMap[string, int]()
+
+	// 测试 Swap 时键不存在
+	pre, ok := m.Swap("key1", 10)
+	assert.Equal(t, 0, pre, "expected pre to be 0 for non-existing key")
+	assert.False(t, ok, "expected ok to be false for non-existing key")
+
+	// 存储一个值
+	m.Store("key1", 5)
+
+	// 测试 Swap 时键存在
+	pre, ok = m.Swap("key1", 10)
+	assert.Equal(t, 5, pre, "expected pre to be 5 for existing key")
+	assert.True(t, ok, "expected ok to be true for existing key")
+
+	// 确认值已被替换
+	val, ok := m.Load("key1")
+	assert.True(t, ok, "expected key1 to exist")
+	assert.Equal(t, 10, val, "expected value to be 10 after swap")
+}
+
+func TestMap_Clear(t *testing.T) {
+	m := syncx.NewMap[string, int]()
+	m.Store("key1", 1)
+	m.Store("key2", 2)
+
+	// 清空 Map
+	m.Clear()
+
+	// 验证 Map 为空
+	if size := m.Size(); size != 0 {
+		t.Errorf("Expected size 0 after clear, got %d", size)
+	}
+
+	// 验证 Load 方法返回值
+	_, ok := m.Load("key1")
+	assert.False(t, ok, "expected key1 to be deleted after clear")
+	_, ok = m.Load("key2")
+	assert.False(t, ok, "expected key2 to be deleted after clear")
+}
+
+func TestMap_LoadAndDelete(t *testing.T) {
+	m := syncx.NewMap[string, int]()
+	m.Store("key1", 1)
+
+	// 测试 LoadAndDelete
+	val, ok := m.LoadAndDelete("key1")
+	assert.True(t, ok, "expected key1 to exist")
+	assert.Equal(t, 1, val, "expected value to be 1")
+
+	// 再次尝试加载已删除的键
+	_, ok = m.Load("key1")
+	assert.False(t, ok, "expected key1 to be deleted")
+}
+
+func TestMap_Equals(t *testing.T) {
+	m := syncx.NewMap[string, int]()
+	m.Store("key1", 1)
+
+	// 测试存在的键
+	isEqual := func(existing int) bool {
+		return existing == 1
+	}
+	assert.True(t, m.Equals("key1", 1, isEqual), "expected key1 to be equal to 1")
+
+	// 测试不存在的键
+	assert.False(t, m.Equals("key2", 1, isEqual), "expected key2 to not exist")
+
+	// 测试不同的比较函数
+	isEqualDifferent := func(existing int) bool {
+		return existing == 2
+	}
+	assert.False(t, m.Equals("key1", 1, isEqualDifferent), "expected key1 to not be equal to 2")
+}
+
+func TestMap_Size_Concurrent(t *testing.T) {
+	m := syncx.NewMap[string, int]()
+
+	// 启动多个 goroutine 来并发存储值
+	for i := 0; i < 100; i++ {
+		go func(i int) {
+			m.Store("key"+strconv.Itoa(i), i) // 使用 strconv.Itoa 将整数转换为字符串
+		}(i)
+	}
+
+	// 等待所有 goroutine 完成（可以使用 sync.WaitGroup 更好地管理）
+	// 这里简单使用 Sleep 来确保所有操作完成
+	time.Sleep(1 * time.Second)
+
+	// 验证 Size
+	if size := m.Size(); size != 100 {
+		t.Errorf("Expected size 100, got %d", size)
+	}
+}
+
+func TestMap_KeysAndValues(t *testing.T) {
+	m := syncx.NewMap[string, int]()
+	m.Store("key1", 1)
+	m.Store("key2", 2)
+	m.Store("key3", 3)
+
+	// 测试 Keys
+	keys := m.Keys()
+	assert.ElementsMatch(t, []string{"key1", "key2", "key3"}, keys, "expected keys to match")
+
+	// 测试 Values
+	values := m.Values()
+	assert.ElementsMatch(t, []int{1, 2, 3}, values, "expected values to match")
 }
 
 func TestCopyMetaWithExistingKeys(t *testing.T) {

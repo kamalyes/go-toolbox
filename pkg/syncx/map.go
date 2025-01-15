@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-01-15 10:59:16
+ * @LastEditTime: 2025-01-15 11:55:06
  * @FilePath: \go-toolbox\pkg\syncx\map.go
  * @Description:
  *
@@ -128,8 +128,19 @@ func (m *Map[K, V]) Store(key K, value V) {
 
 // Swap 替换指定键的值，并返回之前的值。
 func (m *Map[K, V]) Swap(key K, value V) (pre V, ok bool) {
-	previous, ok := m.mp.Swap(key, value) // 调用 sync.Map 的 Swap 方法
-	return m.loadValue(previous, ok)      // 使用辅助函数处理返回值
+	// 尝试加载当前值
+	previous, loaded := m.mp.Load(key)
+	if loaded {
+		// 如果加载成功，先删除当前键
+		m.mp.Delete(key)
+		// 然后存储新值
+		m.mp.Store(key, value)
+		// 返回之前的值
+		return m.loadValue(previous, true)
+	}
+	// 如果键不存在，直接存储新值
+	m.mp.Store(key, value)
+	return zeroValue[V](), false // 返回零值和 false
 }
 
 // loadValue 处理从 sync.Map 加载的值，返回类型 V 和成功标志
