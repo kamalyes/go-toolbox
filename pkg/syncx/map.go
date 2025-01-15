@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-11 13:08:58
+ * @LastEditTime: 2025-01-15 10:59:16
  * @FilePath: \go-toolbox\pkg\syncx\map.go
  * @Description:
  *
@@ -18,23 +18,39 @@ import (
 )
 
 // Map 是一个线程安全的映射，使用泛型 K 和 V。
-type Map[K comparable, V any] struct {
+type Map[K comparable, V comparable] struct { // 确保 V 是可比较的
 	mp sync.Map // 使用 sync.Map 来实现线程安全
 }
 
 // NewMap 创建一个新的 Map 实例。
-func NewMap[K comparable, V any]() *Map[K, V] {
+func NewMap[K comparable, V comparable]() *Map[K, V] {
 	return &Map[K, V]{} // 返回一个新的 Map 实例
 }
 
 // CompareAndDelete 比较指定键的值，如果相等则删除该键的值。
 func (m *Map[K, V]) CompareAndDelete(key K, value V) bool {
-	return m.mp.CompareAndDelete(key, value) // 调用 sync.Map 的 CompareAndDelete 方法
+	actual, loaded := m.mp.Load(key)
+	if !loaded {
+		return false
+	}
+	if actualValue, ok := actual.(V); ok && actualValue == value {
+		m.mp.Delete(key)
+		return true
+	}
+	return false
 }
 
 // CompareAndSwap 比较指定键的现有值，如果相等则将其替换为新值。
 func (m *Map[K, V]) CompareAndSwap(key K, old, new V) bool {
-	return m.mp.CompareAndSwap(key, old, new) // 调用 sync.Map 的 CompareAndSwap 方法
+	actual, loaded := m.mp.Load(key)
+	if !loaded {
+		return false
+	}
+	if actualValue, ok := actual.(V); ok && actualValue == old {
+		m.mp.Store(key, new)
+		return true
+	}
+	return false
 }
 
 // Delete 删除指定键的值。
