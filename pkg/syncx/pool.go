@@ -2,13 +2,13 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-10-24 11:25:16
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-08 13:18:55
- * @FilePath: \go-toolbox\pkg\osx\pool.go
+ * @LastEditTime: 2025-01-17 13:03:15
+ * @FilePath: \go-toolbox\pkg\syncx\pool.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package osx
+package syncx
 
 import (
 	"math"

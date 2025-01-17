@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-08 11:11:26
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-01-09 16:51:18
+ * @LastEditTime: 2025-01-17 15:07:01
  * @FilePath: \go-toolbox\tests\contextx_test.go
  * @Description:
  *
@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/kamalyes/go-toolbox/pkg/contextx"
-	"github.com/kamalyes/go-toolbox/pkg/osx"
+	"github.com/kamalyes/go-toolbox/pkg/syncx"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,7 +30,7 @@ func TestNewContext(t *testing.T) {
 
 	// 创建一个基础上下文
 	parentWithCtx := context.Background()
-	customPool := osx.NewLimitedPool(32, 1024)
+	customPool := syncx.NewLimitedPool(32, 1024)
 
 	// 测试 NewContextWithValue
 	customCtx, err := contextx.NewContextWithValue(parentWithCtx, "key1", "value1", customPool)

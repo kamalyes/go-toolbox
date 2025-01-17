@@ -3,7 +3,7 @@
  * @Date: 2024-11-08 11:25:16
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2024-11-08 15:01:18
- * @FilePath: \go-toolbox\tests\osx_pool_test.go
+ * @FilePath: \go-toolbox\tests\syncx_pool_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
@@ -14,13 +14,13 @@ package tests
 import (
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/osx"
+	"github.com/kamalyes/go-toolbox/pkg/syncx"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestLimitedPool(t *testing.T) {
 	// 创建一个 LimitedPool，最小大小为 16，最大大小为 64
-	pool := osx.NewLimitedPool(16, 64)
+	pool := syncx.NewLimitedPool(16, 64)
 
 	// 测试获取和释放字节切片
 	t.Run("TestGetAndPut", func(t *testing.T) {

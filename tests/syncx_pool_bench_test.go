@@ -3,7 +3,7 @@
  * @Date: 2024-11-08 11:25:16
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2024-11-08 13:32:15
- * @FilePath: \go-toolbox\tests\osx_pool_bench_test.go
+ * @FilePath: \go-toolbox\tests\syncx_pool_bench_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
@@ -14,13 +14,13 @@ package tests
 import (
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/osx"
+	"github.com/kamalyes/go-toolbox/pkg/syncx"
 )
 
 // BenchmarkLimitedPool 测试 LimitedPool 的性能
 func BenchmarkLimitedPool(b *testing.B) {
 	const numAllocations = 100000
-	pool := osx.NewLimitedPool(32, 1024) // 初始化池，最小32字节，最大1024字节
+	pool := syncx.NewLimitedPool(32, 1024) // 初始化池，最小32字节，最大1024字节
 
 	b.ResetTimer() // 重置计时器，确保不包括初始化时间
 

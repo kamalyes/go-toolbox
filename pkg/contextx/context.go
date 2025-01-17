@@ -17,7 +17,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kamalyes/go-toolbox/pkg/osx"
 	"github.com/kamalyes/go-toolbox/pkg/syncx"
 )
 
@@ -27,13 +26,13 @@ type Context struct {
 	values map[interface{}]interface{}
 	context.Context
 	cancelFunc context.CancelFunc // 添加取消函数
-	pool       *osx.LimitedPool   // 引入字节切片池
+	pool       *syncx.LimitedPool // 引入字节切片池
 }
 
 // NewContext 创建一个新的 Context，允许用户传入自定义的字节切片池
-func NewContext(parent context.Context, pool *osx.LimitedPool) *Context {
+func NewContext(parent context.Context, pool *syncx.LimitedPool) *Context {
 	if pool == nil {
-		pool = osx.NewLimitedPool(32, 1024)
+		pool = syncx.NewLimitedPool(32, 1024)
 	}
 	return &Context{
 		values:  make(map[interface{}]interface{}),
@@ -43,7 +42,7 @@ func NewContext(parent context.Context, pool *osx.LimitedPool) *Context {
 }
 
 // NewContextWithTimeout 创建一个带有超时的 Context
-func NewContextWithTimeout(parent context.Context, timeout time.Duration, pool *osx.LimitedPool) *Context {
+func NewContextWithTimeout(parent context.Context, timeout time.Duration, pool *syncx.LimitedPool) *Context {
 	ctx, cancel := context.WithTimeout(parent, timeout)
 	return &Context{
 		values:     make(map[interface{}]interface{}),
@@ -54,7 +53,7 @@ func NewContextWithTimeout(parent context.Context, timeout time.Duration, pool *
 }
 
 // NewContextWithCancel 创建一个可以手动取消的 Context
-func NewContextWithCancel(parent context.Context, pool *osx.LimitedPool) *Context {
+func NewContextWithCancel(parent context.Context, pool *syncx.LimitedPool) *Context {
 	ctx, cancel := context.WithCancel(parent)
 	return &Context{
 		values:     make(map[interface{}]interface{}),
@@ -65,7 +64,7 @@ func NewContextWithCancel(parent context.Context, pool *osx.LimitedPool) *Contex
 }
 
 // NewContextWithValue 在父上下文中设置值并返回新的 Context
-func NewContextWithValue(parent context.Context, key, val interface{}, pool *osx.LimitedPool) (*Context, error) {
+func NewContextWithValue(parent context.Context, key, val interface{}, pool *syncx.LimitedPool) (*Context, error) {
 	customCtx := NewContext(parent, pool)
 	if err := customCtx.Set(key, val); err != nil {
 		return nil, err
