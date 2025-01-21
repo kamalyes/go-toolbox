@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-13 23:32:32
+ * @LastEditTime: 2025-01-21 19:15:15
  * @FilePath: \go-toolbox\tests\mathx_number_test.go
  * @Description:
  *
@@ -73,6 +73,101 @@ func TestMathxAtMost(t *testing.T) {
 		result := mathx.AtMost(tt.x, tt.upper)
 		assert.Equal(tt.expected, result)
 	}
+}
+
+// 自定义类型
+type IFType struct {
+	Value string
+}
+
+// 测试 IF 函数的字符串类型
+func TestIFString(t *testing.T) {
+	assert.Equal(t, "Hello", mathx.IF(true, "Hello", "World"))
+	assert.Equal(t, "World", mathx.IF(false, "Hello", "World"))
+}
+
+// 测试 IF 函数的整数类型
+func TestIFInt(t *testing.T) {
+	assert.Equal(t, 10, mathx.IF(true, 10, 20))
+	assert.Equal(t, 20, mathx.IF(false, 10, 20))
+}
+
+// 测试 IF 函数的布尔类型
+func TestIFBool(t *testing.T) {
+	assert.Equal(t, true, mathx.IF(true, true, false))
+	assert.Equal(t, false, mathx.IF(false, true, false))
+}
+
+// 测试 IF 函数的浮点数类型
+func TestIFFloat(t *testing.T) {
+	assert.Equal(t, 3.14, mathx.IF(true, 3.14, 2.71))
+	assert.Equal(t, 2.71, mathx.IF(false, 3.14, 2.71))
+}
+
+// 测试 If 函数的自定义类型
+func TestIfIFType(t *testing.T) {
+	assert.Equal(t, IFType{Value: "Hello"}, mathx.IF(true, IFType{Value: "Hello"}, IFType{Value: "World"}))
+	assert.Equal(t, IFType{Value: "World"}, mathx.IF(false, IFType{Value: "Hello"}, IFType{Value: "World"}))
+}
+
+// 测试 IfDo 函数的字符串类型
+func TestIfDoString(t *testing.T) {
+	assert.Equal(t, "Hello", mathx.IfDo(true, func() string { return "Hello" }, "World"))
+	assert.Equal(t, "World", mathx.IfDo(false, func() string { return "Hello" }, "World"))
+}
+
+// 测试 IfDo 函数的整数类型
+func TestIfDoInt(t *testing.T) {
+	assert.Equal(t, 100, mathx.IfDo(true, func() int { return 100 }, 0))
+	assert.Equal(t, 0, mathx.IfDo(false, func() int { return 100 }, 0))
+}
+
+// 测试 IfDo 函数的布尔类型
+func TestIfDoBool(t *testing.T) {
+	assert.Equal(t, true, mathx.IfDo(true, func() bool { return true }, false))
+	assert.Equal(t, false, mathx.IfDo(false, func() bool { return true }, false))
+}
+
+// 测试 IfDo 函数的浮点数类型
+func TestIfDoFloat(t *testing.T) {
+	assert.Equal(t, 3.14, mathx.IfDo(true, func() float64 { return 3.14 }, 2.71))
+	assert.Equal(t, 2.71, mathx.IfDo(false, func() float64 { return 3.14 }, 2.71))
+}
+
+// 测试 IfDo 函数的自定义类型
+func TestIfDoIFType(t *testing.T) {
+	assert.Equal(t, IFType{Value: "Hello"}, mathx.IfDo(true, func() IFType { return IFType{Value: "Hello"} }, IFType{Value: "World"}))
+	assert.Equal(t, IFType{Value: "World"}, mathx.IfDo(false, func() IFType { return IFType{Value: "Hello"} }, IFType{Value: "World"}))
+}
+
+// 测试 IfDoAF 函数的字符串类型
+func TestIfDoAFString(t *testing.T) {
+	assert.Equal(t, "Hello", mathx.IfDoAF(true, func() string { return "Hello" }, func() string { return "World" }))
+	assert.Equal(t, "World", mathx.IfDoAF(false, func() string { return "Hello" }, func() string { return "World" }))
+}
+
+// 测试 IfDoAF 函数的整数类型
+func TestIfDoAFInt(t *testing.T) {
+	assert.Equal(t, 100, mathx.IfDoAF(true, func() int { return 100 }, func() int { return 0 }))
+	assert.Equal(t, 0, mathx.IfDoAF(false, func() int { return 100 }, func() int { return 0 }))
+}
+
+// 测试 IfDoAF 函数的布尔类型
+func TestIfDoAFBool(t *testing.T) {
+	assert.Equal(t, true, mathx.IfDoAF(true, func() bool { return true }, func() bool { return false }))
+	assert.Equal(t, false, mathx.IfDoAF(false, func() bool { return true }, func() bool { return false }))
+}
+
+// 测试 IfDoAF 函数的浮点数类型
+func TestIfDoAFFloat(t *testing.T) {
+	assert.Equal(t, 3.14, mathx.IfDoAF(true, func() float64 { return 3.14 }, func() float64 { return 2.71 }))
+	assert.Equal(t, 2.71, mathx.IfDoAF(false, func() float64 { return 3.14 }, func() float64 { return 2.71 }))
+}
+
+// 测试 IfDoAF 函数的自定义类型
+func TestIfDoAFIFType(t *testing.T) {
+	assert.Equal(t, IFType{Value: "Hello"}, mathx.IfDoAF(true, func() IFType { return IFType{Value: "Hello"} }, func() IFType { return IFType{Value: "World"} }))
+	assert.Equal(t, IFType{Value: "World"}, mathx.IfDoAF(false, func() IFType { return IFType{Value: "Hello"} }, func() IFType { return IFType{Value: "World"} }))
 }
 
 func TestMathxBetween(t *testing.T) {

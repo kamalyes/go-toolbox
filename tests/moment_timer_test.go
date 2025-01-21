@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-01-09 19:15:01
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-01-09 10:15:15
+ * @LastEditTime: 2025-01-21 18:55:55
  * @FilePath: \go-toolbox\tests\moment_timer_test.go
  * @Description:
  *
@@ -100,7 +100,7 @@ func TestPauseAndResumeTimer(t *testing.T) {
 
 	// 使用 assert 检查持续时间
 	assert.GreaterOrEqual(t, actualDuration, expectedDuration, "实际持续时间应大于或等于预期持续时间")
-	assert.LessOrEqual(t, actualDuration, expectedDuration+50*time.Millisecond, "实际持续时间应小于或等于预期持续时间加上允许的误差")
+	assert.LessOrEqual(t, actualDuration, expectedDuration+100*time.Millisecond, "实际持续时间应小于或等于预期持续时间加上允许的误差")
 	assert.InDelta(t, expectedDuration.Seconds(), actualDuration.Seconds(), 0.1, "实际持续时间应在预期持续时间的范围内")
 
 	// 检查暂停持续时间

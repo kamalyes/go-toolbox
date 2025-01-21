@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-13 23:20:55
+ * @LastEditTime: 2025-01-21 19:15:15
  * @FilePath: \go-toolbox\pkg\mathx\number.go
  * @Description:
  *
@@ -54,6 +54,30 @@ func AtMost[T types.Numerical](x, upper T) T {
 		return upper
 	}
 	return x
+}
+
+// IF 函数实现三元运算，使用泛型 T
+func IF[T any](condition bool, trueVal, falseVal T) T {
+	if condition {
+		return trueVal
+	}
+	return falseVal
+}
+
+// DoFunc 是一个函数类型，用于执行返回泛型 T 的函数
+type DoFunc[T any] func() T
+
+// IfDo 函数，执行 do 函数并返回对应泛型结果
+func IfDo[T any](condition bool, do DoFunc[T], defaultVal T) T {
+	if condition {
+		return do() // 执行函数并返回结果
+	}
+	return defaultVal // 返回默认值
+}
+
+// IfDoAF 函数，执行 do 函数以及 defaultFunc 函数 并返回对应泛型结果
+func IfDoAF[T any](condition bool, do DoFunc[T], defaultFunc DoFunc[T]) T {
+	return IfDo(condition, do, defaultFunc()) // 使用 IfDo 函数
 }
 
 // Between 将 x 的值限制在 [lower, upper] 范围内。
