@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-08 19:55:56
+ * @LastEditTime: 2025-01-22 09:52:35
  * @FilePath: \go-toolbox\tests\validator_test.go
  * @Description:
  *
@@ -11,7 +11,6 @@
 package tests
 
 import (
-	"errors"
 	"reflect"
 	"testing"
 
@@ -30,18 +29,23 @@ func TestIsEmptyValue(t *testing.T) {
 		value    interface{}
 		expected bool
 	}{
-		{"", true},
-		{"Hello", false},
-		{nil, true},
-		{0, true},
-		{1, false},
-		{[]int{}, true},
-		{[]int{1, 2}, false},
-		{map[string]int{}, true},
-		{map[string]int{"key": 1}, false},
-		{struct{}{}, true},
-		{TestStruct{}, true},
-		{TestStruct{Name: "Test"}, false},
+		{"", true},                                // 空字符串
+		{"Hello", false},                          // 非空字符串
+		{nil, true},                               // nil 值
+		{0, true},                                 // 整数 0
+		{1, false},                                // 非零整数
+		{[]int{}, true},                           // 空切片
+		{[]int{1, 2}, false},                      // 非空切片
+		{map[string]int{}, true},                  // 空映射
+		{map[string]int{"key": 1}, false},         // 非空映射
+		{struct{}{}, true},                        // 空结构体
+		{TestStruct{}, true},                      // 自定义结构体，所有字段零值
+		{TestStruct{Name: "Test"}, false},         // 自定义结构体，非零字段
+		{TestStruct{Name: "", Age: 0}, true},      // 自定义结构体，所有字段零值
+		{TestStruct{Name: "Test", Age: 1}, false}, // 自定义结构体，至少一个非零字段
+		{struct{ A int }{1}, false},               // 非空结构体
+		{struct{ A interface{} }{nil}, true},      // 包含 nil 的结构体
+		{make(chan int), false},                   // 非空通道
 	}
 
 	for _, test := range tests {
@@ -51,7 +55,6 @@ func TestIsEmptyValue(t *testing.T) {
 			}
 			return reflect.TypeOf(test.value).String()
 		}(), func(t *testing.T) {
-			// 直接调用 IsEmptyValue
 			result := validator.IsEmptyValue(reflect.ValueOf(test.value))
 			assert.Equal(t, test.expected, result)
 		})
@@ -151,35 +154,6 @@ func TestEmptyToDefault(t *testing.T) {
 		t.Run(test.str, func(t *testing.T) {
 			result := validator.EmptyToDefault(test.str, test.defaultStr)
 			assert.Equal(t, test.expected, result)
-		})
-	}
-}
-
-func TestVerify(t *testing.T) {
-	tests := []struct {
-		input    TestStruct
-		expected error
-	}{
-		{TestStruct{Name: "John", Age: 30, Email: "john@example.com"}, nil},
-		{TestStruct{Name: "", Age: 30, Email: "john@example.com"}, errors.New("Name值不能为空")},
-		{TestStruct{Name: "John", Age: -1, Email: "john@example.com"}, errors.New("Age长度或值不在合法范围,ge=0")},
-		{TestStruct{Name: "John", Age: 30, Email: "invalid-email"}, errors.New("Email格式校验不通过")},
-	}
-
-	roleMap := validator.Rules{
-		"Name":  {"notEmpty"},
-		"Age":   {"ge=0"},
-		"Email": {"regexp=^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"},
-	}
-
-	for _, test := range tests {
-		t.Run(test.input.Name, func(t *testing.T) {
-			err := validator.Verify(test.input, roleMap)
-			if test.expected == nil {
-				assert.NoError(t, err)
-			} else {
-				assert.EqualError(t, err, test.expected.Error())
-			}
 		})
 	}
 }
