@@ -190,8 +190,8 @@ var callerPool = sync.Pool{
 	},
 }
 
-// GetCallerInfo 获取调用栈信息
-func GetCallerInfo(skip int) *RunTimeCaller {
+// GetRuntimeCaller 获取调用栈信息
+func GetRuntimeCaller(skip int) *RunTimeCaller {
 	// 从池中获取一个 RunTimeCaller 实例
 	caller := callerPool.Get().(*RunTimeCaller)
 	defer callerPool.Put(caller) // 使用完后将实例放回池中

@@ -108,16 +108,16 @@ func TestGetClientPublicIP_NoValidIp(t *testing.T) {
 	assert.NotEmpty(t, ip, fmt.Sprintf("Expected public IP, got: %s", ip))
 }
 
-// TestGetCallerInfo 测试 GetCallerInfo 函数
-func TestGetCallerInfo(t *testing.T) {
-	caller := osx.GetCallerInfo(0)
-	assert.Equal(t, caller.FuncName, "GetCallerInfo")
+// TestGetRuntimeCaller 测试 GetRuntimeCaller 函数
+func TestGetRuntimeCaller(t *testing.T) {
+	caller := osx.GetRuntimeCaller(0)
+	assert.Equal(t, caller.FuncName, "GetRuntimeCaller")
 
-	caller = osx.GetCallerInfo(1)
-	assert.Equal(t, caller.FuncName, "TestGetCallerInfo")
+	caller = osx.GetRuntimeCaller(1)
+	assert.Equal(t, caller.FuncName, "TestGetRuntimeCaller")
 	assert.Equal(t, caller.Line, 116)
 
-	caller = osx.GetCallerInfo(2)
+	caller = osx.GetRuntimeCaller(2)
 	assert.Equal(t, caller.FuncName, "tRunner")
 }
 
