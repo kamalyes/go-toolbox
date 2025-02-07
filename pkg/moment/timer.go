@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-01-09 19:15:01
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-01-09 13:26:00
+ * @LastEditTime: 2025-02-07 17:25:07
  * @FilePath: \go-toolbox\pkg\moment\timer.go
  * @Description:
  *
@@ -47,20 +47,26 @@ type Timer struct {
 // NewTimer 创建一个新的计时器
 func NewTimer() *Timer {
 	t := &Timer{
-		stopChan: make(chan struct{}), // 初始化停止通道
+		stopChan: make(chan struct{}),           // 初始化停止通道
+		traceId:  osx.HashUnixMicroCipherText(), // 初始化跟踪Id
 	}
 	return t
 }
 
+// NewTimerWithTraceId 创建一个带有自定义跟踪Id的新计时器
+func NewTimerWithTraceId(traceId string) *Timer {
+	return NewTimer().SetTraceId(traceId)
+}
+
 // Run 启动计时器，开始计时并打印时差
 func (t *Timer) Run() {
+	// 检查是否已暂停或已开始
+	if t.paused || !t.startTime.IsZero() {
+		return
+	}
 	syncx.WithLock(&t.mu, func() {
-		if t.paused {
-			return // 如果已暂停，不能重新启动
-		}
-		t.startTime = time.Now()                  // 记录开始时间
-		t.traceId = osx.HashUnixMicroCipherText() // 记录跟踪ID
-		t.endTime = t.startTime                   // 初始化结束时间
+		t.startTime = time.Now() // 记录开始时间
+		t.endTime = t.startTime  // 初始化结束时间
 		go func() {
 			// 只需在 goroutine 中执行一次打印
 			select {
@@ -75,7 +81,8 @@ func (t *Timer) Run() {
 // Pause 暂停计时器
 func (t *Timer) Pause() {
 	syncx.WithLock(&t.mu, func() {
-		if t.paused {
+		// 检查是否已暂停或未开始
+		if t.paused || t.startTime.IsZero() {
 			return
 		}
 		t.pauseStart = time.Now() // 记录暂停开始时间
@@ -86,7 +93,8 @@ func (t *Timer) Pause() {
 // Resume 恢复计时器
 func (t *Timer) Resume() {
 	syncx.WithLock(&t.mu, func() {
-		if !t.paused {
+		// 检查是否未暂停或未开始
+		if !t.paused || t.startTime.IsZero() {
 			return
 		}
 		t.pauseDuration += time.Since(t.pauseStart) // 更新总暂停时间
@@ -97,12 +105,21 @@ func (t *Timer) Resume() {
 // Finish 停止计时器
 func (t *Timer) Finish() {
 	syncx.WithLock(&t.mu, func() {
-		t.endTime = time.Now()
-		if t.paused {
-			t.pauseDuration += time.Since(t.pauseStart) // 如果在结束前处于暂停状态，更新暂停时间
+		// 检查是否未开始
+		if t.startTime.IsZero() {
+			return
 		}
+		t.endTime = time.Now()
 		t.duration = t.endTime.Sub(t.startTime) - t.pauseDuration
 		close(t.stopChan)
+	})
+}
+
+// SetTraceId 设置计时器的跟踪Id
+func (t *Timer) SetTraceId(traceId string) *Timer {
+	return syncx.WithLockReturnValue(&t.mu, func() *Timer {
+		t.traceId = traceId
+		return t
 	})
 }
 

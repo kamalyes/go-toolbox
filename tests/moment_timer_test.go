@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-01-09 19:15:01
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-01-21 18:55:55
+ * @LastEditTime: 2025-02-07 15:16:09
  * @FilePath: \go-toolbox\tests\moment_timer_test.go
  * @Description:
  *
@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/kamalyes/go-toolbox/pkg/moment"
+	"github.com/kamalyes/go-toolbox/pkg/osx"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -36,6 +37,11 @@ func TestTimer(t *testing.T) {
 
 	// 断言时差大于等于 250 毫秒（考虑到可能的延迟）
 	assert.GreaterOrEqual(t, elapsed.Milliseconds(), int64(250), "时差应该大于等于 250 毫秒")
+
+	traceId := osx.HashUnixMicroCipherText()
+	// 创建一个带有自定义TraceId的Timer
+	newTimer := moment.NewTimerWithTraceId(traceId)
+	assert.Equal(t, newTimer.GetTraceId(), traceId, "TraceId 不正确")
 }
 
 // TestTimerConcurrent 测试 Timer 结构体的并发功能
@@ -55,7 +61,7 @@ func TestTimerConcurrent(t *testing.T) {
 			// 等待一段时间
 			time.Sleep(time.Duration(100+i*20) * time.Millisecond)
 
-			// 更新结束时间
+			// 完成计时器
 			timer.Finish()
 
 			// 获取当前时间与开始时间的差异
@@ -101,11 +107,43 @@ func TestPauseAndResumeTimer(t *testing.T) {
 	// 使用 assert 检查持续时间
 	assert.GreaterOrEqual(t, actualDuration, expectedDuration, "实际持续时间应大于或等于预期持续时间")
 	assert.LessOrEqual(t, actualDuration, expectedDuration+100*time.Millisecond, "实际持续时间应小于或等于预期持续时间加上允许的误差")
-	assert.InDelta(t, expectedDuration.Seconds(), actualDuration.Seconds(), 0.1, "实际持续时间应在预期持续时间的范围内")
 
 	// 检查暂停持续时间
 	expectedPauseDuration := totalPauseDuration
 	actualPauseDuration := timer.GetPauseDuration()
 
 	assert.InDelta(t, expectedPauseDuration.Seconds(), actualPauseDuration.Seconds(), 0.1, "实际暂停持续时间应在预期暂停持续时间的范围内")
+}
+
+// TestPauseWithoutRun 测试在未运行时暂停计时器
+func TestPauseWithoutRun(t *testing.T) {
+	timer := moment.NewTimer()
+	verifyTimerState(t, timer, "新初始化的计时器的状态应正确")
+
+	timer.Pause() // 尝试暂停计时器
+
+	// 验证未运行的计时器状态
+	verifyTimerState(t, timer, "未运行的计时器进行暂停后状态应正确")
+
+	// 尝试恢复计时器
+	timer.Resume()
+
+	// 验证恢复后的状态
+	verifyTimerState(t, timer, "未运行的计时器进行暂停->恢复后状态应正确")
+
+	// 完成计时器
+	timer.Finish()
+
+	// 验证完成后的状态
+	verifyTimerState(t, timer, "未运行的计时器进行暂停->恢复->结束运行后状态应正确")
+}
+
+// verifyTimerState 验证计时器的状态
+func verifyTimerState(t *testing.T, timer *moment.Timer, msg string) {
+	assert.Empty(t, timer.GetTraceId(), msg+"，跟踪ID应为空")
+	assert.False(t, timer.GetPaused(), msg+"，不应处于暂停状态")
+	assert.Equal(t, time.Time{}, timer.GetStartTime(), msg+"，开始时间应为零值")
+	assert.Equal(t, time.Time{}, timer.GetEndTime(), msg+"，结束时间应为零值")
+	assert.Equal(t, time.Duration(0), timer.GetDuration(), msg+"，持续时间应为零")
+	assert.Equal(t, time.Duration(0), timer.GetPauseDuration(), msg+"，暂停持续时间应为零")
 }
