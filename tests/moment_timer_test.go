@@ -42,6 +42,11 @@ func TestTimer(t *testing.T) {
 	// 创建一个带有自定义TraceId的Timer
 	newTimer := moment.NewTimerWithTraceId(traceId)
 	assert.Equal(t, newTimer.GetTraceId(), traceId, "TraceId 不正确")
+	// 检查timeout是否影响日志打印
+	newTimer.SetTimeOut(100).Run()
+	time.Sleep(250 * time.Millisecond)
+	newTimer.Finish()
+	assert.GreaterOrEqual(t, newTimer.GetTimeOut(), int64(100), "超时时间应该等于 100 毫秒")
 }
 
 // TestTimerConcurrent 测试 Timer 结构体的并发功能

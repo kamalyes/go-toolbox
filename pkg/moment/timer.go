@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-01-09 19:15:01
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-02-07 17:25:07
+ * @LastEditTime: 2025-02-08 10:55:59
  * @FilePath: \go-toolbox\pkg\moment\timer.go
  * @Description:
  *
@@ -42,6 +42,7 @@ type Timer struct {
 	pauseDuration time.Duration // 暂停的总时长
 	stopChan      chan struct{} // 用于停止计时器的通道
 	mu            sync.RWMutex  // 保护共享数据的互斥锁(读锁和写锁)
+	timeout       time.Duration // 超时时间
 }
 
 // NewTimer 创建一个新的计时器
@@ -115,6 +116,21 @@ func (t *Timer) Finish() {
 	})
 }
 
+// SetTimeOut 设置计时器的超时时间
+func (t *Timer) SetTimeOut(timeout time.Duration) *Timer {
+	return syncx.WithLockReturnValue(&t.mu, func() *Timer {
+		t.timeout = timeout
+		return t
+	})
+}
+
+// GetTimeOut 获取计时器的超时时间
+func (t *Timer) GetTimeOut() time.Duration {
+	return syncx.WithRLockReturnValue(&t.mu, func() time.Duration {
+		return t.timeout
+	})
+}
+
 // SetTraceId 设置计时器的跟踪Id
 func (t *Timer) SetTraceId(traceId string) *Timer {
 	return syncx.WithLockReturnValue(&t.mu, func() *Timer {
@@ -165,10 +181,18 @@ func (t *Timer) GetPaused() bool {
 	})
 }
 
-// PrintLog 打印计时器的日志
+// PrintLog 打印计时器的日志信息
 func (t *Timer) PrintLog() {
 	syncx.WithRLock(&t.mu, func() {
-		fmt.Printf("Trace ID: %s, Duration Run Time: %v\n", t.traceId, t.GetDuration())
+		logMessage := fmt.Sprintf("Trace ID: %s, Duration Run Time: %v", t.traceId, t.duration)
+
+		// 检查持续时间是否超过设定的超时阈值
+		if t.duration > t.timeout && t.timeout > 0 {
+			logMessage += fmt.Sprintf(", Exceeded Timeout Period: %v", t.timeout)
+			fmt.Printf("\033[31m%s\033[0m\n", logMessage) // 红色打印
+			return
+		}
+		fmt.Println(logMessage) // 普通打印
 	})
 }
 
