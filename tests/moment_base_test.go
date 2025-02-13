@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-20 18:15:32
+ * @LastEditTime: 2025-02-13 15:28:36
  * @FilePath: \go-toolbox\tests\moment_base_test.go
  * @Description:
  *
@@ -17,18 +17,6 @@ import (
 	"github.com/kamalyes/go-toolbox/pkg/moment"
 	"github.com/stretchr/testify/assert"
 )
-
-func TestAllMomentBaseFunctions(t *testing.T) {
-	t.Run("TestCalculateTimeDifference", TestCalculateTimeDifference)
-	t.Run("TestSafeParseTimeToUnixNano", TestSafeParseTimeToUnixNano)
-	t.Run("TestGetCurrentTimeInfo", TestGetCurrentTimeInfo)
-	t.Run("TestGetServerTimezone", TestGetServerTimezone)
-	t.Run("TestGetTimeOffset", TestGetTimeOffset)
-	t.Run("TestFormatWithLocation", TestFormatWithLocation)
-	t.Run("TestParseWithLocation", TestParseWithLocation)
-	t.Run("TestConvertStringToTimestamp", TestConvertStringToTimestamp)
-
-}
 
 func TestCalculateTimeDifference(t *testing.T) {
 	tests := []struct {
@@ -52,7 +40,7 @@ func TestCalculateTimeDifference(t *testing.T) {
 	}
 }
 
-func TestSafeParseTimeToUnixNano(t *testing.T) {
+func TestSafeTimeToUnixNano(t *testing.T) {
 	tests := []struct {
 		timeStr  string
 		expected int64
@@ -185,5 +173,132 @@ func TestCalculateAgeErrors(t *testing.T) {
 		age, err := moment.CalculateAge(test.birthday, test.currentTime)
 		assert.Error(t, err, "对于生日 %s,期望返回错误", test.birthday)
 		assert.Equal(t, test.expected, age, "对于生日 %s,期望年龄 %d,但得到 %d", test.birthday, test.expected, age)
+	}
+}
+
+func TestHour(t *testing.T) {
+	now := time.Now()
+	hour := moment.Hour(now)
+	if hour < 0 || hour > 23 {
+		t.Errorf("Hour() returned an invalid hour value: %d", hour)
+	}
+}
+
+func TestMinute(t *testing.T) {
+	now := time.Now()
+	minute := moment.Minute(now)
+	if minute < 0 || minute > 59 {
+		t.Errorf("Minute() returned an invalid minute value: %d", minute)
+	}
+}
+
+func TestSecond(t *testing.T) {
+	now := time.Now()
+	second := moment.Second(now)
+	if second < 0 || second > 59 {
+		t.Errorf("Second() returned an invalid second value: %d", second)
+	}
+}
+
+func TestCurrentMillisecond(t *testing.T) {
+	ms := moment.CurrentMillisecond()
+	if ms <= 0 {
+		t.Errorf("CurrentMillisecond() returned an invalid millisecond value: %d", ms)
+	}
+}
+
+func TestCurrentMicrosecond(t *testing.T) {
+	micros := moment.CurrentMicrosecond()
+	if micros <= 0 {
+		t.Errorf("CurrentMicrosecond() returned an invalid microsecond value: %d", micros)
+	}
+}
+
+func TestCurrentNanosecond(t *testing.T) {
+	nanos := moment.CurrentNanosecond()
+	if nanos <= 0 {
+		t.Errorf("CurrentNanosecond() returned an invalid nanosecond value: %d", nanos)
+	}
+}
+
+func TestStrtoTime(t *testing.T) {
+	testString := "2024-12-25 23:59:59"
+	result, err := moment.StrtoTime(testString)
+	if err != nil {
+		t.Errorf("StrtoTime() error: %v", err)
+	}
+
+	expectedDate := time.Date(2024, time.December, 25, 23, 59, 59, 0, time.Local)
+	if !result.Equal(expectedDate) {
+		t.Errorf("Strtotime() did not parse the string correctly")
+	}
+}
+
+func TestCharToCode(t *testing.T) {
+	layout := "Y-m-d H:i:s"
+	expectedLayout := "2006-1-2 15:4:5"
+	result := moment.CharToCode(layout)
+	if result != expectedLayout {
+		t.Errorf("CharToCode() returned %s, expected %s", result, expectedLayout)
+	}
+}
+
+func TestYear(t *testing.T) {
+	testTime := time.Date(2024, time.April, 2, 0, 0, 0, 0, time.UTC)
+	year := moment.Year(testTime)
+	expectedYear := 2024
+	if year != expectedYear {
+		t.Errorf("Year() returned %d, expected %d", year, expectedYear)
+	}
+}
+
+func TestMonth(t *testing.T) {
+	testTime := time.Date(2024, time.April, 2, 0, 0, 0, 0, time.UTC)
+	month := moment.Month(testTime)
+	expectedMonth := 4
+	if month != expectedMonth {
+		t.Errorf("Month() returned %d, expected %d", month, expectedMonth)
+	}
+}
+
+func TestDay(t *testing.T) {
+	testTime := time.Date(2024, time.April, 2, 0, 0, 0, 0, time.UTC)
+	day := moment.Day(testTime)
+	expectedDay := 2
+	if day != expectedDay {
+		t.Errorf("Day() returned %d, expected %d", day, expectedDay)
+	}
+}
+
+func TestYearDay(t *testing.T) {
+	testTime := time.Date(2024, time.April, 2, 0, 0, 0, 0, time.UTC)
+	yearDay := moment.YearDay(testTime)
+	expectedYearDay := 93
+	if yearDay != expectedYearDay {
+		t.Errorf("YearDay() returned %d, expected %d", yearDay, expectedYearDay)
+	}
+}
+
+func TestYearDefault(t *testing.T) {
+	year := moment.Year()
+	currentYear := time.Now().Year()
+	if year != currentYear {
+		t.Errorf("YearDefault() returned %d, expected %d", year, currentYear)
+	}
+}
+
+func TestMonthDefault(t *testing.T) {
+	month := moment.Month()
+	currentMonth := int(time.Now().Month())
+	if month != currentMonth {
+		t.Errorf("MonthDefault() returned %d, expected %d", month, currentMonth)
+	}
+}
+
+func TestDayDefault(t *testing.T) {
+	day := moment.Day()
+	currentDay := int(time.Now().Day())
+	if day != currentDay {
+		t.Errorf("DayDefault() returned %d, expected %d", day, currentDay)
 	}
 }

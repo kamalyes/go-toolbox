@@ -10,7 +10,10 @@
  */
 package moment
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // TimeDifference 结构体用于存储年、天、小时、分钟和秒
 type TimeDifference struct {
@@ -26,10 +29,10 @@ func CalculateTimeDifference(duration time.Duration) TimeDifference {
 	totalSeconds := int(duration.Seconds())
 
 	// 使用常量计算年、天、小时、分钟和秒
-	years := totalSeconds / int(Year.Seconds())
-	days := (totalSeconds / int(Day.Seconds())) % 365
-	hours := (totalSeconds / int(Hour.Seconds())) % 24
-	minutes := (totalSeconds / int(Minute.Seconds())) % 60
+	years := totalSeconds / int(YearDuration.Seconds())
+	days := (totalSeconds / int(DayDuration.Seconds())) % 365
+	hours := (totalSeconds / int(HourDuration.Seconds())) % 24
+	minutes := (totalSeconds / int(MinuteDuration.Seconds())) % 60
 	seconds := totalSeconds % 60
 
 	return TimeDifference{
@@ -136,4 +139,139 @@ func DaysInMonth(month, year int) int {
 		return 30 // 30天的月份
 	}
 	return 31 // 31天的月份
+}
+
+// NowTime 获取时间的辅助函数
+func NowTime(t []time.Time) time.Time {
+	if len(t) > 0 {
+		return t[0]
+	}
+	return time.Now()
+}
+
+// CalculateStartAndEndTime 根据给定的年、月、日和持续时间计算开始和结束时间
+func CalculateStartAndEndTime(year int, month time.Month, day int, duration time.Duration) (int64, int64) {
+	startTime := time.Date(year, month, day, 0, 0, 0, 0, time.Local).UnixMilli()
+	endTime := time.Now().Add(duration).UnixMilli()
+	return startTime, endTime
+}
+
+// 获取年份
+func Year(t ...time.Time) int {
+	return NowTime(t).Year()
+}
+
+// 获取月份
+func Month(t ...time.Time) int {
+	return int(NowTime(t).Month())
+}
+
+// 获取日期
+func Day(t ...time.Time) int {
+	return NowTime(t).Day()
+}
+
+// 获取一年中的第几天
+func YearDay(t ...time.Time) int {
+	return NowTime(t).YearDay()
+}
+
+// 今天的开始和结束时间
+func Today() (int64, int64) {
+	now := time.Now()
+	return CalculateStartAndEndTime(now.Year(), now.Month(), now.Day(), 24*time.Hour)
+}
+
+// 昨天的开始和结束时间
+func Yesterday() (int64, int64) {
+	now := time.Now().Add(-24 * time.Hour)
+	return CalculateStartAndEndTime(now.Year(), now.Month(), now.Day(), 24*time.Hour)
+}
+
+// 最近N天的开始和结束时间
+func LastNDays(num int) (int64, int64) {
+	now := time.Now()
+	start := now.Add(-24 * time.Hour * time.Duration(num-1))
+	return CalculateStartAndEndTime(start.Year(), start.Month(), start.Day(), 24*time.Hour)
+}
+
+// 最近N个月的开始和结束时间
+func LastNMonths(num int) (int64, int64) {
+	now := time.Now()
+	start := now.AddDate(0, -num, 0)
+	return CalculateStartAndEndTime(start.Year(), start.Month(), start.Day(), 30*24*time.Hour)
+}
+
+// 最近N周的开始和结束时间
+func LastNWeeks(num int) (int64, int64) {
+	now := time.Now()
+	start := now.AddDate(0, 0, -7*num)
+	return CalculateStartAndEndTime(start.Year(), start.Month(), start.Day(), 7*24*time.Hour)
+}
+
+// 最近N年的开始和结束时间
+func LastNYears(num int) (int64, int64) {
+	now := time.Now()
+	start := now.AddDate(-num, 0, 0)
+	return CalculateStartAndEndTime(start.Year(), start.Month(), start.Day(), 365*24*time.Hour)
+}
+
+// 获取小时
+func Hour(t ...time.Time) int {
+	return NowTime(t).Hour()
+}
+
+// 获取分钟
+func Minute(t ...time.Time) int {
+	return NowTime(t).Minute()
+}
+
+// 获取秒
+func Second(t ...time.Time) int {
+	return NowTime(t).Second()
+}
+
+// 获取当前时间的毫秒数
+func CurrentMillisecond() int64 {
+	return time.Now().UnixNano() / 1e6
+}
+
+// 获取当前时间的微秒数
+func CurrentMicrosecond() int64 {
+	return time.Now().UnixNano() / 1e3
+}
+
+// 获取当前时间的纳秒数
+func CurrentNanosecond() int64 {
+	return time.Now().UnixNano()
+}
+
+// 字符串转换为 time.Time
+func StrtoTime(s string, format ...string) (time.Time, error) {
+	if len(format) > 0 {
+		return time.ParseInLocation(strings.TrimSpace(format[0]), s, time.Local)
+	}
+	return time.ParseInLocation(DefaultTimeFormat, s, time.Local)
+}
+
+// 将自定义布局字符替换为 Go 时间格式
+func CharToCode(layout string) string {
+	characters := []string{
+		"y", "06",
+		"m", "1",
+		"d", "2",
+		"Y", "2006",
+		"M", "01",
+		"D", "02",
+		"h", "03",
+		"H", "15",
+		"i", "4",
+		"s", "5",
+		"I", "04",
+		"S", "05",
+		"t", "pm",
+		"T", "PM",
+	}
+	replacer := strings.NewReplacer(characters...)
+	return replacer.Replace(layout)
 }

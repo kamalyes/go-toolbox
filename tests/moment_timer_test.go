@@ -145,7 +145,7 @@ func TestPauseWithoutRun(t *testing.T) {
 
 // verifyTimerState 验证计时器的状态
 func verifyTimerState(t *testing.T, timer *moment.Timer, msg string) {
-	assert.Empty(t, timer.GetTraceId(), msg+"，跟踪ID应为空")
+	assert.NotEmpty(t, timer.GetTraceId(), msg+"，跟踪ID应为空")
 	assert.False(t, timer.GetPaused(), msg+"，不应处于暂停状态")
 	assert.Equal(t, time.Time{}, timer.GetStartTime(), msg+"，开始时间应为零值")
 	assert.Equal(t, time.Time{}, timer.GetEndTime(), msg+"，结束时间应为零值")

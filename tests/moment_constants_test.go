@@ -35,15 +35,15 @@ func TestTimeUnits(t *testing.T) {
 		expected time.Duration
 		actual   time.Duration
 	}{
-		{"Nanosecond", nanosecond, moment.Nanosecond},
-		{"Microsecond", microsecond, moment.Microsecond},
-		{"Millisecond", millisecond, moment.Millisecond},
-		{"Second", second, moment.Second},
-		{"Minute", minute, moment.Minute},
-		{"Hour", hour, moment.Hour},
-		{"Day", day, moment.Day},
-		{"Week", week, moment.Week},
-		{"Year", year, moment.Year},
+		{"Nanosecond", nanosecond, moment.NanosecondDuration},
+		{"Microsecond", microsecond, moment.MicrosecondDuration},
+		{"Millisecond", millisecond, moment.MillisecondDuration},
+		{"Second", second, moment.SecondDuration},
+		{"Minute", minute, moment.MinuteDuration},
+		{"Hour", hour, moment.HourDuration},
+		{"Day", day, moment.DayDuration},
+		{"Week", week, moment.WeekDuration},
+		{"Year", year, moment.YearDuration},
 	}
 
 	for _, test := range tests {
