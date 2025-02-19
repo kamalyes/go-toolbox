@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-10 21:51:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-01-08 16:55:06
+ * @LastEditTime: 2025-02-15 09:19:15
  * @FilePath: \go-toolbox\pkg\errorx\base.go
  * @Description:
  *
@@ -11,7 +11,6 @@
 package errorx
 
 import (
-	"context"
 	"fmt"
 	"sync"
 
@@ -28,8 +27,7 @@ func WrapError(message string, err error) error {
 
 // 定义 BaseError 结构体
 type BaseError struct {
-	ctx context.Context
-	msg string
+	Msg string
 }
 
 // 错误类型常量
@@ -47,17 +45,12 @@ var (
 
 // NewBaseError 创建一个新的 BaseError 实例
 func NewBaseError(msg string) BaseError {
-	return BaseError{msg: msg}
-}
-
-// NewBaseErrorWithCtx 创建一个新的 BaseError Ctx 实例
-func NewBaseErrorWithCtx(ctx context.Context, msg string) BaseError {
-	return BaseError{ctx: ctx, msg: msg}
+	return BaseError{Msg: msg}
 }
 
 // Error 实现 error 接口，返回错误信息
 func (e BaseError) Error() string {
-	return e.msg
+	return e.Msg
 }
 
 // RegisterError 注册错误类型和消息

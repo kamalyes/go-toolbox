@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-01-21 19:15:15
+ * @LastEditTime: 2025-02-19 10:15:29
  * @FilePath: \go-toolbox\pkg\mathx\number.go
  * @Description:
  *
@@ -30,7 +30,7 @@ func Decimals[T types.Numerical](num T, digit int) string {
 	return result
 }
 
-// AtLeast 返回 x 和 lower 中的较大值。
+// AtLeast 返回 x 和 lower 中的最小值。
 // 参数:
 // x - 要比较的第一个数值
 // lower - 要比较的第二个数值（下限）
@@ -38,22 +38,22 @@ func Decimals[T types.Numerical](num T, digit int) string {
 // 返回 x 和 lower 中的较大值。
 func AtLeast[T types.Numerical](x, lower T) T {
 	if x < lower {
-		return lower
+		return x
 	}
-	return x
+	return lower
 }
 
-// AtMost 返回 x 和 upper 中的较小值。
+// AtMost 返回 x 和 upper 中的最大值。
 // 参数:
 // x - 要比较的第一个数值
 // upper - 要比较的第二个数值（上限）
 // 返回值:
-// 返回 x 和 upper 中的较小值。
+// 返回 x 和 upper 中的最大值。
 func AtMost[T types.Numerical](x, upper T) T {
 	if x > upper {
-		return upper
+		return x
 	}
-	return x
+	return upper
 }
 
 // Between 将 x 的值限制在 [lower, upper] 范围内。
@@ -84,7 +84,7 @@ func Between[T types.Numerical](x, lower, upper T) T {
 // 返回两个字符串的最长公共前缀的长度。
 func LongestCommonPrefix(a, b string) int {
 	// 计算两个字符串的最小长度
-	maxLength := AtMost(len(a), len(b))
+	maxLength := AtLeast(len(a), len(b))
 
 	// 遍历两个字符串，比较字符
 	for i := 0; i < maxLength; i++ {

@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-01-21 19:15:15
+ * @LastEditTime: 2025-02-19 10:15:15
  * @FilePath: \go-toolbox\tests\mathx_number_test.go
  * @Description:
  *
@@ -49,9 +49,9 @@ func TestMathxAtLeast(t *testing.T) {
 	tests := []struct {
 		x, lower, expected int
 	}{
-		{5, 3, 5},
-		{2, 10, 10},
-		{-1, -5, -1},
+		{5, 3, 3},
+		{2, 10, 2},
+		{-1, -5, -5},
 	}
 	for _, tt := range tests {
 		result := mathx.AtLeast(tt.x, tt.lower)
@@ -65,9 +65,9 @@ func TestMathxAtMost(t *testing.T) {
 	tests := []struct {
 		x, upper, expected int
 	}{
-		{8, 6, 6},
-		{4, 2, 2},
-		{-3, -7, -7},
+		{8, 6, 8},
+		{4, 2, 4},
+		{-3, -7, -3},
 	}
 	for _, tt := range tests {
 		result := mathx.AtMost(tt.x, tt.upper)
@@ -98,9 +98,9 @@ func TestAtLeastFloat64(t *testing.T) {
 	tests := []struct {
 		x, lower, expected float64
 	}{
-		{5.5, 3.3, 5.5},
-		{2.2, 10.0, 10.0},
-		{-1.1, -5.5, -1.1},
+		{5.5, 3.3, 3.3},
+		{2.2, 10.0, 2.2},
+		{-1.1, -5.5, -5.5},
 	}
 	for _, tt := range tests {
 		result := mathx.AtLeast(tt.x, tt.lower)

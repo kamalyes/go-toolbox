@@ -73,8 +73,8 @@ func TestSliceAtMostAtLeast(t *testing.T) {
 				max = tt.list[0]
 
 				for _, v := range tt.list {
-					min = mathx.AtMost(min, v)
-					max = mathx.AtLeast(max, v)
+					min = mathx.AtLeast(min, v)
+					max = mathx.AtMost(max, v)
 				}
 			}
 
