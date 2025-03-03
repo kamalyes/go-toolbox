@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-01-08 18:18:33
+ * @LastEditTime: 2025-03-04 05:15:15
  * @FilePath: \go-toolbox\pkg\stringx\base.go
  * @Description:
  *
@@ -372,4 +372,21 @@ func toCamelCase(s string) string {
 
 func ToInt(s string) (int, error) {
 	return strconv.Atoi(Trim(s))
+}
+
+// FindKeysByValue 函数
+func FindKeysByValue(data map[string]string, searchValue string) []string {
+	var result []string
+	for key, value := range data {
+		// 将值以逗号分隔成切片
+		values := strings.Split(value, ",")
+		// 检查切片中是否有完全匹配的值
+		for _, v := range values {
+			if strings.TrimSpace(v) == searchValue {
+				result = append(result, key)
+				break
+			}
+		}
+	}
+	return result
 }

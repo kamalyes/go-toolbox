@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-01-09 19:15:01
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-02-08 10:55:59
+ * @LastEditTime: 2025-02-19 10:32:50
  * @FilePath: \go-toolbox\pkg\moment\timer.go
  * @Description:
  *
@@ -198,3 +198,10 @@ func (t *Timer) PrintLog() {
 
 // 确保 Timer 实现了 TimerInterface 接口
 var _ TimerInterface = (*Timer)(nil)
+
+// TrackTime 跟踪时间
+func TrackTime(pre time.Time) time.Duration {
+	elapsed := time.Since(pre)
+	fmt.Println("elapsed:", elapsed)
+	return elapsed
+}

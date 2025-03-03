@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-01-22 09:56:55
+ * @LastEditTime: 2025-02-19 10:25:55
  * @FilePath: \go-toolbox\pkg\validator\validator.go
  * @Description:
  *
@@ -101,4 +101,12 @@ func EmptyToDefault(str string, defaultStr string) string {
 		return defaultStr
 	}
 	return str
+}
+
+func IsNil(x interface{}) bool {
+	if x == nil {
+		return true
+	}
+
+	return reflect.ValueOf(x).IsNil()
 }

@@ -144,3 +144,30 @@ func TestToInt(t *testing.T) {
 		assert.Equal(t, test.expected, result, "输入: %q 返回值不匹配", test.input)
 	}
 }
+
+// 测试 FindKeysByValue 函数
+func TestFindKeysByValue(t *testing.T) {
+	data := map[string]string{
+		"key1": "value1, value2, value3",
+		"key2": "value4, value5",
+		"key3": "value1, value6",
+	}
+
+	tests := []struct {
+		searchValue string
+		expected    []string
+	}{
+		{"value1", []string{"key1", "key3"}},
+		{"value4", []string{"key2"}},
+		{"value5", []string{"key2"}},
+		{"value6", []string{"key3"}},
+		{"value7", []string{}}, // 没有匹配的值
+	}
+
+	for _, test := range tests {
+		t.Run(test.searchValue, func(t *testing.T) {
+			result := stringx.FindKeysByValue(data, test.searchValue)
+			assert.ElementsMatch(t, test.expected, result, "对于搜索值 %s，期望 %v 但实际得到 %v", test.searchValue, test.expected, result)
+		})
+	}
+}

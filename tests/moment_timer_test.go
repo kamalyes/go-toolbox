@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-01-09 19:15:01
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-02-07 15:16:09
+ * @LastEditTime: 2025-02-19 13:15:18
  * @FilePath: \go-toolbox\tests\moment_timer_test.go
  * @Description:
  *
@@ -151,4 +151,33 @@ func verifyTimerState(t *testing.T, timer *moment.Timer, msg string) {
 	assert.Equal(t, time.Time{}, timer.GetEndTime(), msg+"，结束时间应为零值")
 	assert.Equal(t, time.Duration(0), timer.GetDuration(), msg+"，持续时间应为零")
 	assert.Equal(t, time.Duration(0), timer.GetPauseDuration(), msg+"，暂停持续时间应为零")
+}
+
+func TestTrackTime(t *testing.T) {
+	// 测试 TrackTime 函数
+	startTime := time.Now()
+
+	// 等待一段时间，例如 100 毫秒
+	time.Sleep(100 * time.Millisecond)
+
+	// 调用 TrackTime
+	elapsed := moment.TrackTime(startTime)
+
+	// 断言 elapsed 是否大于等于 100 毫秒
+	assert.True(t, elapsed >= 100*time.Millisecond, "Expected elapsed time to be at least 100 milliseconds")
+}
+
+func TestDeferTrackTime(t *testing.T) {
+	// 测试 TrackTime 函数
+	startTime := time.Now()
+
+	// 使用 defer 调用 TrackTime
+	defer func() {
+		elapsed := moment.TrackTime(startTime)
+		// 断言 elapsed 是否大于等于 100 毫秒
+		assert.True(t, elapsed >= 100*time.Millisecond, "Expected elapsed time to be at least 100 milliseconds")
+	}()
+
+	// 等待一段时间，例如 100 毫秒
+	time.Sleep(100 * time.Millisecond)
 }
