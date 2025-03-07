@@ -44,6 +44,20 @@ func CalculateTimeDifference(duration time.Duration) TimeDifference {
 	}
 }
 
+// CalculateBirthDate 根据年龄计算出生日期
+func CalculateBirthDate(age int) time.Time {
+	// 获取当前时间
+	currentTime := time.Now()
+
+	// 计算出生年份
+	birthYear := currentTime.Year() - age
+
+	// 创建出生日期（假设出生日期为1月1日）
+	birthDate := time.Date(birthYear, 1, 1, 0, 0, 0, 0, currentTime.Location())
+
+	return birthDate
+}
+
 // SafeParseTimeToUnixNano
 func SafeParseTimeToUnixNano(timeStr string) int64 {
 	parsedTime, err := time.Parse(time.RFC3339, timeStr)

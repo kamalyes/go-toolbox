@@ -40,6 +40,23 @@ func TestCalculateTimeDifference(t *testing.T) {
 	}
 }
 
+// TestCalculateBirthDate 测试 CalculateBirthDate 函数
+func TestCalculateBirthDate(t *testing.T) {
+	tests := []struct {
+		age          int
+		expectedYear int
+	}{
+		{0, time.Now().Year()},       // 0岁，应该是今年
+		{1, time.Now().Year() - 1},   // 1岁，应该是去年
+		{25, time.Now().Year() - 25}, // 25岁
+	}
+
+	for _, test := range tests {
+		result := moment.CalculateBirthDate(test.age)
+		assert.Equal(t, test.expectedYear, result.Year(), "年龄为 %d 的出生年份应该是 %d", test.age, test.expectedYear)
+	}
+}
+
 func TestSafeTimeToUnixNano(t *testing.T) {
 	tests := []struct {
 		timeStr  string
