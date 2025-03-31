@@ -43,6 +43,7 @@ type Timer struct {
 	stopChan      chan struct{} // 用于停止计时器的通道
 	mu            sync.RWMutex  // 保护共享数据的互斥锁(读锁和写锁)
 	timeout       time.Duration // 超时时间
+	logPrefix     string        // 日志前缀
 }
 
 // NewTimer 创建一个新的计时器
@@ -72,7 +73,7 @@ func (t *Timer) Run() {
 			// 只需在 goroutine 中执行一次打印
 			select {
 			case <-t.stopChan: // 如果接收到停止信号，退出并打印持续时间
-				t.PrintLog()
+				t.printLog()
 				return
 			}
 		}()
@@ -139,6 +140,14 @@ func (t *Timer) SetTraceId(traceId string) *Timer {
 	})
 }
 
+// SetLogPrefix 设置日志前缀
+func (t *Timer) SetLogPrefix(prefix string) *Timer {
+	syncx.WithLock(&t.mu, func() {
+		t.logPrefix = prefix
+	})
+	return t
+}
+
 // GetTraceId 获取计时器的跟踪Id
 func (t *Timer) GetTraceId() string {
 	return syncx.WithRLockReturnValue(&t.mu, func() string {
@@ -181,11 +190,10 @@ func (t *Timer) GetPaused() bool {
 	})
 }
 
-// PrintLog 打印计时器的日志信息
-func (t *Timer) PrintLog() {
+// printLog 打印计时器的日志信息
+func (t *Timer) printLog() {
 	syncx.WithRLock(&t.mu, func() {
-		logMessage := fmt.Sprintf("Trace ID: %s, Duration Run Time: %v", t.traceId, t.duration)
-
+		logMessage := fmt.Sprintf("%s Trace ID: %s, Duration Run Time: %v", t.logPrefix, t.traceId, t.duration)
 		// 检查持续时间是否超过设定的超时阈值
 		if t.duration > t.timeout && t.timeout > 0 {
 			logMessage += fmt.Sprintf(", Exceeded Timeout Period: %v", t.timeout)
