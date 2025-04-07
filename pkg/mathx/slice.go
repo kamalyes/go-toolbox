@@ -332,6 +332,18 @@ func SliceRemoveZero(arr []int) []int {
 	return result
 }
 
+// SliceRemoveValue 移除切片中的指定值。
+// 返回一个新切片，包含所有非指定元素。
+func SliceRemoveValue[T comparable](arr []T, value T) []T {
+	result := make([]T, 0, len(arr)) // 创建结果切片
+	for _, val := range arr {
+		if val != value {
+			result = append(result, val) // 仅添加非指定元素
+		}
+	}
+	return result
+}
+
 // SliceChunk 将一个切片分割成多个子切片。
 // size 参数指定每个子切片的大小。
 // 返回一个包含子切片的切片。

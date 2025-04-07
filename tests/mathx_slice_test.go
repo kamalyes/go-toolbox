@@ -345,6 +345,24 @@ func TestSliceRemoveZero(t *testing.T) {
 	}
 }
 
+// 测试 SliceRemoveValue 函数
+func TestSliceRemoveValue(t *testing.T) {
+	tests := []struct {
+		input    []int
+		value    int
+		expected []int
+	}{
+		{[]int{2, 4, 6, 8}, 3, []int{2, 4, 6, 8}}, // 3 不在切片中
+		{[]int{}, 0, []int{}},                     // 空切片
+		{[]int{0, 0, 0, 0}, 0, []int{}},           // 移除所有零
+	}
+
+	for _, test := range tests {
+		result := mathx.SliceRemoveValue(test.input, test.value)
+		assert.ElementsMatch(t, test.expected, result)
+	}
+}
+
 // TestSliceChunk 测试 SliceChunk 函数
 func TestSliceChunk(t *testing.T) {
 	tests := []struct {
