@@ -146,6 +146,29 @@ func TestSaveImage(t *testing.T) {
 	}
 }
 
+func TestWriteContentToFile(t *testing.T) {
+	// 定义测试用的文件路径和内容
+	testFilePath := "test_output.txt"
+	testContent := "Hello, World!"
+
+	// 调用 WriteContentToFile 函数
+	err := osx.WriteContentToFile(testFilePath, testContent)
+
+	// 断言没有错误发生
+	assert.NoError(t, err)
+
+	// 读取文件内容以验证写入是否成功
+	content, err := os.ReadFile(testFilePath)
+	assert.NoError(t, err)
+
+	// 断言内容与预期一致
+	assert.Equal(t, testContent, string(content))
+
+	// 清理测试生成的文件
+	err = os.Remove(testFilePath)
+	assert.NoError(t, err)
+}
+
 // TestFileNameWithoutExt 测试 FileNameWithoutExt 函数
 func TestFileNameWithoutExt(t *testing.T) {
 	// 测试文件名和期望结果

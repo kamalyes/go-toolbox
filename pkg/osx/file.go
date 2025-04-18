@@ -78,6 +78,18 @@ func CheckImageExists(filename string) error {
 	return nil
 }
 
+// WriteContentToFile 将内容追加写入指定文件
+func WriteContentToFile(filePath, content string) error {
+	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	_, err = file.WriteString(content)
+	return err
+}
+
 // SaveImage 将字节数据保存为指定文件名的图片
 func SaveImage(filename string, imgData []byte, quality int) error {
 	// 创建一个新的文件
