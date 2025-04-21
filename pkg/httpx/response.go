@@ -105,6 +105,11 @@ func (r *Response) GetBody() ([]byte, error) {
 	return body, nil
 }
 
+// GetCookies 获取响应中的 Cookie
+func (r *Response) GetCookies() ([]*http.Cookie, error) {
+	return r.Cookies(), nil
+}
+
 // DecodeRespBody 根据响应的 Content-Type 解码响应体
 func DecodeRespBody(resp *Response, dst any) error {
 	contentType := resp.Header.Get(HeaderContentType) // 获取响应的 Content-Type
