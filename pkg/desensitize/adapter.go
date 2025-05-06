@@ -104,6 +104,9 @@ func Desensitization(obj interface{}) error {
 
 // processField 处理字段的脱敏逻辑
 func processField(fieldValue reflect.Value, tag string) error {
+	if !fieldValue.CanSet() {
+		return nil // 如果字段不可设置，直接返回
+	}
 	switch fieldValue.Kind() {
 	case reflect.Slice, reflect.Array:
 		// 如果字段是切片或数组，处理每个元素
