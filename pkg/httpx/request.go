@@ -127,6 +127,12 @@ func (r *Request) AddHeader(key, value string) *Request {
 	return r
 }
 
+// SetEndpoint 设置Endpoint
+func (r *Request) SetEndpoint(endpoint string) *Request {
+	r.endpoint = endpoint // 设置请求头的键值对
+	return r
+}
+
 // SetBodyEncodeFunc 设置请求体编码函数
 func (r *Request) SetBodyEncodeFunc(fn BodyEncodeFunc) *Request {
 	r.bodyEncodeFunc = fn // 设置自定义的请求体编码函数
