@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-10-23 17:37:08
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-01 01:33:56
+ * @LastEditTime: 2025-05-15 17:35:46
  * @FilePath: \go-toolbox\tests\aes_test.go
  * @Description:
  *
@@ -12,9 +12,11 @@ package tests
 
 import (
 	"encoding/base64"
+	"fmt"
 	"testing"
 
 	"github.com/kamalyes/go-toolbox/pkg/sign"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestAesEncryptDecrypt(t *testing.T) {
@@ -82,5 +84,58 @@ func TestAesEncryptDecrypt(t *testing.T) {
 			base64.StdEncoding.EncodeToString([]byte(encryptedText)),
 			base64.StdEncoding.EncodeToString(tc.key),
 			decryptedText)
+	}
+}
+
+func TestAes(t *testing.T) {
+	password := "mysecretpassword"
+	keyLength := 16 // AES-128
+	key := sign.GenerateByteKey(password, keyLength)
+
+	tests := []interface{}{
+		"Hello, World!",
+		12345,
+		3.14159265359,
+		true,
+		[]byte{1, 2, 3, 4, 5},
+		[]int{1, 2, 3, 4, 5},
+		[]float64{1.1, 2.2, 3.3, 4.4, 5.5},
+		"中文测试",
+		"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+	}
+
+	for _, test := range tests {
+		fmt.Println("======================================")
+		fmt.Printf("Original Text: %v\n", test)
+
+		// 转换为字符串
+		originalText := fmt.Sprintf("%v", test)
+		fmt.Printf("Original Text (String): %v\n", originalText)
+
+		// 加密
+		encryptedText, err := sign.AesEncrypt(originalText, key)
+		if err != nil {
+			fmt.Printf("AesEncrypt error: %v\n", err)
+		} else {
+			fmt.Printf("Encrypted Text: %v\n", encryptedText)
+		}
+
+		// 解密
+		decryptedText, err := sign.AesDecrypt(encryptedText, key)
+		if err != nil {
+			fmt.Printf("AesDecrypt error: %v\n", err)
+		} else {
+			fmt.Printf("Decrypted Text: %v\n", decryptedText)
+		}
+
+		// 验证
+		assert.Nil(t, err, "AesDecrypt error")
+		assert.Equal(t, originalText, decryptedText, "Decrypted text does not match the original text")
+		if assert.Equal(t, originalText, decryptedText) {
+			fmt.Println("Verification: PASSED")
+		} else {
+			fmt.Println("Verification: FAILED")
+		}
+		fmt.Println("======================================")
 	}
 }
