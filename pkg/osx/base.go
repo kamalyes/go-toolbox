@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-10 17:17:09
+ * @LastEditTime: 2025-05-26 10:01:15
  * @FilePath: \go-toolbox\pkg\osx\base.go
  * @Description:
  *
@@ -183,37 +183,59 @@ type RunTimeCaller struct {
 	FuncName string  // 函数名
 }
 
-// callerPool 是一个 sync.Pool，用于复用 RunTimeCaller 实例
 var callerPool = sync.Pool{
 	New: func() interface{} {
 		return &RunTimeCaller{}
 	},
 }
 
-// GetRuntimeCaller 获取调用栈信息
+// GetRuntimeCaller 获取调用栈信息，调用者使用完需调用 Release() 归还对象
 func GetRuntimeCaller(skip int) *RunTimeCaller {
-	// 从池中获取一个 RunTimeCaller 实例
 	caller := callerPool.Get().(*RunTimeCaller)
-	defer callerPool.Put(caller) // 使用完后将实例放回池中
-
-	// 获取当前时间和函数名称
-	var ok bool
-	caller.Pc, caller.File, caller.Line, ok = runtime.Caller(skip)
-	if !ok {
-		caller.File = "unknown_file"
-		caller.Line = 0
-	}
-
-	// 获取函数名
-	fn := runtime.FuncForPC(caller.Pc).Name()
-	lastDot := strings.LastIndex(fn, ".")
-	if lastDot != -1 {
-		caller.FuncName = fn[lastDot+1:]
-	} else {
-		caller.FuncName = fn
-	}
-
+	caller.init(skip)
 	return caller
+}
+
+// init 初始化 RunTimeCaller 内容
+func (c *RunTimeCaller) init(skip int) {
+	pc, file, line, ok := runtime.Caller(skip)
+	if !ok {
+		c.Pc = 0
+		c.File = "unknown_file"
+		c.Line = 0
+		c.FuncName = "unknown_func"
+		return
+	}
+
+	c.Pc = pc
+	c.File = file
+	c.Line = line
+
+	fn := runtime.FuncForPC(pc)
+	if fn == nil {
+		c.FuncName = "unknown_func"
+		return
+	}
+
+	fullName := fn.Name()
+	// 只保留函数名（去掉包路径）
+	if lastSlash := strings.LastIndex(fullName, "/"); lastSlash != -1 {
+		fullName = fullName[lastSlash+1:]
+	}
+	if lastDot := strings.LastIndex(fullName, "."); lastDot != -1 {
+		fullName = fullName[lastDot+1:]
+	}
+	c.FuncName = fullName
+}
+
+// Release 放回对象池，调用者必须调用
+func (c *RunTimeCaller) Release() {
+	// 清理字段，防止内存泄漏
+	c.Pc = 0
+	c.File = ""
+	c.Line = 0
+	c.FuncName = ""
+	callerPool.Put(c)
 }
 
 // Command 执行系统命令

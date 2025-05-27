@@ -62,14 +62,14 @@ func TestRequestSend(t *testing.T) {
 	// 创建一个测试服务器
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodPost, r.Method)
-		assert.Equal(t, ContentTypeApplicationJSON, r.Header.Get("Content-Type"))
+		assert.Equal(t, ContentTypeApplicationJSON, r.Header.Get(HeaderContentType))
 		w.Write([]byte("Success"))
 	}))
 	defer server.Close()
 
 	client := &http.Client{}
 	req := NewRequest(context.Background(), client, "POST", server.URL).
-		SetHeader("Content-Type", ContentTypeApplicationJSON).
+		SetHeader(HeaderContentType, ContentTypeApplicationJSON).
 		SetBody(map[string]string{"name": "test"})
 
 	resp, err := req.Send()
@@ -90,7 +90,7 @@ func TestRequestSetBodyMultipart(t *testing.T) {
 	// 创建一个测试服务器
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodPost, r.Method)
-		assert.Equal(t, ContentTypeMultipartFormData, r.Header.Get("Content-Type"))
+		assert.Equal(t, ContentTypeMultipartFormData, r.Header.Get(HeaderContentType))
 		w.Write([]byte("File Uploaded"))
 	}))
 	defer server.Close()

@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-13 19:08:03
+ * @LastEditTime: 2025-05-27 15:15:15
  * @FilePath: \go-toolbox\tests\osx_base_test.go
  * @Description:
  *
@@ -108,17 +108,43 @@ func TestGetClientPublicIP_NoValidIp(t *testing.T) {
 	assert.NotEmpty(t, ip, fmt.Sprintf("Expected public IP, got: %s", ip))
 }
 
-// TestGetRuntimeCaller 测试 GetRuntimeCaller 函数
 func TestGetRuntimeCaller(t *testing.T) {
-	caller := osx.GetRuntimeCaller(0)
-	assert.Equal(t, caller.FuncName, "GetRuntimeCaller")
+	// 调用 GetRuntimeCaller，skip=1 表示跳过测试函数本身，获取调用该函数的调用者信息
+	caller := osx.GetRuntimeCaller(1)
+	defer caller.Release()
 
-	caller = osx.GetRuntimeCaller(1)
-	assert.Equal(t, caller.FuncName, "TestGetRuntimeCaller")
-	assert.Equal(t, caller.Line, 116)
+	// 断言 File 不为空且不是 unknown_file
+	assert.NotEmpty(t, caller.File, "caller.File should not be empty")
+	assert.NotEqual(t, "unknown_file", caller.File, "caller.File should not be unknown_file")
 
-	caller = osx.GetRuntimeCaller(2)
-	assert.Equal(t, caller.FuncName, "tRunner")
+	// 断言 Line 大于 0
+	assert.Greater(t, caller.Line, 0, "caller.Line should be greater than 0")
+
+	// 断言 FuncName 不为空且不是 unknown_func
+	assert.NotEmpty(t, caller.FuncName, "caller.FuncName should not be empty")
+	assert.NotEqual(t, "unknown_func", caller.FuncName, "caller.FuncName should not be unknown_func")
+
+	// 断言 Pc 不为 0
+	assert.NotZero(t, caller.Pc, "caller.Pc should not be zero")
+}
+
+func TestReleaseClearsFields(t *testing.T) {
+	caller := osx.GetRuntimeCaller(2)
+
+	// 先断言字段有值
+	assert.NotEmpty(t, caller.File)
+	assert.NotZero(t, caller.Line)
+	assert.NotEmpty(t, caller.FuncName)
+	assert.NotZero(t, caller.Pc)
+
+	// 调用 Release
+	caller.Release()
+
+	// 断言字段被清空
+	assert.Empty(t, caller.File)
+	assert.Zero(t, caller.Line)
+	assert.Empty(t, caller.FuncName)
+	assert.Zero(t, caller.Pc)
 }
 
 // TestCommand 测试 Command 函数

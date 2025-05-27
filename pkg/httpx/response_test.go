@@ -56,11 +56,11 @@ func TestResponseDecodeRespBodyXML(t *testing.T) {
 	assert.NoError(t, err)
 
 	req := httptest.NewRequest(http.MethodGet, "/test", bytes.NewReader(body))
-	req.Header.Set("Content-Type", ContentTypeTextXML)
+	req.Header.Set(HeaderContentType, ContentTypeTextXML)
 
 	rr := httptest.NewRecorder()
 	http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", ContentTypeTextXML)
+		w.Header().Set(HeaderContentType, ContentTypeTextXML)
 		w.WriteHeader(http.StatusOK)
 		w.Write(body)
 	}).ServeHTTP(rr, req)

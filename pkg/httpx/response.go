@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-28 18:55:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-29 18:49:55
+ * @LastEditTime: 2025-05-27 15:05:08
  * @FilePath: \go-toolbox\pkg\httpx\response.go
  * @Description: HTTP 响应封装
  *
@@ -17,7 +17,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/kamalyes/go-toolbox/pkg/errorx"
 )
@@ -61,13 +60,6 @@ func (r *Response) CheckStatus() error {
 func (r *Response) LogResponse() {
 	if r != nil && r.Response != nil {
 		log.Printf("Request to %s returned status %d", r.Request.URL, r.StatusCode) // 记录请求的 URL 和状态码
-	}
-}
-
-// SetTimeout 设置 HTTP 客户端的超时时间
-func SetTimeout(timeout time.Duration) *http.Client {
-	return &http.Client{
-		Timeout: timeout, // 设置超时时间
 	}
 }
 

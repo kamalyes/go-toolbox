@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-28 18:55:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-29 18:07:36
+ * @LastEditTime: 2025-05-27 15:05:08
  * @FilePath: \go-toolbox\pkg\httpx\client_test.go
  * @Description:
  *
@@ -19,17 +19,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 )
-
-// mapsEqual 检查两个映射是否相等，支持忽略长度比较
-func mapsEqual(t *testing.T, m1, m2 map[string][]string, ignoreLen bool) {
-	if !ignoreLen {
-		assert.Equal(t, m1, m2)
-	}
-	for key, aValue := range m1 {
-		bValue := m2[key]
-		assert.ElementsMatch(t, aValue, bValue)
-	}
-}
 
 // 验证 http.Client 的 Transport 配置
 func validateTransport(t *testing.T, client *http.Client) {

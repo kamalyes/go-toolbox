@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 10:50:50
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-12-10 12:15:07
+ * @LastEditTime: 2025-05-27 18:05:57
  * @FilePath: \go-toolbox\tests\convert_must_test.go
  * @Description:
  *
@@ -438,5 +438,126 @@ func TestStringSliceToFloatSlice(t *testing.T) {
 			}
 			assert.Equal(t, expected32, result32, "输入: %v, 预期: %v, 实际: %v", test.input, expected32, result32)
 		}
+	}
+}
+
+func TestStringSliceToInterfaceSlice_TableDriven(t *testing.T) {
+	tests := map[string]struct {
+		input    []string
+		expected []interface{}
+	}{
+		"normal": {
+			input:    []string{"a", "b", "c"},
+			expected: []interface{}{"a", "b", "c"},
+		},
+		"empty": {
+			input:    []string{},
+			expected: []interface{}{},
+		},
+		"empty string": {
+			input:    []string{"", "x", "y"},
+			expected: []interface{}{"", "x", "y"},
+		},
+		"spaces": {
+			input:    []string{" ", "  ", "abc"},
+			expected: []interface{}{" ", "  ", "abc"},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			result := convert.StringSliceToInterfaceSlice(tc.input)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func TestToNumberSlice_TableDriven(t *testing.T) {
+	tests := map[string]struct {
+		input    interface{}
+		expected []int
+		wantErr  bool
+	}{
+		"string numbers": {
+			input:    "1,2,3,4",
+			expected: []int{1, 2, 3, 4},
+			wantErr:  false,
+		},
+		"string slice numbers": {
+			input:    []string{"10", "20", "30"},
+			expected: []int{10, 20, 30},
+			wantErr:  false,
+		},
+		"empty string": {
+			input:    "",
+			expected: []int{},
+			wantErr:  false,
+		},
+		"string with spaces": {
+			input:    " 1 , 2 , 3 ",
+			expected: []int{1, 2, 3},
+			wantErr:  false,
+		},
+		"negative numbers": {
+			input:    "-1,-2,-3",
+			expected: []int{-1, -2, -3},
+			wantErr:  false,
+		},
+		"invalid number": {
+			input:   "1,2,abc",
+			wantErr: true,
+		},
+		"wrong type": {
+			input:   123,
+			wantErr: true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			result, err := convert.ToNumberSlice[int](tc.input, ",")
+			if tc.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.expected, result)
+			}
+		})
+	}
+}
+
+func TestMustToNumberSlice_TableDriven(t *testing.T) {
+	tests := map[string]struct {
+		input       string
+		expected    []int
+		expectPanic bool
+	}{
+		"normal": {
+			input:    "5,6,7",
+			expected: []int{5, 6, 7},
+		},
+		"with spaces": {
+			input:    " 8 , 9 , 10 ",
+			expected: []int{8, 9, 10},
+		},
+		"panic case": {
+			input:       "1,2,xyz",
+			expectPanic: true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			if tc.expectPanic {
+				assert.Panics(t, func() {
+					convert.MustToNumberSlice[int](tc.input, ",")
+				})
+			} else {
+				assert.NotPanics(t, func() {
+					got := convert.MustToNumberSlice[int](tc.input, ",")
+					assert.Equal(t, tc.expected, got)
+				})
+			}
+		})
 	}
 }

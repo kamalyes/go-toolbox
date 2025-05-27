@@ -156,7 +156,7 @@ func (r *Request) SetBodyForm(data url.Values) *Request {
 	r.bodyEncodeFunc = func(body any) (io.Reader, error) {
 		return strings.NewReader(body.(url.Values).Encode()), nil
 	}
-	r.SetHeader("Content-Type", ContentTypeWWWFormURLEncoded) // 设置 Content-Type 为表单
+	r.SetHeader(HeaderContentType, ContentTypeWWWFormURLEncoded) // 设置 Content-Type 为表单
 	return r
 }
 
@@ -182,7 +182,7 @@ func (r *Request) SetBodyMultipart(fieldName, fileName string, fileContent []byt
 	}
 
 	r.bodyBytes = &buf
-	r.SetHeader("Content-Type", ContentTypeMultipartFormData)
+	r.SetHeader(HeaderContentType, ContentTypeMultipartFormData)
 	return r
 }
 

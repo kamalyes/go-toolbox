@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-08-03 21:32:26
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-12-10 12:15:07
+ * @LastEditTime: 2025-05-27 18:09:55
  * @FilePath: \go-toolbox\pkg\convert\must.go
  * @Description:
  *
@@ -16,6 +16,7 @@ import (
 	"math"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/kamalyes/go-toolbox/pkg/stringx"
@@ -287,4 +288,44 @@ func StringSliceToInterfaceSlice(slice []string) []interface{} {
 		interfaceSlice[i] = v
 	}
 	return interfaceSlice
+}
+
+var defaultRoundMode = RoundNone
+
+// ToNumberSlice 支持输入是 string 或 []string
+func ToNumberSlice[T types.Numerical](input any, decollator string) ([]T, error) {
+	var strSlice []string
+
+	switch v := input.(type) {
+	case string:
+		if v == "" {
+			return []T{}, nil // 空字符串直接返回空切片，不继续拆分
+		}
+		// 自动拆分字符串
+		strSlice = strings.Split(v, decollator)
+	case []string:
+		strSlice = v
+	default:
+		return nil, fmt.Errorf("unsupported input type %T, want string or []string", input)
+	}
+
+	result := make([]T, 0, len(strSlice))
+	for _, s := range strSlice {
+		s = strings.TrimSpace(s) // 去掉前后空格
+		num, err := MustIntT[T](s, &defaultRoundMode)
+		if err != nil {
+			return nil, fmt.Errorf("转换失败，input=%q, err=%w", s, err)
+		}
+		result = append(result, num)
+	}
+	return result, nil
+}
+
+// MustToNumberSlice 是不返回错误版本，遇错 panic
+func MustToNumberSlice[T types.Numerical](input any, decollator string) []T {
+	nums, err := ToNumberSlice[T](input, decollator)
+	if err != nil {
+		panic(err)
+	}
+	return nums
 }
