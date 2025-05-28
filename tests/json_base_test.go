@@ -186,3 +186,78 @@ func TestReplaceKeysComplex(t *testing.T) {
 		}
 	}
 }
+
+type JsonUser struct {
+	Name string `json:"name"`
+	Age  int    `json:"age"`
+}
+
+func TestMarshalWithExtraField_Object(t *testing.T) {
+	u := JsonUser{Name: "Alice", Age: 30}
+	b, err := json.MarshalWithExtraField(u, "extra", "hello")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(b, &result); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+
+	// 验证原字段
+	if result["name"] != "Alice" {
+		t.Errorf("expected name=Alice, got %v", result["name"])
+	}
+	if age, ok := result["age"].(float64); !ok || age != 30 {
+		t.Errorf("expected age=30, got %v", result["age"])
+	}
+
+	// 验证额外字段
+	if result["extra"] != "hello" {
+		t.Errorf("expected extra=hello, got %v", result["extra"])
+	}
+}
+
+func TestMarshalWithExtraField_Map(t *testing.T) {
+	m := map[string]int{"a": 1, "b": 2}
+	b, err := json.MarshalWithExtraField(m, "x", 123)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(b, &result); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+
+	if result["a"] != float64(1) || result["b"] != float64(2) {
+		t.Errorf("unexpected map values: %v", result)
+	}
+	if result["x"] != float64(123) {
+		t.Errorf("expected x=123, got %v", result["x"])
+	}
+}
+
+func TestMarshalWithExtraField_Array_Fail(t *testing.T) {
+	arr := []int{1, 2, 3}
+	_, err := json.MarshalWithExtraField(arr, "extra", "fail")
+	if err == nil {
+		t.Errorf("expected error for array input, got nil")
+	}
+}
+
+func TestMarshalWithExtraField_String_Fail(t *testing.T) {
+	s := "hello"
+	_, err := json.MarshalWithExtraField(s, "extra", "fail")
+	if err == nil {
+		t.Errorf("expected error for string input, got nil")
+	}
+}
+
+func TestMarshalWithExtraField_Number_Fail(t *testing.T) {
+	n := 42
+	_, err := json.MarshalWithExtraField(n, "extra", "fail")
+	if err == nil {
+		t.Errorf("expected error for number input, got nil")
+	}
+}

@@ -27,3 +27,23 @@ var (
 	// NewEncoder is exported by go-toolbox/json package.
 	NewEncoder = json.NewEncoder
 )
+
+func MarshalWithExtraField(v any, extraKey string, extraValue any) ([]byte, error) {
+	// 先序列化成 JSON 字节
+	b, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+
+	// 反序列化成 map
+	var m map[string]interface{}
+	if err := json.Unmarshal(b, &m); err != nil {
+		return nil, err
+	}
+
+	// 添加额外字段
+	m[extraKey] = extraValue
+
+	// 重新序列化
+	return json.Marshal(m)
+}
