@@ -15,7 +15,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/kamalyes/go-toolbox/pkg/convert"
+	"github.com/kamalyes/go-toolbox/pkg/stringx"
 	"github.com/kamalyes/go-toolbox/pkg/types"
 )
 
@@ -105,7 +105,7 @@ func CountPathSegments(path string, prefixes ...string) int {
 	count := 0
 	// 遍历所有前缀并计算出现的次数
 	for _, prefix := range prefixes {
-		count += bytes.Count(convert.StringToSliceByte(path), []byte(prefix))
+		count += bytes.Count(stringx.ToSliceByte(path), []byte(prefix))
 	}
 	return count
 }

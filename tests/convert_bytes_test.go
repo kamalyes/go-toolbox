@@ -159,15 +159,6 @@ func TestSliceByteToString(t *testing.T) {
 	}
 }
 
-func TestStringToSliceByte(t *testing.T) {
-	s := "hello world"
-	b := convert.StringToSliceByte(s)
-
-	if string(b) != s {
-		t.Errorf("expected '%s', got '%s'", s, b)
-	}
-}
-
 func TestCountPathSegments(t *testing.T) {
 	tests := []struct {
 		path     string

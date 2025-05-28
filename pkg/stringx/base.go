@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+	"unsafe"
 
 	"github.com/kamalyes/go-toolbox/pkg/validator"
 )
@@ -389,4 +390,14 @@ func FindKeysByValue(data map[string]string, searchValue string) []string {
 		}
 	}
 	return result
+}
+
+// ToSliceByte 将字符串转换为字节切片
+func ToSliceByte(s string) []byte {
+	return *(*[]byte)(unsafe.Pointer(
+		&struct {
+			string
+			Cap int
+		}{s, len(s)},
+	))
 }

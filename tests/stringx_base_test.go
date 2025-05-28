@@ -171,3 +171,12 @@ func TestFindKeysByValue(t *testing.T) {
 		})
 	}
 }
+
+func TestStringToSliceByte(t *testing.T) {
+	s := "hello world"
+	b := stringx.ToSliceByte(s)
+
+	if string(b) != s {
+		t.Errorf("expected '%s', got '%s'", s, b)
+	}
+}

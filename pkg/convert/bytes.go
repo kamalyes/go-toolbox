@@ -67,13 +67,3 @@ func BytesToBinStrWithSplit(bs []byte, split string) string {
 func SliceByteToString(b []byte) string {
 	return *(*string)(unsafe.Pointer(&b))
 }
-
-// StringToSliceByte 将字符串转换为字节切片
-func StringToSliceByte(s string) []byte {
-	return *(*[]byte)(unsafe.Pointer(
-		&struct {
-			string
-			Cap int
-		}{s, len(s)},
-	))
-}
