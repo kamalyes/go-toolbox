@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-09 12:15:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-01-03 15:27:36
+ * @LastEditTime: 2025-05-28 17:37:41
  * @FilePath: \go-toolbox\tests\imgix_base_test.go
  * @Description:
  *
@@ -341,4 +341,30 @@ func TestAddOverlay(t *testing.T) {
 	maskedImg := imgix.AddOverlay(testImg, overlayColor)
 
 	assert.NotEqual(t, testImg, maskedImg, "无变化")
+}
+
+func TestMatchesAnyPattern(t *testing.T) {
+	cases := []struct {
+		input    string
+		patterns []string
+		want     bool
+	}{
+		{"photo.JPG", []string{"*.jpg", "*.png"}, true},
+		{"document.pdf", []string{"*.jpg", "*.png"}, false},
+		{"Picture.PnG", []string{"*.png"}, true},
+		{"image.gif", []string{"*.jpg", "*.gif", "*.bmp"}, true},
+		{"anything", []string{}, false},
+		{"", []string{"*"}, true},
+		{"file.txt", []string{"[invalid", "*.txt"}, true},
+		{"file1.txt", []string{"file?.txt"}, true},
+		{"file12.txt", []string{"file?.txt"}, false},
+		{"myfile_backup.txt", []string{"myfile*_backup.txt"}, true},
+	}
+
+	for _, c := range cases {
+		got := imgix.MatchesAnyPattern(c.input, c.patterns)
+		if got != c.want {
+			t.Errorf("MatchesAnyPattern(%q, %v) = %v; want %v", c.input, c.patterns, got, c.want)
+		}
+	}
 }

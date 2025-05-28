@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-09 12:15:51
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-01-03 15:18:55
+ * @LastEditTime: 2025-05-28 17:15:25
  * @FilePath: \go-toolbox\pkg\imgix\base.go
  * @Description:
  *
@@ -24,6 +24,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 )
 
 // LoadImageFromURL 从给定的 URL 加载图片并返回 image.Image 对象
@@ -167,4 +169,23 @@ func AddOverlay(originalImg image.Image, overlayColor color.RGBA) image.Image {
 	draw.Draw(maskedImg, bounds, overlay, image.Point{}, draw.Over)
 
 	return maskedImg
+}
+
+var DefaultImgPatterns = []string{"*.jpg", "*.jpeg", "*.png", "*.gif", "*.bmp", "*.webp", "*.tiff"}
+
+// MatchesAnyPattern 判断 input 字符串是否匹配 patterns 中任意一个通配符模式（不区分大小写）
+func MatchesAnyPattern(input string, patterns []string) bool {
+	inputLower := strings.ToLower(input)
+	for _, pattern := range patterns {
+		patternLower := strings.ToLower(pattern)
+		matched, err := filepath.Match(patternLower, inputLower)
+		if err != nil {
+			// 模式无效，跳过
+			continue
+		}
+		if matched {
+			return true
+		}
+	}
+	return false
 }
