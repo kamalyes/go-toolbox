@@ -523,3 +523,99 @@ func TestSliceIntersect(t *testing.T) {
 		})
 	}
 }
+
+// 简化RepeatField测试函数
+func runRepeatTest[T any](t *testing.T, name string, field T, count int, want []T) {
+	t.Run(name, func(t *testing.T) {
+		got := mathx.RepeatField(field, count)
+		assert.Equal(t, want, got)
+	})
+}
+
+// 接口类型
+type Speaker interface {
+	Speak() string
+}
+type Dog struct {
+	Name string
+}
+
+func (d Dog) Speak() string {
+	return "Woof! " + d.Name
+}
+
+func TestRepeatField(t *testing.T) {
+	// 基础类型
+	runRepeatTest(t, "string 3 times", "hello", 3, []string{"hello", "hello", "hello"})
+	runRepeatTest(t, "int 5 times", 42, 5, []int{42, 42, 42, 42, 42})
+	runRepeatTest(t, "float64 2 times", 3.14, 2, []float64{3.14, 3.14})
+	runRepeatTest(t, "bool true 4 times", true, 4, []bool{true, true, true, true})
+
+	// 自定义结构体
+	type Person struct {
+		Name string
+		Age  int
+	}
+	p := Person{"Alice", 30}
+	runRepeatTest(t, "struct 2 times", p, 2, []Person{p, p})
+
+	// 指针类型
+	pPtr := &Person{"Bob", 25}
+	t.Run("pointer 3 times", func(t *testing.T) {
+		got := mathx.RepeatField(pPtr, 3)
+		want := []*Person{pPtr, pPtr, pPtr}
+		assert.Equal(t, want, got)
+	})
+
+	// 数组类型
+	arr := [2]int{1, 2}
+	runRepeatTest(t, "array 2 times", arr, 2, [][2]int{arr, arr})
+
+	// 切片类型（引用类型）
+	slice := []string{"a", "b"}
+	runRepeatTest(t, "slice 3 times", slice, 3, [][]string{slice, slice, slice})
+
+	// map 类型（引用类型）
+	m := map[string]int{"x": 1}
+	runRepeatTest(t, "map 2 times", m, 2, []map[string]int{m, m})
+
+	var dog Speaker = Dog{Name: "Buddy"}
+	runRepeatTest(t, "interface 3 times", dog, 3, []Speaker{dog, dog, dog})
+
+	// 空接口类型
+	var anyVal interface{} = 123
+	runRepeatTest(t, "interface{} 4 times", anyVal, 4, []interface{}{123, 123, 123, 123})
+
+	// 指针数组
+	p1 := &Person{"Cathy", 20}
+	p2 := &Person{"David", 22}
+	ptrArr := [2]*Person{p1, p2}
+	runRepeatTest(t, "pointer array 2 times", ptrArr, 2, [][2]*Person{ptrArr, ptrArr})
+
+	// 嵌套结构体
+	type Address struct {
+		City string
+	}
+	type Employee struct {
+		Person  Person
+		Address Address
+	}
+	emp := Employee{
+		Person:  Person{Name: "Eve", Age: 28},
+		Address: Address{City: "Shanghai"},
+	}
+	runRepeatTest(t, "nested struct 2 times", emp, 2, []Employee{emp, emp})
+
+	// 自定义类型别名
+	type MyInt int
+	runRepeatTest(t, "custom int alias", MyInt(10), 3, []MyInt{10, 10, 10})
+
+	// 布尔指针
+	b := true
+	bp := &b
+	t.Run("bool pointer 2 times", func(t *testing.T) {
+		got := mathx.RepeatField(bp, 2)
+		want := []*bool{bp, bp}
+		assert.Equal(t, want, got)
+	})
+}
