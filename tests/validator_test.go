@@ -233,3 +233,44 @@ func TestIsNil(t *testing.T) {
 	ptrToNonNilInterface := &nonNilInterfaceValue
 	assert.False(t, validator.IsNil(ptrToNonNilInterface), "Expected pointer to non-nil interface to return false")
 }
+
+func TestIsIPAllowed(t *testing.T) {
+	tests := []struct {
+		name     string
+		ip       string
+		cidrList []string
+		want     bool
+	}{
+		// 正常情况
+		{"Exact IP match", "192.168.1.100", []string{"192.168.1.100"}, true},
+		{"IP in CIDR", "192.168.1.50", []string{"192.168.1.0/24"}, true},
+		{"IP not in CIDR", "192.168.2.1", []string{"192.168.1.0/24"}, false},
+		{"Multiple CIDRs one match", "10.0.0.5", []string{"192.168.1.0/24", "10.0.0.0/8"}, true},
+		{"Multiple CIDRs none match", "172.16.0.1", []string{"192.168.1.0/24", "10.0.0.0/8"}, false},
+
+		// IPv6
+		{"IPv6 exact match", "2001:db8::1", []string{"2001:db8::1"}, true},
+		{"IPv6 CIDR match", "2001:db8::abcd", []string{"2001:db8::/64"}, true},
+		{"IPv6 CIDR no match", "2001:db9::1", []string{"2001:db8::/64"}, false},
+
+		// 异常和边界情况
+		{"Empty IP", "", []string{"192.168.1.0/24"}, false},
+		{"Invalid IP format", "invalid-ip", []string{"192.168.1.0/24"}, false},
+		{"Empty CIDR list", "192.168.1.50", []string{}, false},
+		{"Nil CIDR list", "192.168.1.50", nil, false},
+		{"CIDR list contains empty string", "192.168.1.50", []string{""}, false},
+		{"CIDR list contains invalid CIDR", "192.168.1.50", []string{"invalid-cidr"}, false},
+		{"IP equals CIDR but CIDR invalid", "192.168.1.50", []string{"192.168.1.50/33"}, false}, // 33不是合法掩码
+		{"IP equals CIDR string but IP invalid", "999.999.999.999", []string{"999.999.999.999"}, false},
+
+		// IP equals CIDR string exact match优先
+		{"IP equals CIDR string exact match", "10.0.0.1", []string{"10.0.0.1", "10.0.0.0/8"}, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := validator.IsIPAllowed(tt.ip, tt.cidrList)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

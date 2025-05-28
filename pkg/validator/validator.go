@@ -12,6 +12,7 @@
 package validator
 
 import (
+	"net"
 	"reflect"
 	"strings"
 	"unicode"
@@ -109,4 +110,25 @@ func IsNil(x interface{}) bool {
 	}
 
 	return reflect.ValueOf(x).IsNil()
+}
+
+func IsIPAllowed(ip string, cidrList []string) bool {
+	clientIP := net.ParseIP(ip)
+	if clientIP == nil {
+		return false
+	}
+
+	for _, cidr := range cidrList {
+		if ip == cidr {
+			return true
+		}
+		_, ipNet, err := net.ParseCIDR(cidr)
+		if err != nil {
+			continue
+		}
+		if ipNet.Contains(clientIP) {
+			return true
+		}
+	}
+	return false
 }
