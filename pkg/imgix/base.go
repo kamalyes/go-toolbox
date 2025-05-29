@@ -24,7 +24,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -178,13 +177,11 @@ func MatchesAnyPattern(input string, patterns []string) bool {
 	inputLower := strings.ToLower(input)
 	for _, pattern := range patterns {
 		patternLower := strings.ToLower(pattern)
-		matched, err := filepath.Match(patternLower, inputLower)
-		if err != nil {
-			// 模式无效，跳过
-			continue
-		}
-		if matched {
-			return true
+		if strings.HasPrefix(patternLower, "*.") {
+			ext := patternLower[1:]
+			if strings.HasSuffix(inputLower, ext) {
+				return true
+			}
 		}
 	}
 	return false

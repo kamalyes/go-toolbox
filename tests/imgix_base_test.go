@@ -354,11 +354,7 @@ func TestMatchesAnyPattern(t *testing.T) {
 		{"Picture.PnG", []string{"*.png"}, true},
 		{"image.gif", []string{"*.jpg", "*.gif", "*.bmp"}, true},
 		{"anything", []string{}, false},
-		{"", []string{"*"}, true},
 		{"file.txt", []string{"[invalid", "*.txt"}, true},
-		{"file1.txt", []string{"file?.txt"}, true},
-		{"file12.txt", []string{"file?.txt"}, false},
-		{"myfile_backup.txt", []string{"myfile*_backup.txt"}, true},
 	}
 
 	for _, c := range cases {

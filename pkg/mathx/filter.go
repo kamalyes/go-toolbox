@@ -256,3 +256,93 @@ func (f *SliceFilter[T]) Result() []T {
 	f.result = res
 	return res
 }
+
+type FindResult[T any, V any] struct {
+	item  *T
+	val   V
+	found bool
+	// 允许写回 map 的引用
+	dataMap map[string]V
+	key     string
+	stopped bool // 是否停止链式调用
+}
+
+func (r *FindResult[T, V]) Item() *T {
+	return r.item
+}
+
+// 查找函数，返回 FindResult
+func FindUpdate[T any, V any](
+	item *T,
+	dataMap map[string]V,
+	getKey func(*T, ...any) string,
+	keyArgs ...any,
+) *FindResult[T, V] {
+	key := getKey(item, keyArgs...)
+	val, found := dataMap[key]
+	return &FindResult[T, V]{item, val, found, dataMap, key, false}
+}
+
+// 如果找到，执行回调，支持修改 item、val
+func (r *FindResult[T, V]) IfFound(f func(*T, *V)) *FindResult[T, V] {
+	if r.stopped {
+		return r
+	}
+	if r.found {
+		f(r.item, &r.val)
+		// 写回 map
+		r.dataMap[r.key] = r.val
+	}
+	return r
+}
+
+// 如果没找到，执行回调
+func (r *FindResult[T, V]) OrElse(f func(*T)) *FindResult[T, V] {
+	if r.stopped {
+		return r
+	}
+	if !r.found {
+		f(r.item)
+	}
+	return r
+}
+
+// 统一处理找到和没找到
+func (r *FindResult[T, V]) Then(onFound func(*T, *V), onNotFound func(*T)) *FindResult[T, V] {
+	if r.stopped {
+		return r
+	}
+	if r.found {
+		onFound(r.item, &r.val)
+		r.dataMap[r.key] = r.val
+	} else {
+		onNotFound(r.item)
+	}
+	return r
+}
+
+// 支持链式调用中断
+func (r *FindResult[T, V]) Stop() *FindResult[T, V] {
+	r.stopped = true
+	return r
+}
+
+// 支持条件执行，类似 if
+func (r *FindResult[T, V]) When(cond bool, f func(*FindResult[T, V])) *FindResult[T, V] {
+	if r.stopped {
+		return r
+	}
+	if cond {
+		f(r)
+	}
+	return r
+}
+
+// 支持无条件执行，方便写一些操作
+func (r *FindResult[T, V]) Do(f func(*FindResult[T, V])) *FindResult[T, V] {
+	if r.stopped {
+		return r
+	}
+	f(r)
+	return r
+}

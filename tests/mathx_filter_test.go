@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-05-29 13:15:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-05-29 13:55:55
+ * @LastEditTime: 2025-05-29 16:15:27
  * @FilePath: \go-toolbox\tests\mathx_filter_test.go
  * @Description:
  *
@@ -344,4 +344,48 @@ func BenchmarkFilterSliceByFunc(b *testing.B) {
 			return d.key == "key50" && d.count >= 50000
 		})
 	}
+}
+
+type TestItem struct {
+	Key  string
+	Data string
+	Flag bool
+}
+
+type TestValue struct {
+	Info  string
+	Count int
+}
+
+// keyFunc 改为使用 TestItem.Key 作为 map key
+func keyFunc(i *TestItem, args ...any) string {
+	return i.Key
+}
+
+func TestFindUpdate_Generic(t *testing.T) {
+	dataMap := map[string]TestValue{
+		"item1": {Info: "InitialInfo", Count: 1},
+	}
+
+	item := &TestItem{Key: "item1"}
+
+	mathx.FindUpdate(item, dataMap, keyFunc).
+		IfFound(func(i *TestItem, v *TestValue) {
+			i.Data = v.Info
+			v.Count++
+		}).
+		When(item.Flag, func(r *mathx.FindResult[TestItem, TestValue]) {
+			r.Do(func(r2 *mathx.FindResult[TestItem, TestValue]) {
+				r2.Item().Data += " (flagged)"
+			})
+		}).
+		OrElse(func(i *TestItem) {
+			i.Data = "default data"
+		})
+
+	// 使用 assert 校验
+	assert.Equal(t, "InitialInfo", item.Data, "Data 字段应为 'InitialInfo'")
+
+	val := dataMap["item1"]
+	assert.Equal(t, 2, val.Count, "Count 应该增加到 2")
 }
