@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date:2024-10-24 10:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-03 22:53:55
+ * @LastEditTime: 2025-06-04 09:59:38
  * @FilePath: \go-toolbox\tests\json_base_test.go
  * @Description:
  *
@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/kamalyes/go-toolbox/pkg/json"
+	"github.com/stretchr/testify/assert"
 )
 
 // 辅助函数，创建测试用例
@@ -259,5 +260,37 @@ func TestMarshalWithExtraField_Number_Fail(t *testing.T) {
 	_, err := json.MarshalWithExtraField(n, "extra", "fail")
 	if err == nil {
 		t.Errorf("expected error for number input, got nil")
+	}
+}
+
+func TestCompact(t *testing.T) {
+	cases := []string{
+		`{ "a": 1, "b": 2 }`,
+		`hello`,
+		``,
+		`[{"x":1},{"y":2}]`,
+		`123`,
+		`{"outer":{"inner":{"key":"value"}}, "arr":[1,2,3]}`,
+		`{"a":{"b":{"c":{"d":4}}}}`,
+	}
+
+	for _, input := range cases {
+		compacted := json.Compact([]byte(input))
+
+		var expectedObj interface{}
+		var actualObj interface{}
+
+		// 尝试解析原始输入
+		err1 := json.Unmarshal([]byte(input), &expectedObj)
+		// 尝试解析压缩结果
+		err2 := json.Unmarshal([]byte(compacted), &actualObj)
+
+		if err1 == nil && err2 == nil {
+			// 都是合法 JSON，比较解析后结构是否相等
+			assert.Equal(t, expectedObj, actualObj)
+		} else {
+			// 不是 JSON，直接比较字符串
+			assert.Equal(t, input, string(compacted))
+		}
 	}
 }
