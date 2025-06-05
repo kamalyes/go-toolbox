@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/kamalyes/go-toolbox/pkg/osx"
+	"github.com/kamalyes/go-toolbox/pkg/sign"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -230,37 +231,43 @@ func TestCreateIfNotExist(t *testing.T) {
 }
 
 func TestHash(t *testing.T) {
-	// 创建一个临时文件
+	// 创建临时文件
 	tempFile, err := os.CreateTemp("", "tempFile.txt")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(tempFile.Name())
 
-	// 写入内容到临时文件
+	// 写入测试内容
 	_, err = tempFile.Write([]byte("Hello, World!"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	tempFile.Close()
 
-	// 计算文件的MD5哈希值
-	hash, err := osx.ComputeHashes(tempFile.Name())
+	// 计算哈希，返回map
+	hashMap, err := osx.ComputeHashes(tempFile.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// 验证哈希值是否正确
-	expectedMd5Hash := "65a8e27d8879283831b664bd8b7f0ad4"
-	expectedSha1Hash := "0a0a9f2a6772942557ab5355d76af442f8f65e01"
-	expectedSha224Hash := "72a23dfa411ba6fde01dbfabf3b00a709c93ebf273dc29e2d8b261ff"
-	expectedSha256Hash := "dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a4b28688a362182986f"
-	expectedSha384Hash := "5485cc9b3365b4305dfb4e8337e0a598a574f8242bf17289e0dd6c20a3cd44a089de16ab4ab308f63e44b1170eb5f515"
-	expectedSha512Hash := "374d794a95cdcfd8b35993185fef9ba368f160d8daf432d08ba9f1ed1e5abe6cc69291e0fa2fe0006a52570ef18c19def4e617c33ce52ef0a6e5fbe318cb0387"
-	assert.Equal(t, expectedMd5Hash, hash.MD5, fmt.Sprintf("Expected md5 %s, got %s", expectedMd5Hash, hash.MD5))
-	assert.Equal(t, expectedSha1Hash, hash.SHA1, fmt.Sprintf("Expected sha1 %s, got %s", expectedSha1Hash, hash.SHA1))
-	assert.Equal(t, expectedSha224Hash, hash.SHA224, fmt.Sprintf("Expected sha224 %s, got %s", expectedSha224Hash, hash.SHA224))
-	assert.Equal(t, expectedSha256Hash, hash.SHA256, fmt.Sprintf("Expected sha256 %s, got %s", expectedSha256Hash, hash.SHA256))
-	assert.Equal(t, expectedSha384Hash, hash.SHA384, fmt.Sprintf("Expected sha256 %s, got %s", expectedSha384Hash, hash.SHA384))
-	assert.Equal(t, expectedSha512Hash, hash.SHA512, fmt.Sprintf("Expected sha512 %s, got %s", expectedSha512Hash, hash.SHA512))
+	expected := map[sign.HashCryptoFunc]string{
+		sign.AlgorithmMD5:    "65a8e27d8879283831b664bd8b7f0ad4",
+		sign.AlgorithmSHA1:   "0a0a9f2a6772942557ab5355d76af442f8f65e01",
+		sign.AlgorithmSHA224: "72a23dfa411ba6fde01dbfabf3b00a709c93ebf273dc29e2d8b261ff",
+		sign.AlgorithmSHA256: "dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a4b28688a362182986f",
+		sign.AlgorithmSHA384: "5485cc9b3365b4305dfb4e8337e0a598a574f8242bf17289e0dd6c20a3cd44a089de16ab4ab308f63e44b1170eb5f515",
+		sign.AlgorithmSHA512: "374d794a95cdcfd8b35993185fef9ba368f160d8daf432d08ba9f1ed1e5abe6cc69291e0fa2fe0006a52570ef18c19def4e617c33ce52ef0a6e5fbe318cb0387",
+	}
+
+	// 遍历期望值逐个断言
+	for algo, expectedHash := range expected {
+		actualHash, ok := hashMap[algo]
+		if !ok {
+			t.Errorf("缺少算法 %s 的哈希结果", algo)
+			continue
+		}
+		assert.Equal(t, expectedHash, actualHash, fmt.Sprintf("算法 %s 哈希不匹配", algo))
+	}
 }

@@ -12,7 +12,9 @@ package osx
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
+	"hash"
 	"image"
 	"image/jpeg"
 	"image/png"
@@ -160,58 +162,36 @@ func FileNameWithoutExt(file string) string {
 	return strings.TrimSuffix(file, filepath.Ext(file))
 }
 
-// HashResult 是一个结构体，用于存储不同哈希算法的结果。
-type HashResult struct {
-	MD5    string
-	SHA1   string
-	SHA224 string
-	SHA256 string
-	SHA384 string
-	SHA512 string
-}
-
-// ComputeHashes 计算并返回文件的所有哈希值。
-func ComputeHashes(filePath string) (*HashResult, error) {
-	// 打开文件
+// ComputeHashes 计算文件的多种哈希值，优化为只读一次文件
+func ComputeHashes(filePath string) (map[sign.HashCryptoFunc]string, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
 
-	// 定义哈希结果
-	hashes := &HashResult{}
-
-	// 定义算法与结果字段的映射
-	hashFields := map[sign.HashCryptoFunc]*string{
-		sign.AlgorithmMD5:    &hashes.MD5,
-		sign.AlgorithmSHA1:   &hashes.SHA1,
-		sign.AlgorithmSHA224: &hashes.SHA224,
-		sign.AlgorithmSHA256: &hashes.SHA256,
-		sign.AlgorithmSHA384: &hashes.SHA384,
-		sign.AlgorithmSHA512: &hashes.SHA512,
+	// 创建哈希实例
+	hashes := map[sign.HashCryptoFunc]hash.Hash{}
+	for algo, constructor := range sign.SupportHMACCryptoFunc {
+		hashes[algo] = constructor()
 	}
 
-	// 读取文件内容并计算哈希
-	for algo, resultField := range hashFields {
-		// 重置文件指针到文件开始
-		if _, err := file.Seek(0, io.SeekStart); err != nil {
-			return nil, err
-		}
+	// 构造 MultiWriter 写入多个哈希器
+	writers := make([]io.Writer, 0, len(hashes))
+	for _, h := range hashes {
+		writers = append(writers, h)
+	}
+	multiWriter := io.MultiWriter(writers...)
 
-		hasher, err := sign.NewHasher(algo)
-		if err != nil {
-			return nil, err
-		}
-
-		hash, err := hasher.Hash(file)
-		if err != nil {
-			return nil, err
-		}
-
-		// 设置哈希值
-		*resultField = hash
+	// 读取文件一次，写入所有哈希器
+	if _, err := io.Copy(multiWriter, file); err != nil {
+		return nil, err
 	}
 
-	return hashes, nil
+	results := make(map[sign.HashCryptoFunc]string, len(hashes))
+	for algo, h := range hashes {
+		results[algo] = hex.EncodeToString(h.Sum(nil))
+	}
+
+	return results, nil
 }

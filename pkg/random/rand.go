@@ -134,32 +134,45 @@ func createASCIIList(start, end int) *[]int {
  *  @param mode 字符串模式 random.NUMBER|random.LOWERCASE|random.SPECIAL|random.CAPITAL)
  *  @return str 生成的字符串
  */
-func RandString(n int, mode RandType) (str string) {
+func RandString(n int, mode RandType) string {
+	// 初始化ASCII码列表，只执行一次
 	initASCII()
+
 	var (
-		build strings.Builder
-		ascii []int
+		build strings.Builder // 用于高效构建字符串
+		ascii []int           // 用于存储所有符合mode的字符的ASCII码集合
+		r     = NewRand()     // 创建一个带时间种子的随机数生成器
 	)
-	if mode&CAPITAL >= CAPITAL {
+
+	// 判断mode中是否包含大写字母字符集，如果包含则追加对应ASCII码
+	if mode&CAPITAL != 0 {
 		ascii = append(ascii, *matchCapital...)
 	}
-	if mode&LOWERCASE >= LOWERCASE {
+	// 判断mode中是否包含小写字母字符集，如果包含则追加对应ASCII码
+	if mode&LOWERCASE != 0 {
 		ascii = append(ascii, *matchLowercase...)
 	}
-	if mode&SPECIAL >= SPECIAL {
+	// 判断mode中是否包含特殊字符集，如果包含则追加对应ASCII码
+	if mode&SPECIAL != 0 {
 		ascii = append(ascii, *matchSpecial...)
 	}
-	if mode&NUMBER >= NUMBER {
+	// 判断mode中是否包含数字字符集，如果包含则追加对应ASCII码
+	if mode&NUMBER != 0 {
 		ascii = append(ascii, *matchNumber...)
 	}
+
+	// 如果没有任何字符集被选中，ascii长度为0，返回空字符串
 	if len(ascii) == 0 {
-		return
+		return ""
 	}
+
+	// 循环n次，每次随机选择一个ascii码对应的字符追加到字符串中
 	for i := 0; i < n; i++ {
-		build.WriteString(string(rune(ascii[NewRand().Intn(len(ascii))])))
+		randomIndex := r.Intn(len(ascii))         // 在ascii切片中随机选一个索引
+		build.WriteRune(rune(ascii[randomIndex])) // 将对应ASCII码转换成字符写入builder
 	}
-	str = build.String()
-	return
+
+	return build.String() // 返回最终生成的随机字符串
 }
 
 // RandStringSlice 指定长度的随机字符串

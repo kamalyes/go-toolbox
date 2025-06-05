@@ -13,7 +13,7 @@ package random
 
 const (
 	// CAPITAL 包含大写字母
-	CAPITAL RandType = iota + 1 // 自定义扩展
+	CAPITAL RandType = 1 << iota // 自定义扩展
 	// LOWERCASE 包含小写字母
 	LOWERCASE
 	// SPECIAL 包含特殊字符
