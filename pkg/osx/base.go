@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-05-26 10:01:15
+ * @LastEditTime: 2025-06-05 18:55:35
  * @FilePath: \go-toolbox\pkg\osx\base.go
  * @Description:
  *
@@ -12,6 +12,8 @@ package osx
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
@@ -23,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kamalyes/go-toolbox/pkg/mathx"
 	"github.com/kamalyes/go-toolbox/pkg/random"
 	"github.com/kamalyes/go-toolbox/pkg/stringx"
 )
@@ -56,6 +59,28 @@ func HashUnixMicroCipherText() string {
 		cipherText   = stringx.CalculateMD5Hash(plainText)
 	)
 	return cipherText
+}
+
+// StableHashSlot 根据输入字符串 s 和范围 [minNum, maxNum]，返回一个稳定且范围内的整数
+// 使用加密哈希 sha256，抗碰撞更强
+// 如果 maxNum < minNum，会 panic
+// 如果 maxNum == minNum，直接返回 minNum
+func StableHashSlot(s string, minNum, maxNum int) int {
+	if maxNum < minNum {
+		panic("maxNum must be >= minNum")
+	}
+	if maxNum == minNum {
+		return minNum
+	}
+
+	var (
+		hashBytes = sha256.Sum256([]byte(s))
+		// 取哈希结果的前8字节转为uint64
+		hashVal   = binary.BigEndian.Uint64(hashBytes[:8])
+		rangeSize = maxNum - minNum + 1
+		result    = int(hashVal%uint64(rangeSize)) + minNum
+	)
+	return mathx.IF(result > 0, result, 1)
 }
 
 // getNetworkInterfaces 返回所有网络接口的 IP 地址
