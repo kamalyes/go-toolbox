@@ -13,6 +13,7 @@ package osx
 import (
 	"io"
 	"log"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -93,4 +94,27 @@ func MkdirTemp() string {
 // JoinPaths 连接绝对路径和相对路径。
 func JoinPaths(absolutePath, relativePath string) string {
 	return path.Join(absolutePath, relativePath)
+}
+
+// JoinURL 拼接URL，确保路径拼接正确
+func JoinURL(base, p string) (string, error) {
+	baseURL, err := url.Parse(base)
+	if err != nil {
+		return "", err
+	}
+	// 使用path.Join拼接路径，避免重复斜杠
+	baseURL.Path = path.Join(baseURL.Path, p)
+	return baseURL.String(), nil
+}
+
+// ParseUrlPath 解析Url中Path部分
+func ParseUrlPath(urlString string) (path string) {
+	var (
+		err error
+		u   *url.URL
+	)
+	if u, err = url.Parse(urlString); err != nil {
+		return path
+	}
+	return u.Path
 }

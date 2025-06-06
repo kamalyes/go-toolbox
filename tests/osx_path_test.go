@@ -13,9 +13,13 @@ package tests
 import (
 	"fmt"
 	"io/ioutil"
+	"math/rand"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/kamalyes/go-toolbox/pkg/osx"
 	"github.com/stretchr/testify/assert"
@@ -194,4 +198,76 @@ func setup() {
 // 在测试之后清理创建的文件
 func teardown() {
 	os.RemoveAll(osxTestRootPath)
+}
+
+// 随机生成测试用例并测试
+func TestJoinURLRandom(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
+
+	// 随机生成路径片段
+	genPath := func() string {
+		parts := []string{"api", "v1", "user", "profile", "data", "info"}
+		n := rand.Intn(3) + 1 // 1~3段路径
+		p := ""
+		for i := 0; i < n; i++ {
+			if i > 0 {
+				p += "/"
+			}
+			p += parts[rand.Intn(len(parts))]
+		}
+		// 随机决定是否加前置斜杠
+		if rand.Intn(2) == 0 {
+			p = "/" + p
+		}
+		return p
+	}
+
+	// 随机生成base URL
+	genBase := func() string {
+		bases := []string{
+			"https://example.com",
+			"https://example.com/",
+			"https://example.com/api",
+			"https://example.com/api/",
+		}
+		return bases[rand.Intn(len(bases))]
+	}
+
+	// 生成随机测试用例数量
+	for i := 0; i < 20; i++ {
+		base := genBase()
+		p := genPath()
+
+		// 直接调用 JoinURL
+		result, err := osx.JoinURL(base, p)
+		assert.NoError(t, err)
+
+		// 计算期望结果（用标准库path.Join拼接baseURL.Path和p）
+		baseURL, _ := url.Parse(base)
+		expectedPath := path.Join(baseURL.Path, p)
+		expectedURL := *baseURL
+		expectedURL.Path = expectedPath
+
+		assert.Equal(t, expectedURL.String(), result, "base=%q path=%q", base, p)
+	}
+}
+
+func TestParseUrlPath(t *testing.T) {
+	tests := []struct {
+		urlString string
+		expected  string
+	}{
+		{"http://example.com/path/to/resource", "/path/to/resource"},
+		{"https://example.com/another/path?query=param", "/another/path"},
+		{"ftp://example.com/file.txt", "/file.txt"},
+		{"http://example.com/", "/"},
+		{"invalid-url", "invalid-url"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.urlString, func(t *testing.T) {
+			result := osx.ParseUrlPath(test.urlString)
+			assert.Equal(t, test.expected, result)
+		})
+	}
 }
