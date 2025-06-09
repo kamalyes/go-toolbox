@@ -3,7 +3,7 @@
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2024-11-10 00:15:15
- * @FilePath: \go-toolbox\pkg\json\base.go
+ * @FilePath: \go-toolbox\pkg\mathx\base.go
  * @Description: 计算给定概率分布（map）的熵值
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.

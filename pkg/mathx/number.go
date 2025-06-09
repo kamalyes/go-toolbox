@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-02-19 10:15:29
+ * @LastEditTime: 2025-06-09 16:40:16
  * @FilePath: \go-toolbox\pkg\mathx\number.go
  * @Description:
  *
@@ -14,7 +14,9 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"strings"
 
+	"github.com/kamalyes/go-toolbox/pkg/convert"
 	"github.com/kamalyes/go-toolbox/pkg/stringx"
 	"github.com/kamalyes/go-toolbox/pkg/types"
 )
@@ -127,4 +129,14 @@ func EqualSlices[T comparable](a, b []T) bool {
 		}
 	}
 	return true
+}
+
+// ParseIntOrName 解析字符串为数字或名称映射的数字
+func ParseIntOrName(expr string, names map[string]uint) (uint, error) {
+	if names != nil {
+		if val, ok := names[strings.ToLower(expr)]; ok {
+			return val, nil
+		}
+	}
+	return convert.MustIntT[uint](expr, nil)
 }

@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-13 13:06:30
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-01-09 13:25:35
+ * @LastEditTime: 2025-06-09 11:36:21
  * @FilePath: \go-toolbox\tests\syncx_lock_test.go
  * @Description:
  *
@@ -243,4 +243,312 @@ func TestWithRLockReturnValue(t *testing.T) {
 	})
 
 	assert.Equal(t, 42, result, "Expected result to be 42")
+}
+
+// --------------------------------------------------
+// 模拟一个支持 TryLock 的简单互斥锁实现
+type TryMutex struct {
+	mu sync.Mutex
+}
+
+func (m *TryMutex) Lock() {
+	m.mu.Lock()
+}
+
+func (m *TryMutex) Unlock() {
+	m.mu.Unlock()
+}
+
+func (m *TryMutex) TryLock() bool {
+	// 这里示例用 false，实际不调用
+	return false
+}
+
+// 用 channel 模拟的简单 TryMutex 实现
+type ChanTryMutex struct {
+	ch chan struct{}
+}
+
+func NewChanTryMutex() *ChanTryMutex {
+	m := &ChanTryMutex{ch: make(chan struct{}, 1)}
+	m.ch <- struct{}{} // 初始化时可用
+	return m
+}
+
+func (m *ChanTryMutex) Lock() {
+	<-m.ch
+}
+
+func (m *ChanTryMutex) Unlock() {
+	select {
+	case m.ch <- struct{}{}:
+	default:
+		panic("unlock of unlocked mutex")
+	}
+}
+
+func (m *ChanTryMutex) TryLock() bool {
+	select {
+	case <-m.ch:
+		return true
+	default:
+		return false
+	}
+}
+
+// --------------------------------------------------
+// 模拟一个支持 TryRLock 的读写锁实现
+type TryRWMutex struct {
+	mu         sync.RWMutex
+	tryRLockCh chan struct{}
+}
+
+func NewTryRWMutex() *TryRWMutex {
+	m := &TryRWMutex{
+		tryRLockCh: make(chan struct{}, 1),
+	}
+	m.tryRLockCh <- struct{}{}
+	return m
+}
+
+func (m *TryRWMutex) RLock() {
+	m.mu.RLock()
+}
+
+func (m *TryRWMutex) RUnlock() {
+	m.mu.RUnlock()
+}
+
+func (m *TryRWMutex) TryRLock() bool {
+	select {
+	case <-m.tryRLockCh:
+		m.mu.RLock()
+		return true
+	default:
+		return false
+	}
+}
+
+func (m *TryRWMutex) RUnlockTry() {
+	m.mu.RUnlock()
+	m.releaseTryRLockSignal()
+}
+
+// 新增：安全恢复信号，非阻塞放入
+func (m *TryRWMutex) releaseTryRLockSignal() {
+	select {
+	case m.tryRLockCh <- struct{}{}:
+	default:
+	}
+}
+
+// --------------------------------------------------
+// 这里模拟 syncx 包里的错误变量
+var ErrLockNotAcquired = assert.AnError
+
+// 这里模拟 syncx 包里的辅助函数（简化版）
+func WithTryLock(mu interface {
+	TryLock() bool
+	Unlock()
+}, fn func()) error {
+	if !mu.TryLock() {
+		return ErrLockNotAcquired
+	}
+	defer mu.Unlock()
+	fn()
+	return nil
+}
+
+func WithTryLockReturn[T any](mu interface {
+	TryLock() bool
+	Unlock()
+}, fn func() (T, error)) (T, error) {
+	var zero T
+	if !mu.TryLock() {
+		return zero, ErrLockNotAcquired
+	}
+	defer mu.Unlock()
+	return fn()
+}
+
+func WithTryLockReturnValue[T any](mu interface {
+	TryLock() bool
+	Unlock()
+}, fn func() T) (T, error) {
+	var zero T
+	if !mu.TryLock() {
+		return zero, ErrLockNotAcquired
+	}
+	defer mu.Unlock()
+	return fn(), nil
+}
+
+func WithTryRLock(mu interface {
+	TryRLock() bool
+	RUnlockTry()
+}, fn func()) error {
+	if !mu.TryRLock() {
+		return ErrLockNotAcquired
+	}
+	defer mu.RUnlockTry()
+	fn()
+	return nil
+}
+
+func WithTryRLockReturn[T any](mu interface {
+	TryRLock() bool
+	RUnlockTry()
+}, fn func() (T, error)) (T, error) {
+	var zero T
+	if !mu.TryRLock() {
+		return zero, ErrLockNotAcquired
+	}
+	defer mu.RUnlockTry()
+	return fn()
+}
+
+func WithTryRLockReturnValue[T any](mu interface {
+	TryRLock() bool
+	RUnlockTry()
+}, fn func() T) (T, error) {
+	var zero T
+	if !mu.TryRLock() {
+		return zero, ErrLockNotAcquired
+	}
+	defer mu.RUnlockTry()
+	return fn(), nil
+}
+
+// --------------------------------------------------
+
+func TestWithTryLock(t *testing.T) {
+	mu := NewChanTryMutex()
+
+	err := WithTryLock(mu, func() {
+		// 执行任务
+	})
+	assert.NoError(t, err)
+
+	mu.Lock()
+	err = WithTryLock(mu, func() {
+		t.Fatal("不应该执行到这里")
+	})
+	assert.ErrorIs(t, err, ErrLockNotAcquired)
+	mu.Unlock()
+}
+
+func TestWithTryLockReturn(t *testing.T) {
+	mu := NewChanTryMutex()
+
+	v, err := WithTryLockReturn(mu, func() (int, error) {
+		return 42, nil
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, 42, v)
+
+	mu.Lock()
+	v, err = WithTryLockReturn(mu, func() (int, error) {
+		t.Fatal("不应该执行操作")
+		return 0, nil
+	})
+	assert.ErrorIs(t, err, ErrLockNotAcquired)
+	assert.Equal(t, 0, v)
+	mu.Unlock()
+}
+
+func TestWithTryLockReturnValue(t *testing.T) {
+	mu := NewChanTryMutex()
+
+	v, err := WithTryLockReturnValue(mu, func() string {
+		return "hello"
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "hello", v)
+
+	mu.Lock()
+	v, err = WithTryLockReturnValue(mu, func() string {
+		t.Fatal("不应该执行操作")
+		return ""
+	})
+	assert.ErrorIs(t, err, ErrLockNotAcquired)
+	assert.Equal(t, "", v)
+	mu.Unlock()
+}
+
+func TestWithTryRLock(t *testing.T) {
+	rwmu := NewTryRWMutex()
+
+	err := WithTryRLock(rwmu, func() {
+		// 执行读操作
+	})
+	assert.NoError(t, err)
+
+	// 安全消耗信号，模拟 TryRLock 失败
+	select {
+	case <-rwmu.tryRLockCh:
+	default:
+		t.Fatal("信号通道已空，无法消耗信号")
+	}
+
+	err = WithTryRLock(rwmu, func() {
+		t.Fatal("不应该执行操作")
+	})
+	assert.ErrorIs(t, err, ErrLockNotAcquired)
+
+	// 恢复信号，避免影响后续测试
+	rwmu.releaseTryRLockSignal()
+}
+
+func TestWithTryRLockReturn(t *testing.T) {
+	rwmu := NewTryRWMutex()
+
+	v, err := WithTryRLockReturn(rwmu, func() (string, error) {
+		return "read", nil
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "read", v)
+
+	// 安全消耗信号，模拟失败
+	select {
+	case <-rwmu.tryRLockCh:
+	default:
+		t.Fatal("信号通道已空，无法消耗信号")
+	}
+
+	v, err = WithTryRLockReturn(rwmu, func() (string, error) {
+		t.Fatal("不应该执行操作")
+		return "", nil
+	})
+	assert.ErrorIs(t, err, ErrLockNotAcquired)
+	assert.Equal(t, "", v)
+
+	// 恢复信号
+	rwmu.releaseTryRLockSignal()
+}
+
+func TestWithTryRLockReturnValue(t *testing.T) {
+	rwmu := NewTryRWMutex()
+
+	v, err := WithTryRLockReturnValue(rwmu, func() string {
+		return "readValue"
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "readValue", v)
+
+	// 安全消耗信号，模拟失败
+	select {
+	case <-rwmu.tryRLockCh:
+	default:
+		t.Fatal("信号通道已空，无法消耗信号")
+	}
+
+	v, err = WithTryRLockReturnValue(rwmu, func() string {
+		t.Fatal("不应该执行操作")
+		return ""
+	})
+	assert.ErrorIs(t, err, ErrLockNotAcquired)
+	assert.Equal(t, "", v)
+
+	// 恢复信号
+	rwmu.releaseTryRLockSignal()
 }

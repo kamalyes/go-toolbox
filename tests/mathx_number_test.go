@@ -298,3 +298,34 @@ func TestLongestCommonPrefix(t *testing.T) {
 		})
 	}
 }
+
+func TestParseIntOrName(t *testing.T) {
+	names := map[string]uint{
+		"jan": 1,
+		"feb": 2,
+		"mar": 3,
+		"dec": 12,
+	}
+
+	tests := []struct {
+		input    string
+		expected uint
+		wantErr  bool
+	}{
+		{"jan", 1, false},
+		{"FEB", 2, false},
+		{"10", 10, false},
+		{"0", 0, false},
+		{"abc", 0, true},
+	}
+
+	for _, tt := range tests {
+		got, err := mathx.ParseIntOrName(tt.input, names)
+		if tt.wantErr {
+			assert.Error(t, err, "ParseIntOrName(%q) should return error", tt.input)
+		} else {
+			assert.NoError(t, err, "ParseIntOrName(%q) unexpected error", tt.input)
+			assert.Equal(t, tt.expected, got, "ParseIntOrName(%q) got wrong result", tt.input)
+		}
+	}
+}
