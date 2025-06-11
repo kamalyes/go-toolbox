@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-12-05 17:55:55
+ * @LastEditTime: 2025-06-11 18:16:16
  * @FilePath: \go-toolbox\pkg\moment\base.go
  * @Description:
  *
@@ -141,18 +141,9 @@ func CalculateAge(birthday string, currentTime time.Time) (int, error) {
 	return age, nil
 }
 
-// DaysInMonth 获取指定年份和月份的天数
-func DaysInMonth(month, year int) int {
-	if month == 2 {
-		if (year%4 == 0 && year%100 != 0) || (year%400 == 0) {
-			return 29 // 闰年
-		}
-		return 28 // 平年
-	}
-	if month == 4 || month == 6 || month == 9 || month == 11 {
-		return 30 // 30天的月份
-	}
-	return 31 // 31天的月份
+// DaysInMonth 计算指定年月的天数
+func DaysInMonth(year int, month time.Month) int {
+	return time.Date(year, month+1, 0, 0, 0, 0, 0, time.Local).Day()
 }
 
 // NowTime 获取时间的辅助函数
@@ -288,4 +279,98 @@ func CharToCode(layout string) string {
 	}
 	replacer := strings.NewReplacer(characters...)
 	return replacer.Replace(layout)
+}
+
+// DayOfYear 获取指定年份的第n天，时分秒归零
+func DayOfYear(year int, n int) time.Time {
+	// 先获取该年1月1日
+	firstDay := time.Date(year, time.January, 1, 0, 0, 0, 0, time.Local)
+	// 加上n-1天
+	return firstDay.AddDate(0, 0, n-1)
+}
+
+// LastDayOfMonth 获取当月最后一天，时分秒归零
+func LastDayOfMonth(year int, month time.Month) time.Time {
+	// 当月第一天
+	firstDay := time.Date(year, month, 1, 0, 0, 0, 0, time.Local)
+	// 下个月第一天
+	nextMonth := firstDay.AddDate(0, 1, 0)
+	// 下个月第一天减一天即当月最后一天
+	lastDay := nextMonth.AddDate(0, 0, -1)
+	return lastDay
+}
+
+// LastWeekdayOfMonth 获取当月最后一个指定星期几（如最后一个周五）
+// 返回时间，时分秒归零
+func LastWeekdayOfMonth(year int, month time.Month, target time.Weekday) time.Time {
+	// 获取当月最后一天
+	lastDay := LastDayOfMonth(year, month)
+
+	// lastDay的星期几
+	wd := lastDay.Weekday()
+
+	// 计算距离目标星期几需要往前推几天
+	// 例如：lastDay是周日(0)，目标是周五(5)，往前推2天
+	daysBack := (int(wd) - int(target) + 7) % 7
+
+	// 往前推daysBack天
+	lastTargetDay := lastDay.AddDate(0, 0, -daysBack)
+
+	return lastTargetDay
+}
+
+// NextWorkDay 返回指定日期的下一个工作日（周一至周五）
+// 规则说明：
+// - 输入日期是周一到周四，返回下一天（一定是工作日）
+// - 输入日期是周五，返回下周一（跳过周六、周日）
+// - 输入日期是周六，返回下周一（加2天）
+// - 输入日期是周日，返回下周一（加1天）
+// 跨月跨年由 time.AddDate 自动处理，无需额外判断
+func NextWorkDay(year int, month time.Month, day int) time.Time {
+	// 构造时间对象，时分秒设为0，使用本地时区
+	t := time.Date(year, month, day, 0, 0, 0, 0, time.Local)
+
+	// 定义一个数组，索引为 Weekday 值（0=周日，1=周一，...，6=周六）
+	// 数组值表示从该日期到下一个工作日需要加的天数
+	// 解释：
+	// 周日(0)  -> +1 天，变成周一
+	// 周一(1)  -> +1 天，变成周二
+	// 周二(2)  -> +1 天，变成周三
+	// 周三(3)  -> +1 天，变成周四
+	// 周四(4)  -> +1 天，变成周五
+	// 周五(5)  -> +3 天，跳过周六、周日，变成下周一
+	// 周六(6)  -> +2 天，跳过周日，变成下周一
+	daysToAddMap := make(map[time.Weekday]int)
+
+	// 先把周日、周一到周四全部赋值为1
+	for _, day := range []time.Weekday{time.Sunday, time.Monday, time.Tuesday, time.Wednesday, time.Thursday} {
+		daysToAddMap[day] = 1
+	}
+
+	// 单独赋值剩下的周五、周六
+	daysToAddMap[time.Friday] = 3
+	daysToAddMap[time.Saturday] = 2
+
+	// 获取输入日期的星期几（0-6）
+	wd := t.Weekday()
+
+	// 根据星期几从数组中取对应的加天数
+	daysToAdd := daysToAddMap[wd]
+
+	// 返回加上对应天数后的日期，即下一个工作日
+	return t.AddDate(0, 0, daysToAdd)
+}
+
+// NextWeekday 返回指定日期的下一个目标星期几
+// 如果当天是目标星期几，则返回下一周的同一天（加7天）
+func NextWeekday(year int, month time.Month, day int, target time.Weekday) time.Time {
+	t := time.Date(year, month, day, 0, 0, 0, 0, time.Local)
+	wd := t.Weekday()
+
+	daysToAdd := (int(target) - int(wd) + 7) % 7
+	if daysToAdd == 0 {
+		daysToAdd = 7
+	}
+
+	return t.AddDate(0, 0, daysToAdd)
 }

@@ -439,9 +439,9 @@ func BubbleSort(arr []int) {
 // RepeatField 返回一个长度为 count 的切片，
 // 切片中的每个元素都是传入的 field 值的副本。
 func RepeatField[T any](field T, count int) []T {
-    s := make([]T, count)   // 创建一个长度为 count 的切片，元素类型为 T
-    for i := range s {
-        s[i] = field        // 将 field 赋值给切片的每个元素
-    }
-    return s               // 返回填充好的切片
+	s := make([]T, count) // 创建一个长度为 count 的切片，元素类型为 T
+	for i := range s {
+		s[i] = field // 将 field 赋值给切片的每个元素
+	}
+	return s // 返回填充好的切片
 }

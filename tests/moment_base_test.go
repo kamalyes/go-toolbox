@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-02-13 15:28:36
+ * @LastEditTime: 2025-06-11 18:15:26
  * @FilePath: \go-toolbox\tests\moment_base_test.go
  * @Description:
  *
@@ -317,5 +317,165 @@ func TestDayDefault(t *testing.T) {
 	currentDay := int(time.Now().Day())
 	if day != currentDay {
 		t.Errorf("DayDefault() returned %d, expected %d", day, currentDay)
+	}
+}
+
+func TestDayOfYear(t *testing.T) {
+	tests := map[string]struct {
+		year int
+		n    int
+		want time.Time
+	}{
+		"2025-1":   {2025, 1, time.Date(2025, 1, 1, 0, 0, 0, 0, time.Local)},
+		"2025-200": {2025, 162, time.Date(2025, 6, 11, 0, 0, 0, 0, time.Local)},
+		"2028-60":  {2028, 60, time.Date(2028, 2, 29, 0, 0, 0, 0, time.Local)},
+		"2028-366": {2028, 366, time.Date(2028, 12, 31, 0, 0, 0, 0, time.Local)},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := moment.DayOfYear(tc.year, tc.n)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestLastDayOfMonth(t *testing.T) {
+	// 测试用例：year, month, 期望的最后一天日期字符串
+	testCases := []struct {
+		year     int
+		month    time.Month
+		wantDate string
+	}{
+		{2020, time.February, "2020-02-29"},  // 2020年是闰年，2月有29天
+		{2023, time.December, "2023-12-31"},  // 2023年12月最后一天
+		{2026, time.February, "2026-02-28"},  // 2026年不是闰年，2月28天
+		{2025, time.June, "2025-06-30"},      // 6月最后一天
+		{2025, time.July, "2025-07-31"},      // 7月最后一天
+		{2025, time.August, "2025-08-31"},    // 8月最后一天
+		{2025, time.September, "2025-09-30"}, // 9月最后一天
+		{2025, time.October, "2025-10-31"},   // 10月最后一天
+		{2025, time.December, "2025-12-31"},  // 12月最后一天
+	}
+
+	for _, tc := range testCases {
+		got := moment.LastDayOfMonth(tc.year, tc.month)
+		assert.Equal(t, tc.wantDate, got.Format("2006-01-02"), "LastDayOfMonth(%d, %d)", tc.year, tc.month)
+	}
+}
+
+func TestLastWeekdayOfMonth(t *testing.T) {
+	// 测试用例：year, month, 目标weekday, 期望返回日期字符串
+	testCases := []struct {
+		year     int
+		month    time.Month
+		target   time.Weekday
+		wantDate string
+	}{
+		{2023, time.October, time.Friday, "2023-10-27"},     // 2023年10月最后一个周五是27号
+		{2023, time.October, time.Monday, "2023-10-30"},     // 2023年10月最后一个周一是30号
+		{2023, time.January, time.Sunday, "2023-01-29"},     // 2023年1月最后一个周日是29号
+		{2020, time.February, time.Saturday, "2020-02-29"},  // 2020年闰年2月最后一天是周六29号
+		{2025, time.June, time.Thursday, "2025-06-26"},      // 6月最后一个周四是26号
+		{2025, time.June, time.Monday, "2025-06-30"},        // 6月最后一个周一是30号
+		{2025, time.July, time.Friday, "2025-07-25"},        // 7月最后一个周五是25号
+		{2025, time.July, time.Wednesday, "2025-07-30"},     // 7月最后一个周三是30号
+		{2025, time.August, time.Sunday, "2025-08-31"},      // 8月最后一个周日是31号
+		{2025, time.August, time.Tuesday, "2025-08-26"},     // 8月最后一个周二是26号
+		{2025, time.September, time.Monday, "2025-09-29"},   // 9月最后一个周一是29号
+		{2025, time.September, time.Saturday, "2025-09-27"}, // 9月最后一个周六是27号
+		{2025, time.October, time.Friday, "2025-10-31"},     // 10月最后一个周五是31号
+		{2025, time.October, time.Monday, "2025-10-27"},     // 10月最后一个周一是27号
+		{2025, time.December, time.Thursday, "2025-12-25"},  // 12月最后一个周四是25号
+		{2025, time.December, time.Tuesday, "2025-12-30"},   // 12月最后一个周二是30号
+	}
+
+	for _, tc := range testCases {
+		got := moment.LastWeekdayOfMonth(tc.year, tc.month, tc.target)
+		assert.Equal(t, tc.wantDate, got.Format("2006-01-02"),
+			"LastWeekdayOfMonth(%d, %d, %s)", tc.year, tc.month, tc.target.String())
+	}
+}
+
+func TestNextWorkDay(t *testing.T) {
+	tests := []struct {
+		year, month, day int
+		want             int    // 期望返回的“最近工作日”的日（1~31）
+		desc             string // 用例说明
+	}{
+		// 2023-06-04 是周日，返回下周一 2023-06-05
+		{2023, int(time.June), 4, 5, "Sunday -> next Monday (+1 day)"},
+
+		// 2023-06-05 是周一，返回周二 2023-06-06
+		{2023, int(time.June), 5, 6, "Monday -> next day (Tuesday)"},
+
+		// 2023-06-08 是周四，返回周五 2023-06-09
+		{2023, int(time.June), 8, 9, "Thursday -> next day (Friday)"},
+
+		// 2023-06-09 是周五，返回下周一 2023-06-12 (+3 days)
+		{2023, int(time.June), 9, 12, "Friday -> next Monday (+3 days)"},
+
+		// 2023-06-10 是周六，返回下周一 2023-06-12 (+2 days)
+		{2023, int(time.June), 10, 12, "Saturday -> next Monday (+2 days)"},
+
+		// 跨月测试：2023-12-29 是周五，返回下周一 2024-01-01
+		{2023, int(time.December), 29, 1, "Friday (end of year) -> next Monday next year (Jan 1)"},
+
+		// 跨年测试：2023-12-31 是周日，返回下周一 2024-01-01
+		{2023, int(time.December), 31, 1, "Sunday (end of year) -> next Monday next year (Jan 1)"},
+	}
+
+	for _, tt := range tests {
+		got := moment.NextWorkDay(tt.year, time.Month(tt.month), tt.day)
+		assert.Equalf(t, tt.want, got.Day(), "NextWorkDay(%d, %d, %d) failed: %s", tt.year, tt.month, tt.day, tt.desc)
+	}
+}
+
+func TestNextWeekday(t *testing.T) {
+	// 基准日期：2025-06-11 周三（实际2025年6月11日是周三）
+	// 这里保持和之前一致，覆盖周一到周日，跨月跨年
+
+	type testCase struct {
+		year, month, day int
+		target           time.Weekday
+		expYear          int
+		expMonth         time.Month
+		expDay           int
+		desc             string
+	}
+
+	tests := []testCase{
+		// 基准日期场景（当天不是目标）
+		{2025, 6, 11, time.Monday, 2025, 6, 16, "Mon after Wed 2025-06-11"},
+		{2025, 6, 11, time.Tuesday, 2025, 6, 17, "Tue after Wed 2025-06-11"},
+		{2025, 6, 11, time.Wednesday, 2025, 6, 18, "Wed after Wed 2025-06-11 (skip same day)"},
+		{2025, 6, 11, time.Thursday, 2025, 6, 12, "Thu after Wed 2025-06-11"},
+		{2025, 6, 11, time.Friday, 2025, 6, 13, "Fri after Wed 2025-06-11"},
+		{2025, 6, 11, time.Saturday, 2025, 6, 14, "Sat after Wed 2025-06-11"},
+		{2025, 6, 11, time.Sunday, 2025, 6, 15, "Sun after Wed 2025-06-11"},
+
+		// 当天是目标，跳到下一周
+		{2025, 6, 16, time.Monday, 2025, 6, 23, "Mon on Mon 2025-06-16 (next week)"},
+		{2025, 6, 17, time.Tuesday, 2025, 6, 24, "Tue on Tue 2025-06-17 (next week)"},
+		{2025, 6, 18, time.Wednesday, 2025, 6, 25, "Wed on Wed 2025-06-18 (next week)"},
+		{2025, 6, 19, time.Thursday, 2025, 6, 26, "Thu on Thu 2025-06-19 (next week)"},
+		{2025, 6, 20, time.Friday, 2025, 6, 27, "Fri on Fri 2025-06-20 (next week)"},
+		{2025, 6, 21, time.Saturday, 2025, 6, 28, "Sat on Sat 2025-06-21 (next week)"},
+		{2025, 6, 22, time.Sunday, 2025, 6, 29, "Sun on Sun 2025-06-22 (next week)"},
+
+		// 跨月场景：2025-06-30是周一，找下一个周一、周五、周日等
+		{2025, 6, 30, time.Monday, 2025, 7, 7, "Mon on Mon 2025-06-30 (next week)"},
+		{2025, 6, 30, time.Friday, 2025, 7, 4, "Fri after Mon 2025-06-30"},
+		{2025, 6, 30, time.Sunday, 2025, 7, 6, "Sun after Mon 2025-06-30"},
+
+		// 跨年场景：2025-12-31是周三，找下一个周三、周四
+		{2025, 12, 31, time.Wednesday, 2026, 1, 7, "Wed on Wed 2025-12-31 (next week)"},
+		{2025, 12, 31, time.Thursday, 2026, 1, 1, "Thu after Wed 2025-12-31"},
+	}
+
+	for _, tt := range tests {
+		got := moment.NextWeekday(tt.year, time.Month(tt.month), tt.day, tt.target)
+		assert.Equal(t, tt.expYear, got.Year(), "Year mismatch for %s", tt.desc)
+		assert.Equal(t, tt.expMonth, got.Month(), "Month mismatch for %s", tt.desc)
+		assert.Equal(t, tt.expDay, got.Day(), "Day mismatch for %s", tt.desc)
 	}
 }
