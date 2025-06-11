@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-11 15:00:15
+ * @LastEditTime: 2025-06-11 15:57:27
  * @FilePath: \go-toolbox\tests\retry_test.go
  * @Description: 重试机制单元测试文件
  *
@@ -16,7 +16,9 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -39,6 +41,42 @@ func TestRetryWithInvalidAttemptCount(t *testing.T) {
 		return nil
 	})
 	assert.EqualError(t, err, "attemptCount must be greater than zero")
+}
+
+func TestRetry_SetConditionFunc(t *testing.T) {
+	var attemptCounter int32 = 0
+
+	operation := func() error {
+		attempt := atomic.AddInt32(&attemptCounter, 1)
+		if attempt == 1 {
+			return errors.New("network timeout") // 第一次返回可重试错误
+		}
+		return errors.New("other error") // 第二次返回不可重试错误
+	}
+
+	conditionFunc := func(err error) bool {
+		return err != nil && strings.Contains(err.Error(), "network")
+	}
+
+	r := retry.NewRetry().
+		SetAttemptCount(5).
+		SetInterval(10 * time.Millisecond).
+		SetConditionFunc(conditionFunc).
+		SetErrCallback(func(attempt, remain int, err error, _ ...string) {
+			t.Logf("attempt %d failed: %v, remain %d", attempt, err, remain)
+		}).
+		SetSuccessCallback(func(_ ...string) {
+			t.Log("success called")
+		})
+
+	err := r.Do(operation)
+
+	// 预期：
+	// 第一次调用返回 "network timeout" 错误，满足重试条件，继续重试
+	// 第二次调用返回 "other error"，不满足重试条件，立即返回错误，不继续重试
+	assert.NotNil(t, err, "expected error but got nil")
+	assert.Contains(t, err.Error(), "other error", "expected error message to contain 'other error'")
+	assert.Equal(t, int32(2), atomic.LoadInt32(&attemptCounter), "expected 2 attempts")
 }
 
 // 测试重试机制在出错时的行为
@@ -196,4 +234,48 @@ func TestCallbackCoverage(t *testing.T) {
 	// 测试错误回调
 	_ = retryInstance.Do(func() error { return errors.New("") })
 	assert.True(t, errorCalled)
+}
+
+type simpleMutex struct {
+	m sync.Mutex
+}
+
+func (m *simpleMutex) Lock()   { m.m.Lock() }
+func (m *simpleMutex) Unlock() { m.m.Unlock() }
+
+func TestRetry_Do_WithLock_Concurrent(t *testing.T) {
+	retryAttemptCount := 3 // 最多尝试3次
+	r := retry.NewRetry().
+		SetAttemptCount(retryAttemptCount).
+		SetInterval(5 * time.Millisecond).
+		SetLock(&simpleMutex{})
+
+	var totalAttempts int32
+	var wg sync.WaitGroup
+	concurrency := 50
+
+	wg.Add(concurrency)
+	for i := 0; i < concurrency; i++ {
+		go func() {
+			defer wg.Done()
+
+			var attempt int32
+			doFunc := func() error {
+				atomic.AddInt32(&totalAttempts, 1)
+				attempt++
+				if attempt < 3 {
+					return errors.New("fail")
+				}
+				return nil
+			}
+
+			err := r.Do(doFunc)
+			assert.NoError(t, err)
+		}()
+	}
+
+	wg.Wait()
+
+	expectedAttempts := int32(concurrency * (1 + retryAttemptCount))
+	assert.Equal(t, expectedAttempts, atomic.LoadInt32(&totalAttempts), "total attempts should match expected")
 }

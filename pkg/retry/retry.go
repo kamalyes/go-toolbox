@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-11 15:00:15
+ * @LastEditTime: 2025-06-11 15:56:57
  * @FilePath: \go-toolbox\pkg\retry\retry.go
  * @Description: 重试机制
  *
@@ -17,15 +17,18 @@ import (
 
 	"github.com/kamalyes/go-toolbox/pkg/mathx"
 	"github.com/kamalyes/go-toolbox/pkg/osx"
+	"github.com/kamalyes/go-toolbox/pkg/syncx"
 )
 
 // Retry 结构体用于实现重试机制
 type Retry struct {
 	ctx            context.Context     // 上下文
+	lock           syncx.Locker        // 并发执行锁
 	attemptCount   int                 // 最大尝试次数
 	interval       time.Duration       // 重试间隔时间
 	errCallFun     ErrCallbackFunc     // 错误回调函数
 	successCallFun SuccessCallbackFunc // 成功回调函数
+	conditionFunc  func(error) bool    // 重试条件函数
 }
 
 // DoFun 定义执行函数的类型
@@ -76,15 +79,35 @@ func (r *Retry) SetSuccessCallback(successCallbackFunc SuccessCallbackFunc) *Ret
 	return r
 }
 
-// Do 为 Retry 结构体定义执行函数，执行指定函数 f
-func (m *Retry) Do(f DoFun) (err error) {
-	caller := osx.GetRuntimeCaller(3)
-	defer caller.Release()
-	return DoRetry(m.ctx, m.attemptCount, m.interval, f, m.errCallFun, m.successCallFun, caller.String())
+// SetLock 设置锁
+func (r *Retry) SetLock(lock syncx.Locker) *Retry {
+	r.lock = lock
+	return r
 }
 
-// DoRetry 定义了重试操作，执行指定次数的尝试
-func DoRetry(ctx context.Context, attemptCount int, interval time.Duration, f DoFun, errCallFun ErrCallbackFunc, successCallFun SuccessCallbackFunc, funcName ...string) (err error) {
+// SetConditionFunc 设置重试条件函数
+func (r *Retry) SetConditionFunc(f func(error) bool) *Retry {
+	r.conditionFunc = f
+	return r
+}
+
+// Do 为 Retry 结构体定义执行函数，执行指定函数 f
+func (r *Retry) Do(f DoFun) (err error) {
+	caller := osx.GetRuntimeCaller(3)
+	defer caller.Release()
+	exec := func() error {
+		return doRetryWithCondition(r.ctx, r.attemptCount, r.interval, f, r.errCallFun, r.successCallFun, r.conditionFunc, caller.String())
+	}
+	return mathx.IfDo(
+		r.lock != nil,
+		func() error {
+			return syncx.WithLockReturnValue(r.lock, exec)
+		},
+		exec())
+}
+
+// doRetryWithCondition 内部函数，定义了重试操作，执行指定次数的尝试
+func doRetryWithCondition(ctx context.Context, attemptCount int, interval time.Duration, f DoFun, errCallFun ErrCallbackFunc, successCallFun SuccessCallbackFunc, conditionFunc func(error) bool, funcName ...string) (err error) {
 	// 确保尝试次数为正数
 	if attemptCount <= 0 {
 		return fmt.Errorf("attemptCount must be greater than zero")
@@ -116,6 +139,12 @@ func DoRetry(ctx context.Context, attemptCount int, interval time.Duration, f Do
 				}
 				return // 如果没有错误，返回
 			}
+
+			// 判断是否满足重试条件，默认全部重试
+			if conditionFunc != nil && !conditionFunc(err) {
+				return err // 不满足重试条件，直接返回错误
+			}
+
 			if errCallFun != nil {
 				errCallFun(nowAttemptCount, attemptCount-nowAttemptCount, err, fName) // 调用错误回调函数
 			}

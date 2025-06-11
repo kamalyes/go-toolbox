@@ -2,15 +2,20 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-01-21 19:15:15
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-01-22 08:55:16
+ * @LastEditTime: 2025-06-11 15:59:26
  * @FilePath: \go-toolbox\pkg\mathx\ternary.go
  * @Description:
+ *   mathx 包提供了一组基于 Go 泛型实现的三元运算及条件执行函数，支持同步、异步、带错误处理等多种场景
  *
  * Copyright (c) 2025 by kamalyes, All Rights Reserved.
  */
 package mathx
 
+import "time"
+
 // IF 实现三元运算，使用泛型 T
+// 根据布尔条件 condition 返回 trueVal 或 falseVal
+// 作用类似于三元表达式 condition ? trueVal : falseVal
 func IF[T any](condition bool, trueVal, falseVal T) T {
 	if condition {
 		return trueVal
@@ -18,10 +23,12 @@ func IF[T any](condition bool, trueVal, falseVal T) T {
 	return falseVal
 }
 
-// DoFunc 是一个函数类型，用于执行返回泛型 T 的函数
+// DoFunc 是一个泛型函数类型，表示无参返回 T 类型值的函数
+// 用于延迟执行并返回结果
 type DoFunc[T any] func() T
 
-// IfDo 根据条件执行函数并返回结果，支持默认值
+// IfDo 根据条件 condition 决定是否执行函数 do 并返回结果
+// 如果 condition 为 true，执行 do() 并返回其结果；否则返回默认值 defaultVal
 func IfDo[T any](condition bool, do DoFunc[T], defaultVal T) T {
 	if condition {
 		return do() // 执行函数并返回结果
@@ -29,7 +36,132 @@ func IfDo[T any](condition bool, do DoFunc[T], defaultVal T) T {
 	return defaultVal // 返回默认值
 }
 
-// IfDoAF 根据条件执行函数和默认函数并返回结果
+// IfDoAF 根据条件 condition 决定执行 do 或 defaultFunc 函数并返回结果
+// 如果 condition 为 true，执行 do()；否则执行 defaultFunc()
 func IfDoAF[T any](condition bool, do DoFunc[T], defaultFunc DoFunc[T]) T {
-	return IfDo(condition, do, defaultFunc()) // 使用 IfDo 函数
+	return IfDo(condition, do, defaultFunc()) // 复用 IfDo 函数
+}
+
+// DoFuncWithError 是一个泛型函数类型，表示无参返回 (T, error) 的函数
+// 用于执行可能返回错误的延迟操作
+type DoFuncWithError[T any] func() (T, error)
+
+// IfDoWithError 根据条件 condition 执行带错误返回的函数 do
+// 如果 condition 为 true，执行 do() 并返回结果与错误；否则返回默认值 defaultVal 和 nil 错误
+func IfDoWithError[T any](condition bool, do DoFuncWithError[T], defaultVal T) (T, error) {
+	if condition {
+		return do()
+	}
+	return defaultVal, nil
+}
+
+// IfDoAsync 支持异步执行延迟函数 do，返回结果的通道
+// 根据条件 condition 决定是否执行 do()，否则返回默认值 defaultVal
+// 结果通过带缓冲的通道返回，避免阻塞
+func IfDoAsync[T any](condition bool, do DoFunc[T], defaultVal T) <-chan T {
+	ch := make(chan T, 1)
+	go func() {
+		if condition {
+			ch <- do()
+		} else {
+			ch <- defaultVal
+		}
+		close(ch)
+	}()
+	return ch
+}
+
+// IfDoAsyncWithTimeout 异步执行延迟函数 do，支持超时控制
+// condition 为 true 时执行 do()，否则返回默认值 defaultVal
+// timeoutMs 指定超时时间（毫秒），超时则返回类型 T 的零值
+// 返回一个通道，异步获取结果
+func IfDoAsyncWithTimeout[T any](condition bool, do DoFunc[T], defaultVal T, timeoutMs int) <-chan T {
+	ch := make(chan T, 1)
+	go func() {
+		if condition {
+			ch <- do()
+		} else {
+			ch <- defaultVal
+		}
+		close(ch)
+	}()
+
+	out := make(chan T, 1)
+	go func() {
+		select {
+		case v := <-ch:
+			out <- v
+		case <-time.After(time.Duration(timeoutMs) * time.Millisecond):
+			var zero T
+			out <- zero
+		}
+		close(out)
+	}()
+	return out
+}
+
+// IfElse 实现多条件链式判断，安全泛型版本
+// conds 和 values 长度必须相等，依次判断 conds 中的条件
+// 返回第一个为 true 的对应 values 元素；如果没有满足条件，返回 defaultVal
+// 适合实现类似 if ... else if ... else 的多分支逻辑
+func IfElse[T any](conds []bool, values []T, defaultVal T) T {
+	if len(conds) != len(values) {
+		panic("IfElse: 条件和值长度必须相等")
+	}
+	for i, cond := range conds {
+		if cond {
+			return values[i]
+		}
+	}
+	return defaultVal
+}
+
+// ConditionValue 是一个泛型结构体，封装一个条件和对应的值
+// 用于链式多条件判断，方便组合使用
+type ConditionValue[T any] struct {
+	Cond  bool // 条件
+	Value T    // 条件为 true 时对应的返回值
+}
+
+// IfChain 根据传入的 ConditionValue 切片，依次判断每个条件
+// 返回第一个条件为 true 的对应值；如果所有条件均为 false，返回默认值 defaultVal
+// 实现类似 if-else if-else 的多条件链判断，且支持任意泛型类型
+//
+// 示例：
+//   pairs := []ConditionValue[int]{
+//       {Cond: x > 0, Value: 1},
+//       {Cond: x == 0, Value: 0},
+//       {Cond: x < 0, Value: -1},
+//   }
+//   result := IfChain(pairs, 999) // 若都不满足，返回 999
+func IfChain[T any](pairs []ConditionValue[T], defaultVal T) T {
+	for _, pair := range pairs {
+		if pair.Cond {
+			return pair.Value
+		}
+	}
+	return defaultVal
+}
+
+// ResultWithError 泛型结构体，封装结果和错误
+type ResultWithError[T any] struct {
+	Result T
+	Err    error
+}
+
+// IfDoWithErrorAsync 支持异步执行带错误返回的函数 do。
+// 根据条件 condition 决定是否执行 do()，否则返回默认值 defaultVal 和 nil 错误。
+// 返回一个通道，通道元素是 ResultWithError[T] 类型。
+func IfDoWithErrorAsync[T any](condition bool, do DoFuncWithError[T], defaultVal T) <-chan ResultWithError[T] {
+	ch := make(chan ResultWithError[T], 1)
+	go func() {
+		if condition {
+			r, e := do()
+			ch <- ResultWithError[T]{r, e}
+		} else {
+			ch <- ResultWithError[T]{defaultVal, nil}
+		}
+		close(ch)
+	}()
+	return ch
 }
