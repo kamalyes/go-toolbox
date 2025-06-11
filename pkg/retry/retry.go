@@ -2,24 +2,30 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-01 22:07:18
+ * @LastEditTime: 2025-06-11 15:00:15
  * @FilePath: \go-toolbox\pkg\retry\retry.go
- * @Description:
+ * @Description: 重试机制
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
 package retry
 
 import (
+	"context"
+	"fmt"
 	"time"
+
+	"github.com/kamalyes/go-toolbox/pkg/mathx"
+	"github.com/kamalyes/go-toolbox/pkg/osx"
 )
 
 // Retry 结构体用于实现重试机制
 type Retry struct {
-	attemptCount int             // 最大尝试次数
-	interval     time.Duration   // 重试间隔时间
-	errCallFun   ErrCallbackFunc // 错误回调函数
-	funcName     string          // 函数名称（可选，用于回调）
+	ctx            context.Context     // 上下文
+	attemptCount   int                 // 最大尝试次数
+	interval       time.Duration       // 重试间隔时间
+	errCallFun     ErrCallbackFunc     // 错误回调函数
+	successCallFun SuccessCallbackFunc // 成功回调函数
 }
 
 // DoFun 定义执行函数的类型
@@ -31,9 +37,19 @@ type DoFun func() error
 // err 是当前执行时的错误信息
 type ErrCallbackFunc func(nowAttemptCount, remainCount int, err error, funcName ...string)
 
+// SuccessCallbackFunc 是成功回调函数类型
+type SuccessCallbackFunc func(funcName ...string)
+
 // NewRetry 创建一个重试器，返回一个 Retry 实例
 func NewRetry() *Retry {
-	return &Retry{}
+	return NewRetryWithCtx(context.Background())
+}
+
+// NewRetryWithCtx 创建一个自定义上下文的重试器，返回一个 Retry实例
+func NewRetryWithCtx(ctx context.Context) *Retry {
+	return &Retry{
+		ctx: ctx,
+	}
 }
 
 // SetAttemptCount 设置最大尝试次数，返回 Retry 实例以支持链式调用
@@ -54,36 +70,62 @@ func (r *Retry) SetErrCallback(errCallbackFunc ErrCallbackFunc) *Retry {
 	return r
 }
 
+// SetSuccessCallback 设置成功回调函数，返回 Retry 实例以支持链式调用
+func (r *Retry) SetSuccessCallback(successCallbackFunc SuccessCallbackFunc) *Retry {
+	r.successCallFun = successCallbackFunc
+	return r
+}
+
 // Do 为 Retry 结构体定义执行函数，执行指定函数 f
 func (m *Retry) Do(f DoFun) (err error) {
-	return DoRetry(m.attemptCount, m.interval, f, m.errCallFun, m.funcName)
+	caller := osx.GetRuntimeCaller(3)
+	defer caller.Release()
+	return DoRetry(m.ctx, m.attemptCount, m.interval, f, m.errCallFun, m.successCallFun, caller.String())
 }
 
 // DoRetry 定义了重试操作，执行指定次数的尝试
-func DoRetry(attemptCount int, interval time.Duration, f DoFun, errCallFun ErrCallbackFunc, funcName ...string) (err error) {
-	nowAttemptCount := 0
-	var fName string
-	if len(funcName) > 0 {
-		fName = funcName[0] // 获取函数名称
+func DoRetry(ctx context.Context, attemptCount int, interval time.Duration, f DoFun, errCallFun ErrCallbackFunc, successCallFun SuccessCallbackFunc, funcName ...string) (err error) {
+	// 确保尝试次数为正数
+	if attemptCount <= 0 {
+		return fmt.Errorf("attemptCount must be greater than zero")
 	}
-	for {
+
+	var (
+		fName           = mathx.IF(len(funcName) > 0, funcName[0], "") // 获取函数名称
+		nowAttemptCount int
+	)
+
+	for nowAttemptCount < attemptCount {
 		nowAttemptCount++
 
-		err = f() // 执行传入的函数
-		if err == nil {
-			return // 如果没有错误，返回
-		}
-		if errCallFun != nil {
-			errCallFun(nowAttemptCount, attemptCount-nowAttemptCount, err, fName) // 调用错误回调函数
-		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err() // 如果上下文被取消，返回错误
+		default:
+			// 捕获 panic
+			defer func() {
+				if r := recover(); r != nil {
+					err = fmt.Errorf("panic occurred: %v", r)
+				}
+			}()
 
-		if nowAttemptCount >= attemptCount {
-			break // 达到最大尝试次数，退出循环
-		}
+			err = f() // 执行传入的函数
+			if err == nil {
+				if successCallFun != nil {
+					successCallFun(fName) // 调用成功回调函数
+				}
+				return // 如果没有错误，返回
+			}
+			if errCallFun != nil {
+				errCallFun(nowAttemptCount, attemptCount-nowAttemptCount, err, fName) // 调用错误回调函数
+			}
 
-		if interval > 0 {
-			time.Sleep(interval) // 等待指定的间隔时间
+			// 等待指定的间隔时间
+			if interval > 0 {
+				time.Sleep(interval)
+			}
 		}
 	}
-	return
+
+	return err // 返回最后的错误
 }

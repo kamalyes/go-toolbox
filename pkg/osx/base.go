@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-05 18:55:35
+ * @LastEditTime: 2025-06-11 15:09:15
  * @FilePath: \go-toolbox\pkg\osx\base.go
  * @Description:
  *
@@ -261,6 +261,11 @@ func (c *RunTimeCaller) Release() {
 	c.Line = 0
 	c.FuncName = ""
 	callerPool.Put(c)
+}
+
+// String 返回调用栈的格式化字符串，包含函数名、文件名和行号
+func (c *RunTimeCaller) String() string {
+	return fmt.Sprintf("FuncName:%s, File:%s:%d", c.FuncName, c.File, c.Line)
 }
 
 // Command 执行系统命令
