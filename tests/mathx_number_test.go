@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-02-19 10:15:15
+ * @LastEditTime: 2025-06-12 15:26:19
  * @FilePath: \go-toolbox\tests\mathx_number_test.go
  * @Description:
  *
@@ -328,4 +328,93 @@ func TestParseIntOrName(t *testing.T) {
 			assert.Equal(t, tt.expected, got, "ParseIntOrName(%q) got wrong result", tt.input)
 		}
 	}
+}
+
+// 自定义结构体用于测试
+type Person struct {
+	Name string
+	Age  int
+}
+
+func TestSafeGetIndexWithErr(t *testing.T) {
+	// 字符串切片
+	strSlice := []string{"apple", "banana", "cherry"}
+	valStr, err := mathx.SafeGetIndexWithErr(strSlice, 1)
+	assert.NoError(t, err)
+	assert.Equal(t, "banana", valStr)
+
+	// 整型切片
+	intSlice := []int{10, 20, 30}
+	valInt, err := mathx.SafeGetIndexWithErr(intSlice, 2)
+	assert.NoError(t, err)
+	assert.Equal(t, 30, valInt)
+
+	// 结构体切片
+	personSlice := []Person{
+		{"Alice", 30},
+		{"Bob", 25},
+	}
+	valPerson, err := mathx.SafeGetIndexWithErr(personSlice, 0)
+	assert.NoError(t, err)
+	assert.Equal(t, Person{"Alice", 30}, valPerson)
+
+	// 指针切片
+	ptrSlice := []*Person{
+		{"Charlie", 40},
+		nil,
+	}
+	valPtr, err := mathx.SafeGetIndexWithErr(ptrSlice, 1)
+	assert.NoError(t, err)
+	assert.Nil(t, valPtr) // 索引1是nil指针
+
+	// 索引越界测试
+	_, err = mathx.SafeGetIndexWithErr(strSlice, 5)
+	assert.Error(t, err)
+
+	_, err = mathx.SafeGetIndexWithErr(intSlice, -1)
+	assert.Error(t, err)
+}
+
+func TestSafeGetIndexOrDefault(t *testing.T) {
+	// 字符串切片，索引合法
+	strSlice := []string{"apple", "banana", "cherry"}
+	valStr := mathx.SafeGetIndexOrDefault(strSlice, 1, "default")
+	assert.Equal(t, "banana", valStr)
+
+	// 字符串切片，索引越界
+	valStr = mathx.SafeGetIndexOrDefault(strSlice, 5, "default")
+	assert.Equal(t, "default", valStr)
+
+	// 整型切片，索引合法
+	intSlice := []int{10, 20, 30}
+	valInt := mathx.SafeGetIndexOrDefault(intSlice, 2, -1)
+	assert.Equal(t, 30, valInt)
+
+	// 整型切片，索引越界
+	valInt = mathx.SafeGetIndexOrDefault(intSlice, -1, -1)
+	assert.Equal(t, -1, valInt)
+
+	// 结构体切片，索引合法
+	personSlice := []Person{
+		{"Alice", 30},
+		{"Bob", 25},
+	}
+	valPerson := mathx.SafeGetIndexOrDefault(personSlice, 0, Person{"Default", 0})
+	assert.Equal(t, Person{"Alice", 30}, valPerson)
+
+	// 结构体切片，索引越界
+	valPerson = mathx.SafeGetIndexOrDefault(personSlice, 5, Person{"Default", 0})
+	assert.Equal(t, Person{"Default", 0}, valPerson)
+
+	// 指针切片，索引合法且元素为nil指针
+	ptrSlice := []*Person{
+		{"Charlie", 40},
+		nil,
+	}
+	valPtr := mathx.SafeGetIndexOrDefault(ptrSlice, 1, nil)
+	assert.Nil(t, valPtr)
+
+	// 指针切片，索引越界
+	valPtr = mathx.SafeGetIndexOrDefault(ptrSlice, 10, nil)
+	assert.Nil(t, valPtr)
 }

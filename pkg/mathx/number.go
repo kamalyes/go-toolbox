@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-09 16:40:16
+ * @LastEditTime: 2025-06-12 15:27:26
  * @FilePath: \go-toolbox\pkg\mathx\number.go
  * @Description:
  *
@@ -139,4 +139,38 @@ func ParseIntOrName(expr string, names map[string]uint) (uint, error) {
 		}
 	}
 	return convert.MustIntT[uint](expr, nil)
+}
+
+// SafeGetIndexWithErr 安全获取切片指定索引的元素。
+// 支持任意类型切片，避免索引越界导致 panic。
+// 如果索引合法，返回对应元素和 nil 错误；否则返回类型零值和错误。
+//
+// 参数:
+//
+//	slice - 目标切片，支持任意类型 []T
+//	index - 需要获取的元素索引，0-based
+//
+// 返回:
+//
+//	T     - 索引对应的元素，索引越界时返回类型零值
+//	error - 发生错误时返回详细错误信息，否则为 nil
+//
+// 示例:
+//
+//	val, _ := SafeGetIndexWithErr([]string{"a", "b", "c"}, 1)
+//	fmt.Println(val) // 输出: b
+func SafeGetIndexWithErr[T any](slice []T, index int) (zero T, err error) {
+	if index >= 0 && index < len(slice) {
+		return slice[index], nil
+	}
+	return zero, fmt.Errorf("index %d out of range (slice length %d)", index, len(slice))
+}
+
+// SafeGetIndexOrDefault 安全获取切片指定索引元素，索引越界时返回指定默认值。
+func SafeGetIndexOrDefault[T any](slice []T, index int, defaultVal T) (val T) {
+	var err error
+	if val, err = SafeGetIndexWithErr(slice, index); err != nil {
+		return defaultVal
+	}
+	return val
 }

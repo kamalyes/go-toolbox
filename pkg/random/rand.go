@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-01-09 17:15:16
+ * @LastEditTime: 2025-06-12 15:27:26
  * @FilePath: \go-toolbox\pkg\random\rand.go
  * @Description:
  *
@@ -487,4 +487,113 @@ func GenerateAvailablePort(ports ...int) (int, error) {
 		}
 		// 如果端口已被使用或发生其他错误，则尝试下一个端口
 	}
+}
+
+// RandNumerical 泛型函数，生成从 start 到 end（包含）的切片
+func RandNumerical[T types.Numerical](start, end T, step ...T) []T {
+	// 如果结束值小于开始值，返回 nil 表示无效输入
+	if end < start {
+		return nil
+	}
+
+	// 默认步长为 1，如果传入了步长参数，则使用传入的步长
+	var stepVal T = 1
+	if len(step) > 0 {
+		stepVal = step[0]
+	}
+
+	// 步长必须大于 0，否则返回 nil 表示无效步长
+	if stepVal <= 0 {
+		return nil
+	}
+
+	// 根据 start 的具体类型区分处理浮点数和整数
+	switch any(start).(type) {
+	// 如果是浮点数类型（float32 或 float64）
+	case float32, float64:
+		// 计算序列长度 size，向下取整后加 1，确保包含起点
+		size := int((end-start)/stepVal) + 1
+		if size <= 0 {
+			return nil
+		}
+
+		// 创建结果切片，容量为 size
+		result := make([]T, size)
+
+		// 将步长和起点转换为 float64 方便计算
+		stepF := float64(stepVal)
+		startF := float64(start)
+
+		// 依次计算每个元素的值：start + i * step
+		for i := 0; i < size; i++ {
+			result[i] = T(startF + float64(i)*stepF) // 直接转换为泛型浮点数类型 T
+		}
+
+		return result
+
+	// 其他类型视为整数类型处理
+	default:
+		// 将整数类型参数转换为 float64，方便做除法和乘法计算
+		startF := float64(start)
+		endF := float64(end)
+		stepF := float64(stepVal)
+
+		// 计算序列长度 size，向下取整后加 1，确保包含起点
+		size := int((endF-startF)/stepF) + 1
+		if size <= 0 {
+			return nil
+		}
+
+		// 创建结果切片，容量为 size
+		result := make([]T, size)
+
+		// 依次计算每个元素的值（浮点数计算）
+		for i := 0; i < size; i++ {
+			valF := startF + float64(i)*stepF
+
+			// 利用 Float64ToInt 函数将浮点数安全转换回整数泛型 T
+			// RoundNone 表示不做额外取整，直接转换
+			val, err := convert.Float64ToInt[T](valF, convert.RoundNone)
+			if err != nil {
+				// 转换失败时 panic，提示错误信息
+				panic(fmt.Sprintf("RandNumerical: 转换失败 %v", err))
+			}
+			result[i] = val
+		}
+
+		return result
+	}
+}
+
+// RandNumericalWithRandomStep 泛型函数，生成从 start 到 end（包含或不超过）
+// 每一步随机步长在 [minStep, maxStep] 范围内（浮点数或整数）
+func RandNumericalWithRandomStep[T types.Numerical](start, end, minStep, maxStep T) []T {
+	if end < start {
+		return nil
+	}
+	if minStep <= 0 || maxStep < minStep {
+		return nil
+	}
+
+	var result []T
+	current := start
+
+	switch any(start).(type) {
+	case float32, float64:
+		for current <= end {
+			result = append(result, current)
+			// 生成随机浮点步长
+			step := RandFloat(float64(minStep), float64(maxStep))
+			current += T(step)
+		}
+	default:
+		for current <= end {
+			result = append(result, current)
+			// 生成随机整数步长
+			step := RandInt(int(minStep), int(maxStep))
+			current += T(step)
+		}
+	}
+
+	return result
 }

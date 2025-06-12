@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-17 01:55:18
+ * @LastEditTime: 2025-06-12 15:27:26
  * @FilePath: \go-toolbox\tests\random_test.go
  * @Description:
  *
@@ -438,4 +438,108 @@ func TestGenerateAvailablePort_CustomRange(t *testing.T) {
 func TestGenerateAvailablePort_InvalidRange(t *testing.T) {
 	_, err := random.GenerateAvailablePort(65536, 1024)
 	assert.Error(t, err, "Expected an error for an invalid port range")
+}
+
+func TestRandNumericalStep(t *testing.T) {
+	// 指定步长为2，整数类型
+	got := random.RandNumerical(2, 10, 2)
+	want := []int{2, 4, 6, 8, 10}
+	assert.Equal(t, want, got)
+
+	// 指定步长为3，整数类型，end未整除步长
+	got = random.RandNumerical(1, 10, 3)
+	want = []int{1, 4, 7, 10}
+	assert.Equal(t, want, got)
+
+	// 步长大于区间长度，结果只有一个元素
+	got = random.RandNumerical(1, 3, 5)
+	want = []int{1}
+	assert.Equal(t, want, got)
+
+	// 浮点数类型，指定步长1.5
+	gotF := random.RandNumerical(0.0, 6.0, 1.5)
+	wantF := []float64{0.0, 1.5, 3.0, 4.5, 6.0}
+	assert.Equal(t, wantF, gotF)
+
+	// 步长为0，返回空切片
+	got = random.RandNumerical(1, 10, 0)
+	assert.Empty(t, got)
+
+	// 负步长，返回空切片（根据你函数逻辑）
+	got = random.RandNumerical(1, 10, -1)
+	assert.Empty(t, got)
+}
+
+func TestRandNumericalInt(t *testing.T) {
+	got := random.RandNumerical(3, 7)
+	want := []int{3, 4, 5, 6, 7}
+	assert.Equal(t, want, got)
+
+	got = random.RandNumerical(5, 3)
+	assert.Empty(t, got) // end < start，返回空切片
+
+	got = random.RandNumerical(0, 0)
+	want = []int{0}
+	assert.Equal(t, want, got)
+}
+
+func TestRandNumericalUint8(t *testing.T) {
+	got := random.RandNumerical[uint8](1, 5)
+	want := []uint8{1, 2, 3, 4, 5}
+	assert.Equal(t, want, got)
+}
+
+func TestRandNumericalFloat64(t *testing.T) {
+	got := random.RandNumerical(1.0, 2.0, 0.3)
+	want := []float64{1.0, 1.3, 1.6, 1.9}
+	assert.InDeltaSlice(t, want, got, 1e-9) // 浮点数允许误差
+
+	got = random.RandNumerical(2.0, 1.0, 0.1)
+	assert.Empty(t, got) // end < start，空切片
+
+	got = random.RandNumerical[float64](0, 1, 0)
+	assert.Empty(t, got) // 步长0，空切片
+}
+
+func TestRandNumericalFloat32(t *testing.T) {
+	got := random.RandNumerical[float32](0, 1, 0.25)
+	want := []float32{0, 0.25, 0.5, 0.75, 1}
+	assert.InDeltaSlice(t, want, got, 1e-6)
+}
+
+func TestRandNumericalWithRandomStepInt(t *testing.T) {
+	start, end := 1, 20
+	minStep, maxStep := 1, 3
+
+	res := random.RandNumericalWithRandomStep[int](start, end, minStep, maxStep)
+	assert.NotEmpty(t, res, "结果切片不应该为空")
+
+	for i, val := range res {
+		assert.GreaterOrEqual(t, val, start, "元素 %d 小于 start", i)
+		assert.LessOrEqual(t, val, end, "元素 %d 大于 end", i)
+		if i > 0 {
+			step := val - res[i-1]
+			assert.GreaterOrEqual(t, step, minStep, "步长 %d 小于最小步长", step)
+			assert.LessOrEqual(t, step, maxStep, "步长 %d 大于最大步长", step)
+		}
+	}
+}
+
+func TestRandNumericalWithRandomStepFloat64(t *testing.T) {
+	start, end := 0.0, 2.0
+	minStep, maxStep := 0.1, 0.5
+
+	res := random.RandNumericalWithRandomStep[float64](start, end, minStep, maxStep)
+	assert.NotEmpty(t, res, "结果切片不应该为空")
+
+	const epsilon = 1e-9
+	for i, val := range res {
+		assert.True(t, val >= start-epsilon, "元素 %d 小于 start", i)
+		assert.True(t, val <= end+epsilon, "元素 %d 大于 end", i)
+		if i > 0 {
+			step := val - res[i-1]
+			assert.True(t, step >= minStep-epsilon, "步长 %v 小于最小步长", step)
+			assert.True(t, step <= maxStep+epsilon, "步长 %v 大于最大步长", step)
+		}
+	}
 }
