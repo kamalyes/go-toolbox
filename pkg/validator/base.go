@@ -103,10 +103,27 @@ func EmptyToDefault(str string, defaultStr string) string {
 	return str
 }
 
+// IsNil 判断传入的接口值是否为 nil
+// 先判断接口本身是否为 nil，若不是 nil，则通过反射检查其底层值是否为 nil
+// 适用于指针、切片、映射、通道、函数和接口类型的 nil 判断
 func IsNil(x interface{}) bool {
 	if x == nil {
 		return true
 	}
+	v := reflect.ValueOf(x)
+	switch v.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
+		return v.IsNil()
+	}
+	return false
+}
 
-	return reflect.ValueOf(x).IsNil()
+// IsFuncType 判断T是否为函数类型，利用反射
+func IsFuncType[T any]() bool {
+	var zero T
+	tp := reflect.TypeOf(zero)
+	if tp == nil {
+		return false
+	}
+	return tp.Kind() == reflect.Func
 }

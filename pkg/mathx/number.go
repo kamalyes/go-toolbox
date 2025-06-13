@@ -174,3 +174,9 @@ func SafeGetIndexOrDefault[T any](slice []T, index int, defaultVal T) (val T) {
 	}
 	return val
 }
+
+// SafeGetIndexOrDefaultNoSpace 安全获取字符串切片指定索引元素，索引越界时返回默认值，且结果去除所有空格。
+func SafeGetIndexOrDefaultNoSpace(slice []string, index int, defaultVal string) string {
+	val := SafeGetIndexOrDefault(slice, index, defaultVal)
+	return stringx.ReplaceAll(val, " ", "")
+}

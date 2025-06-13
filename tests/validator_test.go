@@ -274,3 +274,30 @@ func TestIsIPAllowed(t *testing.T) {
 		})
 	}
 }
+
+func TestIsFuncType(t *testing.T) {
+	type FuncType func(int) int
+	type MyStruct struct{ A int }
+
+	tests := []struct {
+		name     string
+		typCheck func() bool
+		want     bool
+	}{
+		{"int", func() bool { return validator.IsFuncType[int]() }, false},
+		{"string", func() bool { return validator.IsFuncType[string]() }, false},
+		{"struct", func() bool { return validator.IsFuncType[MyStruct]() }, false},
+		{"pointer", func() bool { return validator.IsFuncType[*MyStruct]() }, false},
+		{"slice", func() bool { return validator.IsFuncType[[]int]() }, false},
+		{"map", func() bool { return validator.IsFuncType[map[string]int]() }, false},
+		{"func type", func() bool { return validator.IsFuncType[FuncType]() }, true},
+		{"func literal type", func() bool { return validator.IsFuncType[func(int) int]() }, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.typCheck()
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

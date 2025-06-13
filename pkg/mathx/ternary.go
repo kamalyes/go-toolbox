@@ -2,10 +2,9 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-01-21 19:15:15
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-11 15:59:26
+ * @LastEditTime: 2025-06-13 17:17:15
  * @FilePath: \go-toolbox\pkg\mathx\ternary.go
- * @Description:
- *   mathx 包提供了一组基于 Go 泛型实现的三元运算及条件执行函数，支持同步、异步、带错误处理等多种场景
+ * @Description: 包提供了一组基于 Go 泛型实现的三元运算及条件执行函数，支持同步、异步、带错误处理等多种场景
  *
  * Copyright (c) 2025 by kamalyes, All Rights Reserved.
  */
@@ -149,9 +148,9 @@ type ResultWithError[T any] struct {
 	Err    error
 }
 
-// IfDoWithErrorAsync 支持异步执行带错误返回的函数 do。
-// 根据条件 condition 决定是否执行 do()，否则返回默认值 defaultVal 和 nil 错误。
-// 返回一个通道，通道元素是 ResultWithError[T] 类型。
+// IfDoWithErrorAsync 支持异步执行带错误返回的函数 do
+// 根据条件 condition 决定是否执行 do()，否则返回默认值 defaultVal 和 nil 错误
+// 返回一个通道，通道元素是 ResultWithError[T] 类型
 func IfDoWithErrorAsync[T any](condition bool, do DoFuncWithError[T], defaultVal T) <-chan ResultWithError[T] {
 	ch := make(chan ResultWithError[T], 1)
 	go func() {
@@ -164,4 +163,27 @@ func IfDoWithErrorAsync[T any](condition bool, do DoFuncWithError[T], defaultVal
 		close(ch)
 	}()
 	return ch
+}
+
+// ReturnIfErr 简化错误检查和返回
+// 如果 err 不为 nil，返回 T 类型的零值和 err；否则返回 val 和 nil
+func ReturnIfErr[T any](val T, err error) (T, error) {
+	if err != nil {
+		var zero T
+		return zero, err
+	}
+	return val, nil
+}
+
+// IfDoWithErrorDefault 根据条件 condition 执行带错误返回的函数 do
+// 如果 condition 为 false 或 do 返回错误，则返回 defaultVal
+func IfDoWithErrorDefault[T any](condition bool, do DoFuncWithError[T], defaultVal T) T {
+	if !condition {
+		return defaultVal
+	}
+	val, err := do()
+	if err != nil {
+		return defaultVal
+	}
+	return val
 }
