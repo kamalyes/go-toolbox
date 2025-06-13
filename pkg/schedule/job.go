@@ -72,19 +72,16 @@ func (c *Schedule) AddJob(job *JobRule) *Schedule {
 		panic(err.Error())
 	}
 
-	// 并发安全地向任务列表中添加任务
-	syncx.WithLock(&c.mu, func() {
-		// 检查任务ID是否已存在，避免重复添加
-		if _, exists := c.jobs[job.id]; exists {
-			panic(fmt.Sprintf(ErrJobIDAlreadyExists, job.id))
-		}
-		// 初始化任务的exceedTaskSnapshots，防止后续空指针异常
-		if job.exceedTaskSnapshots == nil {
-			job.exceedTaskSnapshots = make(map[string]*ExceedTaskSnapshot)
-		}
-		// 添加任务到调度器任务列表
-		c.jobs[job.id] = job
-	})
+	// 检查任务ID是否已存在，避免重复添加
+	if _, exists := c.jobs[job.id]; exists {
+		panic(fmt.Sprintf(ErrJobIDAlreadyExists, job.id))
+	}
+	// 初始化任务的exceedTaskSnapshots，防止后续空指针异常
+	if job.exceedTaskSnapshots == nil {
+		job.exceedTaskSnapshots = make(map[string]*ExceedTaskSnapshot)
+	}
+	// 添加任务到调度器任务列表
+	c.jobs[job.id] = job
 
 	// 返回调度器实例，支持链式调用
 	return c

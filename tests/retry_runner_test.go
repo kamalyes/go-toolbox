@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-06-11 15:57:27
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-11 15:57:27
+ * @LastEditTime: 2025-06-13 18:32:47
  * @FilePath: \go-toolbox\tests\retry_runner_test.go
  * @Description:
  *
@@ -14,7 +14,6 @@ import (
 	"context"
 	"errors"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -173,11 +172,11 @@ func TestRunner_RunWithLock_LockIsNil(t *testing.T) {
 	assert.Equal(t, zero, result)
 }
 
-func TestRunner_RunWithLock_Concurrent_Atomic(t *testing.T) {
+func TestRunner_RunWithLock_Concurrent(t *testing.T) {
 	r := retry.NewRunner[int]()
 	mu := &sync.Mutex{}
 
-	var counter int32 = 0
+	counter := 0
 	const goroutines = 10
 	wg := sync.WaitGroup{}
 	wg.Add(goroutines)
@@ -187,14 +186,15 @@ func TestRunner_RunWithLock_Concurrent_Atomic(t *testing.T) {
 			defer wg.Done()
 			_, err := r.RunWithLock(mu, func(ctx context.Context) (int, error) {
 				time.Sleep(10 * time.Millisecond)
-				// 原子加1
-				newVal := atomic.AddInt32(&counter, 1)
-				return int(newVal), nil
+				counter++ // 有锁保护，安全
+				return counter, nil
 			})
 			assert.NoError(t, err)
 		}()
 	}
 
 	wg.Wait()
-	assert.Equal(t, int32(goroutines), atomic.LoadInt32(&counter))
+	mu.Lock()
+	defer mu.Unlock()
+	assert.Equal(t, goroutines, counter)
 }
