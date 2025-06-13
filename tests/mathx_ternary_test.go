@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-11 16:26:56
+ * @LastEditTime: 2025-06-13 10:41:01
  * @FilePath: \go-toolbox\tests\mathx_ternary_test.go
  * @Description:
  *
@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/kamalyes/go-toolbox/pkg/mathx"
+	"github.com/kamalyes/go-toolbox/pkg/validator"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -221,4 +222,169 @@ func TestIfDoWithErrorAsync(t *testing.T) {
 	res3 := <-ch3
 	assert.NoError(res3.Err, "条件为 false 时错误应为 nil")
 	assert.Equal(999, res3.Result, "条件为 false 应返回默认值")
+}
+
+type MyStruct struct{ A int }
+type NeXStruct struct {
+	X int
+	Y *MyStruct
+}
+
+type MyInterface interface {
+	Foo() string
+}
+
+type Impl struct{ Val string }
+
+func (i Impl) Foo() string { return i.Val }
+
+type FuncType func(int) int
+
+func testReturnIfErr[T any](t *testing.T, name string, val T, err error, wantVal T, wantErr error) {
+	t.Run(name, func(t *testing.T) {
+		gotVal, gotErr := mathx.ReturnIfErr(val, err)
+
+		// 特殊处理函数类型，避免直接比较
+		if validator.IsFuncType[T]() {
+			// 只判断是否为nil，且错误是否符合预期
+			if wantErr == nil {
+				assert.NoError(t, gotErr)
+				if validator.IsNil(gotVal) {
+					t.Errorf("expected non-nil function, got nil")
+				}
+			} else {
+				assert.EqualError(t, gotErr, wantErr.Error())
+				if !validator.IsNil(gotVal) {
+					t.Errorf("expected nil function on error, got non-nil")
+				}
+			}
+			return
+		}
+		// 其他类型正常比较
+		assert.Equal(t, wantVal, gotVal)
+		if wantErr == nil {
+			assert.NoError(t, gotErr)
+		} else {
+			assert.EqualError(t, gotErr, wantErr.Error())
+		}
+	})
+}
+
+func TestReturnIfErr_ComplexTypes(t *testing.T) {
+	err := errors.New("test err")
+
+	// 基础类型
+	testReturnIfErr(t, "int no error", 42, nil, 42, nil)
+	testReturnIfErr(t, "int with error", 42, err, 0, err)
+
+	// 字符串
+	testReturnIfErr(t, "string no error", "hello", nil, "hello", nil)
+	testReturnIfErr(t, "string with error", "hello", err, "", err)
+
+	// 结构体
+	testReturnIfErr(t, "struct no error", MyStruct{1}, nil, MyStruct{1}, nil)
+	testReturnIfErr(t, "struct with error", MyStruct{1}, err, MyStruct{}, err)
+
+	// 嵌套结构体
+	testReturnIfErr(t, "nested struct no error", NeXStruct{X: 10, Y: &MyStruct{2}}, nil, NeXStruct{X: 10, Y: &MyStruct{2}}, nil)
+	testReturnIfErr(t, "nested struct with error", NeXStruct{X: 10, Y: &MyStruct{2}}, err, NeXStruct{}, err)
+
+	// 指针
+	testReturnIfErr(t, "pointer no error", &MyStruct{2}, nil, &MyStruct{2}, nil)
+	testReturnIfErr(t, "pointer with error", &MyStruct{2}, err, (*MyStruct)(nil), err)
+
+	// 切片
+	testReturnIfErr(t, "slice no error", []int{1, 2, 3}, nil, []int{1, 2, 3}, nil)
+	testReturnIfErr(t, "slice with error", []int{1, 2, 3}, err, nil, err)
+
+	// 数组
+	testReturnIfErr(t, "array no error", [3]string{"a", "b", "c"}, nil, [3]string{"a", "b", "c"}, nil)
+	testReturnIfErr(t, "array with error", [3]string{"a", "b", "c"}, err, [3]string{}, err)
+
+	// map
+	testReturnIfErr(t, "map no error", map[string]int{"k": 1}, nil, map[string]int{"k": 1}, nil)
+	testReturnIfErr(t, "map with error", map[string]int{"k": 1}, err, nil, err)
+
+	// 接口
+	testReturnIfErr[MyInterface](t, "interface no error", Impl{"val"}, nil, Impl{"val"}, nil)
+	testReturnIfErr[MyInterface](t, "interface with error", Impl{"val"}, err, nil, err)
+
+	// 自定义类型别名
+	type MyIntAlias int
+	testReturnIfErr(t, "alias no error", MyIntAlias(100), nil, MyIntAlias(100), nil)
+	testReturnIfErr(t, "alias with error", MyIntAlias(100), err, MyIntAlias(0), err)
+
+	// 函数类型（注意函数相等性断言问题，示例仅演示）
+	f := func(x int) int { return x * 2 }
+	testReturnIfErr[FuncType](t, "func no error", f, nil, f, nil)
+	testReturnIfErr[FuncType](t, "func with error", f, err, nil, err)
+}
+
+func TestIfDoWithErrorDefault(t *testing.T) {
+	type testCase[T any] struct {
+		name       string
+		condition  bool
+		do         mathx.DoFuncWithError[T]
+		defaultVal T
+		want       T
+	}
+
+	tests := []testCase[int]{
+		{"condition false returns default", false, func() (int, error) { return 123, nil }, 999, 999},
+		{"condition true and no error returns value", true, func() (int, error) { return 42, nil }, 999, 42},
+		{"condition true but error returns default", true, func() (int, error) { return 0, errors.New("fail") }, 999, 999},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := mathx.IfDoWithErrorDefault(tt.condition, tt.do, tt.defaultVal)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestIfCall_ConditionTrue_Calls(t *testing.T) {
+	type testResult struct {
+		called bool
+		val    int
+		err    error
+	}
+
+	tr := &testResult{}
+	onTrue := func(r int, e error) {
+		tr.called = true
+		tr.val = r
+		tr.err = e
+	}
+	// condition=true，onTrue 不为空，onFalse 为空
+
+	mathx.IfCall(true, 42, nil, onTrue, nil)
+
+	assert.True(t, tr.called, "onTrue should be called")
+	assert.Equal(t, 42, tr.val)
+	assert.Nil(t, tr.err)
+
+	onFalse := func(r int, e error) {
+		tr.called = true
+		tr.val = r
+		tr.err = e
+	}
+	// condition=false，onFalse 不为空，onTrue 为空
+	mathx.IfCall(false, 100, errors.New("error"), nil, onFalse)
+
+	assert.True(t, tr.called, "onFalse should be called")
+	assert.Equal(t, 100, tr.val)
+	assert.EqualError(t, tr.err, "error")
+}
+
+func TestIfCall_BothCallbacksNil_ConditionTrue(t *testing.T) {
+	assert.NotPanics(t, func() {
+		mathx.IfCall(true, 1, nil, nil, nil)
+	}, "IfCall should not panic when both callbacks are nil and condition is true")
+}
+
+func TestIfCall_BothCallbacksNil_ConditionFalse(t *testing.T) {
+	assert.NotPanics(t, func() {
+		mathx.IfCall(false, 1, nil, nil, nil)
+	}, "IfCall should not panic when both callbacks are nil and condition is false")
 }

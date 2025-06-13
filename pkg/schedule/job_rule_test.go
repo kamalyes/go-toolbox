@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-01-22 13:55:18
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-01-24 11:03:07
+ * @LastEditTime: 2025-06-13 17:17:15
  * @FilePath: \go-toolbox\pkg\schedule\job_rule_test.go
  * @Description:
  *
@@ -92,19 +92,34 @@ func TestJobRuleSetAndGetBeforeFunc(t *testing.T) {
 	assert.True(t, expectedCalled, "BeforeFunc should have been called")
 }
 
-// TestSetAndGetAfterFunc 测试 SetAfterFunc 和 GetAfterFunc
-func TestJobRuleSetAndGetAfterFunc(t *testing.T) {
+// 测试 SetAfterSuccessFunc 和 GetAfterSuccessFunc
+func TestJobRuleSetAndGetAfterSuccessFunc(t *testing.T) {
 	rule := &JobRule{}
 
-	expectedCalled := false
-	afterFunc := func() {
-		expectedCalled = true
+	called := false
+	afterSuccessFunc := func() {
+		called = true
 	}
-	rule.SetAfterFunc(afterFunc)
+	rule.SetAfterSuccessFunc(afterSuccessFunc)
 
-	// 调用后置函数并验证
-	rule.GetAfterFunc()()
-	assert.True(t, expectedCalled, "AfterFunc should have been called")
+	f := rule.GetAfterSuccessFunc()
+	f()
+	assert.True(t, called, "AfterSuccessFunc should have been called")
+}
+
+// 测试 SetAfterFailureFunc 和 GetAfterFailureFunc
+func TestJobRuleSetAndGetAfterFailureFunc(t *testing.T) {
+	rule := &JobRule{}
+
+	called := false
+	afterFailureFunc := func() {
+		called = true
+	}
+	rule.SetAfterFailureFunc(afterFailureFunc)
+
+	f := rule.GetAfterFailureFunc()
+	f()
+	assert.True(t, called, "AfterFailureFunc should have been called")
 }
 
 // TestSetAndGetSkipFunc 测试 SetSkipFunc 和 GetSkipFunc
@@ -119,4 +134,32 @@ func TestJobRuleSetAndGetSkipFunc(t *testing.T) {
 	// 调用跳过函数并验证
 	result := rule.GetSkipFunc()()
 	assert.True(t, result, "SkipFunc should return true")
+}
+
+func TestJobRuleTimeout(t *testing.T) {
+	job := &JobRule{}
+
+	// 默认timeout为0
+	assert.Equal(t, time.Duration(0), job.GetTimeout(), "默认timeout应为0")
+
+	// 设置超时时间为5秒
+	d := 5 * time.Second
+	job.SetTimeout(d)
+	assert.Equal(t, d, job.GetTimeout(), "设置timeout后获取值应一致")
+
+	// 再设置超时时间为10毫秒
+	d2 := 10 * time.Millisecond
+	job.SetTimeout(d2)
+	assert.Equal(t, d2, job.GetTimeout(), "更新timeout后获取值应一致")
+}
+
+func TestJobRule_SetTimezone(t *testing.T) {
+	jr := &JobRule{}
+
+	jr.SetTimezone("Asia/Tokyo")
+	assert.Equal(t, "Asia/Tokyo", jr.timezone.String())
+
+	jr.SetTimezone("Invalid/Zone")
+	assert.Equal(t, DefaultTimeZone, jr.timezone)
+	assert.Equal(t, DefaultTimeZone, jr.GetTimezone())
 }

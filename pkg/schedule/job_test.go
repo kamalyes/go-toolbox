@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-01-22 13:55:18
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-01-24 13:27:59
+ * @LastEditTime: 2025-06-13 17:55:19
  * @FilePath: \go-toolbox\pkg\schedule\job_test.go
  * @Description:
  *
@@ -22,38 +22,35 @@ import (
 
 // TestAddJob 测试 AddJob 方法
 func TestAddJob(t *testing.T) {
-	c := &Cron{jobs: make(map[string]*JobRule)}
+	c := &Schedule{jobs: make(map[string]*JobRule)}
 
 	tests := []struct {
-		id          string
-		name        string
-		expression  string
-		fn          func() error
+		job         *JobRule
 		expectPanic bool
 		expectedErr string
 	}{
-		{"job1", "Test Job 1", "*/5 * * * *", func() error { return nil }, false, ""},
-		{"", "Test Job 2", "*/5 * * * *", func() error { return nil }, true, "job id cannot be empty"},
-		{"job2", "", "*/5 * * * *", func() error { return nil }, true, "job name cannot be empty"},
-		{"job3", "Test Job 3", "", func() error { return nil }, true, "cron expression cannot be empty"},
-		{"job4", "Test Job 4", "*/5 * * * *", nil, true, "job callback function cannot be nil"},
-		{"job1", "Test Job 5", "*/5 * * * *", func() error { return nil }, true, "job with id job1 already exists"},
+		{&JobRule{id: "job1", name: "Test Job 1", expression: "*/5 * * * *", callback: func() error { return nil }}, false, ""},
+		{&JobRule{id: "", name: "Test Job 2", expression: "*/5 * * * *", callback: func() error { return nil }}, true, ErrJobIDEmpty},
+		{&JobRule{id: "job2", name: "", expression: "*/5 * * * *", callback: func() error { return nil }}, true, ErrJobNameEmpty},
+		{&JobRule{id: "job3", name: "Test Job 3", expression: "", callback: func() error { return nil }}, true, ErrJobExpressionEmpty},
+		{&JobRule{id: "job4", name: "Test Job 4", expression: "*/5 * * * *", callback: nil}, true, ErrJobCallbackNil},
+		{&JobRule{id: "job1", name: "Test Job 5", expression: "*/5 * * * *", callback: func() error { return nil }}, true, fmt.Sprintf(ErrJobIDAlreadyExists, "job1")},
 	}
 
 	for _, tt := range tests {
 		if tt.expectPanic {
 			assert.PanicsWithValue(t, tt.expectedErr, func() {
-				c.AddJob(tt.id, tt.name, tt.expression, tt.fn)
-			}, fmt.Sprintf("expected panic for input %v, but did not", tt))
+				c.AddJob(tt.job)
+			}, fmt.Sprintf("expected panic for input %+v, but did not", tt.job))
 		} else {
-			c.AddJob(tt.id, tt.name, tt.expression, tt.fn)
-			assert.NotNil(t, c.jobs[tt.id], "Job should be added")
+			c.AddJob(tt.job)
+			assert.NotNil(t, c.jobs[tt.job.id], "Job should be added")
 		}
 	}
 }
 
 func TestConcurrentAddJobs(t *testing.T) {
-	cron := NewCron()
+	schedule := NewSchedule()
 	var wg sync.WaitGroup
 
 	// 定义回调函数
@@ -69,33 +66,29 @@ func TestConcurrentAddJobs(t *testing.T) {
 			defer wg.Done()
 
 			// 定义任务配置
-			jobConfig := JobRule{
+
+			var beforeExecuted, afterExecuted bool
+			beforeFunc := func() { beforeExecuted = true }
+			afterSuccessFunc := func() { afterExecuted = true }
+			timezone, _ := time.LoadLocation("America/New_York")
+			jobConfig := &JobRule{
 				id:               fmt.Sprintf("job%d", id),
 				name:             fmt.Sprintf("Complex Job %d%s", id, osx.HashUnixMicroCipherText()),
 				expression:       fmt.Sprintf("* * * * %d", id),
 				cooldownDuration: 5 * time.Second,
 				sleepDuration:    2 * time.Second,
 				maxFailureCount:  3,
+				callback:         jobFunc,
+				beforeFunc:       beforeFunc,
+				afterSuccessFunc: afterSuccessFunc,
+				timezone:         timezone,
 			}
 
-			// 定义执行前和执行后的函数
-			var beforeExecuted, afterExecuted bool
-			beforeFunc := func() {
-				beforeExecuted = true
-			}
-			afterFunc := func() {
-				afterExecuted = true
-			}
+			schedule.AddJob(jobConfig)
 
-			// 添加任务时设置更多属性
-			job := cron.AddJob(jobConfig.id, jobConfig.name, jobConfig.expression, jobFunc).
-				SetCooldownDuration(jobConfig.cooldownDuration).
-				SetSleepDuration(jobConfig.sleepDuration).
-				SetMaxFailureCount(jobConfig.maxFailureCount).
-				SetBeforeFunc(beforeFunc).
-				SetAfterFunc(afterFunc)
-
+			job := schedule.GetJob(jobConfig.id)
 			// 断言任务的各个属性是否被正确设置
+
 			assert.NotNil(t, job, "Job should not be nil after addition")
 			assert.Equal(t, jobConfig.id, job.GetId(), "Job ID should match")
 			assert.Equal(t, jobConfig.name, job.GetName(), "Job Name should match")
@@ -103,13 +96,14 @@ func TestConcurrentAddJobs(t *testing.T) {
 			assert.Equal(t, jobConfig.cooldownDuration, job.GetCooldownDuration(), "Cooldown Duration should match")
 			assert.Equal(t, jobConfig.sleepDuration, job.GetSleepDuration(), "Sleep Duration should match")
 			assert.Equal(t, jobConfig.maxFailureCount, job.GetMaxFailureCount(), "Max Failure Count should match")
+			assert.Equal(t, jobConfig.timezone, job.GetTimezone(), "Timezone Count should match")
 
 			// 执行前后的函数应该被调用
 			job.GetBeforeFunc()()
 			assert.True(t, beforeExecuted, "Before function should be executed")
 
-			job.GetAfterFunc()()
-			assert.True(t, afterExecuted, "After function should be executed")
+			job.GetAfterSuccessFunc()()
+			assert.True(t, afterExecuted, "AfterSuccessFunc function should be executed")
 		}(i)
 	}
 
@@ -117,46 +111,75 @@ func TestConcurrentAddJobs(t *testing.T) {
 	wg.Wait()
 
 	// 检查作业数量
-	assert.Equal(t, jobCount, len(cron.jobs), "The number of jobs in the cron should match the number of added jobs")
+	assert.Equal(t, jobCount, len(schedule.jobs), "The number of jobs in the schedule should match the number of added jobs")
 
 	// 可选：检查每个作业是否存在
 	for i := 0; i < jobCount; i++ {
 		jobID := fmt.Sprintf("job%d", i)
-		job, exists := cron.jobs[jobID]
-		assert.True(t, exists, "Job should exist in the cron jobs")
+		job, exists := schedule.jobs[jobID]
+		assert.True(t, exists, "Job should exist in the schedule jobs")
 		assert.Equal(t, jobID, job.GetId(), "Job ID should match")
 	}
 }
 
-func TestGetJobStatus(t *testing.T) {
-	cron := NewCron()
-	jobFunc := func() error { return nil }
-	cron.AddJob("job1", "Test Job", "* * * * *", jobFunc)
-
-	// 测试获取任务状态
-	retrievedJob := cron.GetJobStatus("job1")
-	assert.NotNil(t, retrievedJob, "Retrieved job should not be nil")
-	assert.Equal(t, "job1", retrievedJob.GetId(), "Retrieved job ID should match")
-}
-
 func TestDelJob(t *testing.T) {
-	cron := NewCron()
-	jobFunc := func() error { return nil }
-	cron.AddJob("job1", "Test Job", "* * * * *", jobFunc)
+	schedule := NewSchedule()
+	job := &JobRule{
+		id:         "job1",
+		name:       "Test Job",
+		expression: "* * * * *",
+		callback:   func() error { return nil },
+	}
+	schedule.AddJob(job)
 
-	// 测试删除任务
-	cron.DelJob("job1")
-	assert.Nil(t, cron.GetJobStatus("job1"), "Job should be nil after deletion")
+	// 确认任务已添加
+	assert.NotNil(t, schedule.GetJob(job.id))
+
+	// 删除任务
+	schedule.DelJob(job.id)
+
+	// 删除后任务应不存在
+	assert.Nil(t, schedule.GetJob(job.id))
 }
 
 func TestAbortJob(t *testing.T) {
-	cron := NewCron()
-	jobFunc := func() error { return nil }
-	cron.AddJob("job2", "Test Job 2", "* * * * *", jobFunc)
+	schedule := NewSchedule()
+	job := &JobRule{
+		id:         "job2",
+		name:       "Test Job 2",
+		expression: "* * * * *",
+		callback:   func() error { return nil },
+	}
+	schedule.AddJob(job)
 
-	// 测试终止任务
-	cron.AbortJob("job2")
-	abortedJob := cron.GetJobStatus("job2")
-	assert.NotNil(t, abortedJob, "Aborted job should still exist")
-	assert.True(t, abortedJob.Aborted(), "Job should be marked as aborted")
+	// 任务初始状态未被终止
+	assert.False(t, job.Aborted())
+
+	// 终止任务
+	schedule.AbortJob(job.id)
+
+	// 任务状态应被标记为终止
+	abortedJob := schedule.GetJob(job.id)
+	assert.NotNil(t, abortedJob)
+	assert.True(t, abortedJob.Aborted())
+}
+
+func TestGetJob(t *testing.T) {
+	schedule := NewSchedule()
+	job := &JobRule{
+		id:         "job3",
+		name:       "Test Job 3",
+		expression: "* * * * *",
+		callback:   func() error { return nil },
+	}
+	schedule.AddJob(job)
+
+	// 获取已存在任务状态
+	retrieved := schedule.GetJob(job.id)
+	assert.NotNil(t, retrieved)
+	assert.Equal(t, job.id, retrieved.GetId())
+
+	// 获取不存在任务状态应返回 nil
+	nonExistent := schedule.GetJob("nonexistent")
+	assert.Nil(t, nonExistent)
 }

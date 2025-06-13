@@ -14,24 +14,25 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kamalyes/go-toolbox/pkg/mathx"
 	"github.com/kamalyes/go-toolbox/pkg/osx"
 	"github.com/kamalyes/go-toolbox/pkg/syncx"
 )
 
-// Start 启动 Cron 定时器
-func (c *Cron) Start() {
-	syncx.WithLock(&c.runningMux, func() {
+// Start 启动 Schedule 定时器
+func (c *Schedule) Start() {
+	syncx.WithLock(&c.mu, func() {
 		if c.isBroken {
-			fmt.Println("Cron is broken, cannot start.")
+			fmt.Println("Schedule is broken, cannot start.")
 			return
 		}
 		go c.run()
 	})
 }
 
-// Stop 停止 Cron 定时器
-func (c *Cron) Stop() {
-	syncx.WithLock(&c.runningMux, func() {
+// Stop 停止 Schedule 定时器
+func (c *Schedule) Stop() {
+	syncx.WithLock(&c.mu, func() {
 		c.isBroken = true
 		close(c.taskChan)
 		c.jobWaiter.Wait() // 等待所有任务完成
@@ -39,7 +40,7 @@ func (c *Cron) Stop() {
 }
 
 // run 运行定时器，调度任务
-func (c *Cron) run() {
+func (c *Schedule) run() {
 	ticker := time.NewTicker(time.Second) // 每秒检查一次
 	defer ticker.Stop()
 
@@ -54,27 +55,27 @@ func (c *Cron) run() {
 }
 
 // scheduleTasks 调度任务
-func (c *Cron) scheduleTasks() {
-	syncx.WithRLock(&c.runningMux, func() {
+func (c *Schedule) scheduleTasks() {
+	syncx.WithRLock(&c.mu, func() {
 		for _, rule := range c.jobs {
 			if time.Now().After(rule.GetNextTime()) {
 				c.taskChan <- rule
 				rule.SetPrevTime(time.Now())
-				rule.SetNextTime(c.calculateNextRunTime(rule)) // 计算下次运行时间
+				rule.SetNextTime(c.calculateNextRunTime()) // 计算下次运行时间
 			}
 		}
 	})
 }
 
 // calculateNextRunTime 计算下次运行时间
-func (c *Cron) calculateNextRunTime(rule *JobRule) time.Time {
-	// 这里可以实现根据 Cron 表达式计算下次运行时间的逻辑
+func (c *Schedule) calculateNextRunTime() time.Time {
+	// 这里可以实现根据 Schedule 表达式计算下次运行时间的逻辑
 	// 目前仅返回当前时间加上1分钟作为示例
 	return time.Now().Add(time.Minute)
 }
 
 // executeTask 执行任务
-func (c *Cron) executeTask(rule *JobRule) {
+func (c *Schedule) executeTask(rule *JobRule) {
 	defer c.jobWaiter.Done() // 确保任务完成时调用 Done
 
 	// 生成一个新的 traceId
@@ -93,15 +94,16 @@ func (c *Cron) executeTask(rule *JobRule) {
 		c.recordTaskSuccess(rule, traceId)
 	}
 
-	// 执行后的函数
-	if rule.GetAfterFunc() != nil {
-		rule.GetAfterFunc()
-	}
+	// 执行后的函数 细化执行后回调，区分成功和失败，安全调用
+	mathx.IfChain([]mathx.ConditionValue[func()]{
+		{Cond: err != nil, Value: mathx.IF(rule.GetAfterFailureFunc() != nil, rule.GetAfterFailureFunc(), func() {})},
+		{Cond: err == nil, Value: mathx.IF(rule.GetAfterSuccessFunc() != nil, rule.GetAfterSuccessFunc(), func() {})},
+	}, func() {})()
 }
 
 // recordTaskStatus 记录任务状态信息
-func (c *Cron) recordTaskStatus(rule *JobRule, traceId string, status execStatus, err error) {
-	syncx.WithLock(&c.runningMux, func() {
+func (c *Schedule) recordTaskStatus(rule *JobRule, traceId string, status execStatus, err error) {
+	syncx.WithLock(&c.mu, func() {
 		// 查找是否已存在对应的快照
 		currentSnapshot, exists := rule.exceedTaskSnapshots[traceId]
 
@@ -133,31 +135,31 @@ func (c *Cron) recordTaskStatus(rule *JobRule, traceId string, status execStatus
 }
 
 // recordTaskFailure 记录任务失败信息
-func (c *Cron) recordTaskFailure(rule *JobRule, traceId string, err error) {
+func (c *Schedule) recordTaskFailure(rule *JobRule, traceId string, err error) {
 	c.recordTaskStatus(rule, traceId, Failure, err)
 }
 
 // recordTaskSuccess 记录任务成功信息
-func (c *Cron) recordTaskSuccess(rule *JobRule, traceId string) {
+func (c *Schedule) recordTaskSuccess(rule *JobRule, traceId string) {
 	c.recordTaskStatus(rule, traceId, Success, nil)
 }
 
 // recordTaskPending 记录任务等待中信息
-func (c *Cron) recordTaskPending(rule *JobRule, traceId string) {
+func (c *Schedule) recordTaskPending(rule *JobRule, traceId string) {
 	c.recordTaskStatus(rule, traceId, Pending, nil)
 }
 
 // recordTaskRunning 记录任务运行中信息
-func (c *Cron) recordTaskRunning(rule *JobRule, traceId string) {
+func (c *Schedule) recordTaskRunning(rule *JobRule, traceId string) {
 	c.recordTaskStatus(rule, traceId, Running, nil)
 }
 
 // recordTaskSysTermination 记录任务系统终止信息
-func (c *Cron) recordTaskSysTermination(rule *JobRule, traceId string) {
+func (c *Schedule) recordTaskSysTermination(rule *JobRule, traceId string) {
 	c.recordTaskStatus(rule, traceId, SysTermination, nil)
 }
 
 // recordTaskUserTermination 记录任务用户终止信息
-func (c *Cron) recordTaskUserTermination(rule *JobRule, traceId string) {
+func (c *Schedule) recordTaskUserTermination(rule *JobRule, traceId string) {
 	c.recordTaskStatus(rule, traceId, UserTermination, nil)
 }

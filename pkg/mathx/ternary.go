@@ -2,10 +2,9 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-01-21 19:15:15
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-11 15:59:26
+ * @LastEditTime: 2025-06-13 17:17:15
  * @FilePath: \go-toolbox\pkg\mathx\ternary.go
- * @Description:
- *   mathx 包提供了一组基于 Go 泛型实现的三元运算及条件执行函数，支持同步、异步、带错误处理等多种场景
+ * @Description: 包提供了一组基于 Go 泛型实现的三元运算及条件执行函数，支持同步、异步、带错误处理等多种场景
  *
  * Copyright (c) 2025 by kamalyes, All Rights Reserved.
  */
@@ -149,9 +148,9 @@ type ResultWithError[T any] struct {
 	Err    error
 }
 
-// IfDoWithErrorAsync 支持异步执行带错误返回的函数 do。
-// 根据条件 condition 决定是否执行 do()，否则返回默认值 defaultVal 和 nil 错误。
-// 返回一个通道，通道元素是 ResultWithError[T] 类型。
+// IfDoWithErrorAsync 支持异步执行带错误返回的函数 do
+// 根据条件 condition 决定是否执行 do()，否则返回默认值 defaultVal 和 nil 错误
+// 返回一个通道，通道元素是 ResultWithError[T] 类型
 func IfDoWithErrorAsync[T any](condition bool, do DoFuncWithError[T], defaultVal T) <-chan ResultWithError[T] {
 	ch := make(chan ResultWithError[T], 1)
 	go func() {
@@ -164,4 +163,52 @@ func IfDoWithErrorAsync[T any](condition bool, do DoFuncWithError[T], defaultVal
 		close(ch)
 	}()
 	return ch
+}
+
+// ReturnIfErr 简化错误检查和返回
+// 如果 err 不为 nil，返回 T 类型的零值和 err；否则返回 val 和 nil
+func ReturnIfErr[T any](val T, err error) (T, error) {
+	if err != nil {
+		var zero T
+		return zero, err
+	}
+	return val, nil
+}
+
+// IfDoWithErrorDefault 根据条件 condition 执行带错误返回的函数 do
+// 如果 condition 为 false 或 do 返回错误，则返回 defaultVal
+func IfDoWithErrorDefault[T any](condition bool, do DoFuncWithError[T], defaultVal T) T {
+	if !condition {
+		return defaultVal
+	}
+	val, err := do()
+	if err != nil {
+		return defaultVal
+	}
+	return val
+}
+
+// IfCall 根据布尔条件 condition，选择性调用对应的回调函数
+//
+// Params
+//   - condition: 判断条件，true 时调用 onTrue，false 时调用 onFalse
+//   - result: 泛型参数，传递给回调函数的结果值
+//   - err: 错误信息，传递给回调函数
+//   - onTrue: 条件为 true 时调用的回调函数，接收 (result, err)
+//   - onFalse: 条件为 false 时调用的回调函数，接收 (result, err)
+//
+// 函数逻辑：
+//   1. 根据 condition 选择要调用的回调函数 cb（onTrue 或 onFalse）
+//   2. 如果 cb 不为 nil，则调用 cb(result, err)
+//   3. 如果 cb 为 nil，则跳过调用，避免空指针异常
+//
+// 作用：简化根据条件调用不同回调的代码，避免重复写 if-else 和 nil 判断，提高代码简洁性和安全性
+func IfCall[T any](condition bool, result T, err error, onTrue func(T, error), onFalse func(T, error)) {
+	if condition && onTrue != nil {
+		onTrue(result, err)
+		return
+	}
+	if !condition && onFalse != nil {
+		onFalse(result, err)
+	}
 }

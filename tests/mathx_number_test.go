@@ -418,3 +418,27 @@ func TestSafeGetIndexOrDefault(t *testing.T) {
 	valPtr = mathx.SafeGetIndexOrDefault(ptrSlice, 10, nil)
 	assert.Nil(t, valPtr)
 }
+
+func TestSafeGetIndexOrDefaultNoSpace(t *testing.T) {
+	tests := []struct {
+		slice      []string
+		index      int
+		defaultVal string
+		want       string
+	}{
+		{[]string{"a b c", " d e f ", "g h i"}, 0, "default", "abc"},
+		{[]string{"a b c", " d e f ", "g h i"}, 1, "default", "def"},
+		{[]string{"a b c", " d e f ", "g h i"}, 2, "default", "ghi"},
+		{[]string{"a b c", " d e f ", "g h i"}, 3, "default", "default"}, // 越界返回默认值
+		{[]string{}, 0, "default", "default"},                            // 空切片返回默认值
+		{[]string{" no space "}, 0, "default", "nospace"},
+	}
+
+	for _, tt := range tests {
+		got := mathx.SafeGetIndexOrDefaultNoSpace(tt.slice, tt.index, tt.defaultVal)
+		if got != tt.want {
+			t.Errorf("SafeGetIndexOrDefaultNoSpace(%v, %d, %q) = %q; want %q",
+				tt.slice, tt.index, tt.defaultVal, got, tt.want)
+		}
+	}
+}
