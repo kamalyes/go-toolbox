@@ -1,0 +1,601 @@
+/*
+ * @Author: kamalyes 501893067@qq.com
+ * @Date: 2025-06-17 13:15:00
+ * @LastEditors: kamalyes 501893067@qq.com
+ * @LastEditTime: 2025-06-17 13:55:17
+ * @FilePath: \go-toolbox\pkg\random\surnames.go
+ * @Description:
+ *
+ * Copyright (c) 2025 by kamalyes, All Rights Reserved.
+ */
+package random
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"math/rand"
+	"strings"
+)
+
+// SurnameInfo 表示一个姓氏的详细信息
+type SurnameInfo struct {
+	Surname       string   // 姓氏的汉字，例如“赵”、“钱”等
+	Initial       string   // 姓氏拼音的首字母，方便快速索引或分类
+	CorrectPinyin string   // 姓氏的标准拼音（通常为主要读音），例如 "zhao"
+	AllPinyins    []string // 姓氏所有可能的拼音读法（多音字情况），例如 []string{"zhào", "zhao"}
+}
+
+// SurnameManager 管理一组姓氏信息，提供过滤、查询等功能
+type SurnameManager struct {
+	data []SurnameInfo // 姓氏信息列表
+}
+
+// NewSurnameManager 创建一个新的 SurnameManager，可选传入额外的姓氏数据，会追加到默认数据后面
+func NewSurnameManager(data ...[]SurnameInfo) *SurnameManager {
+	// 如果传入了数据，取第一个切片；否则使用空切片
+	additional := []SurnameInfo{}
+	if len(data) > 0 {
+		additional = data[0]
+	}
+
+	// 预分配容量，避免多次扩容
+	combined := make([]SurnameInfo, 0, len(SurnameData)+len(additional))
+	// 先追加默认数据
+	combined = append(combined, SurnameData...)
+	// 再追加额外传入的数据
+	combined = append(combined, additional...)
+
+	return &SurnameManager{
+		data: combined,
+	}
+}
+
+// 按姓氏汉字过滤，返回新的管理器
+func (m *SurnameManager) FilterBySurname(surname string) *SurnameManager {
+	var filtered []SurnameInfo
+	for _, info := range m.data {
+		if info.Surname == surname {
+			filtered = append(filtered, info)
+		}
+	}
+	return &SurnameManager{data: filtered}
+}
+
+// 按拼音过滤，返回新的管理器
+func (m *SurnameManager) FilterByPinyin(pinyin string) *SurnameManager {
+	pinyin = strings.ToLower(pinyin)
+	var filtered []SurnameInfo
+	for _, info := range m.data {
+		if strings.ToLower(info.CorrectPinyin) == pinyin {
+			filtered = append(filtered, info)
+			continue
+		}
+		for _, p := range info.AllPinyins {
+			if strings.ToLower(p) == pinyin {
+				filtered = append(filtered, info)
+				break
+			}
+		}
+	}
+	return &SurnameManager{data: filtered}
+}
+
+// 导出当前管理器数据为JSON字符串
+func (m *SurnameManager) ToJSON() (string, error) {
+	b, err := json.MarshalIndent(m.data, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+// RandomSurname 从管理器中随机返回一个姓氏信息
+func (m *SurnameManager) RandomSurname() (SurnameInfo, error) {
+	if len(m.data) == 0 {
+		return SurnameInfo{}, errors.New("no surnames available")
+	}
+	idx := rand.Intn(len(m.data))
+	return m.data[idx], nil
+}
+
+// 打印当前管理器数据
+func (m *SurnameManager) Print() {
+	for _, info := range m.data {
+		fmt.Printf("%s (%s) 拼音: %s 多音: %v\n", info.Surname, info.Initial, info.CorrectPinyin, info.AllPinyins)
+	}
+}
+
+// Data 返回当前管理器持有的所有姓氏数据切片
+func (m *SurnameManager) Data() []SurnameInfo {
+	return m.data
+}
+
+// AppendData 向当前管理器追加姓氏数据
+func (m *SurnameManager) AppendData(newData ...SurnameInfo) {
+	m.data = append(m.data, newData...)
+}
+
+var SurnameData = []SurnameInfo{
+	{"赵", "z", "zhao", []string{"zhào"}},
+	{"钱", "q", "qian", []string{"qián"}},
+	{"孙", "s", "sun", []string{"sūn"}},
+	{"李", "l", "li", []string{"lĭ"}},
+	{"周", "z", "zhou", []string{"zhōu"}},
+	{"吴", "w", "wu", []string{"wú"}},
+	{"郑", "z", "zheng", []string{"zhèng"}},
+	{"王", "w", "wang", []string{"wáng", "wàng"}},
+	{"冯", "f", "feng", []string{"féng", "píng"}},
+	{"陈", "c", "chen", []string{"chén"}},
+	{"褚", "c", "chu", []string{"chŭ", "zhŭ"}},
+	{"卫", "w", "wei", []string{"wèi"}},
+	{"蒋", "j", "jiang", []string{"jiăng"}},
+	{"沈", "s", "shen", []string{"shĕn", "chén"}},
+	{"韩", "h", "han", []string{"hán"}},
+	{"杨", "y", "yang", []string{"yáng"}},
+	{"朱", "z", "zhu", []string{"zhū"}},
+	{"秦", "q", "qin", []string{"qín"}},
+	{"尤", "y", "you", []string{"yóu"}},
+	{"许", "x", "xu", []string{"xŭ"}},
+	{"何", "h", "he", []string{"hé", "hè"}},
+	{"吕", "l", "lv", []string{"lǚ"}},
+	{"施", "s", "shi", []string{"shī"}},
+	{"张", "z", "zhang", []string{"zhāng"}},
+	{"孔", "k", "kong", []string{"kŏng"}},
+	{"曹", "c", "cao", []string{"cáo"}},
+	{"严", "y", "yan", []string{"yán"}},
+	{"华", "h", "hua", []string{"huá", "huà", "huā"}},
+	{"金", "j", "jin", []string{"jīn"}},
+	{"魏", "w", "wei", []string{"wèi"}},
+	{"陶", "t", "tao", []string{"táo", "yáo"}},
+	{"姜", "j", "jiang", []string{"jiāng"}},
+	{"戚", "q", "qi", []string{"qī"}},
+	{"谢", "x", "xie", []string{"xiè"}},
+	{"邹", "z", "zou", []string{"zōu"}},
+	{"喻", "y", "yu", []string{"yù"}},
+	{"柏", "b", "bo", []string{"bó", "băi", "bò"}},
+	{"水", "s", "shui", []string{"shuĭ"}},
+	{"窦", "d", "dou", []string{"dòu"}},
+	{"章", "z", "zhang", []string{"zhāng"}},
+	{"云", "y", "yun", []string{"yún"}},
+	{"苏", "s", "su", []string{"sū"}},
+	{"潘", "p", "pan", []string{"pān"}},
+	{"葛", "g", "ge", []string{"gĕ", "gé"}},
+	{"奚", "x", "xi", []string{"xī"}},
+	{"范", "f", "fan", []string{"fàn"}},
+	{"彭", "p", "peng", []string{"péng"}},
+	{"郎", "l", "lang", []string{"láng", "làng"}},
+	{"鲁", "l", "lu", []string{"lŭ"}},
+	{"韦", "w", "wei", []string{"wéi"}},
+	{"秦", "q", "qin", []string{"qín"}},
+	{"尤", "y", "you", []string{"yóu"}},
+	{"许", "x", "xu", []string{"xŭ"}},
+	{"何", "h", "he", []string{"hé", "hè"}},
+	{"吕", "l", "lv", []string{"lǚ"}},
+	{"施", "s", "shi", []string{"shī"}},
+	{"张", "z", "zhang", []string{"zhāng"}},
+	{"孔", "k", "kong", []string{"kŏng"}},
+	{"曹", "c", "cao", []string{"cáo"}},
+	{"严", "y", "yan", []string{"yán"}},
+	{"华", "h", "hua", []string{"huá", "huà", "huā"}},
+	{"金", "j", "jin", []string{"jīn"}},
+	{"魏", "w", "wei", []string{"wèi"}},
+	{"陶", "t", "tao", []string{"táo", "yáo"}},
+	{"姜", "j", "jiang", []string{"jiāng"}},
+	{"戚", "q", "qi", []string{"qī"}},
+	{"谢", "x", "xie", []string{"xiè"}},
+	{"邹", "z", "zou", []string{"zōu"}},
+	{"喻", "y", "yu", []string{"yù"}},
+	{"柏", "b", "bo", []string{"bó", "băi", "bò"}},
+	{"水", "s", "shui", []string{"shuĭ"}},
+	{"窦", "d", "dou", []string{"dòu"}},
+	{"章", "z", "zhang", []string{"zhāng"}},
+	{"云", "y", "yun", []string{"yún"}},
+	{"苏", "s", "su", []string{"sū"}},
+	{"潘", "p", "pan", []string{"pān"}},
+	{"葛", "g", "ge", []string{"gĕ", "gé"}},
+	{"奚", "x", "xi", []string{"xī"}},
+	{"范", "f", "fan", []string{"fàn"}},
+	{"彭", "p", "peng", []string{"péng"}},
+	{"郎", "l", "lang", []string{"láng", "làng"}},
+	{"鲁", "l", "lu", []string{"lŭ"}},
+	{"韦", "w", "wei", []string{"wéi"}},
+	{"昌", "c", "chang", []string{"chāng"}},
+	{"马", "m", "ma", []string{"mă"}},
+	{"苗", "m", "miao", []string{"miáo"}},
+	{"凤", "f", "feng", []string{"fèng"}},
+	{"花", "h", "hua", []string{"huā"}},
+	{"方", "f", "fang", []string{"fāng"}},
+	{"俞", "y", "yu", []string{"yú", "shù"}},
+	{"任", "r", "ren", []string{"rèn", "rén"}},
+	{"袁", "y", "yuan", []string{"yuán"}},
+	{"柳", "l", "liu", []string{"liŭ"}},
+	{"酆", "f", "feng", []string{"fēng"}},
+	{"鲍", "b", "bao", []string{"bào"}},
+	{"史", "s", "shi", []string{"shĭ"}},
+	{"唐", "t", "tang", []string{"táng"}},
+	{"费", "f", "fei", []string{"fèi"}},
+	{"廉", "l", "lian", []string{"lián"}},
+	{"岑", "c", "cen", []string{"cén"}},
+	{"薛", "x", "xue", []string{"xuē"}},
+	{"雷", "l", "lei", []string{"léi"}},
+	{"贺", "h", "he", []string{"hè"}},
+	{"倪", "n", "ni", []string{"ní"}},
+	{"汤", "t", "tang", []string{"tāng", "shāng"}},
+	{"滕", "t", "teng", []string{"téng"}},
+	{"殷", "y", "yin", []string{"yīn", "yān", "yĭn"}},
+	{"罗", "l", "luo", []string{"luó", "luō", "luo"}},
+	{"毕", "b", "bi", []string{"bì"}},
+	{"郝", "h", "hao", []string{"hăo"}},
+	{"邬", "w", "wu", []string{"wū"}},
+	{"安", "a", "an", []string{"ān"}},
+	{"常", "c", "chang", []string{"cháng"}},
+	{"乐", "l", "le", []string{"lè", "yuè"}},
+	{"于", "y", "yu", []string{"yú"}},
+	{"时", "s", "shi", []string{"shí"}},
+	{"傅", "f", "fu", []string{"fù"}},
+	{"皮", "p", "pi", []string{"pí"}},
+	{"卞", "b", "bian", []string{"biàn"}},
+	{"齐", "q", "qi", []string{"qí", "jì", "qì"}},
+	{"康", "k", "kang", []string{"kāng"}},
+	{"伍", "w", "wu", []string{"wŭ"}},
+	{"余", "y", "yu", []string{"yú", "tú"}},
+	{"元", "y", "yuan", []string{"yuán"}},
+	{"卜", "b", "bu", []string{"bŭ", "bo"}},
+	{"顾", "g", "gu", []string{"gù"}},
+	{"孟", "m", "meng", []string{"mèng"}},
+	{"平", "p", "ping", []string{"píng"}},
+	{"黄", "h", "huang", []string{"huáng"}},
+	{"和", "h", "he", []string{"hé", "hè", "huó", "huò", "huo", "hāi", "he", "hú"}},
+	{"穆", "m", "mu", []string{"mù"}},
+	{"萧", "x", "xiao", []string{"xiāo"}},
+	{"尹", "y", "yin", []string{"yĭn"}},
+	{"姚", "y", "yao", []string{"yáo"}},
+	{"邵", "s", "shao", []string{"shào"}},
+	{"湛", "z", "zhan", []string{"zhàn"}},
+	{"汪", "w", "wang", []string{"wāng"}},
+	{"祁", "q", "qi", []string{"qí"}},
+	{"毛", "m", "mao", []string{"máo"}},
+	{"禹", "y", "yu", []string{"yŭ"}},
+	{"狄", "d", "di", []string{"dí"}},
+	{"米", "m", "mi", []string{"mĭ"}},
+	{"贝", "b", "bei", []string{"bèi"}},
+	{"明", "m", "ming", []string{"míng"}},
+	{"臧", "z", "zang", []string{"zāng"}},
+	{"计", "j", "ji", []string{"jì"}},
+	{"伏", "f", "fu", []string{"fú"}},
+	{"成", "c", "cheng", []string{"chéng"}},
+	{"戴", "d", "dai", []string{"dài"}},
+	{"谈", "t", "tan", []string{"tán"}},
+	{"宋", "s", "song", []string{"sòng"}},
+	{"茅", "m", "mao", []string{"máo"}},
+	{"庞", "p", "pang", []string{"páng"}},
+	{"熊", "x", "xiong", []string{"xióng"}},
+	{"纪", "j", "ji", []string{"jì", "jĭ"}},
+	{"舒", "s", "shu", []string{"shū"}},
+	{"屈", "q", "qu", []string{"qū"}},
+	{"项", "x", "xiang", []string{"xiàng"}},
+	{"祝", "z", "zhu", []string{"zhù"}},
+	{"董", "d", "dong", []string{"dŏng"}},
+	{"梁", "l", "liang", []string{"liáng"}},
+	{"杜", "d", "du", []string{"dù"}},
+	{"阮", "r", "ruan", []string{"ruăn"}},
+	{"蓝", "l", "lan", []string{"lán", "lan", "la"}},
+	{"闵", "m", "min", []string{"mĭn"}},
+	{"席", "x", "xi", []string{"xí"}},
+	{"季", "j", "ji", []string{"jì"}},
+	{"麻", "m", "ma", []string{"mā", "mā"}},
+	{"强", "j", "jiang", []string{"qiáng", "qiăng", "jiàng"}},
+	{"贾", "j", "jia", []string{"jiă", "gŭ"}},
+	{"路", "l", "lu", []string{"lù"}},
+	{"娄", "l", "lou", []string{"lóu"}},
+	{"危", "w", "wei", []string{"wēi", "wéi"}},
+	{"江", "j", "jiang", []string{"jiāng"}},
+	{"童", "t", "tong", []string{"tóng"}},
+	{"颜", "y", "yan", []string{"yán"}},
+	{"郭", "g", "guo", []string{"guō"}},
+	{"梅", "m", "mei", []string{"méi"}},
+	{"盛", "s", "sheng", []string{"shèng", "chéng"}},
+	{"林", "l", "lin", []string{"lín"}},
+	{"刁", "d", "diao", []string{"diāo"}},
+	{"锺", "z", "zhong", []string{"zhōng"}},
+	{"徐", "x", "xu", []string{"xú"}},
+	{"邱", "q", "qiu", []string{"qiū"}},
+	{"骆", "l", "luo", []string{"luò"}},
+	{"高", "g", "gao", []string{"gāo"}},
+	{"夏", "x", "xia", []string{"xià", "jiă"}},
+	{"蔡", "c", "cai", []string{"cài"}},
+	{"田", "t", "tian", []string{"tián"}},
+	{"樊", "f", "fan", []string{"fán"}},
+	{"胡", "h", "hu", []string{"hú"}},
+	{"凌", "l", "ling", []string{"líng"}},
+	{"霍", "h", "huo", []string{"huò"}},
+	{"虞", "y", "yu", []string{"yú"}},
+	{"万", "w", "wan", []string{"wàn", "mò"}},
+	{"支", "z", "zhi", []string{"zhī"}},
+	{"柯", "k", "ke", []string{"kē"}},
+	{"昝", "z", "zan", []string{"zăn"}},
+	{"管", "g", "guan", []string{"guăn"}},
+	{"卢", "l", "lu", []string{"lú"}},
+	{"莫", "m", "mo", []string{"mò"}},
+	{"经", "j", "jing", []string{"jīng", "jìng"}},
+	{"房", "f", "fang", []string{"fáng"}},
+	{"裘", "q", "qiu", []string{"qiú"}},
+	{"缪", "m", "miao", []string{"móu", "miào", "miù"}},
+	{"干", "g", "gan", []string{"gān", "gàn"}},
+	{"解", "x", "xie", []string{"jiĕ", "jiè", "xiè"}},
+	{"应", "y", "ying", []string{"yīng", "yìng"}},
+	{"宗", "z", "zong", []string{"zōng"}},
+	{"丁", "d", "ding", []string{"dīng", "zhēng"}},
+	{"宣", "x", "xuan", []string{"xuān"}},
+	{"贲", "b", "bi", []string{"bì", "bēn"}},
+	{"邓", "d", "deng", []string{"dèng"}},
+	{"郁", "y", "yu", []string{"yù"}},
+	{"单", "s", "shan", []string{"dān", "chán", "shàn"}},
+	{"杭", "h", "hang", []string{"háng"}},
+	{"洪", "h", "hong", []string{"hóng"}},
+	{"包", "b", "bao", []string{"bāo"}},
+	{"诸", "z", "zhu", []string{"zhū"}},
+	{"左", "z", "zuo", []string{"zuŏ"}},
+	{"石", "s", "shi", []string{"shí", "dàn"}},
+	{"崔", "c", "cui", []string{"cuī"}},
+	{"吉", "j", "ji", []string{"jí"}},
+	{"钮", "n", "niu", []string{"niŭ"}},
+	{"龚", "g", "gong", []string{"gōng"}},
+	{"程", "c", "cheng", []string{"chéng"}},
+	{"嵇", "j", "ji", []string{"jī"}},
+	{"邢", "x", "xing", []string{"xíng"}},
+	{"滑", "h", "hua", []string{"huá", "gŭ"}},
+	{"裴", "p", "pei", []string{"péi"}},
+	{"陆", "l", "lu", []string{"lù", "liù"}},
+	{"荣", "r", "rong", []string{"róng"}},
+	{"翁", "w", "weng", []string{"wēng"}},
+	{"荀", "x", "xun", []string{"xún"}},
+	{"羊", "y", "yang", []string{"yáng"}},
+	{"於", "w", "wu", []string{"wū", "yū", "yú"}},
+	{"惠", "h", "hui", []string{"huì"}},
+	{"甄", "z", "zhen", []string{"zhēn"}},
+	{"麹", "q", "qu", []string{"qū"}},
+	{"家", "j", "jia", []string{"jiā", "gū", "jie", "jia"}},
+	{"封", "f", "feng", []string{"fēng"}},
+	{"芮", "r", "rui", []string{"ruì"}},
+	{"羿", "y", "yi", []string{"yì"}},
+	{"储", "c", "chu", []string{"chŭ"}},
+	{"靳", "j", "jin", []string{"jìn"}},
+	{"汲", "j", "ji", []string{"jí"}},
+	{"邴", "b", "bing", []string{"bĭng"}},
+	{"糜", "m", "mi", []string{"mí", "méi"}},
+	{"松", "s", "song", []string{"sōng"}},
+	{"井", "j", "jing", []string{"jĭng"}},
+	{"段", "d", "duan", []string{"duàn"}},
+	{"富", "f", "fu", []string{"fù"}},
+	{"巫", "w", "wu", []string{"wū", "wú"}},
+	{"乌", "w", "wu", []string{"wū", "wù"}},
+	{"焦", "j", "jiao", []string{"jiāo"}},
+	{"巴", "b", "ba", []string{"bā"}},
+	{"弓", "g", "gong", []string{"gōng"}},
+	{"牧", "m", "mu", []string{"mù"}},
+	{"隗", "w", "wei", []string{"wĕi", "kuí"}},
+	{"山", "s", "shan", []string{"shān"}},
+	{"谷", "g", "gu", []string{"gŭ", "yù"}},
+	{"车", "c", "che", []string{"chē", "jū"}},
+	{"侯", "h", "hou", []string{"hòu", "hóu"}},
+	{"宓", "m", "mi", []string{"mì"}},
+	{"蓬", "p", "peng", []string{"péng"}},
+	{"全", "q", "quan", []string{"quán"}},
+	{"郗", "x", "xi", []string{"xī"}},
+	{"班", "b", "ban", []string{"bān"}},
+	{"仰", "y", "yang", []string{"yǎng"}},
+	{"秋", "q", "qiu", []string{"qiū"}},
+	{"仲", "z", "zhong", []string{"zhòng"}},
+	{"伊", "y", "yi", []string{"yī"}},
+	{"宫", "g", "gong", []string{"gōng"}},
+	{"宁", "n", "ning", []string{"níng"}},
+	{"仇", "c", "chou", []string{"chóu", "qiú"}},
+	{"栾", "l", "luan", []string{"luán"}},
+	{"暴", "b", "bao", []string{"bào"}},
+	{"甘", "g", "gan", []string{"gān"}},
+	{"斜", "x", "xie", []string{"xié"}},
+	{"厉", "l", "li", []string{"lì"}},
+	{"戎", "r", "rong", []string{"róng"}},
+	{"祖", "z", "zu", []string{"zǔ"}},
+	{"武", "w", "wu", []string{"wǔ"}},
+	{"符", "f", "fu", []string{"fú"}},
+	{"刘", "l", "liu", []string{"liú"}},
+	{"景", "j", "jing", []string{"jǐng"}},
+	{"詹", "z", "zhan", []string{"zhān"}},
+	{"束", "s", "shu", []string{"shù"}},
+	{"龙", "l", "long", []string{"lóng"}},
+	{"叶", "y", "ye", []string{"yè"}},
+	{"幸", "x", "xing", []string{"xìng"}},
+	{"司", "s", "si", []string{"sī"}},
+	{"韶", "s", "shao", []string{"sháo"}},
+	{"郜", "g", "gao", []string{"gào"}},
+	{"黎", "l", "li", []string{"lí"}},
+	{"蓟", "j", "ji", []string{"jì"}},
+	{"薄", "b", "bo", []string{"bó"}},
+	{"印", "y", "yin", []string{"yìn"}},
+	{"宿", "s", "su", []string{"sù"}},
+	{"白", "b", "bai", []string{"bái"}},
+	{"怀", "h", "huai", []string{"huái"}},
+	{"蒲", "p", "pu", []string{"pú"}},
+	{"邰", "t", "tai", []string{"tái"}},
+	{"从", "c", "cong", []string{"cóng"}},
+	{"鄂", "e", "e", []string{"è"}},
+	{"索", "s", "suo", []string{"suǒ"}},
+	{"咸", "x", "xian", []string{"xián"}},
+	{"籍", "j", "ji", []string{"jí"}},
+	{"赖", "l", "lai", []string{"lài"}},
+	{"卓", "z", "zhuo", []string{"zhuó"}},
+	{"蔺", "l", "lin", []string{"lìn"}},
+	{"屠", "t", "tu", []string{"tú"}},
+	{"蒙", "m", "meng", []string{"méng"}},
+	{"池", "c", "chi", []string{"chí"}},
+	{"乔", "q", "qiao", []string{"qiáo"}},
+	{"阴", "y", "yin", []string{"yīn"}},
+	{"郁", "y", "yu", []string{"yù"}},
+	{"胥", "x", "xu", []string{"xū"}},
+	{"能", "n", "neng", []string{"néng"}},
+	{"苍", "c", "cang", []string{"cāng"}},
+	{"双", "s", "shuang", []string{"shuāng"}},
+	{"闻", "w", "wen", []string{"wén"}},
+	{"莘", "x", "xin", []string{"xīn"}},
+	{"党", "d", "dang", []string{"dǎng"}},
+	{"翟", "z", "zhai", []string{"zhái"}},
+	{"谭", "t", "tan", []string{"tán"}},
+	{"贡", "g", "gong", []string{"gòng"}},
+	{"劳", "l", "lao", []string{"láo"}},
+	{"逄", "p", "pang", []string{"páng"}},
+	{"姬", "j", "ji", []string{"jī"}},
+	{"申", "s", "shen", []string{"shēn"}},
+	{"扶", "f", "fu", []string{"fú"}},
+	{"堵", "d", "du", []string{"dǔ"}},
+	{"冉", "r", "ran", []string{"rǎn"}},
+	{"宰", "z", "zai", []string{"zǎi"}},
+	{"郦", "l", "li", []string{"lì"}},
+	{"雍", "y", "yong", []string{"yōng"}},
+	{"却", "q", "que", []string{"què"}},
+	{"璩", "q", "qu", []string{"qú"}},
+	{"桑", "s", "sang", []string{"sāng"}},
+	{"桂", "g", "gui", []string{"guì"}},
+	{"濮", "p", "pu", []string{"pú"}},
+	{"牛", "n", "niu", []string{"niú"}},
+	{"寿", "s", "shou", []string{"shòu"}},
+	{"通", "t", "tong", []string{"tōng"}},
+	{"边", "b", "bian", []string{"biān"}},
+	{"扈", "h", "hu", []string{"hù"}},
+	{"燕", "y", "yan", []string{"yān"}},
+	{"冀", "j", "ji", []string{"jì"}},
+	{"郇", "x", "xun", []string{"xún"}},
+	{"浦", "p", "pu", []string{"pǔ"}},
+	{"尚", "s", "shang", []string{"shàng"}},
+	{"农", "n", "nong", []string{"nóng"}},
+	{"温", "w", "wen", []string{"wēn"}},
+	{"别", "b", "bie", []string{"bié"}},
+	{"庄", "z", "zhuang", []string{"zhuāng"}},
+	{"晏", "y", "yan", []string{"yàn"}},
+	{"柴", "c", "chai", []string{"chái"}},
+	{"瞿", "q", "qu", []string{"qú"}},
+	{"阎", "y", "yan", []string{"yán"}},
+	{"充", "c", "chong", []string{"chōng"}},
+	{"慕", "m", "mu", []string{"mù"}},
+	{"连", "l", "lian", []string{"lián"}},
+	{"茹", "r", "ru", []string{"rú"}},
+	{"习", "x", "xi", []string{"xí"}},
+	{"宦", "h", "huan", []string{"huàn"}},
+	{"艾", "a", "ai", []string{"ài"}},
+	{"鱼", "y", "yu", []string{"yú"}},
+	{"容", "r", "rong", []string{"róng"}},
+	{"向", "x", "xiang", []string{"xiàng"}},
+	{"古", "g", "gu", []string{"gŭ"}},
+	{"易", "y", "yi", []string{"yì"}},
+	{"慎", "s", "shen", []string{"shèn"}},
+	{"戈", "g", "ge", []string{"gē"}},
+	{"廖", "l", "liao", []string{"liào"}},
+	{"庾", "y", "yu", []string{"yǔ"}},
+	{"终", "z", "zhong", []string{"zhōng"}},
+	{"暨", "j", "ji", []string{"jì"}},
+	{"居", "j", "ju", []string{"jū"}},
+	{"衡", "h", "heng", []string{"héng"}},
+	{"步", "b", "bu", []string{"bù"}},
+	{"都", "d", "du", []string{"dū"}},
+	{"耿", "g", "geng", []string{"gěng"}},
+	{"满", "m", "man", []string{"mǎn"}},
+	{"弘", "h", "hong", []string{"hóng"}},
+	{"匡", "k", "kuang", []string{"kuāng"}},
+	{"国", "g", "guo", []string{"guó"}},
+	{"文", "w", "wen", []string{"wén"}},
+	{"寇", "k", "kou", []string{"kòu"}},
+	{"广", "g", "guang", []string{"guǎng"}},
+	{"禄", "l", "lu", []string{"lù"}},
+	{"阙", "q", "que", []string{"què"}},
+	{"东", "d", "dong", []string{"dōng"}},
+	{"欧", "o", "ou", []string{"ōu"}},
+	{"殳", "s", "shu", []string{"shū"}},
+	{"沃", "w", "wo", []string{"wò"}},
+	{"利", "l", "li", []string{"lì"}},
+	{"蔚", "w", "wei", []string{"wèi", "yù"}},
+	{"越", "y", "yue", []string{"yuè"}},
+	{"夔", "k", "kui", []string{"kuí"}},
+	{"隆", "l", "long", []string{"lóng"}},
+	{"师", "s", "shi", []string{"shī"}},
+	{"巩", "g", "gong", []string{"gǒng"}},
+	{"厍", "s", "she", []string{"shè"}},
+	{"聂", "n", "nie", []string{"niè"}},
+	{"晁", "c", "chao", []string{"cháo"}},
+	{"勾", "g", "gou", []string{"gōu"}},
+	{"敖", "a", "ao", []string{"áo"}},
+	{"融", "r", "rong", []string{"róng"}},
+	{"冷", "l", "leng", []string{"lěng"}},
+	{"訾", "z", "zi", []string{"zī"}},
+	{"辛", "x", "xin", []string{"xīn"}},
+	{"阚", "k", "kan", []string{"kàn"}},
+	{"那", "n", "na", []string{"nà", "nǎ"}},
+	{"简", "j", "jian", []string{"jiǎn"}},
+	{"饶", "r", "rao", []string{"ráo"}},
+	{"空", "k", "kong", []string{"kōng"}},
+	{"曾", "z", "zeng", []string{"zēng"}},
+	{"毋", "w", "wu", []string{"wú"}},
+	{"沙", "s", "sha", []string{"shā"}},
+	{"乜", "m", "mie", []string{"miē"}},
+	{"养", "y", "yang", []string{"yǎng"}},
+	{"鞠", "j", "ju", []string{"jū"}},
+	{"须", "x", "xu", []string{"xū"}},
+	{"丰", "f", "feng", []string{"fēng"}},
+	{"巢", "c", "chao", []string{"cháo"}},
+	{"关", "g", "guan", []string{"guān"}},
+	{"蒯", "k", "kuai", []string{"kuǎi"}},
+	{"相", "x", "xiang", []string{"xiàng"}},
+	{"查", "c", "zha", []string{"zhā", "chá"}},
+	{"后", "h", "hou", []string{"hòu"}},
+	{"荆", "j", "jing", []string{"jīng"}},
+	{"红", "h", "hong", []string{"hóng"}},
+	{"游", "y", "you", []string{"yóu"}},
+	{"竺", "z", "zhu", []string{"zhú"}},
+	{"权", "q", "quan", []string{"quán"}},
+	{"逯", "l", "lu", []string{"lù"}},
+	{"盖", "g", "gai", []string{"gài"}},
+	{"益", "y", "yi", []string{"yì"}},
+	{"桓", "h", "huan", []string{"huán"}},
+	{"公", "g", "gong", []string{"gōng"}},
+	{"仉", "z", "zhang", []string{"zhǎng"}},
+	{"督", "d", "du", []string{"dū"}},
+	{"晋", "j", "jin", []string{"jìn"}},
+	{"楚", "c", "chu", []string{"chǔ"}},
+	{"阎", "y", "yan", []string{"yán"}},
+	{"法", "f", "fa", []string{"fǎ"}},
+	{"汝", "r", "ru", []string{"rǔ"}},
+	{"鄢", "y", "yan", []string{"yān"}},
+	{"涂", "t", "tu", []string{"tú"}},
+	{"钦", "q", "qin", []string{"qīn"}},
+	{"岳", "y", "yue", []string{"yuè"}},
+	{"帅", "s", "shuai", []string{"shuài"}},
+	{"缑", "g", "gou", []string{"gōu"}},
+	{"亢", "k", "kang", []string{"kàng"}},
+	{"况", "k", "kuang", []string{"kuàng"}},
+	{"郈", "h", "hou", []string{"hòu"}},
+	{"有", "y", "you", []string{"yǒu"}},
+	{"琴", "q", "qin", []string{"qín"}},
+	{"归", "g", "gui", []string{"guī"}},
+	{"海", "h", "hai", []string{"hǎi"}},
+	{"晋", "j", "jin", []string{"jìn"}},
+	{"楚", "c", "chu", []string{"chǔ"}},
+	{"闫", "y", "yan", []string{"yán"}},
+	{"法", "f", "fa", []string{"fǎ"}},
+	{"汝", "r", "ru", []string{"rǔ"}},
+	{"鄢", "y", "yan", []string{"yān"}},
+	{"涂", "t", "tu", []string{"tú"}},
+	{"钦", "q", "qin", []string{"qīn"}},
+	{"岳", "y", "yue", []string{"yuè"}},
+	{"帅", "s", "shuai", []string{"shuài"}},
+	{"缑", "g", "gou", []string{"gōu"}},
+	{"亢", "k", "kang", []string{"kàng"}},
+	{"况", "k", "kuang", []string{"kuàng"}},
+	{"郈", "h", "hou", []string{"hòu"}},
+	{"有", "y", "you", []string{"yǒu"}},
+	{"琴", "q", "qin", []string{"qín"}},
+	{"归", "g", "gui", []string{"guī"}},
+	{"海", "h", "hai", []string{"hǎi"}},
+	{"晋", "j", "jin", []string{"jìn"}},
+	{"楚", "c", "chu", []string{"chǔ"}},
+}

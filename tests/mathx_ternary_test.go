@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-17 11:37:15
+ * @LastEditTime: 2025-06-17 13:20:56
  * @FilePath: \go-toolbox\tests\mathx_ternary_test.go
  * @Description:
  *
@@ -447,7 +447,7 @@ func TestAdjustScore(t *testing.T) {
 		{score: 90, age: 10, expected: 10}, // 返回 age
 		{score: 100, age: 5, expected: 5},  // 返回 age
 
-		{score: 87, age: 65, expected: 63}, // 返回 age
+		{score: 83, age: 66, expected: 64}, // 返回 age
 	}
 
 	for _, tt := range tests {
