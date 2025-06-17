@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-13 10:41:01
+ * @LastEditTime: 2025-06-17 11:37:15
  * @FilePath: \go-toolbox\tests\mathx_ternary_test.go
  * @Description:
  *
@@ -12,6 +12,7 @@ package tests
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -387,4 +388,76 @@ func TestIfCall_BothCallbacksNil_ConditionFalse(t *testing.T) {
 	assert.NotPanics(t, func() {
 		mathx.IfCall(false, 1, nil, nil, nil)
 	}, "IfCall should not panic when both callbacks are nil and condition is false")
+}
+
+func adjustScore(age, score int32) int32 {
+	pairs := []mathx.ConditionValue[int32]{
+		{Cond: score < 30, Value: age + 5},
+		{Cond: score < 40, Value: age + 4},
+		{Cond: score < 50, Value: age + 3},
+		{Cond: score < 60, Value: age + 2},
+		{Cond: score < 70, Value: age + 1},
+		{Cond: score < 80, Value: mathx.IF(age < 1, 0, age-1)},
+		{Cond: score < 90, Value: mathx.IF(age < 2, 0, age-2)},
+	}
+	return mathx.IfChain(pairs, age)
+}
+
+func TestAdjustScore(t *testing.T) {
+	tests := []struct {
+		score    int32
+		age      int32
+		expected int32
+	}{
+		// score < 30
+		{score: 29, age: 10, expected: 15}, // 10 + 5
+		{score: 0, age: 0, expected: 5},    // 0 + 5
+
+		// 30 <= score < 40
+		{score: 30, age: 10, expected: 14}, // 10 + 4
+		{score: 39, age: 5, expected: 9},   // 5 + 4
+
+		// 40 <= score < 50
+		{score: 40, age: 10, expected: 13}, // 10 + 3
+		{score: 49, age: 1, expected: 4},   // 1 + 3
+
+		// 50 <= score < 60
+		{score: 50, age: 10, expected: 12}, // 10 + 2
+		{score: 59, age: 3, expected: 5},   // 3 + 2
+
+		// 60 <= score < 70
+		{score: 60, age: 10, expected: 11}, // 10 + 1
+		{score: 69, age: 0, expected: 1},   // 0 + 1
+
+		// 70 <= score < 80, age < 1
+		{score: 70, age: 0, expected: 0}, // age < 1, 返回0
+		{score: 79, age: 1, expected: 0}, // age=1, age-1=0
+
+		// 70 <= score < 80, age >= 1
+		{score: 75, age: 10, expected: 9}, // 10 - 1 = 9
+
+		// 80 <= score < 90, age < 2
+		{score: 80, age: 0, expected: 0}, // age < 2 返回0
+		{score: 85, age: 1, expected: 0}, // age < 2 返回0
+
+		// 80 <= score < 90, age >= 2
+		{score: 89, age: 10, expected: 8}, // 10 - 2 = 8
+
+		// score >= 90
+		{score: 90, age: 10, expected: 10}, // 返回 age
+		{score: 100, age: 5, expected: 5},  // 返回 age
+
+		{score: 87, age: 65, expected: 63}, // 返回 age
+	}
+
+	for _, tt := range tests {
+		t.Run(
+			fmt.Sprintf("score=%d_age=%d", tt.score, tt.age),
+			func(t *testing.T) {
+				got := adjustScore(tt.age, tt.score)
+				assert.Equal(t, tt.expected, got,
+					"adjustScore(%d, %d) 应该返回 %d", tt.age, tt.score, tt.expected)
+			},
+		)
+	}
 }
