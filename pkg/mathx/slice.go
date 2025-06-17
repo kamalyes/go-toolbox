@@ -2,9 +2,9 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-22 13:55:18
+ * @LastEditTime: 2025-06-17 13:55:21
  * @FilePath: \go-toolbox\pkg\mathx\slice.go
- * @Description: 包含与切片相关的通用函数，例如计算最小值和最大值、差集、并集等。
+ * @Description: 包含与切片相关的通用函数，例如计算最小值和最大值、差集、并集等
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
@@ -13,10 +13,13 @@ package mathx
 
 import (
 	"errors"
+	"fmt"
 	"math/rand"
 	"reflect"
+	"sort"
 	"sync"
 
+	"github.com/kamalyes/go-toolbox/pkg/syncx"
 	"github.com/kamalyes/go-toolbox/pkg/types"
 	"github.com/kamalyes/go-toolbox/pkg/validator"
 )
@@ -37,10 +40,10 @@ func MaxFunc[T types.Numerical](a, b T) T {
 	return b
 }
 
-// SliceMinMax 计算列表中元素的最小值或最大值。
+// SliceMinMax 计算列表中元素的最小值或最大值
 // 接收一个切片和一个 MinMaxFunc 类型的函数，
-// 根据提供的函数决定是计算最小值还是最大值。
-// 如果列表为空，则返回错误。
+// 根据提供的函数决定是计算最小值还是最大值
+// 如果列表为空，则返回错误
 func SliceMinMax[T types.Numerical](list []T, f types.MinMaxFunc[T]) (T, error) {
 	if len(list) == 0 {
 		var zero T
@@ -118,8 +121,8 @@ func SliceDiffSetSorted[T types.Ordered](arr1, arr2 []T) []T {
 	return finalDiff
 }
 
-// SliceUnion 计算两个数组的并集。
-// 返回一个新的数组，包含所有元素，不包含重复元素。
+// SliceUnion 计算两个数组的并集
+// 返回一个新的数组，包含所有元素，不包含重复元素
 func SliceUnion[T comparable](arr1, arr2 []T) []T {
 	unionMap := make(map[T]struct{}, len(arr1)+len(arr2)) // 使用映射去重
 	for _, element := range arr1 {
@@ -223,8 +226,8 @@ func SliceIntersect[T ~[]E, E comparable](list1 T, list2 T) T {
 	return ret
 }
 
-// SliceContains 检查切片中是否包含某个元素。
-// 返回布尔值，表示元素是否存在于切片中。
+// SliceContains 检查切片中是否包含某个元素
+// 返回布尔值，表示元素是否存在于切片中
 func SliceContains[T types.Ordered](slice []T, element T) bool {
 	length := len(slice)
 
@@ -258,8 +261,8 @@ func containsHash[T types.Ordered](slice []T, element T) bool {
 	return found // 返回是否找到该元素
 }
 
-// SliceHasDuplicates 检查切片中是否存在重复对象。
-// 返回布尔值，表示是否存在重复元素。
+// SliceHasDuplicates 检查切片中是否存在重复对象
+// 返回布尔值，表示是否存在重复元素
 func SliceHasDuplicates[T comparable](slice []T) bool {
 	const chunkSize = 1000 // 每个 goroutine 处理的块大小
 	var wg sync.WaitGroup
@@ -294,8 +297,8 @@ func SliceHasDuplicates[T comparable](slice []T) bool {
 	return len(m) > 0 // 如果 map 非空，表示找到重复元素
 }
 
-// SliceRemoveEmpty 移除切片中的空对象。
-// 返回一个新切片，包含所有非空元素。
+// SliceRemoveEmpty 移除切片中的空对象
+// 返回一个新切片，包含所有非空元素
 func SliceRemoveEmpty[T any](slice []T) []T {
 	result := make([]T, 0, len(slice)) // 创建结果切片
 	for _, v := range slice {
@@ -306,8 +309,8 @@ func SliceRemoveEmpty[T any](slice []T) []T {
 	return result
 }
 
-// SliceRemoveDuplicates 移除切片中的重复值。
-// 返回一个新切片，包含所有唯一元素。
+// SliceRemoveDuplicates 移除切片中的重复值
+// 返回一个新切片，包含所有唯一元素
 func SliceRemoveDuplicates[T comparable](numbers []T) []T {
 	m := make(map[T]struct{}, len(numbers))     // 预分配 map 的容量
 	uniqueNumbers := make([]T, 0, len(numbers)) // 创建唯一元素切片
@@ -320,8 +323,8 @@ func SliceRemoveDuplicates[T comparable](numbers []T) []T {
 	return uniqueNumbers
 }
 
-// SliceRemoveZero 移除切片中的零值。
-// 返回一个新切片，包含所有非零元素。
+// SliceRemoveZero 移除切片中的零值
+// 返回一个新切片，包含所有非零元素
 func SliceRemoveZero(arr []int) []int {
 	result := make([]int, 0, len(arr)) // 创建结果切片
 	for _, val := range arr {
@@ -332,8 +335,8 @@ func SliceRemoveZero(arr []int) []int {
 	return result
 }
 
-// SliceRemoveValue 移除切片中的指定值。
-// 返回一个新切片，包含所有非指定元素。
+// SliceRemoveValue 移除切片中的指定值
+// 返回一个新切片，包含所有非指定元素
 func SliceRemoveValue[T comparable](arr []T, value T) []T {
 	result := make([]T, 0, len(arr)) // 创建结果切片
 	for _, val := range arr {
@@ -344,9 +347,9 @@ func SliceRemoveValue[T comparable](arr []T, value T) []T {
 	return result
 }
 
-// SliceChunk 将一个切片分割成多个子切片。
-// size 参数指定每个子切片的大小。
-// 返回一个包含子切片的切片。
+// SliceChunk 将一个切片分割成多个子切片
+// size 参数指定每个子切片的大小
+// 返回一个包含子切片的切片
 func SliceChunk[T any](slice []T, size int) [][]T {
 	if size <= 0 {
 		return nil // 如果 size <= 0，则返回 nil
@@ -437,11 +440,158 @@ func BubbleSort(arr []int) {
 }
 
 // RepeatField 返回一个长度为 count 的切片，
-// 切片中的每个元素都是传入的 field 值的副本。
+// 切片中的每个元素都是传入的 field 值的副本
 func RepeatField[T any](field T, count int) []T {
 	s := make([]T, count) // 创建一个长度为 count 的切片，元素类型为 T
 	for i := range s {
 		s[i] = field // 将 field 赋值给切片的每个元素
 	}
 	return s // 返回填充好的切片
+}
+
+// SliceChain 是一个支持链式调用的泛型切片操作结构体，带并发安全锁保护
+// 通过链式调用可以方便地对切片进行追加、去重、排序、过滤等操作
+type SliceChain[T comparable] struct {
+	mu   sync.RWMutex // 读写锁
+	data []T
+}
+
+// FromSlice 根据普通切片创建一个新的 SliceChain 实例
+// Params:
+//   - slice: 需要转换成链式操作结构的普通切片，类型为 []T
+//
+// Returns:
+//   - 返回一个指向新创建的 SliceChain 实例的指针，内部包含了传入的切片数据副本
+func FromSlice[T comparable](slice []T) *SliceChain[T] {
+	sc := &SliceChain[T]{}
+	if len(slice) > 0 {
+		sc.data = append(sc.data, slice...)
+	}
+	return sc
+}
+
+// Append 追加元素到当前切片，支持链式调用
+// Params:
+//   - elements: 可变参数，表示需要追加到当前切片中的元素，类型为 T
+//
+// Returns:
+//   - 返回当前 SliceChain 实例指针，方便链式调用
+//
+// Examples:
+//
+//	sc.Append(1, 2, 3)
+func (sc *SliceChain[T]) Append(elements ...T) *SliceChain[T] {
+	return syncx.WithLockReturnValue(&sc.mu, func() *SliceChain[T] {
+		sc.data = append(sc.data, elements...)
+		return sc
+	})
+}
+
+// Uniq 去重，移除切片中重复的元素，保持元素顺序，支持链式调用
+// Returns:
+//   - 返回当前 SliceChain 实例指针，去重后的数据保存在内部切片中
+func (sc *SliceChain[T]) Uniq() *SliceChain[T] {
+	return syncx.WithLockReturnValue(&sc.mu, func() *SliceChain[T] {
+		sc.data = SliceRemoveDuplicates(sc.data)
+		return sc
+	})
+}
+
+// RemoveValue 移除切片中所有等于指定值的元素，支持链式调用
+// Params：
+//   - value: 需要从切片中移除的元素值，类型为 T
+//
+// Returns:
+//   - 返回当前 SliceChain 实例指针，移除指定值后的数据保存在内部切片中
+func (sc *SliceChain[T]) RemoveValue(value T) *SliceChain[T] {
+	return syncx.WithLockReturnValue(&sc.mu, func() *SliceChain[T] {
+		n := 0
+		for _, v := range sc.data {
+			if v != value {
+				sc.data[n] = v
+				n++
+			}
+		}
+		sc.data = sc.data[:n]
+		return sc
+	})
+}
+
+// RemoveEmpty 移除“空值”元素，空值定义为元素等于类型零值，支持链式调用
+// 适用于数字、字符串、指针等类型的零值判断
+// Returns:
+//   - 返回当前 SliceChain 实例指针，移除零值元素后的数据保存在内部切片中
+func (sc *SliceChain[T]) RemoveEmpty() *SliceChain[T] {
+	return syncx.WithLockReturnValue(&sc.mu, func() *SliceChain[T] {
+		result := sc.data[:0]
+		for _, v := range sc.data {
+			if !validator.IsCEmpty(v) {
+				result = append(result, v)
+			}
+		}
+		sc.data = result
+		return sc
+	})
+}
+
+// Filter 根据传入的过滤函数 f，保留满足条件的元素，支持链式调用
+// Params：
+//   - f: 过滤函数，接收一个元素 T，返回 bool，返回 true 表示保留该元素，false 表示过滤掉
+//
+// Returns:
+//   - 返回当前 SliceChain 实例指针，过滤后的数据保存在内部切片中
+//
+// Examples:
+//
+//	sc.Filter(func(x int) bool { return x%2 == 0 })
+func (sc *SliceChain[T]) Filter(f func(T) bool) *SliceChain[T] {
+	return syncx.WithLockReturnValue(&sc.mu, func() *SliceChain[T] {
+		result := sc.data[:0] // 利用切片复用内存，避免额外分配
+		for _, v := range sc.data {
+			if f(v) {
+				result = append(result, v)
+			}
+		}
+		sc.data = result
+		return sc
+	})
+}
+
+// Sort 使用传入的 less 函数对切片进行排序，支持链式调用
+// Params:
+//   - less: 比较函数，接收两个元素 a, b，返回 bool，返回 true 表示 a < b
+//
+// Returns:
+//   - 返回当前 SliceChain 实例指针，排序后的数据保存在内部切片中
+//
+// Examples:
+//
+//	sc.Sort(func(a, b int) bool { return a < b })
+func (sc *SliceChain[T]) Sort(less func(a, b T) bool) *SliceChain[T] {
+	return syncx.WithLockReturnValue(&sc.mu, func() *SliceChain[T] {
+		sort.Slice(sc.data, func(i, j int) bool {
+			return less(sc.data[i], sc.data[j])
+		})
+		return sc
+	})
+}
+
+// Data 返回当前链式操作后的切片数据，方便与普通切片交互
+// Returns:
+//   - 返回当前内部切片的引用，类型为 []T
+//
+// 注意：返回的是内部切片的引用，修改返回值会影响 SliceChain 内部数据
+func (sc *SliceChain[T]) Data() []T {
+	return syncx.WithRLockReturnValue(&sc.mu, func() []T {
+		return IF(len(sc.data) > 0, sc.data, []T{}) // 返回非nil空切片，避免断言错误
+	})
+}
+
+// String 实现 fmt.Stringer 接口，方便打印 SliceChain 内容
+// Returns:
+//   - 返回当前切片数据的字符串表示
+func (sc *SliceChain[T]) String() string {
+	return syncx.WithRLockReturnValue(&sc.mu, func() string {
+		return fmt.Sprintf("%v", sc.data)
+	})
 }

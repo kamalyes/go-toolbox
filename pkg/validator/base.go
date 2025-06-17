@@ -54,6 +54,17 @@ func IsEmptyValue(v reflect.Value) bool {
 	}
 }
 
+// IsCEmpty 判断元素是否为类型零值。
+// Params：
+//   - v: 需要判断的元素，类型为 T。
+//
+// Returns:
+//   - 返回布尔值，true 表示 v 是类型的零值，false 表示非零值。
+func IsCEmpty[T comparable](v T) bool {
+	var zero T
+	return v == zero
+}
+
 // HasEmpty checks if any element in the slice is empty.
 func HasEmpty(elems []interface{}) (bool, int) {
 	if len(elems) == 0 {
