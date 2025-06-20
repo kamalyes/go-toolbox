@@ -27,7 +27,7 @@ func TestTimeUnits(t *testing.T) {
 	hour := 60 * minute
 	day := 24 * hour
 	week := 7 * day
-	year := 365 * day
+	year := 366 * day
 
 	// Testing the predefined constants
 	tests := []struct {
@@ -43,7 +43,7 @@ func TestTimeUnits(t *testing.T) {
 		{"Hour", hour, moment.HourDuration},
 		{"Day", day, moment.DayDuration},
 		{"Week", week, moment.WeekDuration},
-		{"Year", year, moment.YearDuration},
+		{"Year", year, moment.Year366Duration},
 	}
 
 	for _, test := range tests {

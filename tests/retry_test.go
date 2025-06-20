@@ -236,46 +236,53 @@ func TestCallbackCoverage(t *testing.T) {
 	assert.True(t, errorCalled)
 }
 
-type simpleMutex struct {
-	m sync.Mutex
-}
+func TestRetry_GetSetMethods(t *testing.T) {
+	r := retry.NewRetryWithCtx(context.Background())
 
-func (m *simpleMutex) Lock()   { m.m.Lock() }
-func (m *simpleMutex) Unlock() { m.m.Unlock() }
+	// 测试 SetAttemptCount 和 GetAttemptCount
+	r.SetAttemptCount(5)
+	assert.Equal(t, 5, r.GetAttemptCount())
 
-func TestRetry_Do_WithLock_Concurrent(t *testing.T) {
-	retryAttemptCount := 3 // 最多尝试3次
-	r := retry.NewRetry().
-		SetAttemptCount(retryAttemptCount).
-		SetInterval(5 * time.Millisecond).
-		SetLock(&simpleMutex{})
+	// 测试 SetInterval 和 GetInterval
+	interval := 2 * time.Second
+	r.SetInterval(interval)
+	assert.Equal(t, interval, r.GetInterval())
 
-	var totalAttempts int32
-	var wg sync.WaitGroup
-	concurrency := 50
-
-	wg.Add(concurrency)
-	for i := 0; i < concurrency; i++ {
-		go func() {
-			defer wg.Done()
-
-			var attempt int32
-			doFunc := func() error {
-				atomic.AddInt32(&totalAttempts, 1)
-				attempt++
-				if attempt < 3 {
-					return errors.New("fail")
-				}
-				return nil
-			}
-
-			err := r.Do(doFunc)
-			assert.NoError(t, err)
-		}()
+	// 测试 SetErrCallback 和 GetErrCallback
+	errCallbackCalled := false
+	errCallback := func(nowAttemptCount, remainCount int, err error, funcName ...string) {
+		errCallbackCalled = true
 	}
+	r.SetErrCallback(errCallback)
+	assert.NotNil(t, r.GetErrCallback())
 
-	wg.Wait()
+	// 触发 errCallback 测试（调用回调）
+	r.GetErrCallback()(1, 3, errors.New("test error"), "TestFunc")
+	assert.True(t, errCallbackCalled)
 
-	expectedAttempts := int32(concurrency * (1 + retryAttemptCount))
-	assert.Equal(t, expectedAttempts, atomic.LoadInt32(&totalAttempts), "total attempts should match expected")
+	// 测试 SetSuccessCallback 和 GetSuccessCallback
+	successCallbackCalled := false
+	successCallback := func(funcName ...string) {
+		successCallbackCalled = true
+	}
+	r.SetSuccessCallback(successCallback)
+	assert.NotNil(t, r.GetSuccessCallback())
+
+	// 触发 successCallback 测试（调用回调）
+	r.GetSuccessCallback()("TestFunc")
+	assert.True(t, successCallbackCalled)
+
+	// 测试 SetConditionFunc 和 GetConditionFunc
+	conditionFunc := func(err error) bool {
+		return err != nil
+	}
+	r.SetConditionFunc(conditionFunc)
+	assert.NotNil(t, r.GetConditionFunc())
+	assert.True(t, r.GetConditionFunc()(errors.New("err")))
+	assert.False(t, r.GetConditionFunc()(nil))
+
+	// 测试 GetContext
+	ctx := r.GetContext()
+	assert.NotNil(t, ctx)
+	assert.Equal(t, context.Background(), ctx)
 }

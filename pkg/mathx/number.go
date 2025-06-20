@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-12 15:27:26
+ * @LastEditTime: 2025-06-20 11:22:00
  * @FilePath: \go-toolbox\pkg\mathx\number.go
  * @Description:
  *
@@ -14,9 +14,9 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 
-	"github.com/kamalyes/go-toolbox/pkg/convert"
 	"github.com/kamalyes/go-toolbox/pkg/stringx"
 	"github.com/kamalyes/go-toolbox/pkg/types"
 )
@@ -138,7 +138,12 @@ func ParseIntOrName(expr string, names map[string]uint) (uint, error) {
 			return val, nil
 		}
 	}
-	return convert.MustIntT[uint](expr, nil)
+	// 用 strconv.ParseUint 解析数字字符串，支持 10 进制
+	val, err := strconv.ParseUint(expr, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid number: %s", expr)
+	}
+	return uint(val), nil
 }
 
 // SafeGetIndexWithErr 安全获取切片指定索引的元素。

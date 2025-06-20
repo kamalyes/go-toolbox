@@ -81,13 +81,12 @@ type TryRLocker interface {
 }
 
 // WithTryLock 在支持 TryLock 的锁上尝试执行操作，成功获取锁才执行
-func WithTryLock(lock TryLocker, operation func()) error {
+func WithTryLock(lock TryLocker, operation func() error) error {
 	if !lock.TryLock() {
 		return ErrLockNotAcquired
 	}
 	defer lock.Unlock()
-	operation()
-	return nil
+	return operation()
 }
 
 // WithTryLockReturn 在支持 TryLock 的锁上尝试执行操作，成功获取锁才执行，支持返回值和错误
@@ -111,13 +110,12 @@ func WithTryLockReturnValue[T any](lock TryLocker, operation func() T) (T, error
 }
 
 // WithTryRLock 在支持 TryRLock 的读锁上尝试执行操作，成功获取读锁才执行
-func WithTryRLock(lock TryRLocker, operation func()) error {
+func WithTryRLock(lock TryRLocker, operation func() error) error {
 	if !lock.TryRLock() {
 		return ErrLockNotAcquired
 	}
 	defer lock.RUnlock()
-	operation()
-	return nil
+	return operation()
 }
 
 // WithTryRLockReturn 在支持 TryRLock 的读锁上尝试执行操作，成功获取读锁才执行，支持返回值和错误

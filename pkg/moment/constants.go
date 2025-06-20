@@ -1,8 +1,8 @@
 /*
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
- * @LastEditors: root 501893067@qq.com
- * @LastEditTime: 2025-02-13 15:20:08
+ * @LastEditors: kamalyes 501893067@qq.com
+ * @LastEditTime: 2025-06-18 11:20:07
  * @FilePath: \go-toolbox\pkg\moment\constants.go
  * @Description:
  *
@@ -45,6 +45,18 @@ const (
 	// 这里不考虑夏时制问题，泛指国际基础单位制（民用日）所理解的时间
 	WeekDuration = 7 * DayDuration
 
-	// 年，表示1年持续的纳秒时长
-	YearDuration = 365 * DayDuration
+	// 月，表示30天
+	Month28Duration = 28 * DayDuration
+
+	// 月，表示29天，等于28天加1天
+	Month29Duration = Month28Duration + 1*DayDuration
+
+	// 月，表示30天，等于28天加2天
+	Month30Duration = Month28Duration + 2*DayDuration
+
+	// 年，表示365天（平年）
+	Year365Duration = 365 * DayDuration
+
+	// 年，表示366天（闰年），等于365天加1天
+	Year366Duration = Year365Duration + 1*DayDuration
 )

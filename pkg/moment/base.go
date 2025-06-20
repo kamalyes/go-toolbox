@@ -11,6 +11,7 @@
 package moment
 
 import (
+	"fmt"
 	"strings"
 	"time"
 )
@@ -29,8 +30,8 @@ func CalculateTimeDifference(duration time.Duration) TimeDifference {
 	totalSeconds := int(duration.Seconds())
 
 	// 使用常量计算年、天、小时、分钟和秒
-	years := totalSeconds / int(YearDuration.Seconds())
-	days := (totalSeconds / int(DayDuration.Seconds())) % 365
+	years := totalSeconds / int(Year366Duration.Seconds())
+	days := (totalSeconds / int(DayDuration.Seconds())) % 366
 	hours := (totalSeconds / int(HourDuration.Seconds())) % 24
 	minutes := (totalSeconds / int(MinuteDuration.Seconds())) % 60
 	seconds := totalSeconds % 60
@@ -373,4 +374,95 @@ func NextWeekday(year int, month time.Month, day int, target time.Weekday) time.
 	}
 
 	return t.AddDate(0, 0, daysToAdd)
+}
+
+// HumanDuration 计算两个时间点之间的年月日时分秒差距，
+// 并返回一个中文格式的字符串，比如“1年零2个月零3天零4小时零5分零6秒”
+// start 和 end 可任意顺序，函数内部会自动调整顺序
+func HumanDuration(start, end time.Time) string {
+	// 如果 end 时间早于 start，交换两者，确保 start <= end
+	if end.Before(start) {
+		start, end = end, start
+	}
+
+	// 计算各个时间单位的初步差值
+	years := end.Year() - start.Year()
+	months := int(end.Month()) - int(start.Month())
+	days := end.Day() - start.Day()
+	hours := end.Hour() - start.Hour()
+	minutes := end.Minute() - start.Minute()
+	seconds := end.Second() - start.Second()
+
+	// 处理秒的借位，比如秒为负数，向分钟借1分钟（60秒）
+	if seconds < 0 {
+		seconds += 60
+		minutes--
+	}
+	// 处理分钟的借位
+	if minutes < 0 {
+		minutes += 60
+		hours--
+	}
+	// 处理小时的借位
+	if hours < 0 {
+		hours += 24
+		days--
+	}
+	// 处理天的借位
+	if days < 0 {
+		// 计算上个月的天数，用于借位
+		previousMonth := end.AddDate(0, -1, 0)
+		days += DaysInMonth(previousMonth.Year(), previousMonth.Month())
+		months--
+	}
+	// 处理月的借位
+	if months < 0 {
+		months += 12
+		years--
+	}
+
+	// 定义一个结构体，便于统一处理单位和值
+	type unit struct {
+		value int
+		name  string
+	}
+	units := []unit{
+		{years, "年"},
+		{months, "个月"},
+		{days, "天"},
+		{hours, "小时"},
+		{minutes, "分"},
+		{seconds, "秒"},
+	}
+
+	// 找第一个非零单位和最后一个非零单位索引
+	firstIdx, lastIdx := -1, -1
+	for i, u := range units {
+		if u.value > 0 {
+			if firstIdx == -1 {
+				firstIdx = i
+			}
+			lastIdx = i
+		}
+	}
+	// 全零返回"0秒"
+	if firstIdx == -1 {
+		return "0秒"
+	}
+
+	// 构造结果字符串
+	result := ""
+	prevNonZeroIdx := -1 // 记录上一个非零单位索引
+	for i := firstIdx; i <= lastIdx; i++ {
+		if units[i].value > 0 {
+			// 如果当前非零单位和上一个非零单位不相邻，中间有零单位，插入“零”
+			if prevNonZeroIdx != -1 && i-prevNonZeroIdx > 1 {
+				result += "零"
+			}
+			result += fmt.Sprintf("%d%s", units[i].value, units[i].name)
+			prevNonZeroIdx = i
+		}
+	}
+
+	return result
 }

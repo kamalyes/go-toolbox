@@ -23,11 +23,11 @@ func TestCalculateTimeDifference(t *testing.T) {
 		duration time.Duration
 		expected moment.TimeDifference
 	}{
-		{time.Duration(31536000 * time.Second), moment.TimeDifference{Years: 1, Days: 0, Hours: 0, Minutes: 0, Seconds: 0}}, // 1 year
-		{time.Duration(86400 * time.Second), moment.TimeDifference{Years: 0, Days: 1, Hours: 0, Minutes: 0, Seconds: 0}},    // 1 day
-		{time.Duration(366 * 24 * time.Hour), moment.TimeDifference{Years: 1, Days: 1, Hours: 0, Minutes: 0, Seconds: 0}},   // 1 year and 1 day
-		{time.Duration(3600 * time.Second), moment.TimeDifference{Years: 0, Days: 0, Hours: 1, Minutes: 0, Seconds: 0}},     // 1 hour
-		{time.Duration(61 * time.Second), moment.TimeDifference{Years: 0, Days: 0, Hours: 0, Minutes: 1, Seconds: 1}},       // 1 minute and 1 second
+		{time.Duration(366 * 24 * time.Hour), moment.TimeDifference{Years: 1, Days: 0, Hours: 0, Minutes: 0, Seconds: 0}}, // 1 year
+		{time.Duration(86400 * time.Second), moment.TimeDifference{Years: 0, Days: 1, Hours: 0, Minutes: 0, Seconds: 0}},  // 1 day
+		{time.Duration(367 * 24 * time.Hour), moment.TimeDifference{Years: 1, Days: 1, Hours: 0, Minutes: 0, Seconds: 0}}, // 1 year and 1 day
+		{time.Duration(3600 * time.Second), moment.TimeDifference{Years: 0, Days: 0, Hours: 1, Minutes: 0, Seconds: 0}},   // 1 hour
+		{time.Duration(61 * time.Second), moment.TimeDifference{Years: 0, Days: 0, Hours: 0, Minutes: 1, Seconds: 1}},     // 1 minute and 1 second
 	}
 
 	for _, tt := range tests {
@@ -477,5 +477,70 @@ func TestNextWeekday(t *testing.T) {
 		assert.Equal(t, tt.expYear, got.Year(), "Year mismatch for %s", tt.desc)
 		assert.Equal(t, tt.expMonth, got.Month(), "Month mismatch for %s", tt.desc)
 		assert.Equal(t, tt.expDay, got.Day(), "Day mismatch for %s", tt.desc)
+	}
+}
+
+func TestHumanDuration(t *testing.T) {
+	tests := []struct {
+		name  string
+		start time.Time
+		end   time.Time
+		want  string
+	}{
+		{
+			name:  "same time",
+			start: time.Date(2023, 6, 18, 10, 0, 0, 0, time.UTC),
+			end:   time.Date(2023, 6, 18, 10, 0, 0, 0, time.UTC),
+			want:  "0秒",
+		},
+		{
+			name:  "seconds difference",
+			start: time.Date(2023, 6, 18, 10, 0, 0, 0, time.UTC),
+			end:   time.Date(2023, 6, 18, 10, 0, 5, 0, time.UTC),
+			want:  "5秒",
+		},
+		{
+			name:  "minutes and seconds",
+			start: time.Date(2023, 6, 18, 10, 0, 0, 0, time.UTC),
+			end:   time.Date(2023, 6, 18, 10, 3, 10, 0, time.UTC),
+			want:  "3分10秒",
+		},
+		{
+			name:  "hours, minutes, seconds",
+			start: time.Date(2023, 6, 18, 8, 25, 0, 0, time.UTC),
+			end:   time.Date(2023, 6, 18, 10, 30, 15, 0, time.UTC),
+			want:  "2小时5分15秒",
+		},
+		{
+			name:  "days, hours, minutes",
+			start: time.Date(2023, 6, 15, 5, 10, 0, 0, time.UTC),
+			end:   time.Date(2023, 6, 18, 10, 30, 0, 0, time.UTC),
+			want:  "3天5小时20分",
+		},
+		{
+			name:  "months, days, hours",
+			start: time.Date(2023, 4, 1, 7, 0, 0, 0, time.UTC),
+			end:   time.Date(2023, 5, 16, 10, 0, 0, 0, time.UTC),
+			want:  "1个月15天3小时",
+		},
+		{
+			name:  "years, months, days, hours",
+			start: time.Date(2022, 1, 10, 12, 0, 0, 0, time.UTC),
+			end:   time.Date(2023, 8, 11, 10, 0, 0, 0, time.UTC),
+			want:  "1年7个月零22小时",
+		},
+		{
+			name:  "reverse order (end before start)",
+			start: time.Date(2023, 6, 18, 10, 0, 0, 0, time.UTC),
+			end:   time.Date(2023, 6, 15, 5, 10, 0, 0, time.UTC),
+			want:  "3天4小时50分",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := moment.HumanDuration(tt.start, tt.end)
+			assert.Equal(t, tt.want, got)
+		})
 	}
 }
