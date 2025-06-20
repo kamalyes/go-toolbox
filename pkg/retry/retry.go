@@ -161,6 +161,8 @@ func (r *Retry) Do(fn DoFun) (err error) {
 		defer caller.Release()
 		return caller.String()
 	}, r.caller)
+	// 确保尝试次数为正数
+	r.attemptCount = mathx.IF(r.attemptCount < 1, 1, r.attemptCount)
 	exec := func() error {
 		return doRetryWithCondition(r.ctx, r.attemptCount, r.interval, fn, r.errCallFun, r.successCallFun, r.conditionFunc, r.caller)
 	}
@@ -169,11 +171,6 @@ func (r *Retry) Do(fn DoFun) (err error) {
 
 // doRetryWithCondition 内部函数，定义了重试操作，执行指定次数的尝试
 func doRetryWithCondition(ctx context.Context, attemptCount int, interval time.Duration, fn DoFun, errCallFun ErrCallbackFunc, successCallFun SuccessCallbackFunc, conditionFunc func(error) bool, funcName ...string) (err error) {
-	// 确保尝试次数为正数
-	if attemptCount <= 0 {
-		return fmt.Errorf("attemptCount must be greater than zero")
-	}
-
 	var (
 		fName           = mathx.IF(len(funcName) > 0, funcName[0], "") // 获取函数名称
 		nowAttemptCount int
