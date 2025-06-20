@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-11 15:57:27
+ * @LastEditTime: 2025-06-20 18:55:16
  * @FilePath: \go-toolbox\tests\retry_test.go
  * @Description: 重试机制单元测试文件
  *
@@ -285,4 +285,17 @@ func TestRetry_GetSetMethods(t *testing.T) {
 	ctx := r.GetContext()
 	assert.NotNil(t, ctx)
 	assert.Equal(t, context.Background(), ctx)
+
+	r.Do(func() error {
+		return nil
+	})
+	assert.Contains(t, r.GetCaller(), "FuncName:TestRetry_GetSetMethods, File")
+	// 设置自定义调用者
+	var caller = "TestRetry_GetSetMethods_12356789"
+	r.SetCaller(caller)
+	// 再次检查
+	r.Do(func() error {
+		return nil
+	})
+	assert.Equal(t, caller, r.GetCaller())
 }

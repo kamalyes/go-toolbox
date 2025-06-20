@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-11 15:56:57
+ * @LastEditTime: 2025-06-20 18:55:15
  * @FilePath: \go-toolbox\pkg\retry\retry.go
  * @Description: 重试机制
  *
@@ -25,6 +25,7 @@ import (
 type Retry struct {
 	ctx            context.Context     // 上下文
 	mu             sync.RWMutex        // 并发锁
+	caller         string              // 调用者
 	attemptCount   int                 // 最大尝试次数
 	interval       time.Duration       // 重试间隔时间
 	errCallFun     ErrCallbackFunc     // 错误回调函数
@@ -54,6 +55,14 @@ func NewRetryWithCtx(ctx context.Context) *Retry {
 	return &Retry{
 		ctx: ctx,
 	}
+}
+
+// SetCaller 设置调用者信息，返回 Retry 实例以支持链式调用
+func (r *Retry) SetCaller(caller string) *Retry {
+	return syncx.WithLockReturnValue(&r.mu, func() *Retry {
+		r.caller = caller
+		return r
+	})
 }
 
 // SetAttemptCount 设置最大尝试次数，返回 Retry 实例以支持链式调用
@@ -93,6 +102,13 @@ func (r *Retry) SetConditionFunc(fn func(error) bool) *Retry {
 	return syncx.WithLockReturnValue(&r.mu, func() *Retry {
 		r.conditionFunc = fn
 		return r
+	})
+}
+
+// GetCaller 获取调用者信息
+func (r *Retry) GetCaller() string {
+	return syncx.WithLockReturnValue(&r.mu, func() string {
+		return r.caller
 	})
 }
 
@@ -140,10 +156,13 @@ func (r *Retry) GetContext() context.Context {
 
 // Do 为 Retry 结构体定义执行函数，执行指定函数 f
 func (r *Retry) Do(fn DoFun) (err error) {
-	caller := osx.GetRuntimeCaller(3)
-	defer caller.Release()
+	r.caller = mathx.IfDo(r.caller == "", func() string {
+		caller := osx.GetRuntimeCaller(5)
+		defer caller.Release()
+		return caller.String()
+	}, r.caller)
 	exec := func() error {
-		return doRetryWithCondition(r.ctx, r.attemptCount, r.interval, fn, r.errCallFun, r.successCallFun, r.conditionFunc, caller.String())
+		return doRetryWithCondition(r.ctx, r.attemptCount, r.interval, fn, r.errCallFun, r.successCallFun, r.conditionFunc, r.caller)
 	}
 	return exec()
 }
