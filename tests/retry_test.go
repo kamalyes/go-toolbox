@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-11 15:57:27
+ * @LastEditTime: 2025-06-20 19:11:55
  * @FilePath: \go-toolbox\tests\retry_test.go
  * @Description: 重试机制单元测试文件
  *
@@ -26,21 +26,38 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// 测试无效尝试次数
-func TestRetryWithInvalidAttemptCount(t *testing.T) {
-	// 初始化重试实例：最大尝试0次，间隔1秒
-	retryInstance := retry.NewRetry().
-		SetAttemptCount(0).
-		SetInterval(time.Microsecond).
-		SetErrCallback(func(now, remain int, err error, _ ...string) {
-			fmt.Printf("当前第%d次尝试(剩余%d次)，错误：%v\n", now, remain, err)
-		})
+// 测试尝试次数
+func TestRetryWithAttemptCount(t *testing.T) {
+	tests := []struct {
+		attemptCount  int
+		expectedCount int
+		desc          string
+	}{
+		{-1, 1, "负数尝试次数,直接调用一次,不重试"},
+		{0, 1, "0尝试次数,直接调用一次,不重试"},
+		{1, 1, "1次尝试,正常调用"},
+		{2, 1, "2次尝试,正常调用"},
+	}
 
-	// 模拟总是返回错误的函数
-	err := retryInstance.Do(func() error {
-		return nil
-	})
-	assert.EqualError(t, err, "attemptCount must be greater than zero")
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			retryInstance := retry.NewRetry().
+				SetAttemptCount(tt.attemptCount).
+				SetInterval(time.Microsecond).
+				SetErrCallback(func(now, remain int, err error, _ ...string) {
+					fmt.Printf("当前第%d次尝试(剩余%d次),错误：%v\n", now, remain, err)
+				})
+
+			callCount := 0
+			err := retryInstance.Do(func() error {
+				callCount++
+				return nil
+			})
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expectedCount, callCount)
+		})
+	}
 }
 
 func TestRetry_SetConditionFunc(t *testing.T) {
@@ -285,4 +302,17 @@ func TestRetry_GetSetMethods(t *testing.T) {
 	ctx := r.GetContext()
 	assert.NotNil(t, ctx)
 	assert.Equal(t, context.Background(), ctx)
+
+	r.Do(func() error {
+		return nil
+	})
+	assert.Contains(t, r.GetCaller(), "FuncName:TestRetry_GetSetMethods, File")
+	// 设置自定义调用者
+	var caller = "TestRetry_GetSetMethods_12356789"
+	r.SetCaller(caller)
+	// 再次检查
+	r.Do(func() error {
+		return nil
+	})
+	assert.Equal(t, caller, r.GetCaller())
 }

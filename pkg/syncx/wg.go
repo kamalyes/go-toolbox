@@ -100,6 +100,7 @@ func (h *WaitGroup) Go(f func()) {
 		h.ch <- struct{}{}
 	}
 	h.Add(1) // 增加等待计数
+	started := make(chan struct{})
 
 	go func() {
 		defer func() {
@@ -109,6 +110,7 @@ func (h *WaitGroup) Go(f func()) {
 			}
 			h.Done()
 		}()
+		close(started) // 通知goroutine已启动
 
 		if h.catchPanic {
 			h.handlePanic(f) // 调用处理 panic 的方法
@@ -116,6 +118,8 @@ func (h *WaitGroup) Go(f func()) {
 		}
 		f() // 执行传入的函数
 	}()
+
+	<-started // 等待goroutine启动
 }
 
 // handlePanic 捕获并处理 panic
