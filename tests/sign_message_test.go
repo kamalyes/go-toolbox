@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-06-05 13:35:59
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-05 17:55:20
+ * @LastEditTime: 2025-08-05 13:15:55
  * @FilePath: \go-toolbox\tests\sign_message_test.go
  * @Description: 签名客户端测试，公共参数提取，结合自定义 WaitGroup 并发测试
  *
@@ -12,11 +12,11 @@ package tests
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/kamalyes/go-toolbox/pkg/sign"
-	"github.com/kamalyes/go-toolbox/pkg/syncx"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -107,38 +107,55 @@ func TestSignerClient_ValidateErrors(t *testing.T) {
 	assert.False(t, valid)
 }
 
-func TestSignerClient_ConcurrentUsage_WithSyncx(t *testing.T) {
+func TestSignerClient_ConcurrentUsage_WithSync(t *testing.T) {
 	client := newTestClient(t)
 	payload := newTestPayload()
 
 	const concurrency = 50
 	const iterations = 100
 
-	wg := syncx.NewWaitGroup(true, uint(concurrency)) // 捕获 panic，限制最大并发数
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var firstErr error // 用于存储第一个发生的错误
 
 	for i := 0; i < concurrency; i++ {
-		wg.Go(func() {
+		wg.Add(1) // 增加等待计数
+		go func() {
+			defer wg.Done() // 确保在 goroutine 完成时调用 Done
+
 			for j := 0; j < iterations; j++ {
 				signedStr, err := client.Create(payload)
 				if err != nil {
-					wg.SetError(err)
+					mu.Lock()
+					if firstErr == nil { // 只记录第一个错误
+						firstErr = err
+					}
+					mu.Unlock()
 					return
 				}
 
 				gotPayload, valid, err := client.Validate(signedStr)
 				if err != nil || !valid {
-					wg.SetError(fmt.Errorf("validate failed: %v, valid=%v", err, valid))
+					mu.Lock()
+					if firstErr == nil { // 只记录第一个错误
+						firstErr = fmt.Errorf("validate failed: %v, valid=%v", err, valid)
+					}
+					mu.Unlock()
 					return
 				}
 
 				if gotPayload.ExtraData.UserID != payload.UserID {
-					wg.SetError(fmt.Errorf("payload mismatch"))
+					mu.Lock()
+					if firstErr == nil { // 只记录第一个错误
+						firstErr = fmt.Errorf("payload mismatch")
+					}
+					mu.Unlock()
 					return
 				}
 			}
-		})
+		}()
 	}
 
-	err := wg.Wait()
-	assert.NoError(t, err)
+	wg.Wait() // 等待所有 goroutine 完成
+	assert.NoError(t, firstErr)
 }

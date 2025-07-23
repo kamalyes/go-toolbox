@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-13 13:06:30
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-20 13:25:66
+ * @LastEditTime: 2025-08-06 17:37:31
  * @FilePath: \go-toolbox\tests\syncx_lock_test.go
  * @Description:
  *
@@ -93,6 +93,14 @@ func (l *MockRWLocker) RUnlock() {
 	l.mu.RUnlock()
 }
 
+func (l *MockRWLocker) Lock() {
+	l.mu.Lock()
+}
+
+func (l *MockRWLocker) Unlock() {
+	l.mu.Unlock()
+}
+
 // TestWithLockReturn 测试 WithLockReturn 函数
 func TestWithLockReturn(t *testing.T) {
 	lock := &MockLocker{}
@@ -104,6 +112,37 @@ func TestWithLockReturn(t *testing.T) {
 
 	assert.NoError(t, err, "Expected no error")
 	assert.Equal(t, 42, result, "Expected result to be 42")
+}
+
+// TestWithUnlockThenLock 测试 WithUnlockThenLock 函数
+func TestWithUnlockThenLock(t *testing.T) {
+	mockLocker := &MockLocker{}
+	var counter int
+
+	// 在锁定的情况下增加计数器
+	mockLocker.Lock()
+	counter = 0
+
+	syncx.WithUnlockThenLock(mockLocker, func() {
+		counter++
+	})
+
+	assert.Equal(t, 1, counter, "计数器应该增加到 1")
+}
+
+// TestWithRUnlockThenLock 测试 WithRUnlockThenLock 函数
+func TestWithRUnlockThenLock(t *testing.T) {
+	mockRLocker := &MockRWLocker{}
+	var counter int
+
+	// 在锁定的情况下增加计数器
+	mockRLocker.Lock()
+	counter = 0
+
+	syncx.WithRUnlockThenLock(mockRLocker, func() {
+		counter++
+	})
+	assert.Equal(t, 1, counter, "计数器应该增加到 1")
 }
 
 // TestWithLockReturnString 测试 WithLockReturn 函数返回字符串

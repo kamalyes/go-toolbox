@@ -183,7 +183,13 @@ func GetConNetPublicIp(urls ...string) (string, error) {
 	if len(urls) > 0 {
 		url = urls[0]
 	}
-	resp, err := http.Get(url)
+
+	// 创建一个 HTTP 客户端并设置超时为 3 秒
+	client := &http.Client{
+		Timeout: 3 * time.Second,
+	}
+
+	resp, err := client.Get(url)
 	if err != nil {
 		return "", err
 	}

@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-13 13:05:03
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-09 11:31:32
+ * @LastEditTime: 2025-08-06 17:32:56
  * @FilePath: \go-toolbox\pkg\syncx\lock.go
  * @Description:
  *
@@ -20,6 +20,8 @@ type Locker interface {
 
 // RLocker 是一个接口，定义了读锁和解锁的方法
 type RLocker interface {
+	Lock()
+	Unlock()
 	RLock()
 	RUnlock()
 }
@@ -29,6 +31,15 @@ func WithLock(lock Locker, operation func()) {
 	lock.Lock()         // 获取锁
 	defer lock.Unlock() // 确保在操作完成后释放锁
 	operation()         // 执行操作
+}
+
+// WithUnlockThenLock 是一个高阶函数，用于在给定的锁上先解锁，然后执行指定的操作，最后重新上锁
+// 注意：在调用此函数之前，确保锁已被锁定
+// 该函数适用于需要在执行操作之前释放锁的场景，例如在进行某些需要不被锁定的操作时
+// 通过将操作封装在函数中，允许灵活地控制锁的使用
+func WithUnlockThenLock(lock Locker, operation func()) {
+	lock.Unlock()             // 先解锁
+	WithLock(lock, operation) // 执行操作时重新上锁
 }
 
 // WithLockReturn 是一个支持返回值的函数，用于在给定的锁上执行操作
@@ -50,6 +61,15 @@ func WithRLock(lock RLocker, operation func()) {
 	lock.RLock()         // 获取读锁
 	defer lock.RUnlock() // 确保在操作完成后释放读锁
 	operation()          // 执行操作
+}
+
+// WithRUnlockThenLock 是一个高阶函数，用于在给定的锁上先解锁，然后执行指定的操作，最后重新上锁
+// 注意：在调用此函数之前，确保锁已被锁定
+// 该函数适用于需要在执行操作之前释放锁的场景，例如在进行某些需要不被锁定的操作时
+// 通过将操作封装在函数中，允许灵活地控制锁的使用
+func WithRUnlockThenLock(lock RLocker, operation func()) {
+	lock.Unlock()              // 先解锁
+	WithRLock(lock, operation) // 执行操作时重新上锁
 }
 
 // WithRLockReturn 是一个支持返回值的函数，用于在给定的读锁上执行操作
