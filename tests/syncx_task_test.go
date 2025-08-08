@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-06-05 16:31:18
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-08-05 15:15:51
+ * @LastEditTime: 2025-08-09 19:15:05
  * @FilePath: \go-toolbox\tests\syncx_task_test.go
  * @Description:
  *
@@ -48,20 +48,37 @@ func TestAddTask(t *testing.T) {
 
 // 测试运行任务
 func TestRunTask(t *testing.T) {
-	tm := syncx.NewTaskManager[string, string, string](2)
-
-	for i := 0; i < 5; i++ {
+	tm := syncx.NewTaskManager[string, string, string](10)
+	index := 10
+	for i := 0; i < 50; i++ {
 		taskName := fmt.Sprintf("task%d", i)
 		task := syncx.NewTask[string, string, string](taskName, func(ctx context.Context, input string) (string, error) {
 			return input, nil
-		}, taskName)
+		}, taskName).SetTimeout(10).SetMaxHistorySize(index).SetMaxHistorySize(index).SetMaxRetries(int32(index))
+
+		for j := 0; j < 50; j++ {
+			dependName := fmt.Sprintf("depend%d", j) // 使用不同的名称
+			depend := syncx.NewTask[string, string, string](dependName, func(ctx context.Context, input string) (string, error) {
+				return input, nil
+			}, dependName) // 使用 dependName 作为输入
+			task.AddDependency(depend)
+		}
+
+		// 设置依赖执行模式为并发
+		task.SetDependExecutionMode(syncx.Concurrent)
 		tm.AddTask(task)
 	}
-	tm.Run() // 执行所有任务
+
+	err := tm.Run()                    // 执行所有任务
+	assert.NoError(t, err, "任务执行应无错误") // 添加错误检查
 
 	for _, task := range tm.GetTasks() {
-		assert.Equal(t, syncx.Completed, task.GetState(), "所有任务状态应为已完成")
+		assert.NoError(t, task.GetError(), "没有错误")
+		assert.Equal(t, task.GetCallbackDuration(), time.Duration(0))
+		assert.Equal(t, task.GetTaskType(), syncx.MainTask)
+		assert.Equal(t, syncx.Completed, task.GetState(), "状态应为已完成")
 		assert.Equal(t, task.GetInput(), task.GetName(), "任务结果应为 'task XXX'")
+		assert.Equal(t, task.GetMaxRetries(), int32(index))
 	}
 }
 
@@ -92,6 +109,8 @@ func TestTaskWithCallback(t *testing.T) {
 	}, "hello").SetSuccessCallback(func(result string, err error) (string, error) {
 		callbackResult = result // 保存回调结果
 		return "callback success", nil
+	}).SetFailureCallback(func(result string, err error) (string, error) {
+		return "callback failure", nil
 	})
 
 	tm.AddTask(task) // 添加任务
