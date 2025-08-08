@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-06-05 16:25:18
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-08-08 15:15:59
+ * @LastEditTime: 2025-08-11 11:17:19
  * @FilePath: \go-toolbox\pkg\syncx\task.go
  * @Description:
  * 泛型参数说明：
@@ -94,7 +94,8 @@ type Task[T any, R any, U any] struct {
 	retryInterval       time.Duration                                 // 重试间隔时间
 	maxRetries          int32                                         // 最大重试次数
 	ctx                 context.Context                               // 传入的上下文
-	timestamp           int64                                         // 任务开始时间
+	timestamp           int64                                         // 任务开始时间(纳秒)
+	totalDuration       time.Duration                                 // 任务的总耗时(纳秒)
 	fnDuration          time.Duration                                 // 主任务运行时间
 	callbackDuration    time.Duration                                 // 回调运行时间
 	callbackResult      U                                             // 存储回调结果
@@ -110,6 +111,7 @@ type Task[T any, R any, U any] struct {
 type TaskManager[T any, R any, U any] struct {
 	tasks        map[string]*Task[T, R, U] // 存储所有任务的映射
 	mu           sync.Mutex                // 互斥锁，确保并发安全
+	concurrency  int                       // 并发数
 	trunUpFunc   func() (R, error)         // 启动时执行的函数
 	trunDownFunc func() (R, error)         // 关闭时执行的函数
 }
@@ -120,7 +122,8 @@ type TaskHistory struct {
 	state            TaskState     // 任务的状态（如成功、失败等）
 	result           interface{}   // 任务执行的结果
 	err              error         // 任务执行过程中发生的错误
-	timestamp        int64         // 任务开始时间
+	timestamp        int64         // 任务开始时间(纳秒)
+	totalDuration    time.Duration // 任务的总耗时(纳秒)
 	fnDuration       time.Duration // 任务函数的执行持续时间
 	callbackDuration time.Duration // 回调函数的执行持续时间
 }
@@ -163,7 +166,8 @@ func (th *TaskHistory) GetTaskType() TaskType {
 // NewTaskManager 创建一个新的 TaskManager
 func NewTaskManager[T any, R any, U any](concurrency int) *TaskManager[T, R, U] {
 	tm := &TaskManager[T, R, U]{
-		tasks: make(map[string]*Task[T, R, U]), // 初始化任务
+		concurrency: concurrency,
+		tasks:       make(map[string]*Task[T, R, U]), // 初始化任务
 	}
 	return tm
 }
@@ -327,9 +331,19 @@ func (tk *Task[T, R, U]) GetFnDuration() time.Duration {
 	return tk.fnDuration
 }
 
+// GetTotalDuration 获取任务的总耗时
+func (tk *Task[T, R, U]) GetTotalDuration() time.Duration {
+	return tk.totalDuration
+}
+
 // GetCallbackDuration 获取回调运行时间
 func (tk *Task[T, R, U]) GetCallbackDuration() time.Duration {
 	return tk.callbackDuration
+}
+
+// GetTaskType 获取任务类型
+func (tk *Task[T, R, U]) GetTaskType() TaskType {
+	return tk.taskType
 }
 
 // GetCallbackResult 获取回调结果
@@ -408,8 +422,13 @@ func (tm *TaskManager[T, R, U]) TrunDown() (result R, err error) {
 }
 
 // Run 执行所有任务
-func (tm *TaskManager[T, R, U]) Run() {
+func (tm *TaskManager[T, R, U]) Run() error {
+	if tm.concurrency <= 0 {
+		return fmt.Errorf("concurrency must be greater than 0") // 返回错误
+	}
+
 	var wg sync.WaitGroup
+	sem := make(chan struct{}, tm.concurrency) // 创建一个通道，限制并发数量
 
 	// 创建并按优先级排序任务
 	taskSlice := make([]*Task[T, R, U], 0, len(tm.tasks))
@@ -425,15 +444,19 @@ func (tm *TaskManager[T, R, U]) Run() {
 	// 将任务发送到队列
 	for _, task := range taskSlice {
 		wg.Add(1)
+		sem <- struct{}{} // 向通道中发送信号，表示一个任务正在执行
 		go func(t *Task[T, R, U]) {
 			defer wg.Done()
+			defer func() { <-sem }() // 任务完成后，从通道中接收信号
+
 			WithLock(&tm.mu, func() {
 				t.executeTask()
 			})
 		}(task)
 	}
 
-	wg.Wait() // 等待所有任务完成
+	wg.Wait()  // 等待所有任务完成
+	return nil // 返回 nil 表示成功
 }
 
 // cancelTaskAndDependencies 递归取消任务及其依赖
@@ -489,8 +512,11 @@ func (tk *Task[T, R, U]) executeTask() {
 		return
 	}
 
+	// 记录任务开始时间
+	startTime := time.Now()
 	// 执行依赖任务
 	if err := tk.executeDependencies(); err != nil {
+		tk.totalDuration = time.Since(startTime) // 更新总耗时
 		tk.state = Failed
 		tk.err = err
 		return
@@ -501,6 +527,9 @@ func (tk *Task[T, R, U]) executeTask() {
 
 	// 调用回调函数并获取结果与错误
 	tk.invokeCallback()
+
+	// 更新总耗时
+	tk.totalDuration = time.Since(startTime)
 	tk.logHistory() // 记录任务历史
 }
 
@@ -523,7 +552,7 @@ func (tk *Task[T, R, U]) executeDependencies() error {
 				dep.executeTask()
 			}(dep)
 		}
-		wg.Wait()
+		wg.Wait() // 等待所有依赖任务完成
 		for _, dep := range tk.depends {
 			if dep.state == Failed {
 				return dep.err
@@ -571,11 +600,6 @@ func (tk *Task[T, R, U]) runWithRetries() (result R, err error) {
 // invokeCallback 处理回调的执行
 // 根据任务的执行结果调用相应的回调函数（成功或失败），并记录相关的执行时间和状态
 func (tk *Task[T, R, U]) invokeCallback() {
-	// 如果主任务已经出错，则不执行回调，直接返回
-	if tk.err != nil {
-		return
-	}
-
 	// 定义一个映射，将错误状态映射到相应的回调函数
 	// 如果没有错误，使用成功回调；如果有错误，使用失败回调
 	callbackMap := map[bool]func(R, error) (U, error){
@@ -620,6 +644,7 @@ func (tk *Task[T, R, U]) logHistory() {
 		result:           tk.result,
 		err:              tk.err,
 		timestamp:        tk.timestamp,
+		totalDuration:    tk.totalDuration,
 		fnDuration:       tk.fnDuration,
 		callbackDuration: tk.callbackDuration,
 	}

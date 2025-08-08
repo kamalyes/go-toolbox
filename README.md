@@ -1,7 +1,7 @@
 # Go-ToolbOX
+Chinese Documentation - [中文文档](./README-ZH.md)
 
 > Go-toolbOx is characterized by daily work requirements and extension development, encapsulated generic tool classes
-
 
 [![stable](https://img.shields.io/badge/stable-stable-green.svg)](https://github.com/kamalyes/go-toolbox)
 [![license](https://img.shields.io/github/license/kamalyes/go-toolbox)]()
@@ -22,35 +22,55 @@
 
 **Go-toolbOx's key features are:**
 
-- **convert**: Indicates the conversion between data types. For example, converting a string to an integer, or converting a date format from one form to another.
+- **Convert**: Conversion between data types, such as converting strings to integers or changing date formats from one form to another.
 
-- **desensitize**: In data processing and privacy protection, it refers to removing or obscurating sensitive information to prevent data leakage. For example, removing personally identifiable information (PII) or encrypting data.
+- **Desensitize**: Remove or obfuscate sensitive information to prevent data leakage, such as removing Personally Identifiable Information (PII) or encrypting data.
 
-- **json** JavaScript Object Notation (JSON) is a lightweight data interchange format that is commonly used for data transfer between Web applications.
+- **CRC**: Cyclic Redundancy Check for error detection in data transmission.
 
-- **moment**: One that parses, validates, manipulates, and displays dates and times, simplifying date and time processing.
+- **Error Handling**: Enhanced error handling capabilities to simplify error management.
 
-- **location**: ip region and so on
+- **HTTP Extensions**: Auxiliary tools for HTTP requests and responses.
 
-- **mathx**: A library of tools for performing calculations with numbers that offers extensions for numerical operations.
+- **Image Processing**: Tools for image processing and manipulation.
 
-- **random**: Random number generators are used in a variety of applications, such as games, simulations, and security protocols.
+- **JSON Handling**: Lightweight data interchange format handling.
 
-- **regex**: Regular Expression is widely used for text processing, data verification, and search and replacement operations.
+- **Location Services**: Information related to IP regions and more.
 
-- **retry**: indicates the process of retrying the operation if it fails. It is used in network requests and database operations to improve system reliability.
+- **Math Extensions**: Extended functionalities for numerical computations.
 
-- **sign**: In programming, 'sign' usually refers to a signature, especially in the context of security and encryption. It can be used to verify the integrity and origin of data, such as word signature and message signature.
+- **Time Handling**: Parsing, validating, manipulating, and displaying dates and times to simplify date and time handling.
 
-- **stringx**: A library of tools used to handle strings, providing extended functions for strings, such as formatting, splitting, concatenation, etc. Implementations may vary by language or library.
+- **OS Interface**: Programming interfaces for interacting with the operating system.
 
-- **osx**: A programming interface or library associated with the system for interacting with the operating system.
+- **Queue**: Implementation of queue data structures.
 
-- **uuid**: Universally Unique Identifier (UUID) is a standardized identifier used to uniquely identify information in a distributed system. Uuids are usually used in scenarios such as database primary key and session ID.
+- **Random Numbers**: Random number generators suitable for various applications.
 
-- **validator**: A tool or library used to verify the validity of data. For example, form validation, data format validation, etc., to ensure that the input data conforms to the expected format and rules.
+- **Retry Mechanism**: The process of retrying an operation when it fails, commonly used for network requests and database operations to enhance system reliability.
 
-- **zipx**: A library of tools related to compression and decompression.
+- **Scheduling**: Task scheduling tools that support the execution of timed tasks.
+
+- **Signature**: Verification of data integrity and origin, used for validating data integrity and origin, such as word signatures and message signatures.
+
+- **SQL Builder**: Tools for constructing SQL queries.
+
+- **String Handling**: Extended functionalities for string processing, providing features like formatting, splitting, and concatenation.
+
+- **Synchronization Tools**: Tools for synchronization in concurrent programming.
+
+- **Types**: Definitions and operations for various types.
+
+- **Unit Conversion**: Tools for converting between units.
+
+- **User Agent**: Tools for handling user agent strings.
+
+- **UUID**: Generation of universally unique identifiers (UUID).
+
+- **Validator**: Tools for validating data integrity, such as form validation and data format validation to ensure input data meets expected formats and rules.
+
+- **Compression Tools**: Tools related to data compression and decompression.
 
 ## Getting started
 
