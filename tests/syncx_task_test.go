@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-06-05 16:31:18
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-08-09 19:15:05
+ * @LastEditTime: 2025-08-11 11:15:15
  * @FilePath: \go-toolbox\tests\syncx_task_test.go
  * @Description:
  *
@@ -79,6 +79,7 @@ func TestRunTask(t *testing.T) {
 		assert.Equal(t, syncx.Completed, task.GetState(), "状态应为已完成")
 		assert.Equal(t, task.GetInput(), task.GetName(), "任务结果应为 'task XXX'")
 		assert.Equal(t, task.GetMaxRetries(), int32(index))
+		assert.Equal(t, task.GetCallbackResult(), "")
 	}
 }
 
@@ -88,7 +89,9 @@ func TestTaskWithError(t *testing.T) {
 
 	task := syncx.NewTask[string, string, string]("task1", func(ctx context.Context, input string) (string, error) {
 		return "", errors.New("任务执行失败") // 模拟错误
-	}, "hello")
+	}, "hello").SetFailureCallback(func(result string, err error) (string, error) {
+		return "callback failure", nil
+	})
 
 	tm.AddTask(task) // 添加任务
 	tm.Run()         // 执行任务
@@ -97,6 +100,7 @@ func TestTaskWithError(t *testing.T) {
 	assert.Equal(t, syncx.Failed, task.GetState(), "任务状态应为失败")
 	assert.NotNil(t, task.GetError(), "任务应返回错误")
 	assert.Equal(t, "任务执行失败", task.GetError().Error(), "错误信息应为 '任务执行失败'")
+	assert.Equal(t, task.GetCallbackResult(), "callback failure")
 }
 
 // 测试任务成功后的回调
@@ -118,6 +122,7 @@ func TestTaskWithCallback(t *testing.T) {
 
 	// 验证回调结果
 	assert.Equal(t, "hello", callbackResult, "回调结果应为 'hello'")
+	assert.Equal(t, task.GetCallbackResult(), "callback success")
 }
 
 // 测试任务取消

@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-06-05 16:25:18
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-08-08 15:15:59
+ * @LastEditTime: 2025-08-11 11:17:19
  * @FilePath: \go-toolbox\pkg\syncx\task.go
  * @Description:
  * 泛型参数说明：
@@ -600,11 +600,6 @@ func (tk *Task[T, R, U]) runWithRetries() (result R, err error) {
 // invokeCallback 处理回调的执行
 // 根据任务的执行结果调用相应的回调函数（成功或失败），并记录相关的执行时间和状态
 func (tk *Task[T, R, U]) invokeCallback() {
-	// 如果主任务已经出错，则不执行回调，直接返回
-	if tk.err != nil {
-		return
-	}
-
 	// 定义一个映射，将错误状态映射到相应的回调函数
 	// 如果没有错误，使用成功回调；如果有错误，使用失败回调
 	callbackMap := map[bool]func(R, error) (U, error){
