@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-11 15:55:06
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-22 11:09:17
+ * @LastEditTime: 2025-08-12 17:52:05
  * @FilePath: \go-toolbox\tests\mathx_slice_test.go
  * @Description:
  *
@@ -248,19 +248,113 @@ func TestBubbleSort(t *testing.T) {
 func TestSliceContains(t *testing.T) {
 	tests := []struct {
 		name     string
-		slice    []int
-		element  int
+		slice    interface{}
+		element  interface{}
 		expected bool
 	}{
-		{"ContainsTrue", []int{1, 2, 3}, 2, true},
-		{"ContainsFalse", []int{1, 2, 3}, 4, false},
-		{"ContainsEmpty", []int{}, 1, false},
+		// 测试整型
+		{"ContainsIntTrue", []int{1, 2, 3}, 2, true},
+		{"ContainsIntFalse", []int{1, 2, 3}, 4, false},
+		{"ContainsEmptyInt", []int{}, 1, false},
+
+		{"ContainsInt8True", []int8{1, 2, 3}, int8(2), true},
+		{"ContainsInt8False", []int8{1, 2, 3}, int8(4), false},
+		{"ContainsEmptyInt8", []int8{}, int8(1), false},
+
+		{"ContainsInt16True", []int16{1, 2, 3}, int16(2), true},
+		{"ContainsInt16False", []int16{1, 2, 3}, int16(4), false},
+		{"ContainsEmptyInt16", []int16{}, int16(1), false},
+
+		{"ContainsInt32True", []int32{1, 2, 3}, int32(2), true},
+		{"ContainsInt32False", []int32{1, 2, 3}, int32(4), false},
+		{"ContainsEmptyInt32", []int32{}, int32(1), false},
+
+		{"ContainsInt64True", []int64{1, 2, 3}, int64(2), true},
+		{"ContainsInt64False", []int64{1, 2, 3}, int64(4), false},
+		{"ContainsEmptyInt64", []int64{}, int64(1), false},
+
+		// 测试无符号整型
+		{"ContainsUintTrue", []uint{1, 2, 3}, uint(2), true},
+		{"ContainsUintFalse", []uint{1, 2, 3}, uint(4), false},
+		{"ContainsEmptyUint", []uint{}, uint(1), false},
+
+		{"ContainsUint8True", []uint8{1, 2, 3}, uint8(2), true},
+		{"ContainsUint8False", []uint8{1, 2, 3}, uint8(4), false},
+		{"ContainsEmptyUint8", []uint8{}, uint8(1), false},
+
+		{"ContainsUint16True", []uint16{1, 2, 3}, uint16(2), true},
+		{"ContainsUint16False", []uint16{1, 2, 3}, uint16(4), false},
+		{"ContainsEmptyUint16", []uint16{}, uint16(1), false},
+
+		{"ContainsUint32True", []uint32{1, 2, 3}, uint32(2), true},
+		{"ContainsUint32False", []uint32{1, 2, 3}, uint32(4), false},
+		{"ContainsEmptyUint32", []uint32{}, uint32(1), false},
+
+		{"ContainsUint64True", []uint64{1, 2, 3}, uint64(2), true},
+		{"ContainsUint64False", []uint64{1, 2, 3}, uint64(4), false},
+		{"ContainsEmptyUint64", []uint64{}, uint64(1), false},
+
+		// 测试浮点型
+		{"ContainsFloat32True", []float32{1.1, 2.2, 3.3}, float32(2.2), true},
+		{"ContainsFloat32False", []float32{1.1, 2.2, 3.3}, float32(4.4), false},
+		{"ContainsEmptyFloat32", []float32{}, float32(1.1), false},
+
+		{"ContainsFloat64True", []float64{1.1, 2.2, 3.3}, float64(2.2), true},
+		{"ContainsFloat64False", []float64{1.1, 2.2, 3.3}, float64(4.4), false},
+		{"ContainsEmptyFloat64", []float64{}, float64(1.1), false},
+
+		// 测试字符串
+		{"ContainsStringTrue", []string{"a", "b", "c"}, "b", true},
+		{"ContainsStringFalse", []string{"a", "b", "c"}, "d", false},
+		{"ContainsEmptyString", []string{}, "a", false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := mathx.SliceContains(tt.slice, tt.element)
-			assert.Equal(t, tt.expected, result)
+			// 使用类型断言来调用 SliceContains
+			switch s := tt.slice.(type) {
+			case []int:
+				result := mathx.SliceContains(s, tt.element.(int))
+				assert.Equal(t, tt.expected, result)
+			case []int8:
+				result := mathx.SliceContains(s, tt.element.(int8))
+				assert.Equal(t, tt.expected, result)
+			case []int16:
+				result := mathx.SliceContains(s, tt.element.(int16))
+				assert.Equal(t, tt.expected, result)
+			case []int32:
+				result := mathx.SliceContains(s, tt.element.(int32))
+				assert.Equal(t, tt.expected, result)
+			case []int64:
+				result := mathx.SliceContains(s, tt.element.(int64))
+				assert.Equal(t, tt.expected, result)
+			case []uint:
+				result := mathx.SliceContains(s, tt.element.(uint))
+				assert.Equal(t, tt.expected, result)
+			case []uint8:
+				result := mathx.SliceContains(s, tt.element.(uint8))
+				assert.Equal(t, tt.expected, result)
+			case []uint16:
+				result := mathx.SliceContains(s, tt.element.(uint16))
+				assert.Equal(t, tt.expected, result)
+			case []uint32:
+				result := mathx.SliceContains(s, tt.element.(uint32))
+				assert.Equal(t, tt.expected, result)
+			case []uint64:
+				result := mathx.SliceContains(s, tt.element.(uint64))
+				assert.Equal(t, tt.expected, result)
+			case []float32:
+				result := mathx.SliceContains(s, tt.element.(float32))
+				assert.Equal(t, tt.expected, result)
+			case []float64:
+				result := mathx.SliceContains(s, tt.element.(float64))
+				assert.Equal(t, tt.expected, result)
+			case []string:
+				result := mathx.SliceContains(s, tt.element.(string))
+				assert.Equal(t, tt.expected, result)
+			default:
+				t.Fatalf("unsupported slice type %T", s)
+			}
 		})
 	}
 }
@@ -389,17 +483,23 @@ func TestSliceDiffSetStrings(t *testing.T) {
 	cases := []struct {
 		arr1 []string
 		arr2 []string
-		want []interface{}
+		want []string
 	}{
-		{[]string{"a", "b", "c"}, []string{"b", "c", "d"}, []interface{}{"a", "d"}},
-		{[]string{}, []string{"b", "c", "d"}, []interface{}{"b", "c", "d"}},
-		{[]string{"a", "b", "c"}, []string{}, []interface{}{"a", "b", "c"}},
-		{[]string{"apple", "banana"}, []string{"banana", "cherry"}, []interface{}{"apple", "cherry"}},
+		{[]string{"a", "b", "c"}, []string{"b", "c", "d"}, []string{"a", "d"}},
+		{[]string{}, []string{"b", "c", "d"}, []string{"b", "c", "d"}},
+		{[]string{"a", "b", "c"}, []string{}, []string{"a", "b", "c"}},
+		{[]string{"apple", "banana"}, []string{"banana", "cherry"}, []string{"apple", "cherry"}},
+		{[]string{"a", "b", "c"}, []string{"a", "b", "c"}, []string{}},                             // 完全相等
+		{[]string{"a", "b", "c"}, []string{"e", "f", "g"}, []string{"a", "b", "c", "e", "f", "g"}}, // 没有交集
+		{[]string{"a"}, []string{"a"}, []string{}},                                                 // 单个元素完全相等
+		{[]string{"a"}, []string{"b"}, []string{"a", "b"}},                                         // 单个元素不相等
+		{[]string{"a", "b", "c"}, []string{"b"}, []string{"a", "c"}},                               // 部分重叠
+		{[]string{"c", "b", "a"}, []string{"b", "a", "d"}, []string{"c", "d"}},                     // 输入顺序不同
 	}
 
 	for _, tc := range cases {
 		result := mathx.SliceDiffSetSorted(tc.arr1, tc.arr2)
-		assert.ElementsMatch(t, tc.want, result, "SliceDiffSet(%v, %v) = %v; want %v", tc.arr1, tc.arr2, result, tc.want)
+		assert.ElementsMatch(t, tc.want, result, "SliceDiffSetSorted(%v, %v) = %v; want %v", tc.arr1, tc.arr2, result, tc.want)
 	}
 }
 

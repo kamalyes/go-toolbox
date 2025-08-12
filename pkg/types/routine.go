@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-13 15:55:18
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-13 13:55:22
+ * @LastEditTime: 2025-08-12 17:35:16
  * @FilePath: \go-toolbox\pkg\types\routine.go
  * @Description:
  *
@@ -21,5 +21,5 @@ type Complex interface {
 // 如果未来的 Go 版本添加了新的有序类型，
 // 这个约束将会被修改以包含它们。
 type Ordered interface {
-	Integer | Float | ~string
+	Integer | Unsigned | Float | ~string
 }
