@@ -28,10 +28,10 @@ func TestSliceMinMax(t *testing.T) {
 		expected  int
 		expectErr bool
 	}{
-		{"Empty list", []int{}, mathx.MinFunc[int], 0, true},
-		{"Single element", []int{5}, mathx.MinFunc[int], 5, false},
-		{"Multiple elements - Min", []int{3, 1, 4, 1, 5, 9}, mathx.MinFunc[int], 1, false},
-		{"Multiple elements - Max", []int{3, 1, 4, 1, 5, 9}, mathx.MaxFunc[int], 9, false},
+		{"Empty list", []int{}, mathx.AtLeast[int], 0, true},
+		{"Single element", []int{5}, mathx.AtMost[int], 5, false},
+		{"Multiple elements - Min", []int{3, 1, 4, 1, 5, 9}, mathx.AtLeast[int], 1, false},
+		{"Multiple elements - Max", []int{3, 1, 4, 1, 5, 9}, mathx.AtMost[int], 9, false},
 	}
 
 	for _, test := range tests {

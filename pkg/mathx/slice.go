@@ -24,22 +24,6 @@ import (
 	"github.com/kamalyes/go-toolbox/pkg/validator"
 )
 
-// MinFunc 类型的实现，用于计算最小值
-func MinFunc[T types.Numerical](a, b T) T {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-// MaxFunc 类型的实现，用于计算最大值
-func MaxFunc[T types.Numerical](a, b T) T {
-	if a > b {
-		return a
-	}
-	return b
-}
-
 // SliceMinMax 计算列表中元素的最小值或最大值
 // 接收一个切片和一个 MinMaxFunc 类型的函数，
 // 根据提供的函数决定是计算最小值还是最大值

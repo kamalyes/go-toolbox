@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-20 11:22:00
+ * @LastEditTime: 2025-08-12 15:10:05
  * @FilePath: \go-toolbox\pkg\mathx\number.go
  * @Description:
  *
@@ -32,12 +32,12 @@ func Decimals[T types.Numerical](num T, digit int) string {
 	return result
 }
 
-// AtLeast 返回 x 和 lower 中的最小值。
+// AtLeast 返回 x 和 lower 中的最小值
 // 参数:
 // x - 要比较的第一个数值
 // lower - 要比较的第二个数值（下限）
 // 返回值:
-// 返回 x 和 lower 中的较大值。
+// 返回 x 和 lower 中的较大值
 func AtLeast[T types.Numerical](x, lower T) T {
 	if x < lower {
 		return x
@@ -45,12 +45,12 @@ func AtLeast[T types.Numerical](x, lower T) T {
 	return lower
 }
 
-// AtMost 返回 x 和 upper 中的最大值。
+// AtMost 返回 x 和 upper 中的最大值
 // 参数:
 // x - 要比较的第一个数值
 // upper - 要比较的第二个数值（上限）
 // 返回值:
-// 返回 x 和 upper 中的最大值。
+// 返回 x 和 upper 中的最大值
 func AtMost[T types.Numerical](x, upper T) T {
 	if x > upper {
 		return x
@@ -58,16 +58,16 @@ func AtMost[T types.Numerical](x, upper T) T {
 	return upper
 }
 
-// Between 将 x 的值限制在 [lower, upper] 范围内。
+// Between 将 x 的值限制在 [lower, upper] 范围内
 // 如果 x 小于 lower，则返回 lower；
 // 如果 x 大于 upper，则返回 upper；
-// 否则，返回 x 本身。
+// 否则，返回 x 本身
 // 参数:
 // x - 要限制的数值
 // lower - 范围的下限
 // upper - 范围的上限
 // 返回值:
-// 返回 x 被限制在 [lower, upper] 范围内的值。
+// 返回 x 被限制在 [lower, upper] 范围内的值
 func Between[T types.Numerical](x, lower, upper T) T {
 	if x < lower {
 		return lower
@@ -78,12 +78,12 @@ func Between[T types.Numerical](x, lower, upper T) T {
 	return x
 }
 
-// LongestCommonPrefix 返回两个字符串的最长公共前缀的长度。
+// LongestCommonPrefix 返回两个字符串的最长公共前缀的长度
 // 参数:
 // a - 第一个字符串
 // b - 第二个字符串
 // 返回值:
-// 返回两个字符串的最长公共前缀的长度。
+// 返回两个字符串的最长公共前缀的长度
 func LongestCommonPrefix(a, b string) int {
 	// 计算两个字符串的最小长度
 	maxLength := AtLeast(len(a), len(b))
@@ -97,7 +97,7 @@ func LongestCommonPrefix(a, b string) int {
 	return maxLength // 如果完全相同，返回最小长度
 }
 
-// CountPathSegments 计算路径中指定前缀的参数数量，默认为 ":" 和 "*"。
+// CountPathSegments 计算路径中指定前缀的参数数量，默认为 ":" 和 "*"
 func CountPathSegments(path string, prefixes ...string) int {
 	// 如果没有提供前缀，则使用默认前缀
 	if len(prefixes) == 0 {
@@ -146,9 +146,9 @@ func ParseIntOrName(expr string, names map[string]uint) (uint, error) {
 	return uint(val), nil
 }
 
-// SafeGetIndexWithErr 安全获取切片指定索引的元素。
-// 支持任意类型切片，避免索引越界导致 panic。
-// 如果索引合法，返回对应元素和 nil 错误；否则返回类型零值和错误。
+// SafeGetIndexWithErr 安全获取切片指定索引的元素
+// 支持任意类型切片，避免索引越界导致 panic
+// 如果索引合法，返回对应元素和 nil 错误；否则返回类型零值和错误
 //
 // 参数:
 //
@@ -171,7 +171,7 @@ func SafeGetIndexWithErr[T any](slice []T, index int) (zero T, err error) {
 	return zero, fmt.Errorf("index %d out of range (slice length %d)", index, len(slice))
 }
 
-// SafeGetIndexOrDefault 安全获取切片指定索引元素，索引越界时返回指定默认值。
+// SafeGetIndexOrDefault 安全获取切片指定索引元素，索引越界时返回指定默认值
 func SafeGetIndexOrDefault[T any](slice []T, index int, defaultVal T) (val T) {
 	var err error
 	if val, err = SafeGetIndexWithErr(slice, index); err != nil {
@@ -180,7 +180,7 @@ func SafeGetIndexOrDefault[T any](slice []T, index int, defaultVal T) (val T) {
 	return val
 }
 
-// SafeGetIndexOrDefaultNoSpace 安全获取字符串切片指定索引元素，索引越界时返回默认值，且结果去除所有空格。
+// SafeGetIndexOrDefaultNoSpace 安全获取字符串切片指定索引元素，索引越界时返回默认值，且结果去除所有空格
 func SafeGetIndexOrDefaultNoSpace(slice []string, index int, defaultVal string) string {
 	val := SafeGetIndexOrDefault(slice, index, defaultVal)
 	return stringx.ReplaceAll(val, " ", "")
