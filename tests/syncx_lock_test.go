@@ -114,6 +114,18 @@ func TestWithLockReturn(t *testing.T) {
 	assert.Equal(t, 42, result, "Expected result to be 42")
 }
 
+// TestWithLockReturnWithE 测试 WithLockReturnWithE 函数
+func TestWithLockReturnWithE(t *testing.T) {
+	lock := &MockLocker{}
+
+	result, err := syncx.WithLockReturnWithE(lock, func() (int, error) {
+		return 42, nil
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, 42, result)
+}
+
 // TestWithUnlockThenLock 测试 WithUnlockThenLock 函数
 func TestWithUnlockThenLock(t *testing.T) {
 	mockLocker := &MockLocker{}
@@ -283,6 +295,18 @@ func TestWithRLockReturnValue(t *testing.T) {
 	})
 
 	assert.Equal(t, 42, result, "Expected result to be 42")
+}
+
+// TestWithRLockReturnWithE 测试 WithRLockReturnWithE 函数
+func TestWithRLockReturnWithE(t *testing.T) {
+	lock := &MockRWLocker{}
+
+	result, err := syncx.WithRLockReturnWithE(lock, func() (string, error) {
+		return "Hello, World!", nil
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, "Hello, World!", result)
 }
 
 // SimpleTryMutex 是个支持 TryLock 的简单互斥锁实现
@@ -500,4 +524,28 @@ func TestWithTryRLockReturnValue(t *testing.T) {
 	assert.Equal(t, syncx.ErrLockNotAcquired, err)
 	assert.Equal(t, 0, val)
 	lock.Unlock()
+}
+
+// 测试 WithTryLockReturnWithE 函数
+func TestWithTryLockReturnWithE(t *testing.T) {
+	lock := &SimpleTryMutex{}
+
+	result, err := syncx.WithTryLockReturnWithE(lock, func() (int, error) {
+		return 42, nil
+	})
+
+	assert.NoError(t, err, "expected no error")
+	assert.Equal(t, 42, result, "expected result 42")
+}
+
+// 测试 WithTryRLockReturnWithE 函数
+func TestWithTryRLockReturnWithE(t *testing.T) {
+	lock := &SimpleTryRWMutex{}
+
+	result, err := syncx.WithTryRLockReturnWithE(lock, func() (int, error) {
+		return 42, nil
+	})
+
+	assert.NoError(t, err, "expected no error")
+	assert.Equal(t, 42, result, "expected result 42")
 }

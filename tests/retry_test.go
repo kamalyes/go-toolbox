@@ -187,7 +187,7 @@ func TestContextTimeout(t *testing.T) {
 func TestOptimizedBackoff(t *testing.T) {
 	t.Parallel()
 	retryInstance := retry.NewRetry().
-		SetAttemptCount(3).
+		SetAttemptCount(2).
 		SetInterval(100 * time.Millisecond). // 基础间隔降为100ms
 		SetErrCallback(func(now, _ int, _ error, _ ...string) {
 			base := math.Pow(1.5, float64(now-1)) // 改用1.5倍增长

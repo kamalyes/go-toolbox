@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-12-13 13:05:03
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-08-06 17:32:56
+ * @LastEditTime: 2025-08-13 17:50:20
  * @FilePath: \go-toolbox\pkg\syncx\lock.go
  * @Description:
  *
@@ -56,6 +56,13 @@ func WithLockReturnValue[T any](lock Locker, operation func() T) T {
 	return operation()  // 执行操作并返回结果
 }
 
+// WithLockReturnWithE 是一个支持返回值和自定义泛型的函数，用于在给定的锁上执行操作
+func WithLockReturnWithE[T any, E any](lock Locker, operation func() (T, E)) (T, E) {
+	lock.Lock()         // 获取锁
+	defer lock.Unlock() // 确保在操作完成后释放锁
+	return operation()  // 执行操作并返回结果
+}
+
 // WithRLock 是一个用于在给定的读锁上执行操作的函数
 func WithRLock(lock RLocker, operation func()) {
 	lock.RLock()         // 获取读锁
@@ -81,6 +88,13 @@ func WithRLockReturn[T any](lock RLocker, operation func() (T, error)) (T, error
 
 // WithRLockReturnValue 是一个支持返回值的函数，用于在给定的读锁上执行操作，不返回错误
 func WithRLockReturnValue[T any](lock RLocker, operation func() T) T {
+	lock.RLock()         // 获取读锁
+	defer lock.RUnlock() // 确保在操作完成后释放读锁
+	return operation()   // 执行操作并返回结果
+}
+
+// WithRLockReturnWithE 是一个支持返回值和自定义泛型的函数，用于在给定的读锁上执行操作
+func WithRLockReturnWithE[T any, E any](lock RLocker, operation func() (T, E)) (T, E) {
 	lock.RLock()         // 获取读锁
 	defer lock.RUnlock() // 确保在操作完成后释放读锁
 	return operation()   // 执行操作并返回结果
@@ -129,6 +143,17 @@ func WithTryLockReturnValue[T any](lock TryLocker, operation func() T) (T, error
 	return operation(), nil
 }
 
+// WithTryLockReturnWithE 在支持 TryLock 的锁上尝试执行操作，成功获取锁才执行，支持返回值和错误
+func WithTryLockReturnWithE[T any, E any](lock TryLocker, operation func() (T, E)) (T, E) {
+	var zero T
+	if !lock.TryLock() {
+		var err E        // 假设 E 是一个错误类型或其他类型
+		return zero, err // 返回零值和一个错误
+	}
+	defer lock.Unlock()
+	return operation()
+}
+
 // WithTryRLock 在支持 TryRLock 的读锁上尝试执行操作，成功获取读锁才执行
 func WithTryRLock(lock TryRLocker, operation func() error) error {
 	if !lock.TryRLock() {
@@ -156,4 +181,15 @@ func WithTryRLockReturnValue[T any](lock TryRLocker, operation func() T) (T, err
 	}
 	defer lock.RUnlock()
 	return operation(), nil
+}
+
+// WithTryRLockReturnWithE 在支持 TryRLock 的读锁上尝试执行操作，成功获取读锁才执行，支持返回值和错误
+func WithTryRLockReturnWithE[T any, E any](lock TryRLocker, operation func() (T, E)) (T, E) {
+	var zero T
+	if !lock.TryRLock() {
+		var err E        // 假设 E 是一个错误类型或其他类型
+		return zero, err // 返回零值和一个错误
+	}
+	defer lock.RUnlock()
+	return operation()
 }
