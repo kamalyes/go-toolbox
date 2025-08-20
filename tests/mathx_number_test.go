@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-08-12 15:10:05
+ * @LastEditTime: 2025-08-20 16:30:58
  * @FilePath: \go-toolbox\tests\mathx_number_test.go
  * @Description:
  *
@@ -296,37 +296,6 @@ func TestLongestCommonPrefix(t *testing.T) {
 				t.Errorf("LongestCommonPrefix(%q, %q) = %d; want %d", tt.a, tt.b, got, tt.expected)
 			}
 		})
-	}
-}
-
-func TestParseIntOrName(t *testing.T) {
-	names := map[string]uint{
-		"jan": 1,
-		"feb": 2,
-		"mar": 3,
-		"dec": 12,
-	}
-
-	tests := []struct {
-		input    string
-		expected uint
-		wantErr  bool
-	}{
-		{"jan", 1, false},
-		{"FEB", 2, false},
-		{"10", 10, false},
-		{"0", 0, false},
-		{"abc", 0, true},
-	}
-
-	for _, tt := range tests {
-		got, err := mathx.ParseIntOrName(tt.input, names)
-		if tt.wantErr {
-			assert.Error(t, err, "ParseIntOrName(%q) should return error", tt.input)
-		} else {
-			assert.NoError(t, err, "ParseIntOrName(%q) unexpected error", tt.input)
-			assert.Equal(t, tt.expected, got, "ParseIntOrName(%q) got wrong result", tt.input)
-		}
 	}
 }
 

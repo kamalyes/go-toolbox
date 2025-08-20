@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-08-12 15:10:05
+ * @LastEditTime: 2025-08-20 16:34:20
  * @FilePath: \go-toolbox\pkg\mathx\number.go
  * @Description:
  *
@@ -14,8 +14,6 @@ import (
 	"bytes"
 	"fmt"
 	"math"
-	"strconv"
-	"strings"
 
 	"github.com/kamalyes/go-toolbox/pkg/stringx"
 	"github.com/kamalyes/go-toolbox/pkg/types"
@@ -129,21 +127,6 @@ func EqualSlices[T comparable](a, b []T) bool {
 		}
 	}
 	return true
-}
-
-// ParseIntOrName 解析字符串为数字或名称映射的数字
-func ParseIntOrName(expr string, names map[string]uint) (uint, error) {
-	if names != nil {
-		if val, ok := names[strings.ToLower(expr)]; ok {
-			return val, nil
-		}
-	}
-	// 用 strconv.ParseUint 解析数字字符串，支持 10 进制
-	val, err := strconv.ParseUint(expr, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("invalid number: %s", expr)
-	}
-	return uint(val), nil
 }
 
 // SafeGetIndexWithErr 安全获取切片指定索引的元素

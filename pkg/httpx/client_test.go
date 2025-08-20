@@ -34,7 +34,7 @@ func validateTransport(t *testing.T, client *http.Client) {
 	assert.Equal(t, 10*time.Second, transport.TLSHandshakeTimeout)
 	assert.Equal(t, time.Second, transport.ExpectContinueTimeout)
 	assert.NotNil(t, transport.TLSClientConfig)
-	assert.True(t, transport.TLSClientConfig.InsecureSkipVerify)
+	assert.False(t, transport.TLSClientConfig.InsecureSkipVerify)
 }
 
 // TestNewHttpClient 测试使用自定义 HTTP 客户端创建

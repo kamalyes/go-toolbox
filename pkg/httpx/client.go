@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-28 18:55:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-05-27 15:05:08
+ * @LastEditTime: 2025-08-20 16:33:01
  * @FilePath: \go-toolbox\pkg\httpx\client.go
  * @Description: HTTP 客户端实现
  *
@@ -60,7 +60,7 @@ func NewCustomDefaultClientWithContext(ctx context.Context) *Client {
 				KeepAlive: 60 * time.Second,
 			}).DialContext,
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true, // 跳过证书验证，生产环境慎用
+				InsecureSkipVerify: false, // 跳过证书验证，生产环境慎用
 			},
 			MaxIdleConns:          0,                // 最大空闲连接数，0 表示无限
 			MaxIdleConnsPerHost:   1000,             // 每个主机最大空闲连接数
