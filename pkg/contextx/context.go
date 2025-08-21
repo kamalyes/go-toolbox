@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-01-09 15:55:51
+ * @LastEditTime: 2025-08-21 11:57:55
  * @FilePath: \go-toolbox\pkg\contextx\context.go
  * @Description:
  *
@@ -65,26 +65,23 @@ func NewContextWithCancel(parent context.Context, pool *syncx.LimitedPool) *Cont
 
 // NewContextWithValue 在父上下文中设置值并返回新的 Context
 func NewContextWithValue(parent context.Context, key, val interface{}, pool *syncx.LimitedPool) (*Context, error) {
-	customCtx := NewContext(parent, pool)
-	if err := customCtx.Set(key, val); err != nil {
+	ctx := NewContext(parent, pool)
+	if err := ctx.WithValue(key, val); err != nil {
 		return nil, err
 	}
-	return customCtx, nil
+	return ctx, nil
 }
 
 // NewLocalContextWithValue 在当前 Context 中设置局部值
 func NewLocalContextWithValue(ctx *Context, key, val interface{}) (*Context, error) {
-	if err := ctx.Set(key, val); err != nil {
-		return nil, err
-	}
-	return ctx, nil
+	return ctx, ctx.WithValue(key, val)
 }
 
 // Values 返回当前上下文中所有的键值对
 func (c *Context) Values() map[interface{}]interface{} {
 	return syncx.WithRLockReturnValue(&c.mu, func() map[interface{}]interface{} {
 		// 创建一个新的映射以返回
-		valuesCopy := make(map[interface{}]interface{})
+		valuesCopy := make(map[interface{}]interface{}, len(c.values))
 		for k, v := range c.values {
 			valuesCopy[k] = v
 		}
@@ -94,10 +91,10 @@ func (c *Context) Values() map[interface{}]interface{} {
 
 // validateKey 检查键是否有效
 func validateKey(key interface{}) error {
-	if key == nil || !reflect.TypeOf(key).Comparable() {
-		if key == nil {
-			return fmt.Errorf("nil key")
-		}
+	if key == nil {
+		return fmt.Errorf("nil key")
+	}
+	if !reflect.TypeOf(key).Comparable() {
 		return fmt.Errorf("key is not comparable")
 	}
 	return nil
@@ -106,6 +103,7 @@ func validateKey(key interface{}) error {
 // Value 获取指定键的值
 func (c *Context) Value(key interface{}) interface{} {
 	return syncx.WithRLockReturnValue(&c.mu, func() any {
+
 		if v, ok := c.values[key]; ok {
 			return v
 		}
@@ -113,8 +111,8 @@ func (c *Context) Value(key interface{}) interface{} {
 	})
 }
 
-// setByteSlice 处理字节切片的存储
-func (c *Context) setByteSlice(key interface{}, value []byte) error {
+// WithByteSlice 处理字节切片的存储
+func (c *Context) WithByteSlice(key interface{}, value []byte) error {
 	if buf := c.pool.Get(len(value)); buf != nil {
 		copy(*buf, value)
 		c.values[key] = buf
@@ -124,20 +122,20 @@ func (c *Context) setByteSlice(key interface{}, value []byte) error {
 	return nil
 }
 
-// Set 设置指定键的值并返回错误
-func (c *Context) Set(key, value interface{}) error {
+// WithValue 设置指定键的值并返回错误
+func (c *Context) WithValue(key, value interface{}) error {
 	if err := validateKey(key); err != nil {
 		return err
 	}
 
 	if byteSlice, ok := value.([]byte); ok {
-		return c.setByteSlice(key, byteSlice)
+		return c.WithByteSlice(key, byteSlice)
 	}
 
-	syncx.WithLock(&c.mu, func() {
+	return syncx.WithLockReturnValue(&c.mu, func() error {
 		c.values[key] = value
+		return nil
 	})
-	return nil
 }
 
 // Remove 删除指定键的键值对
@@ -161,7 +159,7 @@ func (c *Context) Deadline() (deadline time.Time, ok bool) {
 
 // String 返回上下文的字符串表示
 func (c *Context) String() string {
-	return fmt.Sprintf("%v.WithValue(%v)", c.Context, c.values)
+	return fmt.Sprintf("%v.WithValue(%v)", c.Context, c.Values())
 }
 
 // IsContext 检查上下文是否是 Context
@@ -180,15 +178,9 @@ func MergeContext(ctxs ...context.Context) *Context {
 
 	for _, ctx := range ctxs {
 		if customCtx, ok := ctx.(*Context); ok { // 确保 ctx 是 Context 类型
-			syncx.WithLock(&customCtx.mu, func() {
-				for key, value := range customCtx.values {
-					// 设置值时，如果键已经存在，则会覆盖
-					if err := merged.Set(key, value); err != nil {
-						// 处理错误（可选）
-						fmt.Printf("Error setting value: %v\n", err)
-					}
-				}
-			})
+			for key, value := range customCtx.values {
+				merged.WithValue(key, value) // 设置值时，如果键已经存在，则会覆盖
+			}
 		}
 	}
 

@@ -135,9 +135,6 @@ func createASCIIList(start, end int) *[]int {
  *  @return str 生成的字符串
  */
 func RandString(n int, mode RandType) string {
-	// 初始化ASCII码列表，只执行一次
-	initASCII()
-
 	var (
 		build strings.Builder // 用于高效构建字符串
 		ascii []int           // 用于存储所有符合mode的字符的ASCII码集合
@@ -596,4 +593,9 @@ func RandNumericalWithRandomStep[T types.Numerical](start, end, minStep, maxStep
 	}
 
 	return result
+}
+
+func init() {
+	// 初始化ASCII码列表，只执行一次
+	initASCII()
 }

@@ -64,7 +64,7 @@ func TestSetAndGetValue(t *testing.T) {
 
 	key := "testKey"
 	value := "testValue"
-	customCtx.Set(key, value)
+	customCtx.WithValue(key, value)
 
 	got := customCtx.Value(key)
 	assert.Equal(t, value, got, "Expected value to be equal")
@@ -83,7 +83,7 @@ func TestDeleteKey(t *testing.T) {
 
 	key := "testKey"
 	value := "testValue"
-	customCtx.Set(key, value)
+	customCtx.WithValue(key, value)
 
 	customCtx.Remove(key)
 
@@ -121,15 +121,15 @@ func TestContext_String(t *testing.T) {
 func TestMergeContext(t *testing.T) {
 	// 创建上下文并设置一些值
 	ctx1 := contextx.NewContext(context.Background(), nil)
-	_ = ctx1.Set("key1", "value1")
-	_ = ctx1.Set("key2", "value2")
+	_ = ctx1.WithValue("key1", "value1")
+	_ = ctx1.WithValue("key2", "value2")
 
 	ctx2 := contextx.NewContext(context.Background(), nil)
-	_ = ctx2.Set("key2", "newValue2") // 这个值会覆盖 ctx1 中的值
-	_ = ctx2.Set("key3", "value3")
+	_ = ctx2.WithValue("key2", "newValue2") // 这个值会覆盖 ctx1 中的值
+	_ = ctx2.WithValue("key3", "value3")
 
 	ctx3 := contextx.NewContext(context.Background(), nil)
-	_ = ctx3.Set("key4", "value4")
+	_ = ctx3.WithValue("key4", "value4")
 
 	// 合并上下文
 	merged := contextx.MergeContext(ctx1, ctx2, ctx3)
@@ -181,7 +181,7 @@ func TestSetNilKey(t *testing.T) {
 	parentCtx := context.Background()
 	customCtx := contextx.NewContext(parentCtx, nil)
 
-	err := customCtx.Set(nil, "value")
+	err := customCtx.WithValue(nil, "value")
 	assert.Error(t, err, "Expected error when setting nil key")
 }
 
@@ -197,8 +197,8 @@ func TestValues(t *testing.T) {
 	parentCtx := context.Background()
 	customCtx := contextx.NewContext(parentCtx, nil)
 
-	customCtx.Set("key1", "value1")
-	customCtx.Set("key2", "value2")
+	customCtx.WithValue("key1", "value1")
+	customCtx.WithValue("key2", "value2")
 
 	values := customCtx.Values()
 	assert.Equal(t, 2, len(values), "Expected 2 values in context")
@@ -234,7 +234,7 @@ func TestSetByteSlice(t *testing.T) {
 	customCtx := contextx.NewContext(parentCtx, nil)
 
 	byteSlice := []byte("test")
-	err := customCtx.Set("byteKey", byteSlice)
+	err := customCtx.WithValue("byteKey", byteSlice)
 	assert.NoError(t, err, "Expected no error when setting byte slice")
 
 	got := customCtx.Value("byteKey")

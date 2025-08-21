@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-08 11:11:26
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-08 20:20:55
+ * @LastEditTime: 2025-08-21 11:57:55
  * @FilePath: \go-toolbox\tests\context_bench_test.go
  * @Description:
  *
@@ -13,75 +13,163 @@ package tests
 
 import (
 	"context"
-	"strconv"
 	"testing"
 
 	"github.com/kamalyes/go-toolbox/pkg/contextx"
+	"github.com/kamalyes/go-toolbox/pkg/syncx"
 )
 
-// 基准测试：并发设置值
-func BenchmarkConcurrentSet(b *testing.B) {
-	parentCtx := context.Background()
-	customCtx := contextx.NewContext(parentCtx, nil)
+func BenchmarkNewContext(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		ctx := context.Background()
+		pool := syncx.NewLimitedPool(32, 1024)
+		_ = contextx.NewContext(ctx, pool)
+	}
+}
 
-	// 使用 RunParallel 进行并发基准测试
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			// 为每个 goroutine 生成唯一的键和值
-			key := "testKey" + strconv.Itoa(b.N) // 使用 b.N 作为唯一标识
-			value := "testValue" + strconv.Itoa(b.N)
-			customCtx.Set(key, value) // 并发设置值
+// 基准测试：并发设置字符串值
+func BenchmarkWithStringValue(b *testing.B) {
+	ctx := context.Background()
+	pool := syncx.NewLimitedPool(32, 1024)
+	c := contextx.NewContext(ctx, pool)
+
+	b.ResetTimer() // 重置计时器，以排除设置上下文的开销
+
+	for i := 0; i < b.N; i++ {
+		key := i // 使用整数作为键
+		value := "test string value"
+		if err := c.WithValue(key, value); err != nil {
+			b.Fatalf("failed to set value: %v", err)
 		}
-	})
+	}
+}
+
+// 基准测试：并发设置整数值
+func BenchmarkWithIntValue(b *testing.B) {
+	ctx := context.Background()
+	pool := syncx.NewLimitedPool(32, 1024)
+	c := contextx.NewContext(ctx, pool)
+
+	b.ResetTimer() // 重置计时器，以排除设置上下文的开销
+
+	for i := 0; i < b.N; i++ {
+		key := i    // 使用整数作为键
+		value := 42 // 整数值
+		if err := c.WithValue(key, value); err != nil {
+			b.Fatalf("failed to set value: %v", err)
+		}
+	}
+}
+
+func BenchmarkWithStructValue(b *testing.B) {
+	ctx := context.Background()
+	pool := syncx.NewLimitedPool(32, 1024)
+	c := contextx.NewContext(ctx, pool)
+
+	b.ResetTimer() // 重置计时器，以排除设置上下文的开销
+
+	for i := 0; i < b.N; i++ {
+		key := i                                  // 使用整数作为键
+		value := TestStruct{Name: "test", Age: i} // 结构体值
+		if err := c.WithValue(key, value); err != nil {
+			b.Fatalf("failed to set value: %v", err)
+		}
+	}
+}
+
+// 基准测试：并发设置切片值
+func BenchmarkWithSliceValue(b *testing.B) {
+	ctx := context.Background()
+	pool := syncx.NewLimitedPool(32, 1024)
+	c := contextx.NewContext(ctx, pool)
+
+	b.ResetTimer() // 重置计时器，以排除设置上下文的开销
+
+	for i := 0; i < b.N; i++ {
+		key := i                            // 使用整数作为键
+		value := []byte("test slice value") // 切片值
+		if err := c.WithValue(key, value); err != nil {
+			b.Fatalf("failed to set value: %v", err)
+		}
+	}
+}
+
+// 基准测试：并发设置空接口值
+func BenchmarkWithInterfaceValue(b *testing.B) {
+	ctx := context.Background()
+	pool := syncx.NewLimitedPool(32, 1024)
+	c := contextx.NewContext(ctx, pool)
+
+	b.ResetTimer() // 重置计时器，以排除设置上下文的开销
+
+	for i := 0; i < b.N; i++ {
+		key := i                                     // 使用整数作为键
+		value := interface{}("test interface value") // 空接口值
+		if err := c.WithValue(key, value); err != nil {
+			b.Fatalf("failed to set value: %v", err)
+		}
+	}
+}
+
+// 基准测试：合并上下文
+func BenchmarkMergeContext(b *testing.B) {
+	ctx1 := context.Background()
+	ctx2 := context.Background()
+	pool := syncx.NewLimitedPool(32, 1024)
+	c1 := contextx.NewContext(ctx1, pool)
+	c2 := contextx.NewContext(ctx2, pool)
+
+	// 预先设置一些值
+	for i := 0; i < 1000; i++ {
+		c1.WithValue(i, []byte("value from ctx1"))
+		c2.WithValue(i, []byte("value from ctx2"))
+	}
+
+	b.ResetTimer() // 重置计时器，以排除设置上下文的开销
+
+	for i := 0; i < b.N; i++ {
+		_ = contextx.MergeContext(c1, c2)
+	}
 }
 
 // 基准测试：并发获取值
-func BenchmarkConcurrentGetValue(b *testing.B) {
-	parentCtx := context.Background()
-	customCtx := contextx.NewContext(parentCtx, nil)
+func BenchmarkValue(b *testing.B) {
+	ctx := context.Background()
+	pool := syncx.NewLimitedPool(32, 1024)
+	c := contextx.NewContext(ctx, pool)
 
-	// 预先填充一些值到上下文中
-	const numValues = 100
-	for i := 0; i < numValues; i++ {
-		key := "key" + strconv.Itoa(i)
-		value := "value" + strconv.Itoa(i)
-		customCtx.Set(key, value) // 设置初始值
+	// 预先设置一些值
+	for i := 0; i < 1000; i++ {
+		key := i
+		value := []byte("test value")
+		c.WithValue(key, value)
 	}
 
-	// 使用 RunParallel 进行并发基准测试
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			// 随机选择一个键
-			key := "key" + strconv.Itoa(int(b.N%numValues))             // 随机选择一个键
-			expectedValue := "value" + strconv.Itoa(int(b.N%numValues)) // 预期的值
-			actualValue := customCtx.Value(key)                         // 并发获取值
+	b.ResetTimer() // 重置计时器，以排除设置上下文的开销
 
-			// 断言获取的值是否正确
-			if actualValue != expectedValue {
-				b.Errorf("expected %s, got %s", expectedValue, actualValue)
-			}
-		}
-	})
+	for i := 0; i < b.N; i++ {
+		key := i % 1000 // 访问先前设置的值
+		_ = c.Value(key)
+	}
 }
 
 // 基准测试：并发删除键
-func BenchmarkConcurrentDeleteKey(b *testing.B) {
-	parentCtx := context.Background()
-	customCtx := contextx.NewContext(parentCtx, nil)
+func BenchmarkRemove(b *testing.B) {
+	ctx := context.Background()
+	pool := syncx.NewLimitedPool(32, 1024)
+	c := contextx.NewContext(ctx, pool)
 
-	// 预先填充一些值到上下文中
-	const numValues = 100
-	for i := 0; i < numValues; i++ {
-		key := "key" + strconv.Itoa(i)
-		value := "value" + strconv.Itoa(i)
-		customCtx.Set(key, value) // 设置初始值
+	// 预先设置一些值
+	for i := 0; i < 1000; i++ {
+		key := i
+		value := []byte("test value")
+		c.WithValue(key, value)
 	}
 
-	// 使用 RunParallel 进行并发基准测试
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			key := "key" + strconv.Itoa(int(b.N%numValues)) // 随机选择一个键
-			customCtx.Remove(key)                           // 并发删除键
-		}
-	})
+	b.ResetTimer() // 重置计时器，以排除设置上下文的开销
+
+	for i := 0; i < b.N; i++ {
+		key := i % 1000 // 删除先前设置的值
+		c.Remove(key)
+	}
 }

@@ -310,29 +310,29 @@ func SliceRemoveDuplicates[T comparable](numbers []T) []T {
 // SliceRemove 根据给定的条件函数移除切片中的元素
 // 返回一个新切片，包含所有满足条件的元素
 func SliceRemove[T any](arr []T, condition func(T) bool) []T {
-    result := make([]T, 0, len(arr)) // 创建结果切片
-    for _, val := range arr {
-        if condition(val) {
-            result = append(result, val) // 仅添加满足条件的元素
-        }
-    }
-    return result
+	result := make([]T, 0, len(arr)) // 创建结果切片
+	for _, val := range arr {
+		if condition(val) {
+			result = append(result, val) // 仅添加满足条件的元素
+		}
+	}
+	return result
 }
 
 // SliceRemoveZero 移除切片中的零值
 // 返回一个新切片，包含所有非零元素
 func SliceRemoveZero[T comparable](arr []T) []T {
-    return SliceRemove(arr, func(val T) bool {
-        return val != *new(T) // 仅保留非零元素，使用零值判断
-    })
+	return SliceRemove(arr, func(val T) bool {
+		return val != *new(T) // 仅保留非零元素，使用零值判断
+	})
 }
 
 // SliceRemoveValue 移除切片中的指定值
 // 返回一个新切片，包含所有非指定元素
 func SliceRemoveValue[T comparable](arr []T, value T) []T {
-    return SliceRemove(arr, func(val T) bool {
-        return val != value // 仅保留非指定元素
-    })
+	return SliceRemove(arr, func(val T) bool {
+		return val != value // 仅保留非指定元素
+	})
 }
 
 // SliceChunk 将一个切片分割成多个子切片
