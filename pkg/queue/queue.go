@@ -21,3 +21,13 @@ type Queue interface {
 	IsEmpty() bool
 	Size() int
 }
+
+// checkContext 检查上下文是否已取消
+func checkContext(ctx context.Context) error {
+	select {
+	case <-ctx.Done(): // 检查上下文是否已完成
+		return ctx.Err() // 返回上下文错误
+	default:
+		return nil // 上下文正常
+	}
+}
