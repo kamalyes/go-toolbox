@@ -15,6 +15,8 @@ import (
 	"context"
 	"errors"
 	"sync"
+
+	"github.com/kamalyes/go-toolbox/pkg/syncx"
 )
 
 // Item 定义了优先队列中的元素
@@ -68,46 +70,42 @@ func NewPriorityQueue() *PriorityQueue {
 
 // Enqueue 将一个元素添加到优先队列中，支持上下文取消
 func (pq *PriorityQueue) Enqueue(ctx context.Context, item interface{}, priority int) error {
-	select {
-	case <-ctx.Done(): // 如果上下文被取消，返回取消错误
-		return ctx.Err()
-	default:
+	// 检查上下文是否已取消
+	if err := checkContext(ctx); err != nil {
+		return err // 如果上下文已取消，返回错误
 	}
 
-	pq.mu.Lock()         // 锁定操作，确保线程安全
-	defer pq.mu.Unlock() // 解锁操作
-
-	heap.Push(pq, &Item{value: item, priority: priority})
-	return nil
+	return syncx.WithLockReturnValue(&pq.mu, func() error {
+		heap.Push(pq, &Item{value: item, priority: priority})
+		return nil
+	})
 }
 
 // Dequeue 从优先队列中取出最优先的元素，支持上下文取消
 func (pq *PriorityQueue) Dequeue(ctx context.Context) (interface{}, error) {
-	select {
-	case <-ctx.Done(): // 如果上下文被取消，返回取消错误
-		return nil, ctx.Err()
-	default:
+	// 检查上下文是否已取消
+	if err := checkContext(ctx); err != nil {
+		return nil, err // 如果上下文已取消，返回错误
 	}
 
-	pq.mu.Lock()         // 锁定操作，确保线程安全
-	defer pq.mu.Unlock() // 解锁操作
-
-	if pq.Len() == 0 {
-		return nil, errors.New("队列为空")
-	}
-	return heap.Pop(pq).(*Item).value, nil
+	return syncx.WithLockReturn(&pq.mu, func() (interface{}, error) {
+		if pq.Len() == 0 {
+			return nil, errors.New("队列为空")
+		}
+		return heap.Pop(pq).(*Item).value, nil
+	})
 }
 
 // IsEmpty 判断优先队列是否为空
 func (pq *PriorityQueue) IsEmpty() bool {
-	pq.mu.RLock()         // 读锁定操作
-	defer pq.mu.RUnlock() // 解锁操作
-	return pq.Len() == 0
+	return syncx.WithRLockReturnValue(&pq.mu, func() bool {
+		return pq.Len() == 0
+	})
 }
 
 // Size 返回优先队列的大小
 func (pq *PriorityQueue) Size() int {
-	pq.mu.RLock()         // 读锁定操作
-	defer pq.mu.RUnlock() // 解锁操作
-	return pq.Len()
+	return syncx.WithRLockReturnValue(&pq.mu, func() int {
+		return pq.Len()
+	})
 }
