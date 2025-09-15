@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-11 15:09:15
+ * @LastEditTime: 2025-09-16 09:26:55
  * @FilePath: \go-toolbox\pkg\osx\base.go
  * @Description:
  *
@@ -59,6 +59,21 @@ func HashUnixMicroCipherText() string {
 		cipherText   = stringx.CalculateMD5Hash(plainText)
 	)
 	return cipherText
+}
+
+// GetWorkerId 获取唯一的 Worker ID
+func GetWorkerId() int64 {
+	// 获取主机名
+	hostName := SafeGetHostName()
+
+	// 结合主机名生成唯一的 Worker ID
+	hash := sha256.Sum256([]byte(hostName))
+	hostNameHash := int64(binary.BigEndian.Uint64(hash[:8]))
+
+	// 计算 Worker ID，确保在 0-1023 范围内
+	workerId := hostNameHash % 1024
+
+	return workerId
 }
 
 // StableHashSlot 根据输入字符串 s 和范围 [minNum, maxNum]，返回一个稳定且范围内的整数

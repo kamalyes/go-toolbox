@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-05 18:56:01
+ * @LastEditTime: 2025-09-15 18:27:25
  * @FilePath: \go-toolbox\tests\osx_base_test.go
  * @Description:
  *
@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/kamalyes/go-toolbox/pkg/osx"
@@ -30,6 +31,20 @@ func TestSafeGetHostName(t *testing.T) {
 	assert.NotEmpty(t, actual, "HostNames should match")
 }
 
+// BenchmarkGetHostName 测试 GetHostName 的性能
+func BenchmarkGetHostName(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		osx.GetHostName()
+	}
+}
+
+// BenchmarkSafeGetHostName 测试 SafeGetHostName 的性能
+func BenchmarkSafeGetHostName(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		osx.SafeGetHostName()
+	}
+}
+
 // TestHashUnixMicroCipherText 测试 HashUnixMicroCipherText 函数
 func TestHashUnixMicroCipherText(t *testing.T) {
 	hash1 := osx.HashUnixMicroCipherText()
@@ -40,6 +55,50 @@ func TestHashUnixMicroCipherText(t *testing.T) {
 	assert.NotEqual(t, hash2, "")
 	assert.Equal(t, len(hash1), 32)
 	assert.NotEqual(t, hash1, hash2)
+}
+
+func TestGetWorkerId(t *testing.T) {
+	workerId := osx.GetWorkerId()
+	fmt.Printf("TestGetWorkerId workerId %#v", workerId)
+	assert.NotEmpty(t, workerId)
+	assert.Less(t, workerId, int64(1024)) // Worker ID 范围为 0-1023
+}
+
+// 测试多次调用以确保一致性
+func TestGetWorkerIdConsistency(t *testing.T) {
+	const numCalls = 1000
+	var wg sync.WaitGroup
+	results := make([]int64, numCalls)
+	errors := make([]error, numCalls)
+
+	// 使用 WaitGroup 来等待所有 goroutine 完成
+	for i := 0; i < numCalls; i++ {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			results[index] = osx.GetWorkerId()
+		}(i)
+	}
+
+	// 等待所有 goroutine 完成
+	wg.Wait()
+
+	// 检查是否有错误
+	for _, err := range errors {
+		assert.NoError(t, err)
+	}
+
+	// 检查所有结果是否一致
+	for i := 1; i < numCalls; i++ {
+		assert.Equal(t, results[0], results[i], "WorkerInfo 应该在多次调用中保持一致")
+	}
+}
+
+// BenchmarkGetWorkerId 测试 GetWorkerId 的性能
+func BenchmarkGetWorkerId(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		osx.GetWorkerId()
+	}
 }
 
 func TestStableHashSlot_Complex(t *testing.T) {
