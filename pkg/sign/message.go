@@ -24,11 +24,13 @@ import (
 
 // SignerClient 是带状态的签名客户端，支持复用 secretKey、算法和签名器，且并发安全。
 type SignerClient[T any] struct {
-	secretKey  []byte
-	alg        HashCryptoFunc
-	serializer Serializer
-	signer     Signer
-	mu         sync.RWMutex
+	secretKey          []byte
+	alg                HashCryptoFunc
+	serializer         Serializer
+	signer             Signer
+	mu                 sync.RWMutex
+	expirationDuration time.Duration // 设置过期时间
+	issuer             string        // 签发人
 }
 
 // ----------- 签名器注册与获取 -----------
@@ -83,20 +85,29 @@ func (JSONSerializer) Unmarshal(data []byte, v any) error {
 // - GenUnixMicro 是消息生成时的时间戳，单位为微秒，方便做时效校验
 // - ExtraData 是用户自定义的泛型数据，支持任意结构
 type SignedMessage[T any] struct {
-	Alg          HashCryptoFunc // 签名算法名称（如 "HMAC-SHA256"）
-	Send         string         // 随机字符串，用于防重放
-	GenUnixMicro int64          // 生成时间戳，微秒级
-	ExtraData    T              // 用户自定义额外数据
+	Header    Header // JWT 头部
+	ExtraData T      // 用户自定义额外数据
+}
+
+// Header 是 JWT 的头部结构体
+type Header struct {
+	Alg        HashCryptoFunc // 签名算法名称（如 "HMAC-SHA256"）
+	Send       string         // 随机字符串，用于防重放
+	Issuer     string         // 签发人
+	IssuedAt   int64          // 签发时间，微秒级
+	Expiration int64          // 过期时间，单位为微秒
 }
 
 // NewSignerClient 创建默认客户端实例
 func NewSignerClient[T any]() *SignerClient[T] {
 	return &SignerClient[T]{
-		serializer: JSONSerializer{},
+		serializer:         JSONSerializer{},
+		expirationDuration: 7 * 24 * time.Hour,
+		issuer:             "kamalyes",
 	}
 }
 
-// WithSecretKey 设置密钥，链式调用
+// WithSecretKey 设置密钥
 func (c *SignerClient[T]) WithSecretKey(key []byte) *SignerClient[T] {
 	syncx.WithLock(&c.mu, func() {
 		c.secretKey = key
@@ -104,7 +115,7 @@ func (c *SignerClient[T]) WithSecretKey(key []byte) *SignerClient[T] {
 	return c
 }
 
-// WithAlgorithm 设置算法及对应签名器，链式调用
+// WithAlgorithm 设置算法及对应签名器
 func (c *SignerClient[T]) WithAlgorithm(alg HashCryptoFunc) (*SignerClient[T], error) {
 	signer, err := GetSigner(alg)
 	if err != nil {
@@ -117,7 +128,7 @@ func (c *SignerClient[T]) WithAlgorithm(alg HashCryptoFunc) (*SignerClient[T], e
 	return c, nil
 }
 
-// WithSerializer 设置序列化器，链式调用
+// WithSerializer 设置序列化器
 func (c *SignerClient[T]) WithSerializer(s Serializer) *SignerClient[T] {
 	syncx.WithLock(&c.mu, func() {
 		c.serializer = s
@@ -125,113 +136,143 @@ func (c *SignerClient[T]) WithSerializer(s Serializer) *SignerClient[T] {
 	return c
 }
 
+// WithExpiration 设置过期时间
+func (c *SignerClient[T]) WithExpiration(duration time.Duration) *SignerClient[T] {
+	syncx.WithLock(&c.mu, func() {
+		c.expirationDuration = duration
+	})
+	return c
+}
+
+// WithIssuer 设置签发人
+func (c *SignerClient[T]) WithIssuer(issuer string) *SignerClient[T] {
+	syncx.WithLock(&c.mu, func() {
+		c.issuer = issuer
+	})
+	return c
+}
+
 // Create 创建签名消息字符串，内部使用客户端状态
 func (c *SignerClient[T]) Create(extraData T) (string, error) {
-	// 读锁获取状态
-	state, err := syncx.WithRLockReturn(&c.mu, func() (*SignerClient[T], error) {
+	return syncx.WithRLockReturnWithE(&c.mu, func() (string, error) {
 		if c.signer == nil {
-			return nil, errors.New("signer not set, call WithAlgorithm first")
+			return "", errors.New("signer not set, call WithAlgorithm first")
 		}
 		if len(c.secretKey) == 0 {
-			return nil, errors.New("secretKey not set, call WithSecretKey first")
+			return "", errors.New("secretKey not set, call WithSecretKey first")
 		}
-		return c, nil
+
+		now := time.Now().UnixMicro()
+		expirationTime := now + c.expirationDuration.Microseconds()
+
+		// 构造头部
+		header := Header{
+			Alg:        c.alg,
+			Issuer:     c.issuer,
+			IssuedAt:   now,
+			Send:       random.RandString(16, random.LOWERCASE|random.NUMBER|random.CAPITAL),
+			Expiration: expirationTime,
+		}
+
+		// 使用传入的序列化器将头部和负载序列化为字节切片
+		headerBytes, err := c.serializer.Marshal(header)
+		if err != nil {
+			return "", err
+		}
+
+		payloadBytes, err := c.serializer.Marshal(extraData)
+		if err != nil {
+			return "", err
+		}
+
+		// 预分配签名字符串的大小，避免多次分配
+		signatureInput := make([]byte, 0, len(headerBytes)+len(payloadBytes)+1)
+		signatureInput = append(signatureInput, base64.RawURLEncoding.EncodeToString(headerBytes)...)
+		signatureInput = append(signatureInput, '.')
+		signatureInput = append(signatureInput, base64.RawURLEncoding.EncodeToString(payloadBytes)...)
+
+		// 使用签名器和密钥对签名输入进行签名，得到签名字节
+		signature, err := c.signer.Sign(signatureInput, c.secretKey)
+		if err != nil {
+			return "", err
+		}
+
+		// 对签名字节进行 base64 URL 编码
+		signatureB64 := base64.RawURLEncoding.EncodeToString(signature)
+
+		// 拼接返回字符串
+		return string(signatureInput) + "." + signatureB64, nil
 	})
-	if err != nil {
-		return "", err
-	}
-	// 构造负载结构体，包含算法名、随机字符串、生成时间戳和用户数据
-	payload := SignedMessage[T]{
-		Alg:          state.alg,
-		Send:         random.RandString(16, random.LOWERCASE|random.NUMBER|random.CAPITAL),
-		GenUnixMicro: time.Now().UnixMicro(),
-		ExtraData:    extraData,
-	}
-	// 使用传入的序列化器将负载结构体序列化为字节切片
-	payloadBytes, err := state.serializer.Marshal(payload)
-	if err != nil {
-		return "", err
-	}
-
-	// 对序列化后的负载字节进行 base64 URL 编码，不带填充字符
-	payloadB64 := base64.RawURLEncoding.EncodeToString(payloadBytes)
-	// 使用签名器和密钥对签名输入进行签名，得到签名字节
-	signature, err := state.signer.Sign([]byte(payloadB64), state.secretKey)
-	if err != nil {
-		return "", err
-	}
-
-	// 对签名字节进行 base64 URL 编码，不带填充
-	signatureB64 := base64.RawURLEncoding.EncodeToString(signature)
-	// 拼接返回字符串，格式为：base64(payload) + "." + base64(signature)
-	return payloadB64 + "." + signatureB64, nil
 }
 
 // Validate 验证签名消息字符串，返回负载、是否有效和错误
 func (c *SignerClient[T]) Validate(signedStr string) (*SignedMessage[T], bool, error) {
-	// 将签名字符串以 '.' 分割，应该分割成两部分：payload 和 signature
+	// 将签名字符串以 '.' 分割，应该分割成三部分：header、payload 和 signature
 	parts := strings.Split(signedStr, ".")
-	if len(parts) != 2 {
-		return nil, false, errors.New("invalid signed string format: must contain exactly one '.' separator")
+	if len(parts) != 3 {
+		return nil, false, errors.New("invalid signed string format: must contain exactly two '.' separators")
 	}
 
-	// 定义辅助函数，用于 base64 URL 解码，不带填充
-	decode := func(s string) ([]byte, error) {
-		return base64.RawURLEncoding.DecodeString(s)
+	// 解码头部部分的 base64 字符串
+	headerBytes, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		return nil, false, errors.New("header base64 decode failed: " + err.Error())
 	}
 
 	// 解码负载部分的 base64 字符串
-	payloadBytes, err := decode(parts[0])
+	payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
 		return nil, false, errors.New("payload base64 decode failed: " + err.Error())
 	}
+
 	// 解码签名部分的 base64 字符串
-	signature, err := decode(parts[1])
+	signature, err := base64.RawURLEncoding.DecodeString(parts[2])
 	if err != nil {
 		return nil, false, errors.New("signature base64 decode failed: " + err.Error())
 	}
 
-	// 反序列化负载字节，得到 SignedMessage 结构体实例
-	var payload SignedMessage[T]
+	// 反序列化头部和负载字节
+	var header Header
+	if err := c.serializer.Unmarshal(headerBytes, &header); err != nil {
+		return nil, false, errors.New("header unmarshal failed: " + err.Error())
+	}
+
+	// 检查过期时间
+	if header.Expiration < time.Now().UnixMicro() {
+		return nil, false, errors.New("signature has expired")
+	}
+
+	var payload T
 	if err := c.serializer.Unmarshal(payloadBytes, &payload); err != nil {
 		return nil, false, errors.New("payload unmarshal failed: " + err.Error())
 	}
 
-	// 先读锁获取当前 signer 和 alg
-	state, _ := syncx.WithRLockReturn(&c.mu, func() (*SignerClient[T], error) {
-		return c, nil
-	})
-
-	signer := state.signer
-	alg := state.alg
-	secretKey := state.secretKey
-
-	// 如果签名器为空或算法不匹配，则尝试重新获取签名器并写锁更新
-	if signer == nil || alg != payload.Alg {
-		newSigner, err := GetSigner(payload.Alg)
+	// 确保签名器是最新的
+	if c.signer == nil || c.alg != HashCryptoFunc(header.Alg) {
+		newSigner, err := GetSigner(HashCryptoFunc(header.Alg))
 		if err != nil {
-			return nil, false, errors.New("unsupported algorithm in payload: " + err.Error())
+			return nil, false, errors.New("unsupported algorithm in header: " + err.Error())
 		}
 		syncx.WithLock(&c.mu, func() {
 			c.signer = newSigner
-			c.alg = payload.Alg
-			signer = newSigner
+			c.alg = HashCryptoFunc(header.Alg)
 		})
 	}
 
-	if len(secretKey) == 0 {
+	if len(c.secretKey) == 0 {
 		return nil, false, errors.New("secretKey not set, call WithSecretKey first")
 	}
 
-	ok, err := signer.Verify([]byte(parts[0]), secretKey, signature)
+	// 验证签名
+	ok, err := c.signer.Verify([]byte(parts[0]+"."+parts[1]), c.secretKey, signature)
 	if err != nil {
 		return nil, false, errors.New("signature verify error: " + err.Error())
 	}
 	if !ok {
 		return nil, false, errors.New("signature verification failed")
 	}
-	// 签名验证通过，返回负载数据和成功标志
-	return &payload, true, nil
+	// 签名验证通过，返回头部、负载数据和成功标志
+	return &SignedMessage[T]{Header: header, ExtraData: payload}, true, nil
 }
 
 // ----------- 初始化注册所有支持的 HMAC 签名算法 -----------

@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-06-05 13:35:59
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-08-05 13:15:55
+ * @LastEditTime: 2025-09-16 18:15:50
  * @FilePath: \go-toolbox\tests\sign_message_test.go
  * @Description: 签名客户端测试，公共参数提取，结合自定义 WaitGroup 并发测试
  *
@@ -42,6 +42,19 @@ func newTestClient(t *testing.T) *sign.SignerClient[TestPayload] {
 	return client
 }
 
+func newBenchmarkClient(b *testing.B) *sign.SignerClient[TestPayload] {
+	secretKey := []byte("my_secret_key_123")
+	serializer := sign.JSONSerializer{}
+
+	client := sign.NewSignerClient[TestPayload]().
+		WithSecretKey(secretKey).
+		WithSerializer(serializer)
+
+	client, err := client.WithAlgorithm(sign.AlgorithmSHA256)
+	assert.NoError(b, err)
+	return client
+}
+
 func newTestPayload() TestPayload {
 	return TestPayload{
 		UserID:   42,
@@ -53,7 +66,8 @@ func newTestPayload() TestPayload {
 // 测试用例
 
 func TestSignerClient_ChainUsage(t *testing.T) {
-	client := newTestClient(t)
+	issuer := "issuer string"
+	client := newTestClient(t).WithIssuer(issuer)
 	payload := newTestPayload()
 
 	signedStr, err := client.Create(payload)
@@ -67,12 +81,29 @@ func TestSignerClient_ChainUsage(t *testing.T) {
 	assert.Equal(t, payload.UserID, gotPayload.ExtraData.UserID)
 	assert.Equal(t, payload.Username, gotPayload.ExtraData.Username)
 	assert.Equal(t, payload.Email, gotPayload.ExtraData.Email)
-	assert.NotEmpty(t, gotPayload.Send)
-	assert.WithinDuration(t, time.UnixMicro(gotPayload.GenUnixMicro), time.Now(), time.Minute)
+	assert.Equal(t, issuer, gotPayload.Header.Issuer)
+	assert.NotEmpty(t, gotPayload.Header.Send)
+	assert.WithinDuration(t, time.UnixMicro(gotPayload.Header.IssuedAt), time.Now(), time.Minute)
 
 	// 测试错误算法设置
 	_, err = client.WithAlgorithm("UNSUPPORTED-ALG")
 	assert.Error(t, err)
+}
+
+func TestValidate_ValidSignature(t *testing.T) {
+	client := newTestClient(t)
+	payload := newTestPayload()
+	signedMessage, err := client.WithExpiration(1 * time.Second).Create(payload)
+	assert.NoError(t, err, "应该成功创建签名消息")
+
+	// 等待一段时间使签名过期
+	time.Sleep(2 * time.Second) // 暂停2秒以确保过期
+
+	// 验证签名消息
+	validatedMessage, valid, err := client.Validate(signedMessage)
+	assert.False(t, valid, "签名消息应该过期")
+	assert.Error(t, err, "应该返回过期错误")
+	assert.Nil(t, validatedMessage, "过期的签名消息应该返回 nil")
 }
 
 func TestSignerClient_ValidateErrors(t *testing.T) {
@@ -158,4 +189,64 @@ func TestSignerClient_ConcurrentUsage_WithSync(t *testing.T) {
 
 	wg.Wait() // 等待所有 goroutine 完成
 	assert.NoError(t, firstErr)
+}
+
+func BenchmarkSignerClient_Create(b *testing.B) {
+	client := newBenchmarkClient(b)
+	payload := newTestPayload()
+	b.ResetTimer() // 重置计时器，以确保不测量设置时间
+	for i := 0; i < b.N; i++ {
+		_, err := client.Create(payload)
+		if err != nil {
+			b.Fatalf("failed to create signed message: %v", err)
+		}
+	}
+}
+
+func BenchmarkSignerClient_Validate(b *testing.B) {
+	client := newBenchmarkClient(b)
+	payload := newTestPayload()
+	signedStr, err := client.Create(payload)
+	if err != nil {
+		b.Fatalf("failed to create signed message: %v", err)
+	}
+
+	b.ResetTimer() // 重置计时器
+	for i := 0; i < b.N; i++ {
+		_, valid, err := client.Validate(signedStr)
+		if err != nil || !valid {
+			b.Fatalf("failed to validate signed message: %v, valid=%v", err, valid)
+		}
+	}
+}
+
+func BenchmarkSignerClient_ConcurrentCreate(b *testing.B) {
+	client := newBenchmarkClient(b)
+	payload := newTestPayload()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			_, err := client.Create(payload)
+			if err != nil {
+				b.Fatalf("failed to create signed message: %v", err)
+			}
+		}
+	})
+}
+
+func BenchmarkSignerClient_ConcurrentValidate(b *testing.B) {
+	client := newBenchmarkClient(b)
+	payload := newTestPayload()
+	signedStr, err := client.Create(payload)
+	if err != nil {
+		b.Fatalf("failed to create signed message: %v", err)
+	}
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			_, valid, err := client.Validate(signedStr)
+			if err != nil || !valid {
+				b.Fatalf("failed to validate signed message: %v, valid=%v", err, valid)
+			}
+		}
+	})
 }
