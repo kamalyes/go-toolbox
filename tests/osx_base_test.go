@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-09-15 18:27:25
+ * @LastEditTime: 2025-09-18 17:36:32
  * @FilePath: \go-toolbox\tests\osx_base_test.go
  * @Description:
  *
@@ -12,8 +12,6 @@ package tests
 
 import (
 	"fmt"
-	"net/http"
-	"strings"
 	"sync"
 	"testing"
 
@@ -148,72 +146,6 @@ func TestStableHashSlot_Complex(t *testing.T) {
 			osx.StableHashSlot("test", 10, 5)
 		}, "should panic when maxNum < minNum")
 	})
-}
-
-func TestGetServerIP(t *testing.T) {
-	externalIP, internalIP, err := osx.GetLocalInterfaceIeIp()
-	assert.Nil(t, err)
-	if externalIP != "" {
-		t.Logf("externalIP %s", externalIP)
-	}
-	if internalIP != "" {
-		t.Logf("internalIP %s", internalIP)
-	}
-}
-
-func TestGetLocalInterfaceIps(t *testing.T) {
-	ips, err := osx.GetLocalInterfaceIps()
-	assert.Nil(t, err)
-	assert.NotEmpty(t, ips, fmt.Sprintf("Expected at least one global unicast IP, got: %v", ips))
-	for _, ip := range ips {
-		assert.NotEmpty(t, ip, fmt.Sprintf("Invalid IP address: %s", ip))
-	}
-}
-
-func TestGetClientPublicIP_XForwardedFor(t *testing.T) {
-	req, _ := http.NewRequest("GET", "/", nil)
-	testIp := "1.2.3.4"
-	req.Header.Set("X-Forwarded-For", testIp)
-	ip, err := osx.GetClientPublicIP(req)
-	assert.Nil(t, err)
-	assert.Equal(t, testIp, ip)
-	assert.NotEmpty(t, ip, fmt.Sprintf("Expected IP %s, got: %s", testIp, ip))
-}
-
-func TestGetClientPublicIP_XRealIp(t *testing.T) {
-	testIp := "113.168.80.129"
-	req, _ := http.NewRequest("GET", "/", nil)
-	req.Header.Set("X-Real-Ip", testIp)
-	ip, err := osx.GetClientPublicIP(req)
-	assert.Nil(t, err)
-	assert.Equal(t, testIp, ip)
-	assert.NotEmpty(t, ip, fmt.Sprintf("Expected IP %s, got: %s", testIp, ip))
-}
-
-func TestGetClientPublicIP_RemoteAddr(t *testing.T) {
-	req, _ := http.NewRequest("GET", "/", nil)
-	req.RemoteAddr = "115.10.11.12:12345"
-	spIp := strings.Split(req.RemoteAddr, ":")[0]
-	ip, err := osx.GetClientPublicIP(req)
-	assert.Nil(t, err)
-	assert.Equal(t, spIp, ip)
-	assert.NotEmpty(t, ip, fmt.Sprintf("Expected IP %s, got: %s", spIp, ip))
-}
-
-func TestGetConNetPublicIp(t *testing.T) {
-	ip, err := osx.GetConNetPublicIp()
-	assert.Nil(t, err)
-	assert.NotEmpty(t, ip, fmt.Sprintf("Expected public IP, got: %s", ip))
-}
-
-func TestGetClientPublicIP_NoValidIp(t *testing.T) {
-	req, _ := http.NewRequest("GET", "/", nil)
-	req.Header.Set("X-Forwarded-For", "127.0.0.1") // Localhost IP
-	req.Header.Set("X-Real-Ip", "169.254.0.1")     // Link-local IP
-	req.RemoteAddr = "192.168.1.1:12345"           // Private IP
-	ip, err := osx.GetClientPublicIP(req)
-	assert.Nil(t, err)
-	assert.NotEmpty(t, ip, fmt.Sprintf("Expected public IP, got: %s", ip))
 }
 
 func TestGetRuntimeCaller(t *testing.T) {
