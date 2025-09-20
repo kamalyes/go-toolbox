@@ -4,6 +4,18 @@
         "watchFileChanges": true,  // 在编辑器外监视文件更改
         "deepCompletion": true,    // 启用深度完成
     },
+    // 启用 Go 语言服务器（gopls），提供代码补全、跳转等核心功能
+    "go.useLanguageServer": true,
+  
+    // 保存时自动格式化代码（搭配 goimports 效果更佳）
+    "editor.formatOnSave": true,
+  
+    // 自动导入缺失的包，移除未使用的包（需安装 alpsmonaco.go-imports-alphabetical ）
+    "go.importsOnSave": true,
+  
+    // 配置代码格式化工具（推荐 goimports，比 gofmt 多了 import 管理）
+    "go.formatTool": "goimports",
+  
     "fileheader.customMade": {
         // Author字段是文件的创建者 可以在specialOptions中更改特殊属性
         // 公司项目和个人项目可以配置不同的用户名与邮箱 搜索: gitconfig includeIf  比如: https://ayase.moe/2021/03/09/customized-git-config/
