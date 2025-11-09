@@ -1,8 +1,18 @@
 /*
  * @Author: kamalyes 501893067@qq.com
+ * @Date: 2025-11-08 03:59:11
+ * @LastEditors: kamalyes 501893067@qq.com
+ * @LastEditTime: 2025-11-09 09:21:43
+ * @FilePath: \go-toolbox\pkg\random\rand.go
+ * @Description:
+ *
+ * Copyright (c) 2025 by kamalyes, All Rights Reserved.
+ */
+/*
+ * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-12 15:27:26
+ * @LastEditTime: 2025-11-09 09:20:57
  * @FilePath: \go-toolbox\pkg\random\rand.go
  * @Description:
  *
@@ -15,7 +25,6 @@ import (
 	"math"
 	"math/rand"
 	"net"
-	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -340,122 +349,6 @@ func FRandBool() bool {
 // 生成随机时间
 func FRandTime() time.Time {
 	return time.Now().Add(time.Duration(FRandInt(1, 1000)) * time.Hour)
-}
-
-// GenerateRandModel 生成随机模型的 JSON 格式
-func GenerateRandModel(model interface{}) (interface{}, string, error) {
-	v := reflect.ValueOf(model)
-
-	// 确保传入的是指针类型且非空
-	if v.Kind() != reflect.Ptr || v.IsNil() {
-		return nil, "", nil
-	}
-
-	v = v.Elem() // 获取指针指向的值
-
-	// 填充模型字段的随机值
-	if err := populateFields(v); err != nil {
-		return nil, "", err
-	}
-
-	// 将模型转换为 JSON 格式
-	jsonData, err := convert.MustJSONIndent(model)
-	if err != nil {
-		return nil, "", err
-	}
-	return model, string(jsonData), nil
-}
-
-// populateFields 填充结构体字段的随机值
-func populateFields(v reflect.Value) error {
-	for i := 0; i < v.NumField(); i++ {
-		field := v.Field(i)
-		fieldType := v.Type().Field(i)
-		// 仅处理导出字段
-		if field.CanSet() {
-			// 根据字段类型设置随机值
-			if err := setRandValue(field, fieldType); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-// setRandValue 根据字段类型设置随机值
-func setRandValue(field reflect.Value, fieldType reflect.StructField) error {
-	switch fieldType.Type.Kind() {
-	case reflect.String:
-		field.SetString(FRandString(10)) // 随机生成10个字符的字符串
-	case reflect.Int:
-		field.SetInt(int64(FRandInt(18, 65))) // 随机生成18到65之间的整数
-	case reflect.Float64:
-		field.SetFloat(math.Round(float64(FRandInt(1, 100)) / 1.5)) // 随机生成1.0到100.0之间的浮点数
-	case reflect.Bool:
-		field.SetBool(FRandBool()) // 随机生成布尔值
-	case reflect.Struct:
-		if fieldType.Type == reflect.TypeOf(time.Time{}) {
-			field.Set(reflect.ValueOf(FRandTime())) // 随机生成时间
-		} else {
-			// 递归填充嵌套结构体字段
-			if err := populateFields(field); err != nil {
-				return err
-			}
-		}
-	case reflect.Slice:
-		return setRandSlice(field, fieldType) // 处理切片类型
-	case reflect.Map:
-		return setRandMap(field, fieldType) // 处理映射类型
-	case reflect.Ptr: // 处理指针类型
-		if field.IsNil() {
-			field.Set(reflect.New(fieldType.Type.Elem())) // 确保指针被分配
-		}
-		// 仅当指针指向结构体时才递归填充
-		if fieldType.Type.Elem().Kind() == reflect.Struct {
-			return populateFields(field.Elem())
-		}
-	default:
-		// 你可以添加更多类型的处理逻辑
-	}
-	return nil
-}
-
-// setRandSlice 随机生成切片并设置到字段
-func setRandSlice(field reflect.Value, fieldType reflect.StructField) error {
-	if fieldType.Type.Elem().Kind() == reflect.String {
-		length := FRandInt(1, 5) // 随机长度
-		slice := reflect.MakeSlice(fieldType.Type, length, length)
-		for j := 0; j < length; j++ {
-			slice.Index(j).SetString(FRandString(5)) // 随机生成5个字符的字符串
-		}
-		field.Set(slice) // 设置生成的切片
-	} else if fieldType.Type.Elem().Kind() == reflect.Struct {
-		length := FRandInt(1, 5) // 随机长度
-		slice := reflect.MakeSlice(fieldType.Type, length, length)
-		for j := 0; j < length; j++ {
-			// 递归填充每个嵌套结构体
-			if err := populateFields(slice.Index(j)); err != nil {
-				return err
-			}
-		}
-		field.Set(slice) // 设置生成的切片
-	}
-	return nil
-}
-
-// setRandMap 随机生成映射并设置到字段
-func setRandMap(field reflect.Value, fieldType reflect.StructField) error {
-	if fieldType.Type.Key().Kind() == reflect.String && fieldType.Type.Elem().Kind() == reflect.Int {
-		m := reflect.MakeMap(fieldType.Type) // 创建映射
-		length := FRandInt(1, 5)             // 随机长度
-		for j := 0; j < length; j++ {
-			key := FRandString(5)                                       // 随机生成字符串作为键
-			value := FRandInt(1, 100)                                   // 随机生成整数作为值
-			m.SetMapIndex(reflect.ValueOf(key), reflect.ValueOf(value)) // 设置映射的键值对
-		}
-		field.Set(m) // 设置生成的映射
-	}
-	return nil
 }
 
 // GenerateAvailablePort 返回一个随机的可用端口号

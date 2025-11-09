@@ -416,7 +416,7 @@ func TestWithTryLock(t *testing.T) {
 	assert.True(t, ok)
 
 	err = syncx.WithTryLock(lock, func() error {
-		t.Fatal("不应该执行")
+		assert.Fail(t, "不应该执行")
 		return nil
 	})
 	assert.Equal(t, syncx.ErrLockNotAcquired, err)
@@ -436,7 +436,7 @@ func TestWithTryLockReturn(t *testing.T) {
 	assert.True(t, ok)
 
 	val, err = syncx.WithTryLockReturn(lock, func() (int, error) {
-		t.Fatal("不应该执行")
+		assert.Fail(t, "不应该执行")
 		return 0, nil
 	})
 	assert.Equal(t, syncx.ErrLockNotAcquired, err)
@@ -457,7 +457,7 @@ func TestWithTryLockReturnValue(t *testing.T) {
 	assert.True(t, ok)
 
 	val, err = syncx.WithTryLockReturnValue(lock, func() string {
-		t.Fatal("不应该执行")
+		assert.Fail(t, "不应该执行")
 		return "fail"
 	})
 	assert.Equal(t, syncx.ErrLockNotAcquired, err)
@@ -477,7 +477,7 @@ func TestWithTryRLock(t *testing.T) {
 	assert.True(t, ok)
 
 	err = syncx.WithTryRLock(lock, func() error {
-		t.Fatal("不应该执行")
+		assert.Fail(t, "不应该执行")
 		return nil
 	})
 	assert.Equal(t, syncx.ErrLockNotAcquired, err)
@@ -497,7 +497,7 @@ func TestWithTryRLockReturn(t *testing.T) {
 	assert.True(t, ok)
 
 	val, err = syncx.WithTryRLockReturn(lock, func() (string, error) {
-		t.Fatal("不应该执行")
+		assert.Fail(t, "不应该执行")
 		return "", nil
 	})
 	assert.Equal(t, syncx.ErrLockNotAcquired, err)
@@ -518,7 +518,7 @@ func TestWithTryRLockReturnValue(t *testing.T) {
 	assert.True(t, ok)
 
 	val, err = syncx.WithTryRLockReturnValue(lock, func() int {
-		t.Fatal("不应该执行")
+		assert.Fail(t, "不应该执行")
 		return 456
 	})
 	assert.Equal(t, syncx.ErrLockNotAcquired, err)

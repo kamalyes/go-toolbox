@@ -55,6 +55,7 @@ func BenchmarkFIFOQueue_Concurrent(b *testing.B) {
 	q := queue.NewFIFOQueue(1000, true)
 	ctx := context.Background()
 	var wg sync.WaitGroup
+	var errChan = make(chan error, 10) // 用于收集错误
 
 	// 启动多个 goroutine 来并发入队
 	for i := 0; i < 10; i++ {
@@ -63,7 +64,8 @@ func BenchmarkFIFOQueue_Concurrent(b *testing.B) {
 			defer wg.Done()
 			for j := 0; j < b.N/10; j++ { // 每个 goroutine 入队一定数量的元素
 				if err := q.Enqueue(ctx, time.Now().UnixNano()); err != nil {
-					b.Fatalf("unexpected error: %v", err)
+					errChan <- err
+					return
 				}
 			}
 		}()
@@ -71,6 +73,14 @@ func BenchmarkFIFOQueue_Concurrent(b *testing.B) {
 
 	// 等待所有入队操作完成
 	wg.Wait()
+	close(errChan)
+
+	// 检查是否有错误
+	for err := range errChan {
+		if err != nil {
+			b.Fatalf("unexpected error: %v", err)
+		}
+	}
 
 	// 进行出队操作
 	b.ResetTimer() // 重置计时器，确保不包括设置时间

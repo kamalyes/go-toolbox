@@ -74,21 +74,18 @@ func TestMap(t *testing.T) {
 	assert.False(t, ok, "expected key2 to be deleted")
 
 	// 测试 Size
-	if size := m.Size(); size != 2 {
-		t.Errorf("Expected size 2, got %d", size)
-	}
+	size := m.Size()
+	assert.Equal(t, 2, size, "Expected size 2 after deletion")
 
 	// 测试 Keys
 	keys := m.Keys()
-	if len(keys) != 2 || (keys[0] != "key3" && keys[1] != "key3") {
-		t.Errorf("Expected keys to contain 'key3' and 'key4', got %v", keys)
-	}
+	assert.Equal(t, 2, len(keys), "Expected 2 keys")
+	assert.Contains(t, keys, "key3", "Expected keys to contain 'key3'")
+	assert.Contains(t, keys, "key4", "Expected keys to contain 'key4'")
 
 	// 测试 Values
 	values := m.Values()
-	if len(values) != 2 {
-		t.Errorf("Expected 2 values, got %d", len(values))
-	}
+	assert.Equal(t, 2, len(values), "Expected 2 values")
 
 	// 对返回的值进行排序
 	sort.Ints(values)
@@ -96,13 +93,12 @@ func TestMap(t *testing.T) {
 	// 检查值是否为预期的内容
 	expectedValues := []int{3, 4}
 	sort.Ints(expectedValues)
-	assert.Equal(t, expectedValues, values, "expected values to contain 3 and 4, got %v", values)
+	assert.Equal(t, expectedValues, values, "expected values to contain 3 and 4")
 
 	// 测试 Clear
 	m.Clear()
-	if size := m.Size(); size != 0 {
-		t.Errorf("Expected size 0 after clear, got %d", size)
-	}
+	size = m.Size()
+	assert.Equal(t, 0, size, "Expected size 0 after clear")
 }
 
 func TestMap_Swap(t *testing.T) {
@@ -136,9 +132,8 @@ func TestMap_Clear(t *testing.T) {
 	m.Clear()
 
 	// 验证 Map 为空
-	if size := m.Size(); size != 0 {
-		t.Errorf("Expected size 0 after clear, got %d", size)
-	}
+	size := m.Size()
+	assert.Equal(t, 0, size, "Expected size 0 after clear")
 
 	// 验证 Load 方法返回值
 	_, ok := m.Load("key1")
@@ -196,9 +191,8 @@ func TestMap_Size_Concurrent(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// 验证 Size
-	if size := m.Size(); size != 100 {
-		t.Errorf("Expected size 100, got %d", size)
-	}
+	size := m.Size()
+	assert.Equal(t, 100, size, "Expected size 100")
 }
 
 func TestMap_KeysAndValues(t *testing.T) {
@@ -226,9 +220,7 @@ func TestCopyMetaWithExistingKeys(t *testing.T) {
 
 	syncx.CopyMeta(src, dst)
 
-	if dst["key1"] != "value1" {
-		t.Errorf("expected dst['key1'] = 'value1', got '%s'", dst["key1"])
-	}
+	assert.Equal(t, "value1", dst["key1"], "expected dst['key1'] = 'value1'")
 }
 
 func TestMetaStringToMap(t *testing.T) {
@@ -245,9 +237,8 @@ func TestMetaStringToMap(t *testing.T) {
 
 	for _, test := range tests {
 		result := syncx.MetaStringToMap(test.meta)
-		if !mapsEqual(result, test.expected) {
-			t.Errorf("MetaStringToMap(%q) = %v; want %v", test.meta, result, test.expected)
-		}
+		assert.True(t, mapsEqual(result, test.expected), 
+			"MetaStringToMap(%q) = %v; want %v", test.meta, result, test.expected)
 	}
 }
 
@@ -265,9 +256,8 @@ func TestMetaMapToString(t *testing.T) {
 
 	for _, test := range tests {
 		result := syncx.MetaMapToString(test.meta)
-		if result != test.expected {
-			t.Errorf("MetaMapToString(%v) = %q; want %q", test.meta, result, test.expected)
-		}
+		assert.Equal(t, test.expected, result, 
+			"MetaMapToString(%v) should equal expected", test.meta)
 	}
 }
 

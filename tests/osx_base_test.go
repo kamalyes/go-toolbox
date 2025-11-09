@@ -189,14 +189,24 @@ func TestReleaseClearsFields(t *testing.T) {
 
 // TestCommand 测试 Command 函数
 func TestCommand(t *testing.T) {
-	// 使用 echo 命令进行测试
-	output, err := osx.Command("echo", []string{"Hello, World!"}, "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+	var cmd string
+	var args []string
+	var expectedOutput string
+
+	// 根据操作系统选择合适的命令
+	if osx.IsWindows() {
+		// Windows 环境使用 cmd /c echo（不使用引号）
+		cmd = "cmd"
+		args = []string{"/c", "echo", "Hello, World!"}
+		expectedOutput = "\"Hello, World!\"\r\n" // Windows echo 会添加引号
+	} else {
+		// Unix-like 环境使用 echo
+		cmd = "echo"
+		args = []string{"Hello, World!"}
+		expectedOutput = "Hello, World!\n"
 	}
 
-	expectedOutput := "Hello, World!\n"
-	if string(output) != expectedOutput {
-		t.Errorf("expected %q, got %q", expectedOutput, string(output))
-	}
+	output, err := osx.Command(cmd, args, "")
+	assert.NoError(t, err, "Command execution should not return error")
+	assert.Equal(t, expectedOutput, string(output), "Command output should match expected")
 }
