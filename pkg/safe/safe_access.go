@@ -35,6 +35,17 @@ func (s *SafeAccess) Field(fieldName string) *SafeAccess {
 		return &SafeAccess{valid: false}
 	}
 
+	// 首先检查是否是 map[string]interface{}
+	if m, ok := s.value.(map[string]interface{}); ok {
+		if value, exists := m[fieldName]; exists && value != nil {
+			return &SafeAccess{
+				value: value,
+				valid: true,
+			}
+		}
+		return &SafeAccess{valid: false}
+	}
+
 	rv := reflect.ValueOf(s.value)
 	if rv.Kind() == reflect.Ptr {
 		if rv.IsNil() {
@@ -166,6 +177,11 @@ func (s *SafeAccess) Duration(defaultValue ...time.Duration) time.Duration {
 	if dp, ok := s.value.(*time.Duration); ok && dp != nil {
 		return *dp
 	}
+	if str, ok := s.value.(string); ok {
+		if parsed, err := time.ParseDuration(str); err == nil {
+			return parsed
+		}
+	}
 	if i, ok := s.value.(int); ok {
 		return time.Duration(i)
 	}
@@ -255,4 +271,26 @@ func SafeGetStringSlice(m map[string]interface{}, key string) []string {
 		}
 	}
 	return nil
+}
+
+// 常用便捷方法
+
+// Enabled 获取 Enabled 字段的布尔值
+func (s *SafeAccess) Enabled(defaultValue ...bool) bool {
+	return s.Field("Enabled").Bool(defaultValue...)
+}
+
+// Host 获取 Host 字段的字符串值
+func (s *SafeAccess) Host(defaultValue ...string) string {
+	return s.Field("Host").String(defaultValue...)
+}
+
+// Port 获取 Port 字段的整数值
+func (s *SafeAccess) Port(defaultValue ...int) int {
+	return s.Field("Port").Int(defaultValue...)
+}
+
+// Timeout 获取 Timeout 字段的时间间隔值
+func (s *SafeAccess) Timeout(defaultValue ...time.Duration) time.Duration {
+	return s.Field("Timeout").Duration(defaultValue...)
 }
