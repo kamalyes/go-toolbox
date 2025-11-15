@@ -902,7 +902,7 @@ func TestScenario_MiddlewareChain(t *testing.T) {
 	// 鉴权中间件
 	var authChecks atomic.Int64
 	m.Use(func(ctx *Context, next func() (*Result, bool)) (*Result, bool) {
-		if !ctx.GetBool("authenticated") {
+		if !ctx.SafeGetBool("authenticated") {
 			authChecks.Add(1)
 			return nil, false
 		}
@@ -912,7 +912,7 @@ func TestScenario_MiddlewareChain(t *testing.T) {
 	// 限流中间件
 	var rateLimitHits atomic.Int64
 	m.Use(func(ctx *Context, next func() (*Result, bool)) (*Result, bool) {
-		if ctx.GetBool("rate_limited") {
+		if ctx.SafeGetBool("rate_limited") {
 			rateLimitHits.Add(1)
 			return nil, false
 		}

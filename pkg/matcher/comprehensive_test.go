@@ -110,8 +110,8 @@ func TestTypeCompatibility_String_And_Bool(t *testing.T) {
 	ctx.Set("rune", 'A')
 
 	assert.Equal(t, "hello world", ctx.GetString("string"))
-	assert.True(t, ctx.GetBool("bool_true"))
-	assert.False(t, ctx.GetBool("bool_false"))
+	assert.True(t, ctx.SafeGetBool("bool_true"))
+	assert.False(t, ctx.SafeGetBool("bool_false"))
 	assert.Equal(t, int32('A'), ctx.GetRune("rune"))
 }
 
@@ -160,7 +160,7 @@ func TestTypeCompatibility_Collections(t *testing.T) {
 
 	assert.Equal(t, intSlice, ctx.GetIntSlice("intSlice"))
 	assert.Equal(t, []int{10, 20, 30}, ctx.GetIntSlice("interfaceSlice"))
-	assert.Equal(t, stringSlice, ctx.GetStringSlice("stringSlice"))
+	assert.Equal(t, stringSlice, ctx.SafeGetStringSlice("stringSlice"))
 	assert.Equal(t, testMap, ctx.GetMap("map"))
 }
 
@@ -690,7 +690,7 @@ func TestEdgeCases_Nil_Values(t *testing.T) {
 
 	assert.Equal(t, "", ctx.GetString("nil_value"))
 	assert.Equal(t, 0, ctx.GetInt("nil_value"))
-	assert.False(t, ctx.GetBool("nil_value"))
+	assert.False(t, ctx.SafeGetBool("nil_value"))
 
 	assert.Equal(t, "", ctx.GetString("empty_string"))
 	assert.Equal(t, "", ctx.GetString("nonexistent"))

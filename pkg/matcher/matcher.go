@@ -136,8 +136,8 @@ func (c *Context) GetString(key string) string {
 	return ""
 }
 
-// GetStringSlice 获取字符串切片
-func (c *Context) GetStringSlice(key string) []string {
+// SafeGetStringSlice 获取字符串切片
+func (c *Context) SafeGetStringSlice(key string) []string {
 	if val, ok := c.getValue(key); ok {
 		if slice, ok := val.([]string); ok {
 			return slice
@@ -164,8 +164,8 @@ func (c *Context) GetInt64(key string) int64 {
 	return 0
 }
 
-// GetBool 获取布尔值
-func (c *Context) GetBool(key string) bool {
+// SafeGetBool 获取布尔值
+func (c *Context) SafeGetBool(key string) bool {
 	if val, ok := c.getValue(key); ok {
 		return convert.MustBool(val)
 	}
@@ -1091,7 +1091,7 @@ func MatchContains(key, substring string) func(*Context) bool {
 // MatchBool 布尔值匹配
 func MatchBool(key string, expected bool) func(*Context) bool {
 	return func(ctx *Context) bool {
-		return ctx.GetBool(key) == expected
+		return ctx.SafeGetBool(key) == expected
 	}
 }
 

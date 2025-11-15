@@ -2,8 +2,8 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-11-13 00:00:00
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-11-13 13:08:19
- * @FilePath: \go-toolbox\pkg\safe\safe_access.go
+ * @LastEditTime: 2025-11-15 16:31:15
+ * @FilePath: \engine-im-service\go-toolbox\pkg\safe\safe_access.go
  * @Description: 安全访问装饰器 - 类似JavaScript的可选链操作符
  *
  * Copyright (c) 2025 by kamalyes, All Rights Reserved.
@@ -129,6 +129,28 @@ func (s *SafeAccess) String(defaultValue ...string) string {
 	return ""
 }
 
+// StringOr 获取字符串值，如果无效或为空则返回默认值
+func (s *SafeAccess) StringOr(defaultValue string) string {
+	if !s.valid {
+		return defaultValue
+	}
+
+	if str, ok := s.value.(string); ok {
+		if str == "" {
+			return defaultValue
+		}
+		return str
+	}
+	if sp, ok := s.value.(*string); ok && sp != nil {
+		if *sp == "" {
+			return defaultValue
+		}
+		return *sp
+	}
+
+	return defaultValue
+}
+
 // Duration 获取时间间隔值
 func (s *SafeAccess) Duration(defaultValue ...time.Duration) time.Duration {
 	if !s.valid {
@@ -197,4 +219,40 @@ func (s *SafeAccess) Filter(predicate func(interface{}) bool) *SafeAccess {
 		return &SafeAccess{valid: false}
 	}
 	return s
+}
+
+// SafeGetString 安全获取map中的字符串值
+func SafeGetString(m map[string]interface{}, key string) string {
+	if v, ok := m[key]; ok {
+		if str, ok := v.(string); ok {
+			return str
+		}
+	}
+	return ""
+}
+
+// SafeGetBool 安全获取map中的布尔值
+func SafeGetBool(m map[string]interface{}, key string) bool {
+	if v, ok := m[key]; ok {
+		if b, ok := v.(bool); ok {
+			return b
+		}
+	}
+	return false
+}
+
+// SafeGetStringSlice 安全获取map中的字符串切片
+func SafeGetStringSlice(m map[string]interface{}, key string) []string {
+	if v, ok := m[key]; ok {
+		if slice, ok := v.([]interface{}); ok {
+			result := make([]string, 0, len(slice))
+			for _, item := range slice {
+				if str, ok := item.(string); ok {
+					result = append(result, str)
+				}
+			}
+			return result
+		}
+	}
+	return nil
 }

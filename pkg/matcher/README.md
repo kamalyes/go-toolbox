@@ -107,8 +107,8 @@ ctx := matcher.NewContext()
 ctx.Set("key", "value")           // 设置值
 val, ok := ctx.Get("key")         // 获取值
 str := ctx.GetString("key")       // 获取字符串
-slice := ctx.GetStringSlice("key") // 获取字符串切片
-bool := ctx.GetBool("key")        // 获取布尔值
+slice := ctx.SafeGetStringSlice("key") // 获取字符串切片
+bool := ctx.SafeGetBool("key")        // 获取布尔值
 ```
 
 ### Matcher 匹配器
