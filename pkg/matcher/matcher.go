@@ -15,11 +15,23 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/kamalyes/go-toolbox/pkg/convert"
 )
+
+// 对象池用于重用 strings.Builder（性能优化：减少 GC 压力）
+var builderPool = sync.Pool{
+	New: func() interface{} {
+		builder := &strings.Builder{}
+		builder.Grow(128) // 预分配 128 字节，减少小对象分配
+		return builder
+	},
+}
 
 // Rule 规则接口
 type Rule[T any] interface {
@@ -83,8 +95,13 @@ func (c *Context) Set(key string, value interface{}) *Context {
 	return c
 }
 
-// SetBatch 批量设置（性能优化）
+// SetBatch 批量设置（性能优化：减少锁竞争，参考其他包的批量操作模式）
 func (c *Context) SetBatch(kvs map[string]interface{}) *Context {
+	if len(kvs) == 0 {
+		return c // 空数据，直接返回
+	}
+
+	// 批量存储，减少 sync.Map 的锁竞争
 	for k, v := range kvs {
 		c.data.Store(k, v)
 	}
@@ -104,9 +121,14 @@ func (c *Context) MustGet(key string) interface{} {
 	panic(fmt.Sprintf("key %s not found in context", key))
 }
 
+// getValue 通用的值获取辅助函数
+func (c *Context) getValue(key string) (interface{}, bool) {
+	return c.data.Load(key)
+}
+
 // GetString 获取字符串
 func (c *Context) GetString(key string) string {
-	if val, ok := c.data.Load(key); ok {
+	if val, ok := c.getValue(key); ok {
 		if str, ok := val.(string); ok {
 			return str
 		}
@@ -116,7 +138,7 @@ func (c *Context) GetString(key string) string {
 
 // GetStringSlice 获取字符串切片
 func (c *Context) GetStringSlice(key string) []string {
-	if val, ok := c.data.Load(key); ok {
+	if val, ok := c.getValue(key); ok {
 		if slice, ok := val.([]string); ok {
 			return slice
 		}
@@ -126,59 +148,204 @@ func (c *Context) GetStringSlice(key string) []string {
 
 // GetInt 获取整数
 func (c *Context) GetInt(key string) int {
-	if val, ok := c.data.Load(key); ok {
-		switch v := val.(type) {
-		case int:
-			return v
-		case int64:
-			return int(v)
-		case int32:
-			return int(v)
-		}
+	if val, ok := c.getValue(key); ok {
+		result, _ := convert.MustIntT[int](val, nil)
+		return result
 	}
 	return 0
 }
 
 // GetInt64 获取 int64
 func (c *Context) GetInt64(key string) int64 {
-	if val, ok := c.data.Load(key); ok {
-		switch v := val.(type) {
-		case int64:
-			return v
-		case int:
-			return int64(v)
-		case int32:
-			return int64(v)
-		}
+	if val, ok := c.getValue(key); ok {
+		result, _ := convert.MustIntT[int64](val, nil)
+		return result
 	}
 	return 0
 }
 
 // GetBool 获取布尔值
 func (c *Context) GetBool(key string) bool {
-	if val, ok := c.data.Load(key); ok {
-		if b, ok := val.(bool); ok {
-			return b
-		}
+	if val, ok := c.getValue(key); ok {
+		return convert.MustBool(val)
 	}
 	return false
 }
 
 // GetFloat64 获取浮点数
 func (c *Context) GetFloat64(key string) float64 {
-	if val, ok := c.data.Load(key); ok {
+	if val, ok := c.getValue(key); ok {
+		result, _ := convert.MustFloatT[float64](val, convert.RoundNone)
+		return result
+	}
+	return 0
+}
+
+// GetFloat32 获取 float32
+func (c *Context) GetFloat32(key string) float32 {
+	if val, ok := c.getValue(key); ok {
+		result, _ := convert.MustFloatT[float32](val, convert.RoundNone)
+		return result
+	}
+	return 0
+}
+
+// GetUint 获取无符号整数
+func (c *Context) GetUint(key string) uint {
+	if val, ok := c.getValue(key); ok {
+		result, _ := convert.MustIntT[uint](val, nil)
+		return result
+	}
+	return 0
+}
+
+// GetUint64 获取 uint64
+func (c *Context) GetUint64(key string) uint64 {
+	if val, ok := c.getValue(key); ok {
+		result, _ := convert.MustIntT[uint64](val, nil)
+		return result
+	}
+	return 0
+}
+
+// GetUint32 获取 uint32
+func (c *Context) GetUint32(key string) uint32 {
+	if val, ok := c.getValue(key); ok {
+		result, _ := convert.MustIntT[uint32](val, nil)
+		return result
+	}
+	return 0
+}
+
+// GetInt8 获取 int8
+func (c *Context) GetInt8(key string) int8 {
+	if val, ok := c.getValue(key); ok {
+		result, _ := convert.MustIntT[int8](val, nil)
+		return result
+	}
+	return 0
+}
+
+// GetInt16 获取 int16
+func (c *Context) GetInt16(key string) int16 {
+	if val, ok := c.getValue(key); ok {
+		result, _ := convert.MustIntT[int16](val, nil)
+		return result
+	}
+	return 0
+}
+
+// GetInt32 获取 int32
+func (c *Context) GetInt32(key string) int32 {
+	if val, ok := c.getValue(key); ok {
+		result, _ := convert.MustIntT[int32](val, nil)
+		return result
+	}
+	return 0
+}
+
+// GetUint8 获取 uint8
+func (c *Context) GetUint8(key string) uint8 {
+	if val, ok := c.getValue(key); ok {
+		result, _ := convert.MustIntT[uint8](val, nil)
+		return result
+	}
+	return 0
+}
+
+// GetUint16 获取 uint16
+func (c *Context) GetUint16(key string) uint16 {
+	if val, ok := c.getValue(key); ok {
+		result, _ := convert.MustIntT[uint16](val, nil)
+		return result
+	}
+	return 0
+}
+
+// GetByte 获取字节
+func (c *Context) GetByte(key string) byte {
+	return c.GetUint8(key)
+}
+
+// GetRune 获取 rune
+func (c *Context) GetRune(key string) rune {
+	if val, ok := c.getValue(key); ok {
+		result, _ := convert.MustIntT[int32](val, nil)
+		return rune(result)
+	}
+	return 0
+}
+
+// GetTime 获取时间
+func (c *Context) GetTime(key string) time.Time {
+	if val, ok := c.getValue(key); ok {
 		switch v := val.(type) {
-		case float64:
+		case time.Time:
 			return v
-		case float32:
-			return float64(v)
-		case int:
-			return float64(v)
+		case string:
+			if t, err := time.Parse(time.RFC3339, v); err == nil {
+				return t
+			}
 		case int64:
-			return float64(v)
+			return time.Unix(v, 0)
+		}
+	}
+	return time.Time{}
+}
+
+// GetDuration 获取时间间隔
+func (c *Context) GetDuration(key string) time.Duration {
+	if val, ok := c.getValue(key); ok {
+		switch v := val.(type) {
+		case time.Duration:
+			return v
+		case string:
+			if d, err := time.ParseDuration(v); err == nil {
+				return d
+			}
+		case int64:
+			return time.Duration(v)
+		case int:
+			return time.Duration(v)
 		}
 	}
 	return 0
+}
+
+// GetIntSlice 获取整数切片
+func (c *Context) GetIntSlice(key string) []int {
+	if val, ok := c.getValue(key); ok {
+		if slice, ok := val.([]int); ok {
+			return slice
+		}
+		// 尝试从 []interface{} 转换
+		if iSlice, ok := val.([]interface{}); ok {
+			result := make([]int, 0, len(iSlice))
+			for _, item := range iSlice {
+				if converted, err := convert.MustIntT[int](item, nil); err == nil {
+					result = append(result, converted)
+				}
+			}
+			return result
+		}
+	}
+	return nil
+}
+
+// GetMap 获取映射
+func (c *Context) GetMap(key string) map[string]interface{} {
+	if val, ok := c.getValue(key); ok {
+		if m, ok := val.(map[string]interface{}); ok {
+			return m
+		}
+	}
+	return nil
+}
+
+// GetInterface 获取任意类型
+func (c *Context) GetInterface(key string) interface{} {
+	val, _ := c.getValue(key)
+	return val
 }
 
 // SetMetadata 设置元数据
@@ -254,7 +421,7 @@ type cacheEntry[T any] struct {
 // MatchMiddleware 匹配中间件
 type MatchMiddleware[T any] func(ctx *Context, next func() (T, bool)) (T, bool)
 
-// NewMatcher 创建匹配器
+// NewMatcher 创建匹配器（性能优化：预分配内存，减少扩容开销）
 func NewMatcher[T any]() *Matcher[T] {
 	m := &Matcher[T]{
 		stats: &MatcherStats{},
@@ -263,9 +430,11 @@ func NewMatcher[T any]() *Matcher[T] {
 			ttl:     5 * time.Minute,
 		},
 	}
-	emptyRules := make([]Rule[T], 0, 16) // 预分配容量
+	// 参考 mathx 包的做法：预分配合理的初始容量
+	emptyRules := make([]Rule[T], 0, 16) // 预分配 16 个规则的容量
 	m.rules.Store(&emptyRules)
-	emptyMws := make([]MatchMiddleware[T], 0, 4)
+	// 预分配中间件容量
+	emptyMws := make([]MatchMiddleware[T], 0, 4) // 预分配 4 个中间件的容量
 	m.middlewares.Store(&emptyMws)
 	return m
 }
@@ -309,11 +478,17 @@ func (m *Matcher[T]) AddRule(rule Rule[T]) *Matcher[T] {
 	return m
 }
 
-// AddRules 批量添加规则
+// AddRules 批量添加规则（性能优化：一次性分配，减少内存分配次数）
 func (m *Matcher[T]) AddRules(rules ...Rule[T]) *Matcher[T] {
+	if len(rules) == 0 {
+		return m // 空规则列表，直接返回
+	}
+
 	m.mu.Lock()
 	oldRules := m.rules.Load()
-	newRules := make([]Rule[T], len(*oldRules), len(*oldRules)+len(rules))
+	// 性能优化：一次性分配所需的全部内存，参考 mathx 包的做法
+	newCapacity := len(*oldRules) + len(rules)
+	newRules := make([]Rule[T], len(*oldRules), newCapacity)
 	copy(newRules, *oldRules)
 	newRules = append(newRules, rules...)
 	m.rules.Store(&newRules)
@@ -354,64 +529,113 @@ func (m *Matcher[T]) getRules() *[]Rule[T] {
 
 // Match 执行匹配（返回第一个匹配的规则）
 func (m *Matcher[T]) Match(ctx *Context) (T, bool) {
-	m.stats.totalMatches.Add(1)
+	m.incrementTotalMatches()
 
-	// 检查超时
+	// 快速路径检查
 	if ctx.IsExpired() {
-		m.stats.failedMatches.Add(1)
+		m.incrementFailedMatches()
 		var zero T
 		return zero, false
 	}
 
-	// 检查缓存
-	if m.cache.enabled {
-		if cached, ok := m.getCache(ctx); ok {
-			m.stats.cacheHits.Add(1)
-			if cached.matched {
-				m.stats.successMatches.Add(1)
-			} else {
-				m.stats.failedMatches.Add(1)
-			}
-			return cached.result, cached.matched
-		}
-		m.stats.cacheMisses.Add(1)
+	// 尝试从缓存获取
+	if result, matched, found := m.tryGetFromCache(ctx); found {
+		m.updateStatsForCacheHit(matched)
+		return result, matched
 	}
 
-	// 执行中间件链
-	result, matched := m.executeWithMiddlewares(ctx, func() (T, bool) {
-		return m.doMatch(ctx)
-	})
+	// 执行匹配
+	result, matched := m.executeMatch(ctx)
 
+	// 更新缓存和统计
+	m.updateCacheAndStats(ctx, result, matched)
+
+	return result, matched
+}
+
+// 统计相关的辅助函数
+func (m *Matcher[T]) incrementTotalMatches() {
+	m.stats.totalMatches.Add(1)
+}
+
+func (m *Matcher[T]) incrementFailedMatches() {
+	m.stats.failedMatches.Add(1)
+}
+
+func (m *Matcher[T]) incrementSuccessMatches() {
+	m.stats.successMatches.Add(1)
+}
+
+func (m *Matcher[T]) incrementCacheHits() {
+	m.stats.cacheHits.Add(1)
+}
+
+func (m *Matcher[T]) incrementCacheMisses() {
+	m.stats.cacheMisses.Add(1)
+}
+
+// 缓存相关的辅助函数
+func (m *Matcher[T]) tryGetFromCache(ctx *Context) (T, bool, bool) {
+	var zero T
+	if !m.cache.enabled {
+		return zero, false, false
+	}
+
+	if cached, ok := m.getCache(ctx); ok {
+		return cached.result, cached.matched, true
+	}
+
+	m.incrementCacheMisses()
+	return zero, false, false
+}
+
+func (m *Matcher[T]) updateStatsForCacheHit(matched bool) {
+	m.incrementCacheHits()
+	if matched {
+		m.incrementSuccessMatches()
+	} else {
+		m.incrementFailedMatches()
+	}
+}
+
+func (m *Matcher[T]) updateCacheAndStats(ctx *Context, result T, matched bool) {
 	// 更新缓存
 	if m.cache.enabled {
 		m.setCache(ctx, result, matched)
 	}
 
+	// 更新统计
 	if matched {
-		m.stats.successMatches.Add(1)
+		m.incrementSuccessMatches()
 	} else {
-		m.stats.failedMatches.Add(1)
+		m.incrementFailedMatches()
 	}
-
-	return result, matched
 }
 
-// doMatch 执行实际匹配（零拷贝优化）
+// executeMatch 执行匹配逻辑
+func (m *Matcher[T]) executeMatch(ctx *Context) (T, bool) {
+	return m.executeWithMiddlewares(ctx, func() (T, bool) {
+		return m.doMatch(ctx)
+	})
+}
+
+// doMatch 执行实际匹配（激进优化：减少指针解引用）
 func (m *Matcher[T]) doMatch(ctx *Context) (T, bool) {
 	// 确保规则已排序
 	m.ensureSorted()
 
 	rules := *m.getRules() // 解引用一次
+	// 直接使用值类型，避免指针解引用开销
 	for i := range rules {
-		rule := &rules[i]
+		rule := rules[i] // 直接使用值
 		// 检查是否启用
-		if !(*rule).Enabled() {
+		if !rule.Enabled() {
 			continue
 		}
 
 		// 检查是否匹配
-		if (*rule).Match(ctx) {
-			return (*rule).Result(), true
+		if rule.Match(ctx) {
+			return rule.Result(), true
 		}
 	}
 
@@ -421,31 +645,47 @@ func (m *Matcher[T]) doMatch(ctx *Context) (T, bool) {
 
 // MatchAll 执行匹配（返回所有匹配的规则）
 func (m *Matcher[T]) MatchAll(ctx *Context) []T {
-	m.stats.totalMatches.Add(1)
+	m.incrementTotalMatches()
 
 	m.ensureSorted()
 
 	rules := *m.getRules() // 解引用
-	results := make([]T, 0)
+	// 性能优化：根据规则数量预分配合理的容量，避免频繁扩容
+	// 参考 mathx 包的做法：预分配 map/slice 容量
+	estimatedCapacity := len(rules) / 4 // 估计匹配率为 25%
+	if estimatedCapacity < 2 {
+		estimatedCapacity = 2 // 最小容量
+	}
+	if estimatedCapacity > 16 {
+		estimatedCapacity = 16 // 最大容量，避免过度预分配
+	}
+	results := make([]T, 0, estimatedCapacity)
 
+	// 直接使用值类型，避免指针解引用开销
 	for i := range rules {
-		rule := &rules[i]
-		if !(*rule).Enabled() {
+		rule := rules[i] // 直接使用值
+		if !rule.Enabled() {
 			continue
 		}
 
-		if (*rule).Match(ctx) {
-			results = append(results, (*rule).Result())
+		if rule.Match(ctx) {
+			results = append(results, rule.Result())
 		}
 	}
 
-	if len(results) > 0 {
-		m.stats.successMatches.Add(1)
-	} else {
-		m.stats.failedMatches.Add(1)
-	}
+	// 统一的统计更新
+	m.updateMatchStats(len(results) > 0)
 
 	return results
+}
+
+// updateMatchStats 统一的匹配统计更新
+func (m *Matcher[T]) updateMatchStats(success bool) {
+	if success {
+		m.incrementSuccessMatches()
+	} else {
+		m.incrementFailedMatches()
+	}
 }
 
 // executeWithMiddlewares 执行中间件链（零拷贝优化）
@@ -503,37 +743,16 @@ func (m *Matcher[T]) ensureSorted() {
 	m.sorted.Store(true)
 }
 
-// sortRules 排序规则（快速排序）
+// sortRules 排序规则（使用标准库，更高效且可靠）
 func (m *Matcher[T]) sortRules(rules []Rule[T]) {
 	if len(rules) <= 1 {
 		return
 	}
 
-	// 快速排序（降序）
-	quickSort(rules, 0, len(rules)-1)
-}
-
-func quickSort[T any](rules []Rule[T], low, high int) {
-	if low < high {
-		pi := partition(rules, low, high)
-		quickSort(rules, low, pi-1)
-		quickSort(rules, pi+1, high)
-	}
-}
-
-func partition[T any](rules []Rule[T], low, high int) int {
-	pivot := rules[high].Priority()
-	i := low - 1
-
-	for j := low; j < high; j++ {
-		if rules[j].Priority() > pivot {
-			i++
-			rules[i], rules[j] = rules[j], rules[i]
-		}
-	}
-
-	rules[i+1], rules[high] = rules[high], rules[i+1]
-	return i + 1
+	// 按优先级降序排序
+	sort.Slice(rules, func(i, j int) bool {
+		return rules[i].Priority() > rules[j].Priority()
+	})
 }
 
 // getCache 获取缓存
@@ -560,25 +779,157 @@ func (m *Matcher[T]) setCache(ctx *Context, result T, matched bool) {
 	m.cache.cache.Store(key, entry)
 }
 
-// getCacheKey 生成缓存键（优化：使用 strings.Builder + sync.Map.Range）
+// getCacheKey 生成缓存键（激进性能优化：消除 fmt.Sprintf，使用快速数字转换）
 func (m *Matcher[T]) getCacheKey(ctx *Context) string {
-	var sb strings.Builder
-	sb.Grow(128) // 预分配
+	builder := builderPool.Get().(*strings.Builder)
+	defer func() {
+		builder.Reset() // 清理缓冲区
+		builderPool.Put(builder)
+	}()
 
+	// 检查常用的单一字段场景（极端优化）
+	if singleKey := m.tryGetSingleFieldCache(ctx); singleKey != "" {
+		return singleKey
+	}
+
+	// 多字段场景：使用高效遍历和快速转换
+	var keys []string
 	ctx.data.Range(func(k, v interface{}) bool {
 		if key, ok := k.(string); ok {
-			sb.WriteString(key)
-			sb.WriteString("=")
-			sb.WriteString(fmt.Sprintf("%v", v))
-			sb.WriteString(";")
+			keys = append(keys, key)
 		}
 		return true
 	})
 
-	return sb.String()
+	// 排序保证缓存键的一致性
+	sort.Strings(keys)
+
+	for i, key := range keys {
+		if i > 0 {
+			builder.WriteByte('&')
+		}
+		builder.WriteString(key)
+		builder.WriteByte('=')
+
+		val, _ := ctx.data.Load(key)
+		switch v := val.(type) {
+		case string:
+			builder.WriteString(v)
+		case int:
+			builder.WriteString(fastIntToString(v))
+		case int64:
+			builder.WriteString(fastInt64ToString(v))
+		case bool:
+			if v {
+				builder.WriteString("true")
+			} else {
+				builder.WriteString("false")
+			}
+		default:
+			// 只有在确实需要时才使用 fmt.Sprintf
+			builder.WriteString(fmt.Sprintf("%v", v))
+		}
+	}
+
+	return builder.String()
 }
 
-// Stats 获取统计信息
+// tryGetSingleFieldCache 尝试获取单字段的缓存键（针对简单场景的极速优化）
+func (m *Matcher[T]) tryGetSingleFieldCache(ctx *Context) string {
+	var foundKey string
+	var foundValue interface{}
+	count := 0
+
+	ctx.data.Range(func(k, v interface{}) bool {
+		count++
+		if count == 1 {
+			if key, ok := k.(string); ok {
+				foundKey = key
+				foundValue = v
+			}
+		}
+		return count <= 1 // 只检查前两个元素
+	})
+
+	// 如果只有一个字段，使用快速路径
+	if count == 1 && foundKey != "" {
+		switch v := foundValue.(type) {
+		case string:
+			return foundKey + "=" + v
+		case int:
+			return foundKey + "=" + fastIntToString(v)
+		case int64:
+			return foundKey + "=" + fastInt64ToString(v)
+		case bool:
+			if v {
+				return foundKey + "=true"
+			} else {
+				return foundKey + "=false"
+			}
+		}
+	}
+
+	return "" // 不是单字段场景
+}
+
+// 快速整数转字符串（避免 fmt.Sprintf 的开销）
+func fastIntToString(n int) string {
+	if n == 0 {
+		return "0"
+	}
+
+	isNeg := n < 0
+	if isNeg {
+		n = -n
+	}
+
+	// 使用固定大小的缓冲区
+	buf := make([]byte, 0, 20) // int 最多 19 位 + 负号
+
+	for n > 0 {
+		buf = append(buf, byte('0'+n%10))
+		n /= 10
+	}
+
+	if isNeg {
+		buf = append(buf, '-')
+	}
+
+	// 反转字符串
+	for i, j := 0, len(buf)-1; i < j; i, j = i+1, j-1 {
+		buf[i], buf[j] = buf[j], buf[i]
+	}
+
+	return string(buf)
+}
+
+func fastInt64ToString(n int64) string {
+	if n == 0 {
+		return "0"
+	}
+
+	isNeg := n < 0
+	if isNeg {
+		n = -n
+	}
+
+	buf := make([]byte, 0, 21) // int64 最多 20 位 + 负号
+
+	for n > 0 {
+		buf = append(buf, byte('0'+n%10))
+		n /= 10
+	}
+
+	if isNeg {
+		buf = append(buf, '-')
+	}
+
+	for i, j := 0, len(buf)-1; i < j; i, j = i+1, j-1 {
+		buf[i], buf[j] = buf[j], buf[i]
+	}
+
+	return string(buf)
+} // Stats 获取统计信息
 func (m *Matcher[T]) Stats() map[string]int64 {
 	return map[string]int64{
 		"total_matches":   m.stats.totalMatches.Load(),

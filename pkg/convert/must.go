@@ -96,6 +96,26 @@ func MustFloatT[T types.Float](value any, mode RoundMode) (T, error) {
 		f = v // 直接使用 float64 值
 	case float32:
 		f = float64(v) // 将 float32 转换为 float64
+	case int:
+		f = float64(v)
+	case int8:
+		f = float64(v)
+	case int16:
+		f = float64(v)
+	case int32:
+		f = float64(v)
+	case int64:
+		f = float64(v)
+	case uint:
+		f = float64(v)
+	case uint8:
+		f = float64(v)
+	case uint16:
+		f = float64(v)
+	case uint32:
+		f = float64(v)
+	case uint64:
+		f = float64(v)
 	default:
 		return 0, fmt.Errorf("不支持的输入类型: %T", v)
 	}
