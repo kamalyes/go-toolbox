@@ -273,7 +273,60 @@ func SafeGetStringSlice(m map[string]interface{}, key string) []string {
 	return nil
 }
 
-// 常用便捷方法
+// 通用便捷方法
+
+// At 通用字段路径访问方法，支持链式调用和默认值
+func (s *SafeAccess) At(fieldPath string, defaultValue ...interface{}) *SafeAccess {
+	// 支持路径访问，如 "Config.Database.Host"
+	fields := splitFieldPath(fieldPath)
+	current := s
+
+	for _, field := range fields {
+		current = current.Field(field)
+		if !current.valid {
+			break
+		}
+	}
+
+	if !current.valid && len(defaultValue) > 0 {
+		return Safe(defaultValue[0])
+	}
+
+	return current
+}
+
+// BoolAt 获取布尔字段的便捷方法
+func (s *SafeAccess) BoolAt(fieldPath string, defaultValue ...bool) bool {
+	return s.At(fieldPath).Bool(defaultValue...)
+}
+
+// StringAt 获取字符串字段的便捷方法
+func (s *SafeAccess) StringAt(fieldPath string, defaultValue ...string) string {
+	return s.At(fieldPath).String(defaultValue...)
+}
+
+// StringOrAt 获取字符串字段，支持空值默认值
+func (s *SafeAccess) StringOrAt(fieldPath string, defaultValue string) string {
+	return s.At(fieldPath).StringOr(defaultValue)
+}
+
+// IntAt 获取整数字段的便捷方法
+func (s *SafeAccess) IntAt(fieldPath string, defaultValue ...int) int {
+	return s.At(fieldPath).Int(defaultValue...)
+}
+
+// DurationAt 获取时间间隔字段的便捷方法
+func (s *SafeAccess) DurationAt(fieldPath string, defaultValue ...time.Duration) time.Duration {
+	return s.At(fieldPath).Duration(defaultValue...)
+}
+
+// ValueAt 获取任意类型字段的原始值
+func (s *SafeAccess) ValueAt(fieldPath string, defaultValue ...interface{}) interface{} {
+	result := s.At(fieldPath, defaultValue...)
+	return result.Value()
+}
+
+// 保留原有的便捷方法以保持向后兼容
 
 // Enabled 获取 Enabled 字段的布尔值
 func (s *SafeAccess) Enabled(defaultValue ...bool) bool {
@@ -293,4 +346,30 @@ func (s *SafeAccess) Port(defaultValue ...int) int {
 // Timeout 获取 Timeout 字段的时间间隔值
 func (s *SafeAccess) Timeout(defaultValue ...time.Duration) time.Duration {
 	return s.Field("Timeout").Duration(defaultValue...)
+} // 辅助函数：分割字段路径
+func splitFieldPath(path string) []string {
+	if path == "" {
+		return []string{}
+	}
+
+	// 简单的点分割，支持嵌套字段访问
+	result := []string{}
+	current := ""
+
+	for _, char := range path {
+		if char == '.' {
+			if current != "" {
+				result = append(result, current)
+				current = ""
+			}
+		} else {
+			current += string(char)
+		}
+	}
+
+	if current != "" {
+		result = append(result, current)
+	}
+
+	return result
 }

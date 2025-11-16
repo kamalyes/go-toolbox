@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"math"
 	"testing"
+	"time"
 )
 
 func TestFastHash(t *testing.T) {
@@ -999,5 +1000,240 @@ func BenchmarkIsPrime(b *testing.B) {
 func BenchmarkFibonacci(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		Fibonacci(30)
+	}
+}
+
+// SafeAccess新API的测试用例
+
+func TestSafeAccessAtMethods(t *testing.T) {
+	// 创建测试数据结构
+	type DatabaseConfig struct {
+		Host     string        `json:"host"`
+		Port     int           `json:"port"`
+		Enabled  bool          `json:"enabled"`
+		Timeout  time.Duration `json:"timeout"`
+		Username *string       `json:"username"`
+	}
+
+	type ServerConfig struct {
+		Host string `json:"host"`
+		Port int    `json:"port"`
+	}
+
+	type Config struct {
+		Database *DatabaseConfig `json:"database"`
+		Server   *ServerConfig   `json:"server"`
+	}
+
+	username := "admin"
+	config := &Config{
+		Database: &DatabaseConfig{
+			Host:     "localhost",
+			Port:     5432,
+			Enabled:  true,
+			Timeout:  time.Second * 30,
+			Username: &username,
+		},
+		Server: &ServerConfig{
+			Host: "0.0.0.0",
+			Port: 8080,
+		},
+	}
+
+	safe := Safe(config)
+
+	t.Run("StringAt正常访问", func(t *testing.T) {
+		result := safe.StringAt("Database.Host", "unknown")
+		assert.Equal(t, "localhost", result)
+	})
+
+	t.Run("StringAt不存在字段使用默认值", func(t *testing.T) {
+		result := safe.StringAt("Database.NonExistent", "default")
+		assert.Equal(t, "default", result)
+	})
+
+	t.Run("IntAt正常访问", func(t *testing.T) {
+		result := safe.IntAt("Database.Port", 3306)
+		assert.Equal(t, 5432, result)
+	})
+
+	t.Run("IntAt嵌套路径访问", func(t *testing.T) {
+		result := safe.IntAt("Server.Port", 8000)
+		assert.Equal(t, 8080, result)
+	})
+
+	t.Run("BoolAt正常访问", func(t *testing.T) {
+		result := safe.BoolAt("Database.Enabled", false)
+		assert.Equal(t, true, result)
+	})
+
+	t.Run("BoolAt不存在字段使用默认值", func(t *testing.T) {
+		result := safe.BoolAt("Database.NonExistent", false)
+		assert.Equal(t, false, result)
+	})
+
+	t.Run("DurationAt正常访问", func(t *testing.T) {
+		result := safe.DurationAt("Database.Timeout", time.Second*10)
+		assert.Equal(t, time.Second*30, result)
+	})
+
+	t.Run("ValueAt获取原始值", func(t *testing.T) {
+		result := safe.ValueAt("Database.Port")
+		assert.Equal(t, 5432, result)
+	})
+
+	t.Run("StringOrAt空值处理", func(t *testing.T) {
+		// 测试不存在的字段
+		result := safe.StringOrAt("Database.EmptyField", "guest")
+		assert.Equal(t, "guest", result)
+	})
+
+	t.Run("At方法链式调用", func(t *testing.T) {
+		result := safe.At("Database.Host").String("unknown")
+		assert.Equal(t, "localhost", result)
+	})
+
+	t.Run("At方法验证有效性", func(t *testing.T) {
+		validAccess := safe.At("Database.Host")
+		assert.True(t, validAccess.IsValid())
+
+		invalidAccess := safe.At("NonExistent.Field")
+		assert.False(t, invalidAccess.IsValid())
+	})
+}
+
+func TestSafeAccessAtMethodsWithMap(t *testing.T) {
+	// 测试Map数据
+	mapData := map[string]interface{}{
+		"app": map[string]interface{}{
+			"name":    "MyApp",
+			"version": "1.0.0",
+			"port":    9000,
+			"debug":   true,
+			"config": map[string]interface{}{
+				"timeout": "30s",
+				"retries": 3,
+			},
+		},
+		"database": map[string]interface{}{
+			"host": "db.example.com",
+			"port": 5432,
+		},
+	}
+
+	safe := Safe(mapData)
+
+	t.Run("Map数据StringAt访问", func(t *testing.T) {
+		result := safe.StringAt("app.name", "Unknown")
+		assert.Equal(t, "MyApp", result)
+	})
+
+	t.Run("Map数据IntAt访问", func(t *testing.T) {
+		result := safe.IntAt("app.port", 8080)
+		assert.Equal(t, 9000, result)
+	})
+
+	t.Run("Map数据BoolAt访问", func(t *testing.T) {
+		result := safe.BoolAt("app.debug", false)
+		assert.Equal(t, true, result)
+	})
+
+	t.Run("Map数据深层嵌套访问", func(t *testing.T) {
+		result := safe.StringAt("app.config.timeout", "10s")
+		assert.Equal(t, "30s", result)
+
+		intResult := safe.IntAt("app.config.retries", 1)
+		assert.Equal(t, 3, intResult)
+	})
+
+	t.Run("Map数据不同路径访问", func(t *testing.T) {
+		dbHost := safe.StringAt("database.host", "localhost")
+		assert.Equal(t, "db.example.com", dbHost)
+
+		dbPort := safe.IntAt("database.port", 3306)
+		assert.Equal(t, 5432, dbPort)
+	})
+}
+
+func TestSafeAccessAtMethodsEdgeCases(t *testing.T) {
+	t.Run("空路径处理", func(t *testing.T) {
+		data := map[string]interface{}{"key": "value"}
+		safe := Safe(data)
+
+		result := safe.StringAt("", "default")
+		assert.Equal(t, "default", result)
+	})
+
+	t.Run("nil数据处理", func(t *testing.T) {
+		safe := Safe(nil)
+
+		result := safe.StringAt("any.path", "default")
+		assert.Equal(t, "default", result)
+	})
+
+	t.Run("单层路径访问", func(t *testing.T) {
+		data := map[string]interface{}{"key": "value"}
+		safe := Safe(data)
+
+		result := safe.StringAt("key", "default")
+		assert.Equal(t, "value", result)
+	})
+
+	t.Run("路径中包含点号的字段名", func(t *testing.T) {
+		data := map[string]interface{}{
+			"normal": map[string]interface{}{
+				"field": "value",
+			},
+		}
+		safe := Safe(data)
+
+		result := safe.StringAt("normal.field", "default")
+		assert.Equal(t, "value", result)
+	})
+
+	t.Run("多层级深度访问", func(t *testing.T) {
+		data := map[string]interface{}{
+			"level1": map[string]interface{}{
+				"level2": map[string]interface{}{
+					"level3": map[string]interface{}{
+						"value": "deep-value",
+					},
+				},
+			},
+		}
+		safe := Safe(data)
+
+		result := safe.StringAt("level1.level2.level3.value", "default")
+		assert.Equal(t, "deep-value", result)
+	})
+}
+
+// 性能测试
+
+func BenchmarkSafeAccessStringAt(b *testing.B) {
+	data := map[string]interface{}{
+		"app": map[string]interface{}{
+			"name": "TestApp",
+		},
+	}
+	safe := Safe(data)
+	
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		safe.StringAt("app.name", "default")
+	}
+}
+
+func BenchmarkSafeAccessTraditional(b *testing.B) {
+	data := map[string]interface{}{
+		"app": map[string]interface{}{
+			"name": "TestApp",
+		},
+	}
+	safe := Safe(data)
+	
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		safe.Field("app").Field("name").String("default")
 	}
 }
