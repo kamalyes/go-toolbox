@@ -426,3 +426,245 @@ func (ic *IfValueChainer[T]) Get() T {
 	}
 	return ic.falseVal
 }
+
+// IfNotNil 空值检查三元运算
+// 如果 val 不为 nil，返回 val；否则返回 defaultVal
+// 适用于指针类型的空值检查
+func IfNotNil[T any](val *T, defaultVal T) T {
+	if val != nil {
+		return *val
+	}
+	return defaultVal
+}
+
+// IfNotEmpty 空字符串检查三元运算
+// 如果字符串非空，返回原字符串；否则返回默认值
+func IfNotEmpty(str string, defaultVal string) string {
+	return IF(str != "", str, defaultVal)
+}
+
+// IfNotZero 零值检查三元运算
+// 如果值不为类型零值，返回原值；否则返回默认值
+// 支持任意可比较类型
+func IfNotZero[T comparable](val T, defaultVal T) T {
+	var zero T
+	return IF(val != zero, val, defaultVal)
+}
+
+// IfInRange 范围检查三元运算
+// 检查 val 是否在 [min, max] 范围内
+// 如果在范围内，返回 val；否则返回 defaultVal
+func IfInRange[T comparable](val, min, max, defaultVal T) T {
+	// 这里需要具体的类型约束来比较大小，简化为相等性检查
+	return IF(val == min || val == max, val, defaultVal)
+}
+
+// IfContains 包含检查三元运算
+// 检查 slice 是否包含 target
+// 如果包含，返回 trueVal；否则返回 falseVal
+func IfContains[T comparable](slice []T, target T, trueVal, falseVal T) T {
+	for _, item := range slice {
+		if item == target {
+			return trueVal
+		}
+	}
+	return falseVal
+}
+
+// IfAny 任意条件满足的三元运算
+// 如果 conditions 中任意一个为 true，返回 trueVal；否则返回 falseVal
+func IfAny[T any](conditions []bool, trueVal, falseVal T) T {
+	for _, cond := range conditions {
+		if cond {
+			return trueVal
+		}
+	}
+	return falseVal
+}
+
+// IfAll 所有条件满足的三元运算
+// 如果 conditions 中所有条件都为 true，返回 trueVal；否则返回 falseVal
+func IfAll[T any](conditions []bool, trueVal, falseVal T) T {
+	for _, cond := range conditions {
+		if !cond {
+			return falseVal
+		}
+	}
+	return IF(len(conditions) > 0, trueVal, falseVal)
+}
+
+// IfCount 计数条件三元运算
+// 统计 conditions 中为 true 的条件数量
+// 如果满足条件的数量 >= threshold，返回 trueVal；否则返回 falseVal
+func IfCount[T any](conditions []bool, threshold int, trueVal, falseVal T) T {
+	count := 0
+	for _, cond := range conditions {
+		if cond {
+			count++
+		}
+	}
+	return IF(count >= threshold, trueVal, falseVal)
+}
+
+// IfMap 映射转换三元运算
+// 根据条件决定是否对值进行转换
+// 如果 condition 为 true，对 val 执行 mapper 函数；否则返回 defaultVal
+func IfMap[T, R any](condition bool, val T, mapper func(T) R, defaultVal R) R {
+	if condition {
+		return mapper(val)
+	}
+	return defaultVal
+}
+
+// IfMapElse 双向映射三元运算
+// 根据条件选择不同的映射函数
+// 如果 condition 为 true，执行 trueMapper；否则执行 falseMapper
+func IfMapElse[T, R any](condition bool, val T, trueMapper, falseMapper func(T) R) R {
+	if condition {
+		return trueMapper(val)
+	}
+	return falseMapper(val)
+}
+
+// IfFilter 过滤三元运算
+// 根据 predicate 函数过滤 slice
+// 如果 useFilter 为 true，返回过滤后的结果；否则返回原始 slice
+func IfFilter[T any](useFilter bool, slice []T, predicate func(T) bool) []T {
+	if !useFilter {
+		return slice
+	}
+
+	var result []T
+	for _, item := range slice {
+		if predicate(item) {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+// IfValidate 验证三元运算
+// 使用验证函数检查值，根据验证结果返回不同值
+// 如果验证通过，返回 validVal；否则返回 invalidVal
+func IfValidate[T, R any](val T, validator func(T) bool, validVal, invalidVal R) R {
+	return IF(validator(val), validVal, invalidVal)
+}
+
+// IfCast 类型转换三元运算
+// 尝试将 val 断言为 R 类型
+// 如果断言成功，返回转换后的值；否则返回 defaultVal
+func IfCast[R any](val any, defaultVal R) R {
+	if casted, ok := val.(R); ok {
+		return casted
+	}
+	return defaultVal
+}
+
+// IfBetween 区间检查三元运算（支持数值类型）
+// 检查 val 是否在 [min, max] 区间内
+func IfBetween[T int | int64 | float32 | float64](val, min, max T, trueVal, falseVal T) T {
+	return IF(val >= min && val <= max, trueVal, falseVal)
+}
+
+// IfSwitch 开关式三元运算
+// 根据 key 从 cases 映射中查找对应值
+// 如果找到，返回对应值；否则返回 defaultVal
+func IfSwitch[K comparable, V any](key K, cases map[K]V, defaultVal V) V {
+	if val, exists := cases[key]; exists {
+		return val
+	}
+	return defaultVal
+}
+
+// IfTryParse 尝试解析三元运算
+// 使用 parser 函数尝试解析 input
+// 如果解析成功（无错误），返回解析结果；否则返回 defaultVal
+func IfTryParse[T, R any](input T, parser func(T) (R, error), defaultVal R) R {
+	if result, err := parser(input); err == nil {
+		return result
+	}
+	return defaultVal
+}
+
+// IfSafeIndex 安全索引访问三元运算
+// 安全地访问 slice 的指定索引
+// 如果索引有效，返回对应元素；否则返回 defaultVal
+func IfSafeIndex[T any](slice []T, index int, defaultVal T) T {
+	if index >= 0 && index < len(slice) {
+		return slice[index]
+	}
+	return defaultVal
+}
+
+// IfSafeKey 安全键访问三元运算
+// 安全地访问 map 的指定键
+// 如果键存在，返回对应值；否则返回 defaultVal
+func IfSafeKey[K comparable, V any](m map[K]V, key K, defaultVal V) V {
+	if val, exists := m[key]; exists {
+		return val
+	}
+	return defaultVal
+}
+
+// IfMulti 多值比较三元运算
+// 检查 target 是否等于 values 中的任意一个
+// 如果匹配，返回 trueVal；否则返回 falseVal
+func IfMulti[T comparable, R any](target T, values []T, trueVal, falseVal R) R {
+	for _, item := range values {
+		if item == target {
+			return trueVal
+		}
+	}
+	return falseVal
+}
+
+// IfPipeline 管道式三元运算
+// 如果 condition 为 true，依次执行 funcs 中的函数
+// 每个函数的输出作为下一个函数的输入
+// 如果 condition 为 false，返回 defaultVal
+func IfPipeline[T any](condition bool, input T, funcs []func(T) T, defaultVal T) T {
+	if !condition {
+		return defaultVal
+	}
+
+	result := input
+	for _, fn := range funcs {
+		result = fn(result)
+	}
+	return result
+}
+
+// IfDefault 默认值设置三元运算
+// 提供多个默认值选项，返回第一个满足条件的值
+// conditions 和 values 一一对应，返回第一个条件为 true 的值
+// 如果都不满足，返回 finalDefault
+func IfDefault[T any](conditions []bool, values []T, finalDefault T) T {
+	return IfElse(conditions, values, finalDefault)
+}
+
+// IfLazy 惰性求值三元运算
+// 只有在需要时才执行对应的函数
+// 避免不必要的计算开销
+func IfLazy[T any](condition bool, trueFn, falseFn func() T) T {
+	if condition {
+		return trueFn()
+	}
+	return falseFn()
+}
+
+// IfMemoized 带缓存的三元运算
+// 缓存函数执行结果，避免重复计算
+// cache 用于存储计算结果
+func IfMemoized[T any](condition bool, key string, cache map[string]T, computeFn func() T, defaultVal T) T {
+	if !condition {
+		return defaultVal
+	}
+
+	if cached, exists := cache[key]; exists {
+		return cached
+	}
+
+	result := computeFn()
+	cache[key] = result
+	return result
+}

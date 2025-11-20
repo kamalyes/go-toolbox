@@ -94,7 +94,7 @@ graph TB
 
 | 模块 | 功能描述 | 使用场景 |
 |------|----------|----------|
-| [🔢 mathx](pkg/mathx) | 数学计算增强 | 数据分析、算法实现 |
+| [🔢 mathx](pkg/mathx) | 数学计算增强、三元运算符 | 数据分析、算法实现、条件判断 |
 | [🔐 sign](pkg/sign) | 加密签名工具 | 安全认证、数据完整性 |
 | [✅ validator](pkg/validator) | 数据验证器 | 表单验证、参数检查 |
 
@@ -184,7 +184,7 @@ err := retry.Do(
 )
 ```
 
-#### 🔢 数学计算
+#### 🔢 数学计算与三元运算
 
 ```go
 import "github.com/kamalyes/go-toolbox/pkg/mathx"
@@ -194,6 +194,17 @@ data := []float64{1, 2, 3, 4, 5}
 avg := mathx.Average(data)          // 平均值
 max := mathx.Max(data)              // 最大值
 min := mathx.Min(data)              // 最小值
+
+// 三元运算符
+status := mathx.IF(score >= 60, "及格", "不及格")
+name := mathx.IfNotEmpty(user.Name, "匿名用户")
+value := mathx.IfSafeIndex(slice, index, "默认值")
+
+// 链式条件判断
+result := mathx.WhenValue(age >= 18).
+    ThenReturn("成年人").
+    ElseReturn("未成年人").
+    Get()
 
 // 概率计算
 prob := mathx.Probability(0.8)      // 80% 概率
