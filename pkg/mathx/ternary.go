@@ -212,3 +212,45 @@ func IfCall[T any](condition bool, result T, err error, onTrue func(T, error), o
 		onFalse(result, err)
 	}
 }
+
+// IfExec 根据条件执行副作用操作（无返回值）
+// 适用于只需要执行代码块，不需要返回值的场景
+//
+// Params
+//   - condition: 判断条件，true 时执行 action
+//   - action: 条件为 true 时执行的函数
+//
+// 示例：
+//   mathx.IfExec(user != nil, func() {
+//       log.Printf("User: %s", user.Name)
+//   })
+func IfExec(condition bool, action func()) {
+	if condition && action != nil {
+		action()
+	}
+}
+
+// IfExecElse 根据条件执行不同的副作用操作
+// 类似三元运算符，但用于执行代码块而非返回值
+//
+// Params
+//   - condition: 判断条件
+//   - onTrue: 条件为 true 时执行的函数
+//   - onFalse: 条件为 false 时执行的函数
+//
+// 示例：
+//   mathx.IfExecElse(err == nil,
+//       func() { log.Info("Success") },
+//       func() { log.Error("Failed: " + err.Error()) },
+//   )
+func IfExecElse(condition bool, onTrue func(), onFalse func()) {
+	if condition {
+		if onTrue != nil {
+			onTrue()
+		}
+	} else {
+		if onFalse != nil {
+			onFalse()
+		}
+	}
+}
