@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-01-21 19:15:15
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-13 17:17:15
+ * @LastEditTime: 2025-11-20 11:19:04
  * @FilePath: \go-toolbox\pkg\mathx\ternary.go
  * @Description: 包提供了一组基于 Go 泛型实现的三元运算及条件执行函数，支持同步、异步、带错误处理等多种场景
  *
@@ -10,7 +10,10 @@
  */
 package mathx
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // IF 实现三元运算，使用泛型 T
 // 根据布尔条件 condition 返回 trueVal 或 falseVal
@@ -127,12 +130,13 @@ type ConditionValue[T any] struct {
 // 实现类似 if-else if-else 的多条件链判断，且支持任意泛型类型
 //
 // 示例：
-//   pairs := []ConditionValue[int]{
-//       {Cond: x > 0, Value: 1},
-//       {Cond: x == 0, Value: 0},
-//       {Cond: x < 0, Value: -1},
-//   }
-//   result := IfChain(pairs, 999) // 若都不满足，返回 999
+//
+//	pairs := []ConditionValue[int]{
+//	    {Cond: x > 0, Value: 1},
+//	    {Cond: x == 0, Value: 0},
+//	    {Cond: x < 0, Value: -1},
+//	}
+//	result := IfChain(pairs, 999) // 若都不满足，返回 999
 func IfChain[T any](pairs []ConditionValue[T], defaultVal T) T {
 	for _, pair := range pairs {
 		if pair.Cond {
@@ -198,9 +202,9 @@ func IfDoWithErrorDefault[T any](condition bool, do DoFuncWithError[T], defaultV
 //   - onFalse: 条件为 false 时调用的回调函数，接收 (result, err)
 //
 // 函数逻辑：
-//   1. 根据 condition 选择要调用的回调函数 cb（onTrue 或 onFalse）
-//   2. 如果 cb 不为 nil，则调用 cb(result, err)
-//   3. 如果 cb 为 nil，则跳过调用，避免空指针异常
+//  1. 根据 condition 选择要调用的回调函数 cb（onTrue 或 onFalse）
+//  2. 如果 cb 不为 nil，则调用 cb(result, err)
+//  3. 如果 cb 为 nil，则跳过调用，避免空指针异常
 //
 // 作用：简化根据条件调用不同回调的代码，避免重复写 if-else 和 nil 判断，提高代码简洁性和安全性
 func IfCall[T any](condition bool, result T, err error, onTrue func(T, error), onFalse func(T, error)) {
@@ -221,9 +225,10 @@ func IfCall[T any](condition bool, result T, err error, onTrue func(T, error), o
 //   - action: 条件为 true 时执行的函数
 //
 // 示例：
-//   mathx.IfExec(user != nil, func() {
-//       log.Printf("User: %s", user.Name)
-//   })
+//
+//	mathx.IfExec(user != nil, func() {
+//	    log.Printf("User: %s", user.Name)
+//	})
 func IfExec(condition bool, action func()) {
 	if condition && action != nil {
 		action()
@@ -239,10 +244,11 @@ func IfExec(condition bool, action func()) {
 //   - onFalse: 条件为 false 时执行的函数
 //
 // 示例：
-//   mathx.IfExecElse(err == nil,
-//       func() { log.Info("Success") },
-//       func() { log.Error("Failed: " + err.Error()) },
-//   )
+//
+//	mathx.IfExecElse(err == nil,
+//	    func() { log.Info("Success") },
+//	    func() { log.Error("Failed: " + err.Error()) },
+//	)
 func IfExecElse(condition bool, onTrue func(), onFalse func()) {
 	if condition {
 		if onTrue != nil {
@@ -253,4 +259,64 @@ func IfExecElse(condition bool, onTrue func(), onFalse func()) {
 			onFalse()
 		}
 	}
+}
+
+// MarshalJSONOrDefault 将任意值序列化为 JSON 字符串，失败或空值时返回默认值
+// 适用于需要确保 JSON 字段不为空的场景（如 MySQL JSON 列）
+//
+// 参数：
+//   - value: 待序列化的值（可以是 map、struct、slice 等任意类型）
+//   - defaultVal: 序列化失败或值为空时返回的默认值（通常为 "{}" 或 "[]"）
+//
+// 返回：
+//   - JSON 字符串或默认值
+//
+// 示例：
+//
+//	map[string]string 序列化
+//	extra := map[string]string{"key": "value"}
+//	json := mathx.MarshalJSONOrDefault(extra, "{}") // 返回 {"key":"value"}
+//
+//	空 map 返回默认值
+//	empty := map[string]string{}
+//	json := mathx.MarshalJSONOrDefault(empty, "{}") // 返回 {}
+//
+//	nil 值返回默认值
+//	json := mathx.MarshalJSONOrDefault(nil, "{}") // 返回 {}
+//
+//	序列化失败返回默认值
+//	invalid := make(chan int) // channel 不能序列化
+//	json := mathx.MarshalJSONOrDefault(invalid, "{}") // 返回 {}
+func MarshalJSONOrDefault(value any, defaultVal string) string {
+	// 处理 nil 值
+	if value == nil {
+		return defaultVal
+	}
+
+	// 处理 map 类型的空值检测
+	switch v := value.(type) {
+	case map[string]string:
+		if len(v) == 0 {
+			return defaultVal
+		}
+	case map[string]any:
+		if len(v) == 0 {
+			return defaultVal
+		}
+	}
+
+	// 尝试序列化
+	bytes, err := json.Marshal(value)
+	if err != nil {
+		return defaultVal
+	}
+
+	result := string(bytes)
+
+	// 处理 JSON null 的情况
+	if result == "null" {
+		return defaultVal
+	}
+
+	return result
 }
