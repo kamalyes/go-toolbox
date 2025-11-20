@@ -320,3 +320,109 @@ func MarshalJSONOrDefault(value any, defaultVal string) string {
 
 	return result
 }
+
+// IfChainer 链式调用构建器，支持优雅的三元运算符链式调用
+// 用于简化 if-else 判断，特别是日志记录等副作用操作
+//
+// 示例：
+//
+//	mathx.When(err != nil).
+//	    Then(func() { log.Error("失败") }).
+//	    Else(func() { log.Info("成功") }).
+//	    Do()
+type IfChainer struct {
+	condition bool
+	onTrue    func()
+	onFalse   func()
+}
+
+// When 创建一个链式调用构建器
+// 参数 condition 为判断条件
+func When(condition bool) *IfChainer {
+	return &IfChainer{condition: condition}
+}
+
+// Then 设置条件为 true 时执行的函数
+func (ic *IfChainer) Then(action func()) *IfChainer {
+	ic.onTrue = action
+	return ic
+}
+
+// Else 设置条件为 false 时执行的函数
+func (ic *IfChainer) Else(action func()) *IfChainer {
+	ic.onFalse = action
+	return ic
+}
+
+// Do 执行链式调用
+func (ic *IfChainer) Do() {
+	if ic.condition {
+		if ic.onTrue != nil {
+			ic.onTrue()
+		}
+	} else {
+		if ic.onFalse != nil {
+			ic.onFalse()
+		}
+	}
+}
+
+// IfValueChainer 链式调用构建器（支持返回值）
+// 用于需要返回值的三元运算
+//
+// 示例：
+//
+//	result := mathx.WhenValue(x > 0).
+//	    ThenReturn(100).
+//	    ElseReturn(0).
+//	    Get()
+type IfValueChainer[T any] struct {
+	condition bool
+	trueVal   T
+	falseVal  T
+	trueFn    func() T
+	falseFn   func() T
+}
+
+// WhenValue 创建一个支持返回值的链式调用构建器
+func WhenValue[T any](condition bool) *IfValueChainer[T] {
+	return &IfValueChainer[T]{condition: condition}
+}
+
+// ThenReturn 设置条件为 true 时返回的值
+func (ic *IfValueChainer[T]) ThenReturn(val T) *IfValueChainer[T] {
+	ic.trueVal = val
+	return ic
+}
+
+// ElseReturn 设置条件为 false 时返回的值
+func (ic *IfValueChainer[T]) ElseReturn(val T) *IfValueChainer[T] {
+	ic.falseVal = val
+	return ic
+}
+
+// ThenDo 设置条件为 true 时执行的函数（返回值）
+func (ic *IfValueChainer[T]) ThenDo(fn func() T) *IfValueChainer[T] {
+	ic.trueFn = fn
+	return ic
+}
+
+// ElseDo 设置条件为 false 时执行的函数（返回值）
+func (ic *IfValueChainer[T]) ElseDo(fn func() T) *IfValueChainer[T] {
+	ic.falseFn = fn
+	return ic
+}
+
+// Get 获取最终结果
+func (ic *IfValueChainer[T]) Get() T {
+	if ic.condition {
+		if ic.trueFn != nil {
+			return ic.trueFn()
+		}
+		return ic.trueVal
+	}
+	if ic.falseFn != nil {
+		return ic.falseFn()
+	}
+	return ic.falseVal
+}
