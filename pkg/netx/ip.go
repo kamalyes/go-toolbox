@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-09-18 17:22:25
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-09-18 17:55:15
+ * @LastEditTime: 2025-11-21 16:09:51
  * @FilePath: \go-toolbox\pkg\netx\ip.go
  * @Description:
  *
@@ -15,6 +15,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -93,4 +94,28 @@ func GetConNetPublicIP(urls ...string) (string, error) {
 		return "", err
 	}
 	return string(body), nil
+}
+
+// GetClientIP 从 HTTP 请求中提取客户端 IP
+func GetClientIP(r *http.Request) string {
+	// 1. 尝试从 X-Forwarded-For 头获取
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		// X-Forwarded-For 可能包含多个 IP，取第一个
+		ips := strings.Split(xff, ",")
+		if len(ips) > 0 {
+			return strings.TrimSpace(ips[0])
+		}
+	}
+
+	// 2. 尝试从 X-Real-IP 头获取
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return strings.TrimSpace(xri)
+	}
+
+	// 3. 从 RemoteAddr 获取
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return ip
 }
