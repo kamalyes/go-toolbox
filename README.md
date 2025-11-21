@@ -105,6 +105,7 @@ graph TB
 | [🔁 retry](pkg/retry) | 智能重试机制 | 网络请求、服务调用 |
 | [🎲 random](pkg/random) | 随机数生成 | 测试数据、算法实现 |
 | [🆔 uuid](pkg/uuid) | UUID 生成器 | 唯一标识、分布式 ID |
+| [⚡ idgen](pkg/idgen) | 高性能 ID 生成器 | TraceID、分布式 ID、链路追踪 |
 | [🚦 queue](pkg/queue) | 队列数据结构 | 任务处理、消息队列 |
 
 ## 🚀 快速开始
@@ -208,6 +209,30 @@ result := mathx.WhenValue(age >= 18).
 
 // 概率计算
 prob := mathx.Probability(0.8)      // 80% 概率
+```
+
+#### ⚡ 高性能 ID 生成器
+
+```go
+import "github.com/kamalyes/go-toolbox/pkg/idgen"
+
+// 创建生成器（5种算法可选）
+gen := idgen.NewIDGenerator("uuid")  // uuid, nanoid, snowflake, ulid, default
+
+// 生成各类 ID
+traceID := gen.GenerateTraceID()           // 分布式追踪 ID
+spanID := gen.GenerateSpanID()             // 跨度 ID
+requestID := gen.GenerateRequestID()       // 请求 ID
+correlationID := gen.GenerateCorrelationID() // 关联 ID
+
+// 直接创建特定生成器
+uuidGen := idgen.NewUUIDGenerator()        // UUID v4
+nanoGen := idgen.NewNanoIDGenerator()      // NanoID (21字符)
+snowflakeGen := idgen.NewSnowflakeGenerator(1, 1)  // Snowflake (分布式)
+ulidGen := idgen.NewULIDGenerator()        // ULID (时间排序)
+defaultGen := idgen.NewDefaultIDGenerator() // Default Hex
+
+// 特点：零分配优化、并发安全、多种算法
 ```
 
 ## 📈 性能基准
