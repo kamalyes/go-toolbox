@@ -67,13 +67,24 @@ func (s *SafeAccess) Field(fieldName string) *SafeAccess {
 		return &SafeAccess{valid: false}
 	}
 
+	// 检查字段是否可导出（公开）
+	if !field.CanInterface() {
+		return &SafeAccess{valid: false}
+	}
+
 	// 如果是指针类型且为nil
 	if field.Kind() == reflect.Ptr && field.IsNil() {
 		return &SafeAccess{valid: false}
 	}
 
+	// 如果是指针类型且不为nil，解引用获取实际值
+	fieldValue := field.Interface()
+	if field.Kind() == reflect.Ptr && !field.IsNil() {
+		fieldValue = field.Elem().Interface()
+	}
+
 	return &SafeAccess{
-		value: field.Interface(),
+		value: fieldValue,
 		valid: true,
 	}
 }
@@ -218,17 +229,15 @@ func (s *SafeAccess) String(defaultValue ...string) string {
 		return ""
 	}
 
-	if s, ok := s.value.(string); ok {
-		return s
-	}
-	if sp, ok := s.value.(*string); ok && sp != nil {
-		return *sp
-	}
+	// 使用 convert.MustString 进行强大的类型转换
+	result := convert.MustString(s.value)
 
-	if len(defaultValue) > 0 {
+	// 如果转换结果为空且提供了默认值，使用默认值
+	if result == "" && len(defaultValue) > 0 {
 		return defaultValue[0]
 	}
-	return ""
+
+	return result
 }
 
 // StringOr 获取字符串值，如果无效或为空则返回默认值
@@ -237,20 +246,12 @@ func (s *SafeAccess) StringOr(defaultValue string) string {
 		return defaultValue
 	}
 
-	if str, ok := s.value.(string); ok {
-		if str == "" {
-			return defaultValue
-		}
-		return str
+	// 使用 convert.MustString 进行强大的类型转换
+	result := convert.MustString(s.value)
+	if result == "" {
+		return defaultValue
 	}
-	if sp, ok := s.value.(*string); ok && sp != nil {
-		if *sp == "" {
-			return defaultValue
-		}
-		return *sp
-	}
-
-	return defaultValue
+	return result
 }
 
 // Duration 获取时间间隔值
@@ -331,9 +332,8 @@ func (s *SafeAccess) Filter(predicate func(interface{}) bool) *SafeAccess {
 // SafeGetString 安全获取map中的字符串值
 func SafeGetString(m map[string]interface{}, key string) string {
 	if v, ok := m[key]; ok {
-		if str, ok := v.(string); ok {
-			return str
-		}
+		// 使用 convert.MustString 进行类型转换
+		return convert.MustString(v)
 	}
 	return ""
 }
@@ -341,9 +341,8 @@ func SafeGetString(m map[string]interface{}, key string) string {
 // SafeGetBool 安全获取map中的布尔值
 func SafeGetBool(m map[string]interface{}, key string) bool {
 	if v, ok := m[key]; ok {
-		if b, ok := v.(bool); ok {
-			return b
-		}
+		// 使用 convert.MustBool 进行类型转换
+		return convert.MustBool(v)
 	}
 	return false
 }
@@ -351,12 +350,16 @@ func SafeGetBool(m map[string]interface{}, key string) bool {
 // SafeGetStringSlice 安全获取map中的字符串切片
 func SafeGetStringSlice(m map[string]interface{}, key string) []string {
 	if v, ok := m[key]; ok {
+		// 直接使用[]string类型
+		if slice, ok := v.([]string); ok {
+			return slice
+		}
+		// 处理[]interface{}类型
 		if slice, ok := v.([]interface{}); ok {
 			result := make([]string, 0, len(slice))
 			for _, item := range slice {
-				if str, ok := item.(string); ok {
-					result = append(result, str)
-				}
+				// 使用convert.MustString进行类型转换
+				result = append(result, convert.MustString(item))
 			}
 			return result
 		}
@@ -377,6 +380,14 @@ func splitFieldPath(path string) []string {
 
 // At 通用字段路径访问方法，支持链式调用和默认值
 func (s *SafeAccess) At(fieldPath string, defaultValue ...interface{}) *SafeAccess {
+	// 空路径视为无效
+	if fieldPath == "" {
+		if len(defaultValue) > 0 {
+			return Safe(defaultValue[0])
+		}
+		return &SafeAccess{valid: false}
+	}
+
 	// 支持路径访问，如 "Config.Database.Host"
 	fields := splitFieldPath(fieldPath)
 	current := s
@@ -428,40 +439,30 @@ func (s *SafeAccess) ValueAt(fieldPath string, defaultValue ...interface{}) inte
 
 // GetIntValue 从SafeAccess中获取int值,支持int/int64/float64类型转换
 func (sa *SafeAccess) GetIntValue(defaultValue int) int {
-	if val := sa.Value(); val != nil {
-		switch v := val.(type) {
-		case int:
-			return v
-		case int64:
-			return int(v)
-		case int32:
-			return int(v)
-		case float64:
-			return int(v)
-		case float32:
-			return int(v)
-		}
+	if !sa.valid {
+		return defaultValue
 	}
-	return defaultValue
+
+	// 使用 convert.MustIntT 进行类型转换
+	result, err := convert.MustIntT[int](sa.value, nil)
+	if err != nil {
+		return defaultValue
+	}
+	return result
 }
 
 // GetInt64Value 从SafeAccess中获取int64值,支持int/int64/float64类型转换
 func (sa *SafeAccess) GetInt64Value(defaultValue int64) int64 {
-	if val := sa.Value(); val != nil {
-		switch v := val.(type) {
-		case int64:
-			return v
-		case int:
-			return int64(v)
-		case int32:
-			return int64(v)
-		case float64:
-			return int64(v)
-		case float32:
-			return int64(v)
-		}
+	if !sa.valid {
+		return defaultValue
 	}
-	return defaultValue
+
+	// 使用 convert.MustIntT 进行类型转换
+	result, err := convert.MustIntT[int64](sa.value, nil)
+	if err != nil {
+		return defaultValue
+	}
+	return result
 }
 
 // ==================== 泛型转换方法 ====================

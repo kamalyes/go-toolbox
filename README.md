@@ -21,8 +21,7 @@
 
 <br>
 
-*[English Documentation](README-EN.md) • [API 文档](https://pkg.go.dev/github.com/kamalyes/go-toolbox) • [更新日志](CHANGELOG.md)*
-
+*[API 文档](https://pkg.go.dev/github.com/kamalyes/go-toolbox)*
 </div>
 
 ---
@@ -244,6 +243,14 @@ BenchmarkConvert-8           1000000    1.2 ns/op    0 B/op
 BenchmarkStringx-8            500000    2.4 ns/op    0 B/op  
 BenchmarkMathx-8             2000000    0.8 ns/op    0 B/op
 BenchmarkValidator-8          300000    4.1 ns/op    0 B/op
+```
+
+## 查看测试覆盖率
+
+```bash
+go test -coverprofile coverage.out
+go tool cover -func coverage.out
+go test -v 2>&1 | Select-String -Pattern "FAIL"
 ```
 
 ## 🤝 社区与支持
