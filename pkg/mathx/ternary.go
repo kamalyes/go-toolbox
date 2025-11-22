@@ -652,6 +652,27 @@ func IfLazy[T any](condition bool, trueFn, falseFn func() T) T {
 	return falseFn()
 }
 
+// IfV void 版三元运算 - 执行副作用操作
+// 根据条件执行 trueFunc 或 falseFunc，无返回值
+// 适用于只需要执行操作而不需要返回值的场景
+func IfV(condition bool, trueFunc, falseFunc func()) {
+	if condition {
+		if trueFunc != nil {
+			trueFunc()
+		}
+	} else {
+		if falseFunc != nil {
+			falseFunc()
+		}
+	}
+}
+
+// IfElseFn 函数式三元运算 - 简化版
+// 根据条件返回并执行对应的函数，支持泛型返回值
+func IfElseFn[T any](condition bool, trueVal, falseVal T) T {
+	return IF(condition, trueVal, falseVal)
+}
+
 // IfMemoized 带缓存的三元运算
 // 缓存函数执行结果，避免重复计算
 // cache 用于存储计算结果
