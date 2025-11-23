@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-01-23 09:08:56
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-11-23 19:03:15
+ * @LastEditTime: 2025-11-23 19:35:00
  * @FilePath: \go-toolbox\pkg\syncx\delay.go
  * @Description:
  *
@@ -39,7 +39,24 @@ const (
 // DelayFunc 自定义延迟函数类型
 type DelayFunc func(attempt int, baseDelay time.Duration) time.Duration
 
-// ExecutionResult 执行结果
+// ExecutionContext 执行上下文，包含执行过程中的全部信息
+type ExecutionContext struct {
+	Index      int                    // 执行索引
+	Attempt    int                    // 尝试次数（从0开始）
+	StartTime  time.Time              // 开始时间
+	EndTime    time.Time              // 结束时间
+	Duration   time.Duration          // 执行耗时
+	Error      error                  // 执行错误
+	Skipped    bool                   // 是否被跳过
+	Delay      time.Duration          // 实际延迟时间
+	Strategy   DelayStrategy          // 使用的延迟策略
+	Concurrent bool                   // 是否并发执行
+	Cancelled  bool                   // 是否被取消
+	Retryable  bool                   // 是否可重试
+	Metadata   map[string]interface{} // 自定义元数据
+}
+
+// ExecutionResult 执行结果（为了向后兼容保留）
 type ExecutionResult struct {
 	Index     int           // 执行索引
 	StartTime time.Time     // 开始时间
@@ -49,23 +66,53 @@ type ExecutionResult struct {
 	Skipped   bool          // 是否被跳过
 }
 
-// ExecutionStats 执行统计
-type ExecutionStats struct {
-	Total     int64         // 总执行次数
-	Success   int64         // 成功次数
-	Failed    int64         // 失败次数
-	Skipped   int64         // 跳过次数
-	TotalTime time.Duration // 总耗时
-	AvgTime   time.Duration // 平均耗时
+// ToExecutionContext 将 ExecutionResult 转换为 ExecutionContext
+func (r *ExecutionResult) ToExecutionContext() *ExecutionContext {
+	return &ExecutionContext{
+		Index:     r.Index,
+		StartTime: r.StartTime,
+		EndTime:   r.EndTime,
+		Duration:  r.Duration,
+		Error:     r.Error,
+		Skipped:   r.Skipped,
+		Metadata:  make(map[string]interface{}),
+	}
 }
 
-// Delayer 结构体，用于支持链式调用的延迟执行器
-type Delayer struct {
+// TaskFunc 泛型任务函数类型
+type TaskFunc[T any] func(ctx *ExecutionContext) (T, error)
+
+// SimpleTaskFunc 简单任务函数类型（无返回值）
+type SimpleTaskFunc func(ctx *ExecutionContext) error
+
+// CallbackFunc 泛型回调函数类型
+type CallbackFunc[T any] func(ctx *ExecutionContext, result T)
+
+// ErrorHandlerFunc 错误处理回调函数类型
+type ErrorHandlerFunc func(ctx *ExecutionContext) (shouldContinue bool)
+
+// TaskProgressFunc 任务进度回调函数类型
+type TaskProgressFunc func(completed int64, total int64, percentage float64)
+
+// ExecutionStats 执行统计
+type ExecutionStats struct {
+	StartTime      time.Time     // 开始时间
+	EndTime        time.Time     // 结束时间
+	TotalDuration  time.Duration // 总耗时
+	SuccessCount   int64         // 成功次数
+	ErrorCount     int64         // 错误次数
+	SkippedCount   int64         // 跳过次数
+	CancelledCount int64         // 取消次数
+}
+
+// Delayer 统一的泛型延迟执行器
+type Delayer[T any] struct {
 	// 基本配置
 	delay           time.Duration // 基础延迟时间
 	execCount       int           // 执行次数
 	function        func() error  // 要执行的函数（支持返回错误）
 	functionNoError func()        // 无错误返回的函数
+	taskFunc        TaskFunc[T]   // 泛型任务函数
 
 	// 延迟策略相关
 	strategy        DelayStrategy // 延迟策略
@@ -82,9 +129,21 @@ type Delayer struct {
 	stopOnError    bool               // 遇到错误是否停止
 
 	// 回调和监控
-	onStart    func(index int)                 // 开始执行回调
-	onComplete func(result *ExecutionResult)   // 完成执行回调
-	onError    func(index int, err error) bool // 错误处理回调（返回true表示继续执行）
+	onBeforeStart   func(ctx *ExecutionContext) // 开始执行前回调
+	onAfterComplete func(ctx *ExecutionContext) // 完成执行后回调
+	onError         ErrorHandlerFunc            // 错误处理回调
+	onProgress      TaskProgressFunc            // 进度回调
+	onSuccess       CallbackFunc[T]             // 泛型成功回调
+
+	// 性能优化相关
+	callbackPool     sync.Pool // ExecutionContext 对象池
+	disableCallbacks bool      // 禁用回调以提升性能
+
+	// 泛型结果相关
+	resultChannel    chan T       // 结果通道
+	genericResults   []T          // 泛型任务结果集合
+	genericResultsMu sync.RWMutex // 泛型结果集合读写锁
+	channelClosed    int64        // 通道是否已关闭 (0=开启, 1=关闭)
 
 	// 内部状态
 	timers         []*time.Timer      // 计时器列表
@@ -97,10 +156,10 @@ type Delayer struct {
 	pendingTasks   int64              // 待执行任务数
 }
 
-// NewDelayer 创建一个新的 Delayer 实例
-func NewDelayer() *Delayer {
+// NewDelayer 创建一个新的泛型 Delayer 实例
+func NewDelayer[T any]() *Delayer[T] {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &Delayer{
+	d := &Delayer[T]{
 		delay:          0,
 		execCount:      1,
 		strategy:       FixedDelayStrategy,
@@ -116,483 +175,599 @@ func NewDelayer() *Delayer {
 		results:        make([]*ExecutionResult, 0),
 		timers:         make([]*time.Timer, 0),
 		completionChan: make(chan struct{}),
+		resultChannel:  make(chan T, 100), // 泛型结果通道
+		genericResults: make([]T, 0, 100), // 预分配容量以减少重新分配
 	}
+
+	// 初始化对象池
+	d.callbackPool = sync.Pool{
+		New: func() interface{} {
+			return &ExecutionContext{
+				Metadata: make(map[string]interface{}),
+			}
+		},
+	}
+
+	return d
 }
 
 // WithDelay 设置基础延迟时间
-func (d *Delayer) WithDelay(delay time.Duration) *Delayer {
+func (d *Delayer[T]) WithDelay(delay time.Duration) *Delayer[T] {
 	d.delay = delay
 	return d
 }
 
-// WithFunction 设置要执行的函数（支持错误返回）
-func (d *Delayer) WithFunction(f func() error) *Delayer {
+// WithFunction 设置要执行的函数
+func (d *Delayer[T]) WithFunction(f func() error) *Delayer[T] {
 	d.function = f
 	return d
 }
 
-// WithSimpleFunction 设置要执行的函数（无错误返回）
-func (d *Delayer) WithSimpleFunction(f func()) *Delayer {
+// WithSimpleFunction 设置无返回值的函数
+func (d *Delayer[T]) WithSimpleFunction(f func()) *Delayer[T] {
 	d.functionNoError = f
 	return d
 }
 
-// WithTimes 设置执行次数
-func (d *Delayer) WithTimes(count int) *Delayer {
-	if count > 0 {
-		d.execCount = count
+// WithTaskFunc 设置泛型任务函数
+func (d *Delayer[T]) WithTaskFunc(taskFunc TaskFunc[T]) *Delayer[T] {
+	d.taskFunc = taskFunc
+	return d
+}
+
+// WithSimpleTaskFunc 设置简单任务函数（无返回值）
+func (d *Delayer[T]) WithSimpleTaskFunc(taskFunc SimpleTaskFunc) *Delayer[T] {
+	d.taskFunc = func(ctx *ExecutionContext) (T, error) {
+		var zero T
+		err := taskFunc(ctx)
+		return zero, err
 	}
 	return d
 }
 
+// WithTimes 设置执行次数
+func (d *Delayer[T]) WithTimes(count int) *Delayer[T] {
+	if count <= 0 {
+		count = 1
+	}
+	d.execCount = count
+	return d
+}
+
 // WithStrategy 设置延迟策略
-func (d *Delayer) WithStrategy(strategy DelayStrategy) *Delayer {
+func (d *Delayer[T]) WithStrategy(strategy DelayStrategy) *Delayer[T] {
 	d.strategy = strategy
 	return d
 }
 
 // WithCustomDelay 设置自定义延迟函数
-func (d *Delayer) WithCustomDelay(delayFunc DelayFunc) *Delayer {
-	d.strategy = CustomDelayStrategy
+func (d *Delayer[T]) WithCustomDelay(delayFunc DelayFunc) *Delayer[T] {
 	d.customDelayFunc = delayFunc
+	d.strategy = CustomDelayStrategy
 	return d
 }
 
-// WithRandomBase 设置随机基数
-func (d *Delayer) WithRandomBase(base float64) *Delayer {
-	if base > 0 {
-		d.randomBase = base
+// WithRandomBase 设置随机基数（用于随机延迟策略）
+func (d *Delayer[T]) WithRandomBase(base float64) *Delayer[T] {
+	if base <= 0 {
+		base = 1.0
 	}
+	d.randomBase = base
 	return d
 }
 
 // WithMaxDelay 设置最大延迟时间
-func (d *Delayer) WithMaxDelay(maxDelay time.Duration) *Delayer {
+func (d *Delayer[T]) WithMaxDelay(maxDelay time.Duration) *Delayer[T] {
 	d.maxDelay = maxDelay
 	return d
 }
 
 // WithMultiplier 设置指数策略的倍数
-func (d *Delayer) WithMultiplier(multiplier float64) *Delayer {
-	if multiplier > 0 {
-		d.multiplier = multiplier
+func (d *Delayer[T]) WithMultiplier(multiplier float64) *Delayer[T] {
+	if multiplier <= 1.0 {
+		multiplier = 2.0
 	}
+	d.multiplier = multiplier
 	return d
 }
 
 // WithContext 设置上下文
-func (d *Delayer) WithContext(ctx context.Context) *Delayer {
-	d.cancelFunc() // 取消之前的上下文
+func (d *Delayer[T]) WithContext(ctx context.Context) *Delayer[T] {
+	if d.cancelFunc != nil {
+		d.cancelFunc()
+	}
 	d.ctx, d.cancelFunc = context.WithCancel(ctx)
 	return d
 }
 
 // WithConcurrent 设置是否并发执行
-func (d *Delayer) WithConcurrent(concurrent bool) *Delayer {
+func (d *Delayer[T]) WithConcurrent(concurrent bool) *Delayer[T] {
 	d.concurrent = concurrent
 	return d
 }
 
 // WithMaxConcurrency 设置最大并发数
-func (d *Delayer) WithMaxConcurrency(maxConcurrency int) *Delayer {
-	if maxConcurrency > 0 {
-		d.maxConcurrency = maxConcurrency
+func (d *Delayer[T]) WithMaxConcurrency(maxConcurrency int) *Delayer[T] {
+	if maxConcurrency <= 0 {
+		maxConcurrency = 10
 	}
+	d.maxConcurrency = maxConcurrency
 	return d
 }
 
 // WithStopOnError 设置遇到错误是否停止
-func (d *Delayer) WithStopOnError(stopOnError bool) *Delayer {
+func (d *Delayer[T]) WithStopOnError(stopOnError bool) *Delayer[T] {
 	d.stopOnError = stopOnError
 	return d
 }
 
-// WithOnStart 设置开始执行回调
-func (d *Delayer) WithOnStart(callback func(index int)) *Delayer {
-	d.onStart = callback
+// WithOnBeforeStart 设置开始执行前回调
+func (d *Delayer[T]) WithOnBeforeStart(callback func(ctx *ExecutionContext)) *Delayer[T] {
+	d.onBeforeStart = callback
 	return d
 }
 
-// WithOnComplete 设置完成执行回调
-func (d *Delayer) WithOnComplete(callback func(result *ExecutionResult)) *Delayer {
-	d.onComplete = callback
+// WithOnStart 设置开始执行回调（向后兼容）
+func (d *Delayer[T]) WithOnStart(callback func(index int)) *Delayer[T] {
+	d.onBeforeStart = func(ctx *ExecutionContext) {
+		callback(ctx.Index)
+	}
 	return d
 }
 
-// WithOnError 设置错误处理回调
-func (d *Delayer) WithOnError(callback func(index int, err error) bool) *Delayer {
+// WithOnAfterComplete 设置完成执行后回调
+func (d *Delayer[T]) WithOnAfterComplete(callback func(ctx *ExecutionContext)) *Delayer[T] {
+	d.onAfterComplete = callback
+	return d
+}
+
+// WithOnComplete 设置完成执行回调（向后兼容）
+func (d *Delayer[T]) WithOnComplete(callback func(result *ExecutionResult)) *Delayer[T] {
+	d.onAfterComplete = func(ctx *ExecutionContext) {
+		result := &ExecutionResult{
+			Index:     ctx.Index,
+			StartTime: ctx.StartTime,
+			EndTime:   ctx.EndTime,
+			Duration:  ctx.Duration,
+			Error:     ctx.Error,
+			Skipped:   ctx.Skipped,
+		}
+		callback(result)
+	}
+	return d
+}
+
+// WithOnError 设置错误处理回调（向后兼容）
+func (d *Delayer[T]) WithOnError(callback func(index int, err error) bool) *Delayer[T] {
+	d.onError = func(ctx *ExecutionContext) bool {
+		return callback(ctx.Index, ctx.Error)
+	}
+	return d
+}
+
+// WithOnErrorContext 设置错误处理回调
+func (d *Delayer[T]) WithOnErrorContext(callback ErrorHandlerFunc) *Delayer[T] {
 	d.onError = callback
 	return d
 }
 
-// calculateDelay 计算延迟时间
-func (d *Delayer) calculateDelay(attempt int) time.Duration {
-	var delay time.Duration
+// WithOnProgress 设置进度回调
+func (d *Delayer[T]) WithOnProgress(callback TaskProgressFunc) *Delayer[T] {
+	d.onProgress = callback
+	return d
+}
 
+// WithOnSuccess 设置成功回调
+func (d *Delayer[T]) WithOnSuccess(callback CallbackFunc[T]) *Delayer[T] {
+	d.onSuccess = callback
+	return d
+}
+
+// WithDisableCallbacks 设置是否禁用回调以提升性能
+func (d *Delayer[T]) WithDisableCallbacks(disable bool) *Delayer[T] {
+	d.disableCallbacks = disable
+	return d
+}
+
+// GetResults 获取所有泛型任务结果
+func (d *Delayer[T]) GetResults() []T {
+	d.genericResultsMu.RLock()
+	defer d.genericResultsMu.RUnlock()
+	results := make([]T, len(d.genericResults))
+	copy(results, d.genericResults)
+	return results
+}
+
+// GetResultChannel 获取结果通道（只读）
+func (d *Delayer[T]) GetResultChannel() <-chan T {
+	return d.resultChannel
+}
+
+// calculateDelay 根据策略计算延迟时间
+func (d *Delayer[T]) calculateDelay(attempt int) time.Duration {
 	switch d.strategy {
 	case FixedDelayStrategy:
-		delay = d.delay
+		return d.delay
+
 	case LinearDelayStrategy:
-		delay = d.delay * time.Duration(attempt+1)
+		delay := d.delay * time.Duration(attempt+1)
+		if d.maxDelay > 0 && delay > d.maxDelay {
+			return d.maxDelay
+		}
+		return delay
+
 	case ExponentialDelayStrategy:
-		delay = time.Duration(float64(d.delay) * math.Pow(d.multiplier, float64(attempt)))
+		delay := time.Duration(float64(d.delay) * math.Pow(d.multiplier, float64(attempt)))
+		if d.maxDelay > 0 && delay > d.maxDelay {
+			return d.maxDelay
+		}
+		return delay
+
 	case RandomDelayStrategy:
-		randomFactor := rand.Float64() * d.randomBase
-		delay = time.Duration(float64(d.delay) * randomFactor)
+		min := float64(d.delay) / d.randomBase
+		max := float64(d.delay) * d.randomBase
+		randomDelay := time.Duration(min + rand.Float64()*(max-min))
+		if d.maxDelay > 0 && randomDelay > d.maxDelay {
+			return d.maxDelay
+		}
+		return randomDelay
+
 	case CustomDelayStrategy:
 		if d.customDelayFunc != nil {
-			delay = d.customDelayFunc(attempt, d.delay)
-		} else {
-			delay = d.delay
+			delay := d.customDelayFunc(attempt, d.delay)
+			if d.maxDelay > 0 && delay > d.maxDelay {
+				return d.maxDelay
+			}
+			return delay
 		}
+		return d.delay
+
 	default:
-		delay = d.delay
+		return d.delay
+	}
+}
+
+// getExecutionContext 从对象池获取 ExecutionContext
+func (d *Delayer[T]) getExecutionContext() *ExecutionContext {
+	if d.disableCallbacks {
+		// 当回调被禁用时，返回一个简单的上下文
+		return &ExecutionContext{
+			Metadata: make(map[string]interface{}),
+		}
 	}
 
-	// 应用最大延迟限制
-	if delay > d.maxDelay {
-		delay = d.maxDelay
+	// 从对象池获取
+	ctx := d.callbackPool.Get().(*ExecutionContext)
+
+	// 重置状态
+	ctx.Error = nil
+	ctx.Skipped = false
+	ctx.Cancelled = false
+	ctx.Retryable = true
+	for k := range ctx.Metadata {
+		delete(ctx.Metadata, k)
 	}
 
-	return delay
+	return ctx
+}
+
+// putExecutionContext 归还 ExecutionContext 到对象池
+func (d *Delayer[T]) putExecutionContext(ctx *ExecutionContext) {
+	if !d.disableCallbacks {
+		d.callbackPool.Put(ctx)
+	}
+}
+
+// Close 关闭结果通道
+func (d *Delayer[T]) Close() {
+	// 使用原子操作设置关闭状态
+	if atomic.CompareAndSwapInt64(&d.channelClosed, 0, 1) {
+		close(d.resultChannel)
+	}
+}
+
+// safeChannelSend 安全地向通道发送结果（使用原子操作优化性能）
+func (d *Delayer[T]) safeChannelSend(result T) {
+	// 使用原子操作检查通道状态
+	if atomic.LoadInt64(&d.channelClosed) == 0 {
+		// 使用 select 防止阻塞，如果通道在发送过程中被关闭也不会 panic
+		select {
+		case d.resultChannel <- result:
+			// 成功发送
+		default:
+			// 通道已满，丢弃结果
+		}
+	}
+}
+
+// Execute 执行延迟任务
+func (d *Delayer[T]) Execute() error {
+	if d.function == nil && d.functionNoError == nil && d.taskFunc == nil {
+		return fmt.Errorf("no function to execute")
+	}
+
+	// 执行延迟任务
+	if d.taskFunc != nil {
+		// 如果有泛型任务函数，直接执行
+		return d.executeSequentially()
+	}
+
+	d.stats.StartTime = time.Now()
+	defer func() {
+		d.stats.EndTime = time.Now()
+		d.stats.TotalDuration = d.stats.EndTime.Sub(d.stats.StartTime)
+	}()
+
+	if d.concurrent {
+		return d.executeConcurrently()
+	}
+	return d.executeSequentially()
+}
+
+// executeSequentially 顺序执行
+func (d *Delayer[T]) executeSequentially() error {
+	for i := 0; i < d.execCount; i++ {
+		if atomic.LoadInt64(&d.stopped) == 1 {
+			break
+		}
+
+		// 检查上下文是否被取消
+		select {
+		case <-d.ctx.Done():
+			return d.ctx.Err()
+		default:
+		}
+
+		// 延迟执行
+		if d.delay > 0 || d.strategy != FixedDelayStrategy {
+			delay := d.calculateDelay(i)
+			if delay > 0 {
+				timer := time.NewTimer(delay)
+				d.timers = append(d.timers, timer)
+
+				select {
+				case <-timer.C:
+				case <-d.ctx.Done():
+					timer.Stop()
+					return d.ctx.Err()
+				}
+			}
+		}
+
+		// 执行任务
+		err := d.executeTask(i)
+		if err != nil {
+			atomic.AddInt64(&d.stats.ErrorCount, 1)
+			if d.stopOnError {
+				return err
+			}
+		} else {
+			atomic.AddInt64(&d.stats.SuccessCount, 1)
+		}
+
+		// 更新进度
+		if d.onProgress != nil && !d.disableCallbacks {
+			completed := int64(i + 1)
+			total := int64(d.execCount)
+			percentage := float64(completed) / float64(total) * 100
+			d.onProgress(completed, total, percentage)
+		}
+	}
+
+	// 通知任务完成
+	close(d.completionChan)
+	return nil
+}
+
+// executeConcurrently 并发执行
+func (d *Delayer[T]) executeConcurrently() error {
+	semaphore := make(chan struct{}, d.maxConcurrency)
+	errChan := make(chan error, d.execCount)
+	var wg sync.WaitGroup
+
+	atomic.StoreInt64(&d.pendingTasks, int64(d.execCount))
+
+	for i := 0; i < d.execCount; i++ {
+		if atomic.LoadInt64(&d.stopped) == 1 {
+			break
+		}
+
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			defer atomic.AddInt64(&d.pendingTasks, -1)
+
+			// 获取信号量
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }()
+
+			// 增加运行计数
+			atomic.AddInt64(&d.running, 1)
+			defer atomic.AddInt64(&d.running, -1)
+
+			// 检查上下文是否被取消
+			select {
+			case <-d.ctx.Done():
+				errChan <- d.ctx.Err()
+				return
+			default:
+			}
+
+			// 延迟执行
+			if d.delay > 0 || d.strategy != FixedDelayStrategy {
+				delay := d.calculateDelay(index)
+				if delay > 0 {
+					timer := time.NewTimer(delay)
+					select {
+					case <-timer.C:
+					case <-d.ctx.Done():
+						timer.Stop()
+						errChan <- d.ctx.Err()
+						return
+					}
+				}
+			}
+
+			// 执行任务
+			err := d.executeTask(index)
+			if err != nil {
+				atomic.AddInt64(&d.stats.ErrorCount, 1)
+				if d.stopOnError {
+					errChan <- err
+					return
+				}
+			} else {
+				atomic.AddInt64(&d.stats.SuccessCount, 1)
+			}
+
+			// 更新进度
+			if d.onProgress != nil && !d.disableCallbacks {
+				completed := atomic.LoadInt64(&d.stats.SuccessCount) + atomic.LoadInt64(&d.stats.ErrorCount)
+				total := int64(d.execCount)
+				percentage := float64(completed) / float64(total) * 100
+				d.onProgress(completed, total, percentage)
+			}
+		}(i)
+	}
+
+	// 等待所有任务完成
+	go func() {
+		wg.Wait()
+		close(errChan)
+		close(d.completionChan)
+	}()
+
+	// 收集错误
+	var lastErr error
+	for err := range errChan {
+		if err != nil {
+			lastErr = err
+			if d.stopOnError {
+				atomic.StoreInt64(&d.stopped, 1)
+			}
+		}
+	}
+
+	return lastErr
 }
 
 // executeTask 执行单个任务
-func (d *Delayer) executeTask(index int) {
-	// 增加运行中的任务计数
-	atomic.AddInt64(&d.running, 1)
-	defer func() {
-		// 减少运行中的任务计数
-		running := atomic.AddInt64(&d.running, -1)
-		pending := atomic.AddInt64(&d.pendingTasks, -1)
+func (d *Delayer[T]) executeTask(index int) error {
+	ctx := d.getExecutionContext()
+	defer d.putExecutionContext(ctx)
 
-		// 如果所有任务都完成了，关闭完成通道
-		if running == 0 && pending == 0 {
-			select {
-			case <-d.completionChan:
-				// 通道已经关闭
-			default:
-				close(d.completionChan)
+	ctx.Index = index
+	ctx.Attempt = 0
+	ctx.StartTime = time.Now()
+	ctx.Strategy = d.strategy
+	ctx.Concurrent = d.concurrent
+
+	// 前置回调
+	if d.onBeforeStart != nil && !d.disableCallbacks {
+		d.onBeforeStart(ctx)
+	}
+
+	var err error
+	// 优先执行泛型任务函数
+	if d.taskFunc != nil {
+		result, taskErr := d.taskFunc(ctx)
+		err = taskErr
+		if err == nil {
+			// 使用预分配的切片以减少内存分配
+			d.genericResultsMu.Lock()
+			d.genericResults = append(d.genericResults, result)
+			d.genericResultsMu.Unlock()
+
+			// 高性能的通道发送
+			d.safeChannelSend(result)
+
+			// 调用成功回调
+			if d.onSuccess != nil && !d.disableCallbacks {
+				d.onSuccess(ctx, result)
 			}
 		}
-	}()
-
-	if atomic.LoadInt64(&d.stopped) == 1 {
-		return
-	}
-
-	result := &ExecutionResult{
-		Index:     index,
-		StartTime: time.Now(),
-	}
-
-	// 检查上下文是否已取消
-	select {
-	case <-d.ctx.Done():
-		result.Error = d.ctx.Err()
-		result.Skipped = true
-		result.EndTime = time.Now()
-		result.Duration = result.EndTime.Sub(result.StartTime)
-		d.recordResult(result)
-		return
-	default:
-	}
-
-	// 调用开始回调
-	if d.onStart != nil {
-		d.onStart(index)
-	}
-
-	// 执行函数
-	var err error
-	if d.function != nil {
+	} else if d.function != nil {
 		err = d.function()
 	} else if d.functionNoError != nil {
 		d.functionNoError()
 	}
 
-	result.EndTime = time.Now()
-	result.Duration = result.EndTime.Sub(result.StartTime)
-	result.Error = err
+	ctx.EndTime = time.Now()
+	ctx.Duration = ctx.EndTime.Sub(ctx.StartTime)
+	ctx.Error = err
 
-	// 记录结果
-	d.recordResult(result)
-
-	// 处理错误
-	if err != nil {
-		shouldContinue := true
-		if d.onError != nil {
-			shouldContinue = d.onError(index, err)
-		}
-
-		if d.stopOnError || !shouldContinue {
-			atomic.StoreInt64(&d.stopped, 1)
-			d.Stop()
+	// 如果有错误，尝试调用错误处理回调
+	if err != nil && d.onError != nil && !d.disableCallbacks {
+		shouldContinue := d.onError(ctx)
+		if !shouldContinue {
+			return err
 		}
 	}
 
-	// 调用完成回调
-	if d.onComplete != nil {
-		d.onComplete(result)
+	// 后置回调
+	if d.onAfterComplete != nil && !d.disableCallbacks {
+		d.onAfterComplete(ctx)
 	}
-}
 
-// recordResult 记录执行结果
-func (d *Delayer) recordResult(result *ExecutionResult) {
+	// 保存执行结果
+	result := &ExecutionResult{
+		Index:     index,
+		StartTime: ctx.StartTime,
+		EndTime:   ctx.EndTime,
+		Duration:  ctx.Duration,
+		Error:     err,
+		Skipped:   ctx.Skipped,
+	}
+
 	d.mu.Lock()
-	defer d.mu.Unlock()
-
 	d.results = append(d.results, result)
-
-	// 更新统计信息
-	atomic.AddInt64(&d.stats.Total, 1)
-	d.stats.TotalTime += result.Duration
-
-	if result.Skipped {
-		atomic.AddInt64(&d.stats.Skipped, 1)
-	} else if result.Error != nil {
-		atomic.AddInt64(&d.stats.Failed, 1)
-	} else {
-		atomic.AddInt64(&d.stats.Success, 1)
-	}
-
-	// 计算平均时间
-	if d.stats.Total > 0 {
-		d.stats.AvgTime = d.stats.TotalTime / time.Duration(d.stats.Total)
-	}
-}
-
-// Build 开始延迟执行
-func (d *Delayer) Build() *Delayer {
-	if d.function == nil && d.functionNoError == nil {
-		return d
-	}
-
-	atomic.StoreInt64(&d.stopped, 0)
-	atomic.StoreInt64(&d.pendingTasks, int64(d.execCount))
-	atomic.StoreInt64(&d.running, 0)
-
-	// 重新创建完成通道
-	d.mu.Lock()
-	d.completionChan = make(chan struct{})
 	d.mu.Unlock()
 
-	if d.concurrent {
-		d.buildConcurrent()
-	} else {
-		d.buildSequential()
-	}
-
-	return d
+	return err
 }
 
-// buildSequential 顺序执行
-func (d *Delayer) buildSequential() {
-	for i := 0; i < d.execCount; i++ {
-		if atomic.LoadInt64(&d.stopped) == 1 {
-			break
-		}
-
-		delay := d.calculateDelay(i)
-
-		timer := time.AfterFunc(delay, func(index int) func() {
-			return func() {
-				// 在执行前再次检查是否应该停止
-				if atomic.LoadInt64(&d.stopped) == 1 {
-					// 减少待执行任务计数
-					pending := atomic.AddInt64(&d.pendingTasks, -1)
-					running := atomic.LoadInt64(&d.running)
-					if running == 0 && pending == 0 {
-						select {
-						case <-d.completionChan:
-							// 通道已经关闭
-						default:
-							close(d.completionChan)
-						}
-					}
-					return
-				}
-				// 检查上下文是否已取消
-				select {
-				case <-d.ctx.Done():
-					// 减少待执行任务计数
-					pending := atomic.AddInt64(&d.pendingTasks, -1)
-					running := atomic.LoadInt64(&d.running)
-					if running == 0 && pending == 0 {
-						select {
-						case <-d.completionChan:
-							// 通道已经关闭
-						default:
-							close(d.completionChan)
-						}
-					}
-					return
-				default:
-					d.executeTask(index)
-				}
-			}
-		}(i))
-
-		d.mu.Lock()
-		d.timers = append(d.timers, timer)
-		d.mu.Unlock()
-	}
-}
-
-// buildConcurrent 并发执行
-func (d *Delayer) buildConcurrent() {
-	semaphore := make(chan struct{}, d.maxConcurrency)
-
-	for i := 0; i < d.execCount; i++ {
-		if atomic.LoadInt64(&d.stopped) == 1 {
-			break
-		}
-
-		delay := d.calculateDelay(i)
-
-		timer := time.AfterFunc(delay, func(index int) func() {
-			return func() {
-				// 在执行前再次检查是否应该停止
-				if atomic.LoadInt64(&d.stopped) == 1 {
-					// 减少待执行任务计数
-					pending := atomic.AddInt64(&d.pendingTasks, -1)
-					running := atomic.LoadInt64(&d.running)
-					if running == 0 && pending == 0 {
-						select {
-						case <-d.completionChan:
-							// 通道已经关闭
-						default:
-							close(d.completionChan)
-						}
-					}
-					return
-				}
-				// 检查上下文是否已取消
-				select {
-				case <-d.ctx.Done():
-					// 减少待执行任务计数
-					pending := atomic.AddInt64(&d.pendingTasks, -1)
-					running := atomic.LoadInt64(&d.running)
-					if running == 0 && pending == 0 {
-						select {
-						case <-d.completionChan:
-							// 通道已经关闭
-						default:
-							close(d.completionChan)
-						}
-					}
-					return
-				default:
-					semaphore <- struct{}{} // 获取信号量
-					go func() {
-						defer func() { <-semaphore }() // 释放信号量
-						d.executeTask(index)
-					}()
-				}
-			}
-		}(i))
-
-		d.mu.Lock()
-		d.timers = append(d.timers, timer)
-		d.mu.Unlock()
-	}
-}
-
-// Stop 停止所有待执行的任务
-func (d *Delayer) Stop() {
+// Stop 停止执行
+func (d *Delayer[T]) Stop() {
 	atomic.StoreInt64(&d.stopped, 1)
-	d.cancelFunc()
-
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	if d.cancelFunc != nil {
+		d.cancelFunc()
+	}
 
 	// 停止所有计时器
+	d.mu.Lock()
 	for _, timer := range d.timers {
 		timer.Stop()
 	}
+	d.timers = d.timers[:0]
+	d.mu.Unlock()
 }
 
-// Wait 等待所有任务完成
-// Wait 等待上下文取消
-func (d *Delayer) Wait() {
-	<-d.ctx.Done()
-}
-
-// WaitForCompletion 等待所有任务完成
-func (d *Delayer) WaitForCompletion() {
-	<-d.completionChan
-}
-
-// WaitForCompletionWithTimeout 等待所有任务完成（带超时）
-func (d *Delayer) WaitForCompletionWithTimeout(timeout time.Duration) bool {
-	select {
-	case <-d.completionChan:
-		return true
-	case <-time.After(timeout):
-		return false
-	}
-}
-
-// GetResults 获取所有执行结果
-func (d *Delayer) GetResults() []*ExecutionResult {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-
-	results := make([]*ExecutionResult, len(d.results))
-	copy(results, d.results)
-	return results
-}
-
-// GetStats 获取执行统计信息
-func (d *Delayer) GetStats() *ExecutionStats {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-
-	return &ExecutionStats{
-		Total:     atomic.LoadInt64(&d.stats.Total),
-		Success:   atomic.LoadInt64(&d.stats.Success),
-		Failed:    atomic.LoadInt64(&d.stats.Failed),
-		Skipped:   atomic.LoadInt64(&d.stats.Skipped),
-		TotalTime: d.stats.TotalTime,
-		AvgTime:   d.stats.AvgTime,
-	}
-}
-
-// IsRunning 检查是否有任务正在运行
-func (d *Delayer) IsRunning() bool {
+// IsRunning 检查是否正在运行
+func (d *Delayer[T]) IsRunning() bool {
 	return atomic.LoadInt64(&d.running) > 0
 }
 
-// IsStopped 检查是否已停止
-func (d *Delayer) IsStopped() bool {
-	return atomic.LoadInt64(&d.stopped) == 1
+// GetStats 获取执行统计
+func (d *Delayer[T]) GetStats() *ExecutionStats {
+	return d.stats
 }
 
-// Reset 重置所有状态
-func (d *Delayer) Reset() *Delayer {
-	d.Stop()
-
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	d.results = make([]*ExecutionResult, 0)
-	d.timers = make([]*time.Timer, 0)
-	d.stats = &ExecutionStats{}
-	d.completionChan = make(chan struct{})
-	atomic.StoreInt64(&d.stopped, 0)
-	atomic.StoreInt64(&d.running, 0)
-	atomic.StoreInt64(&d.pendingTasks, 0)
-
-	// 重新创建上下文
-	ctx, cancel := context.WithCancel(context.Background())
-	d.ctx = ctx
-	d.cancelFunc = cancel
-
-	return d
+// Wait 等待上下文取消
+func (d *Delayer[T]) Wait() error {
+	<-d.ctx.Done()
+	return d.ctx.Err()
 }
 
-// String 返回当前配置的字符串表示
-func (d *Delayer) String() string {
-	return fmt.Sprintf("Delayer{delay=%v, count=%d, strategy=%d, concurrent=%v, maxConcurrency=%d}",
-		d.delay, d.execCount, d.strategy, d.concurrent, d.maxConcurrency)
+// WaitForCompletion 等待任务完成
+func (d *Delayer[T]) WaitForCompletion() {
+	<-d.completionChan
+}
+
+// GetLegacyResults 获取所有执行结果（向后兼容）
+func (d *Delayer[T]) GetLegacyResults() []*ExecutionResult {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	results := make([]*ExecutionResult, len(d.results))
+	copy(results, d.results)
+	return results
 }
