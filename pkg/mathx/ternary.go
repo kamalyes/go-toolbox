@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-01-21 19:15:15
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-11-20 11:19:04
+ * @LastEditTime: 2025-11-23 19:20:21
  * @FilePath: \go-toolbox\pkg\mathx\ternary.go
  * @Description: 包提供了一组基于 Go 泛型实现的三元运算及条件执行函数，支持同步、异步、带错误处理等多种场景
  *
@@ -102,7 +102,7 @@ func IfDoAsyncWithTimeout[T any](condition bool, do DoFunc[T], defaultVal T, tim
 	return out
 }
 
-// IfElse 实现多条件链式判断，安全泛型版本
+// IfElse 实现多条件链式判断，安全泛型版本IfE
 // conds 和 values 长度必须相等，依次判断 conds 中的条件
 // 返回第一个为 true 的对应 values 元素；如果没有满足条件，返回 defaultVal
 // 适合实现类似 if ... else if ... else 的多分支逻辑
@@ -688,4 +688,149 @@ func IfMemoized[T any](condition bool, key string, cache map[string]T, computeFn
 	result := computeFn()
 	cache[key] = result
 	return result
+}
+
+// IFChainBuilder 链式条件构建器，支持无限级别的链式调用
+// 用于处理复杂的条件判断和提前返回逻辑
+type IFChainBuilder[T any] struct {
+	executed    bool
+	returnValue T
+	hasReturn   bool
+}
+
+// NewIFChain 创建一个新的链式构建器
+func NewIFChain[T any]() *IFChainBuilder[T] {
+	return &IFChainBuilder[T]{}
+}
+
+// IFChain 全局链式构建器入口，自动推断类型
+func IFChain() *IFChainBuilder[any] {
+	return NewIFChain[any]()
+}
+
+// IFChainFor 为特定类型创建链式构建器
+func IFChainFor[T any]() *IFChainBuilder[T] {
+	return NewIFChain[T]()
+}
+
+// When 添加条件判断
+func (c *IFChainBuilder[T]) When(condition bool) *IFChainBuilderCondition[T] {
+	if c.executed {
+		return &IFChainBuilderCondition[T]{
+			chain:     c,
+			condition: false, // 已执行过，跳过后续条件
+		}
+	}
+	return &IFChainBuilderCondition[T]{
+		chain:     c,
+		condition: condition,
+	}
+}
+
+// IFChainBuilderCondition 条件构建器
+type IFChainBuilderCondition[T any] struct {
+	chain     *IFChainBuilder[T]
+	condition bool
+}
+
+// Then 条件为真时执行操作
+func (c *IFChainBuilderCondition[T]) Then(action func()) *IFChainBuilderAction[T] {
+	return &IFChainBuilderAction[T]{
+		chain:     c.chain,
+		condition: c.condition,
+		action:    action,
+	}
+}
+
+// ThenReturn 条件为真时执行操作并设置返回值
+func (c *IFChainBuilderCondition[T]) ThenReturn(value T, action ...func()) *IFChainBuilder[T] {
+	if c.condition && !c.chain.executed {
+		if len(action) > 0 && action[0] != nil {
+			action[0]()
+		}
+		c.chain.returnValue = value
+		c.chain.hasReturn = true
+		c.chain.executed = true
+	}
+	return c.chain
+}
+
+// ThenReturnNil 条件为真时执行操作并返回 nil（用于返回 error 或指针类型）
+func (c *IFChainBuilderCondition[T]) ThenReturnNil(action ...func()) *IFChainBuilder[T] {
+	var zero T
+	return c.ThenReturn(zero, action...)
+}
+
+// IFChainBuilderAction 操作构建器
+type IFChainBuilderAction[T any] struct {
+	chain     *IFChainBuilder[T]
+	condition bool
+	action    func()
+}
+
+// Return 设置返回值
+func (c *IFChainBuilderAction[T]) Return(value T) *IFChainBuilder[T] {
+	if c.condition && !c.chain.executed {
+		if c.action != nil {
+			c.action()
+		}
+		c.chain.returnValue = value
+		c.chain.hasReturn = true
+		c.chain.executed = true
+	}
+	return c.chain
+}
+
+// ReturnNil 返回零值
+func (c *IFChainBuilderAction[T]) ReturnNil() *IFChainBuilder[T] {
+	var zero T
+	return c.Return(zero)
+}
+
+// ContinueChain 继续链式调用
+func (c *IFChainBuilderAction[T]) ContinueChain() *IFChainBuilder[T] {
+	if c.condition && !c.chain.executed && c.action != nil {
+		c.action()
+	}
+	return c.chain
+}
+
+// Execute 执行链式调用并返回结果
+func (c *IFChainBuilder[T]) Execute() (T, bool) {
+	if c.hasReturn {
+		return c.returnValue, true
+	}
+	var zero T
+	return zero, false
+}
+
+// MustExecute 执行链式调用，如果没有匹配的条件则 panic
+func (c *IFChainBuilder[T]) MustExecute() T {
+	if value, hasReturn := c.Execute(); hasReturn {
+		return value
+	}
+	panic("no condition matched in chain")
+}
+
+// ExecuteOr 执行链式调用，如果没有匹配的条件则返回默认值
+func (c *IFChainBuilder[T]) ExecuteOr(defaultValue T) T {
+	if value, hasReturn := c.Execute(); hasReturn {
+		return value
+	}
+	return defaultValue
+}
+
+// HasResult 检查是否有结果
+func (c *IFChainBuilder[T]) HasResult() bool {
+	return c.hasReturn
+}
+
+// 便利函数：用于错误处理的特殊链式构建器
+func IFErrorChain() *IFChainBuilder[error] {
+	return NewIFChain[error]()
+}
+
+// 便利函数：用于返回 nil 的链式构建器
+func IFNilChain() *IFChainBuilder[any] {
+	return NewIFChain[any]()
 }
