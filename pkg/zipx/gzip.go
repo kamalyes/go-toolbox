@@ -58,7 +58,10 @@ func GzipCompress(data []byte) ([]byte, error) {
 		return nil, err // 关闭 writer 时出错
 	}
 
-	return buf.Bytes(), nil // 返回压缩后的字节切片
+	// 创建副本以避免对象池重用时的数据污染
+	result := make([]byte, buf.Len())
+	copy(result, buf.Bytes())
+	return result, nil // 返回压缩后的字节切片副本
 }
 
 // GzipDecompress 解压缩 gzip 压缩的数据

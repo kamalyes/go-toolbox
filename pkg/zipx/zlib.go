@@ -56,7 +56,11 @@ func ZlibCompress(data []byte) ([]byte, error) {
 		return nil, err // 关闭 writer 时出错
 	}
 
-	return buf.Bytes(), nil // 返回压缩后的字节切片
+	// 必须返回副本!不能返回buf.Bytes(),因为buf会被放回Pool重用
+	// 直接返回buf.Bytes()会导致并发竞争,其他goroutine可能修改同一buffer
+	result := make([]byte, buf.Len())
+	copy(result, buf.Bytes())
+	return result, nil
 }
 
 // ZlibDecompress 解压缩数据
