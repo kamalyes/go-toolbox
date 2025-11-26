@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-22 10:15:50
+ * @LastEditTime: 2025-11-26 19:55:35
  * @FilePath: \go-toolbox\pkg\stringx\split.go
  * @Description:
  *
@@ -105,6 +105,23 @@ func Cut(str string, n int) []string {
 		}
 		result = append(result, string(runeStr[start:end]))
 		start = end
+	}
+
+	return result
+}
+
+func UniqueStringSlice(slice []string) []string {
+	seen := make(map[string]struct{}, len(slice))
+	result := make([]string, 0, len(slice))
+
+	for _, item := range slice {
+		if item == "" {
+			continue
+		}
+		if _, exists := seen[item]; !exists {
+			seen[item] = struct{}{}
+			result = append(result, item)
+		}
 	}
 
 	return result

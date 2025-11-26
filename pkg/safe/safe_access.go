@@ -2,8 +2,8 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-11-13 00:00:00
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-11-21 22:38:19
- * @FilePath: \engine-im-service\go-toolbox\pkg\safe\safe_access.go
+ * @LastEditTime: 2025-11-26 21:08:32
+ * @FilePath: \go-toolbox\pkg\safe\safe_access.go
  * @Description: 安全访问装饰器 - 类似JavaScript的可选链操作符
  *
  * Copyright (c) 2025 by kamalyes, All Rights Reserved.

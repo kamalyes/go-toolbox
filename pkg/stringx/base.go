@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-03-04 05:15:15
+ * @LastEditTime: 2025-11-26 15:10:17
  * @FilePath: \go-toolbox\pkg\stringx\base.go
  * @Description:
  *
@@ -400,4 +400,17 @@ func ToSliceByte(s string) []byte {
 			Cap int
 		}{s, len(s)},
 	))
+}
+
+// TruncateMessage 截断消息内容用于日志显示
+func TruncateMessage(content string, maxLen int) string {
+	if len(content) <= maxLen {
+		return content
+	}
+
+	var builder strings.Builder
+	builder.WriteString(content[:maxLen])
+	builder.WriteString("...")
+
+	return builder.String()
 }

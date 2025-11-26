@@ -180,3 +180,63 @@ func TestStringToSliceByte(t *testing.T) {
 		t.Errorf("expected '%s', got '%s'", s, b)
 	}
 }
+
+func TestTruncateMessage(t *testing.T) {
+	// 测试用例
+	tests := []struct {
+		content  string
+		maxLen   int
+		expected string
+	}{
+		{"Hello, World!", 5, "Hello..."},
+		{"Go is awesome!", 20, "Go is awesome!"},
+		{"", 5, ""},
+		{"Very long message that exceeds the limit", 10, "Very long ..."},
+		{"Short", 10, "Short"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.content, func(t *testing.T) {
+			result := stringx.TruncateMessage(test.content, test.maxLen)
+			assert.Equal(t, test.expected, result)
+		})
+	}
+}
+
+// 测试 UniqueStringSlice 函数
+func TestUniqueStringSlice(t *testing.T) {
+	tests := []struct {
+		input    []string
+		expected []string
+	}{
+		{
+			input:    []string{"apple", "banana", "apple", "orange", "banana", ""},
+			expected: []string{"apple", "banana", "orange"},
+		},
+		{
+			input:    []string{"", "", "", ""},
+			expected: []string{},
+		},
+		{
+			input:    []string{"apple", "banana", "orange"},
+			expected: []string{"apple", "banana", "orange"},
+		},
+		{
+			input:    []string{"apple", "apple", "apple"},
+			expected: []string{"apple"},
+		},
+		{
+			input:    []string{"banana", "banana", "", "apple", "orange", "banana"},
+			expected: []string{"banana", "apple", "orange"},
+		},
+		{
+			input:    []string{},
+			expected: []string{},
+		},
+	}
+
+	for _, test := range tests {
+		result := stringx.UniqueStringSlice(test.input)
+		assert.ElementsMatch(t, test.expected, result, "Input: %v", test.input)
+	}
+}
