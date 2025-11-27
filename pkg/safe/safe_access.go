@@ -14,6 +14,7 @@ package safe
 import (
 	"fmt"
 	"github.com/kamalyes/go-toolbox/pkg/convert"
+	"github.com/kamalyes/go-toolbox/pkg/stringx"
 	"github.com/kamalyes/go-toolbox/pkg/types"
 	"reflect"
 	"strings"
@@ -34,6 +35,7 @@ func Safe(v interface{}) *SafeAccess {
 }
 
 // Field 安全访问字段，支持链式调用
+// 支持多种命名风格：camelCase, PascalCase, snake_case, kebab-case
 func (s *SafeAccess) Field(fieldName string) *SafeAccess {
 	if !s.valid || s.value == nil {
 		return &SafeAccess{valid: false}
@@ -41,10 +43,14 @@ func (s *SafeAccess) Field(fieldName string) *SafeAccess {
 
 	// 首先检查是否是 map[string]interface{}
 	if m, ok := s.value.(map[string]interface{}); ok {
-		if value, exists := m[fieldName]; exists && value != nil {
-			return &SafeAccess{
-				value: value,
-				valid: true,
+		// 尝试所有可能的字段名变体
+		variants := stringx.NormalizeFieldName(fieldName)
+		for _, variant := range variants {
+			if value, exists := m[variant]; exists && value != nil {
+				return &SafeAccess{
+					value: value,
+					valid: true,
+				}
 			}
 		}
 		return &SafeAccess{valid: false}
@@ -62,31 +68,30 @@ func (s *SafeAccess) Field(fieldName string) *SafeAccess {
 		return &SafeAccess{valid: false}
 	}
 
-	field := rv.FieldByName(fieldName)
-	if !field.IsValid() {
-		return &SafeAccess{valid: false}
+	// 尝试所有可能的字段名变体
+	variants := stringx.NormalizeFieldName(fieldName)
+	for _, variant := range variants {
+		field := rv.FieldByName(variant)
+		if field.IsValid() && field.CanInterface() {
+			// 如果是指针类型且为nil
+			if field.Kind() == reflect.Ptr && field.IsNil() {
+				return &SafeAccess{valid: false}
+			}
+
+			// 如果是指针类型且不为nil，解引用获取实际值
+			fieldValue := field.Interface()
+			if field.Kind() == reflect.Ptr && !field.IsNil() {
+				fieldValue = field.Elem().Interface()
+			}
+
+			return &SafeAccess{
+				value: fieldValue,
+				valid: true,
+			}
+		}
 	}
 
-	// 检查字段是否可导出（公开）
-	if !field.CanInterface() {
-		return &SafeAccess{valid: false}
-	}
-
-	// 如果是指针类型且为nil
-	if field.Kind() == reflect.Ptr && field.IsNil() {
-		return &SafeAccess{valid: false}
-	}
-
-	// 如果是指针类型且不为nil，解引用获取实际值
-	fieldValue := field.Interface()
-	if field.Kind() == reflect.Ptr && !field.IsNil() {
-		fieldValue = field.Elem().Interface()
-	}
-
-	return &SafeAccess{
-		value: fieldValue,
-		valid: true,
-	}
+	return &SafeAccess{valid: false}
 }
 
 // Bool 获取布尔值，如果无效则返回默认值

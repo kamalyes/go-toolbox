@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-11-26 15:10:17
+ * @LastEditTime: 2025-11-27 23:55:26
  * @FilePath: \go-toolbox\pkg\stringx\base.go
  * @Description:
  *
@@ -13,13 +13,12 @@ package stringx
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"github.com/kamalyes/go-toolbox/pkg/validator"
 	"reflect"
 	"strconv"
 	"strings"
 	"unicode"
 	"unsafe"
-
-	"github.com/kamalyes/go-toolbox/pkg/validator"
 )
 
 // StringX 是一个结构体，用于封装字符串值并提供操作方法。
@@ -299,6 +298,8 @@ const (
 	SnakeCharacterStyle  CharacterStyle = iota // 表示蛇形命名法（例如：hello_world）
 	StudlyCharacterStyle                       // 表示每个单词首字母大写的风格（例如：HelloWorld）
 	CamelCharacterStyle                        // 表示驼峰命名法（例如：helloWorld）
+	KebabCharacterStyle                        // 表示短横线命名法（例如：hello-world）
+	PascalCharacterStyle                       // 表示帕斯卡命名法（例如：HelloWorld，同 StudlyCharacterStyle）
 )
 
 // ConvertCharacterStyle 根据指定的 CharacterStyle 将字符串转换为相应的格式
@@ -309,9 +310,11 @@ func ConvertCharacterStyle(input string, caseType CharacterStyle) string {
 	}
 
 	converters := map[CharacterStyle]func(string) string{
-		SnakeCharacterStyle:  toSnakeCase,
-		StudlyCharacterStyle: toStudlyCase,
-		CamelCharacterStyle:  toCamelCase,
+		SnakeCharacterStyle:  ToSnakeCase,
+		StudlyCharacterStyle: ToPascalCase, // 使用统一的 ToPascalCase
+		CamelCharacterStyle:  ToCamelCase,
+		KebabCharacterStyle:  ToKebabCase,
+		PascalCharacterStyle: ToPascalCase,
 	}
 
 	if converter, exists := converters[caseType]; exists {
@@ -326,49 +329,122 @@ func (s *StringX) ConvertCharacterStyleChain(caseType CharacterStyle) *StringX {
 	return s
 }
 
-// toSnakeCase 将字符串转换为蛇形命名法
-func toSnakeCase(s string) string {
-	var builder strings.Builder
+// ToPascalCase 将字符串转换为帕斯卡命名法（首字母大写的驼峰，例如：UserName）
+// 支持输入格式：camelCase, snake_case, kebab-case, 普通字符串（带空格）
+// 增强版：合并了原 toStudlyCase 的逻辑，统一处理所有分隔符
+func ToPascalCase(s string) string {
+	if s == "" {
+		return s
+	}
+
+	// 如果包含下划线、连字符或空格，先分割处理
+	if strings.ContainsAny(s, "_- ") {
+		// 统一替换为下划线再分割
+		normalized := strings.ReplaceAll(strings.ReplaceAll(s, "-", "_"), " ", "_")
+		parts := strings.Split(normalized, "_")
+		var builder strings.Builder
+		for _, part := range parts {
+			if len(part) > 0 {
+				// 首字母大写，其余小写
+				builder.WriteRune(unicode.ToUpper(rune(part[0])))
+				if len(part) > 1 {
+					builder.WriteString(strings.ToLower(part[1:]))
+				}
+			}
+		}
+		return builder.String()
+	}
+
+	// 如果已经是驼峰式，只需首字母大写
+	if len(s) > 0 && unicode.IsLower(rune(s[0])) {
+		return string(unicode.ToUpper(rune(s[0]))) + s[1:]
+	}
+
+	return s
+}
+
+// ToSnakeCase 将字符串转换为蛇形命名法（例如：user_name）
+// 支持输入格式：camelCase, PascalCase, kebab-case
+func ToSnakeCase(s string) string {
+	var result strings.Builder
+
 	for i, r := range s {
+		if r == '-' {
+			result.WriteRune('_')
+			continue
+		}
+
 		if unicode.IsUpper(r) {
-			if i > 0 && (s[i-1] != '_' && s[i-1] != ' ') {
-				builder.WriteRune('_') // 在大写字母前添加下划线
+			// 如果不是第一个字符，且前一个字符不是大写，添加下划线
+			if i > 0 {
+				prevRune := rune(s[i-1])
+				if !unicode.IsUpper(prevRune) && prevRune != '_' {
+					result.WriteRune('_')
+				}
 			}
-			builder.WriteRune(unicode.ToLower(r)) // 转为小写
-		} else if r == '_' {
-			if builder.Len() == 0 || builder.String()[builder.Len()-1] != '_' {
-				builder.WriteRune('_') // 添加下划线，但避免重复
-			}
-		} else if r == ' ' {
-			if builder.Len() > 0 && builder.String()[builder.Len()-1] != '_' {
-				builder.WriteRune('_') // 将空格转换为下划线
-			}
+			result.WriteRune(unicode.ToLower(r))
 		} else {
-			builder.WriteRune(r) // 直接添加小写字母或其他字符
+			result.WriteRune(r)
 		}
 	}
-	return builder.String()
+
+	return result.String()
 }
 
-// toStudlyCase 将字符串转换为每个单词首字母大写的风格
-func toStudlyCase(s string) string {
-	var builder strings.Builder
-	s = strings.ReplaceAll(s, "_", " ") // 将下划线替换为空格
-	words := strings.Fields(s)          // 按空格分割单词
-
-	for _, word := range words {
-		if len(word) > 0 {
-			builder.WriteRune(unicode.ToUpper(rune(word[0]))) // 首字母大写
-			builder.WriteString(word[1:])                     // 追加剩余部分
-		}
+// ToCamelCase 将字符串转换为驼峰命名法（首字母小写，例如：userName）
+// 支持输入格式：PascalCase, snake_case, kebab-case
+func ToCamelCase(s string) string {
+	pascal := ToPascalCase(s)
+	if len(pascal) > 0 {
+		return string(unicode.ToLower(rune(pascal[0]))) + pascal[1:]
 	}
-	return builder.String()
+	return pascal
 }
 
-// toCamelCase 将字符串转换为驼峰命名法
-func toCamelCase(s string) string {
-	studly := toStudlyCase(s)                                    // 首先转换为 Studly Case
-	return string(unicode.ToLower(rune(studly[0]))) + studly[1:] // 将首字母转换为小写
+// ToKebabCase 将字符串转换为短横线命名法（例如：user-name）
+// 支持输入格式：camelCase, PascalCase, snake_case
+func ToKebabCase(s string) string {
+	return strings.ReplaceAll(ToSnakeCase(s), "_", "-")
+}
+
+// NormalizeFieldName 规范化字段名，返回所有可能的命名风格变体
+// 支持的输入格式：camelCase, PascalCase, snake_case, kebab-case
+// 返回顺序：原始名称、PascalCase、camelCase、snake_case、kebab-case
+func NormalizeFieldName(fieldName string) []string {
+	if fieldName == "" {
+		return []string{}
+	}
+
+	variants := make([]string, 0, 5)
+
+	// 原始名称
+	variants = append(variants, fieldName)
+
+	// 转换为 PascalCase (首字母大写的驼峰)
+	pascalCase := ToPascalCase(fieldName)
+	if pascalCase != fieldName {
+		variants = append(variants, pascalCase)
+	}
+
+	// 转换为 camelCase (首字母小写的驼峰)
+	camelCase := ToCamelCase(fieldName)
+	if camelCase != fieldName && camelCase != pascalCase {
+		variants = append(variants, camelCase)
+	}
+
+	// 转换为 snake_case
+	snakeCase := ToSnakeCase(fieldName)
+	if snakeCase != fieldName {
+		variants = append(variants, snakeCase)
+	}
+
+	// 转换为 kebab-case
+	kebabCase := ToKebabCase(fieldName)
+	if kebabCase != fieldName && kebabCase != snakeCase {
+		variants = append(variants, kebabCase)
+	}
+
+	return variants
 }
 
 func ToInt(s string) (int, error) {
