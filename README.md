@@ -72,6 +72,7 @@ graph TB
 | [🎭 desensitize](pkg/desensitize) | 数据脱敏，保护隐私 | 日志输出、数据展示 |
 | [📄 json](pkg/json) | 高性能 JSON 处理 | API 开发、配置管理 |
 | [🧵 stringx](pkg/stringx) | 字符串增强工具 | 文本处理、模板渲染 |
+| [📦 serializer](pkg/serializer) | 高性能序列化器，支持压缩 | 队列消息、缓存存储、网络传输 |
 
 ### 🌐 网络工具类
 
