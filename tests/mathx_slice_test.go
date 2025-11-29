@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-11 15:55:06
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-08-12 17:52:05
+ * @LastEditTime: 2025-11-29 13:03:31
  * @FilePath: \go-toolbox\tests\mathx_slice_test.go
  * @Description:
  *
@@ -717,5 +717,124 @@ func TestRepeatField(t *testing.T) {
 		got := mathx.RepeatField(bp, 2)
 		want := []*bool{bp, bp}
 		assert.Equal(t, want, got)
+	})
+}
+
+// 定义一个测试用的枚举类型
+type TestStatus int
+
+const (
+	StatusActive TestStatus = iota + 1
+	StatusInactive
+	StatusPending
+	StatusClosed
+)
+
+func TestSliceContainsComparable(t *testing.T) {
+	tests := []struct {
+		name     string
+		slice    interface{}
+		element  interface{}
+		expected bool
+	}{
+		{
+			name:     "字符串切片包含元素",
+			slice:    []string{"apple", "banana", "cherry"},
+			element:  "banana",
+			expected: true,
+		},
+		{
+			name:     "字符串切片不包含元素",
+			slice:    []string{"apple", "banana", "cherry"},
+			element:  "orange",
+			expected: false,
+		},
+		{
+			name:     "整数切片包含元素",
+			slice:    []int{1, 2, 3, 4, 5},
+			element:  3,
+			expected: true,
+		},
+		{
+			name:     "整数切片不包含元素",
+			slice:    []int{1, 2, 3, 4, 5},
+			element:  6,
+			expected: false,
+		},
+		{
+			name:     "枚举切片包含元素",
+			slice:    []TestStatus{StatusActive, StatusInactive, StatusPending},
+			element:  StatusPending,
+			expected: true,
+		},
+		{
+			name:     "枚举切片不包含元素",
+			slice:    []TestStatus{StatusActive, StatusInactive, StatusPending},
+			element:  StatusClosed,
+			expected: false,
+		},
+		{
+			name:     "空切片",
+			slice:    []string{},
+			element:  "test",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var result bool
+
+			switch s := tt.slice.(type) {
+			case []string:
+				result = mathx.SliceContainsComparable(s, tt.element.(string))
+			case []int:
+				result = mathx.SliceContainsComparable(s, tt.element.(int))
+			case []TestStatus:
+				result = mathx.SliceContainsComparable(s, tt.element.(TestStatus))
+			}
+
+			if result != tt.expected {
+				t.Errorf("SliceContainsComparable() = %v, expected %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+// Benchmark测试
+func BenchmarkSliceContainsComparable(b *testing.B) {
+	slice := []string{"apple", "banana", "cherry", "date", "elderberry"}
+	element := "cherry"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		mathx.SliceContainsComparable(slice, element)
+	}
+}
+
+// 与原有遍历方式的对比测试
+func BenchmarkSliceContainsComparable_vs_ManualLoop(b *testing.B) {
+	slice := []TestStatus{StatusActive, StatusInactive, StatusPending}
+	element := StatusPending
+
+	// 测试新函数
+	b.Run("SliceContainsComparable", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			mathx.SliceContainsComparable(slice, element)
+		}
+	})
+
+	// 测试手动循环
+	b.Run("ManualLoop", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			found := false
+			for _, s := range slice {
+				if s == element {
+					found = true
+					break
+				}
+			}
+			_ = found
+		}
 	})
 }

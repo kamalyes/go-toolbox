@@ -245,6 +245,17 @@ func containsHash[T types.Ordered](slice []T, element T) bool {
 	return found // 返回是否找到该元素
 }
 
+// SliceContainsComparable 检查切片中是否包含某个元素（支持comparable类型）
+// 适用于枚举、字符串等comparable类型，比SliceContains支持更广泛的类型
+func SliceContainsComparable[T comparable](slice []T, element T) bool {
+	for _, item := range slice {
+		if item == element {
+			return true
+		}
+	}
+	return false
+}
+
 // SliceHasDuplicates 检查切片中是否存在重复对象
 // 返回布尔值，表示是否存在重复元素
 func SliceHasDuplicates[T comparable](slice []T) bool {
