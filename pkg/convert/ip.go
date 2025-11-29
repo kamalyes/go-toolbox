@@ -28,7 +28,8 @@ func IP2Long(ip net.IP) (uint, error) {
 
 // Long2IP 把数值转为net.IP
 func Long2IP(i uint) (net.IP, error) {
-	if i > math.MaxUint32 {
+	// 使用uint32(math.MaxUint32)避免32位架构上的常量溢出
+	if uint64(i) > uint64(uint32(math.MaxUint32)) {
 		return nil, errors.New("beyond the scope of ipv4")
 	}
 

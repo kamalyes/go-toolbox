@@ -260,7 +260,8 @@ func FastIntn(n int) int {
 	if n <= 0 {
 		return 0
 	}
-	if n <= math.MaxUint32 {
+	// 使用uint32(math.MaxUint32)避免32位架构上的常量溢出
+	if uint64(n) <= uint64(uint32(math.MaxUint32)) {
 		return int(FastRandn(uint32(n)))
 	}
 	return int(NewRand().Int63n(int64(n)))

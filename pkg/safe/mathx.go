@@ -14,15 +14,45 @@ import (
 	"errors"
 	"math"
 	"math/big"
+	"unsafe"
 )
 
 // 定义常用的数学常数
 const (
-	MaxSafeInteger = 1<<53 - 1      // JavaScript安全整数最大值
-	MinSafeInteger = -(1<<53 - 1)   // JavaScript安全整数最小值
-	GoldenRatio    = 1.618033988749 // 黄金比例
-	EulerNumber    = 2.718281828459 // 欧拉数
+	// 使用int64避免32位架构溢出
+	MaxSafeInteger64 = int64(1<<53 - 1)    // JavaScript安全整数最大值
+	MinSafeInteger64 = int64(-(1<<53 - 1)) // JavaScript安全整数最小值
+	GoldenRatio      = 1.618033988749      // 黄金比例
+	EulerNumber      = 2.718281828459      // 欧拉数
 )
+
+// 架构相关的安全整数最大值
+var (
+	MaxSafeInteger = getMaxSafeIntegerForArch()
+	MinSafeInteger = getMinSafeIntegerForArch()
+)
+
+// getMaxSafeIntegerForArch 获取当前架构的安全整数最大值
+func getMaxSafeIntegerForArch() int {
+	if unsafe.Sizeof(int(0)) == 8 {
+		// 64位架构，安全转换
+		maxSafe := int64(1<<53 - 1) // JavaScript安全整数最大值
+		return int(maxSafe)
+	}
+	// 32位架构，使用math.MaxInt32
+	return math.MaxInt32
+}
+
+// getMinSafeIntegerForArch 获取当前架构的安全整数最小值
+func getMinSafeIntegerForArch() int {
+	if unsafe.Sizeof(int(0)) == 8 {
+		// 64位架构，安全转换
+		minSafe := int64(-(1<<53 - 1)) // JavaScript安全整数最小值
+		return int(minSafe)
+	}
+	// 32位架构，使用math.MinInt32
+	return math.MinInt32
+}
 
 // FastHash 快速哈希函数 - 安全版本
 // 使用FNV-1a算法，避免哈希冲突和安全问题
@@ -50,7 +80,7 @@ func NextPowerOfTwo(n int) int {
 	if n > MaxSafeInteger>>1 {
 		return MaxSafeInteger // 防止溢出
 	}
-	
+
 	// 如果n已经是2的幂，返回下一个
 	if n&(n-1) == 0 {
 		return n << 1
