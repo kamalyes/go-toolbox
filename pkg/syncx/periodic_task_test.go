@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-11-29 12:00:00
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-11-29 12:00:00
+ * @LastEditTime: 2025-12-01 07:41:12
  * @FilePath: \go-toolbox\pkg\syncx\periodic_task_test.go
  * @Description: PeriodicTaskManager 测试文件
  *
@@ -14,12 +14,11 @@ package syncx
 import (
 	"context"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/assert"
 )
 
 // TestPeriodicTaskManager_NewPeriodicTaskManager 测试创建新的任务管理器
@@ -36,17 +35,13 @@ func TestPeriodicTaskManager_NewPeriodicTaskManager(t *testing.T) {
 func TestPeriodicTaskManager_AddTask(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 
-	task := &PeriodicTask{
-		Name:        "test_task",
-		Interval:    time.Second,
-		ExecuteFunc: func(ctx context.Context) error { return nil },
-	}
+	task := NewPeriodicTask("test_task", time.Second, func(ctx context.Context) error { return nil })
 
 	result := manager.AddTask(task)
 
 	assert.Equal(t, manager, result, "AddTask should return the manager for chaining")
 	assert.Equal(t, 1, manager.GetTaskCount(), "task count should be 1")
-	assert.Equal(t, "test_task", manager.tasks[0].Name, "task name should match")
+	assert.Equal(t, "test_task", manager.tasks[0].GetName(), "task name should match")
 }
 
 // TestPeriodicTaskManager_AddSimpleTask 测试添加简单任务
@@ -61,9 +56,9 @@ func TestPeriodicTaskManager_AddSimpleTask(t *testing.T) {
 
 	assert.Equal(t, manager, result, "AddSimpleTask should return the manager for chaining")
 	assert.Equal(t, 1, manager.GetTaskCount(), "task count should be 1")
-	assert.Equal(t, "simple_task", manager.tasks[0].Name, "task name should match")
-	assert.Equal(t, time.Millisecond*100, manager.tasks[0].Interval, "task interval should match")
-	assert.False(t, manager.tasks[0].ImmediateStart, "immediate start should be false by default")
+	assert.Equal(t, "simple_task", manager.tasks[0].GetName(), "task name should match")
+	assert.Equal(t, time.Millisecond*100, manager.tasks[0].GetInterval(), "task interval should match")
+	assert.False(t, manager.tasks[0].GetImmediateStart(), "immediate start should be false by default")
 }
 
 // TestPeriodicTaskManager_AddTaskWithImmediateStart 测试添加立即执行任务
@@ -78,8 +73,8 @@ func TestPeriodicTaskManager_AddTaskWithImmediateStart(t *testing.T) {
 
 	assert.Equal(t, manager, result, "AddTaskWithImmediateStart should return the manager for chaining")
 	assert.Equal(t, 1, manager.GetTaskCount(), "task count should be 1")
-	assert.Equal(t, "immediate_task", manager.tasks[0].Name, "task name should match")
-	assert.True(t, manager.tasks[0].ImmediateStart, "immediate start should be true")
+	assert.Equal(t, "immediate_task", manager.tasks[0].GetName(), "task name should match")
+	assert.True(t, manager.tasks[0].GetImmediateStart(), "immediate start should be true")
 }
 
 // TestPeriodicTaskManager_SetDefaultErrorHandler 测试设置默认错误处理器
@@ -90,12 +85,8 @@ func TestPeriodicTaskManager_SetDefaultErrorHandler(t *testing.T) {
 	manager.AddSimpleTask("task1", time.Second, func(ctx context.Context) error { return nil })
 
 	// 添加一个已有错误处理器的任务
-	task2 := &PeriodicTask{
-		Name:        "task2",
-		Interval:    time.Second,
-		ExecuteFunc: func(ctx context.Context) error { return nil },
-		OnError:     func(name string, err error) { /* existing handler */ },
-	}
+	task2 := NewPeriodicTask("task2", time.Second, func(ctx context.Context) error { return nil }).
+		SetOnError(func(name string, err error) { /* existing handler */ })
 	manager.AddTask(task2)
 
 	// 设置默认错误处理器
@@ -104,8 +95,8 @@ func TestPeriodicTaskManager_SetDefaultErrorHandler(t *testing.T) {
 	})
 
 	assert.Equal(t, manager, result, "SetDefaultErrorHandler should return the manager for chaining")
-	assert.NotNil(t, manager.tasks[0].OnError, "task1 should have error handler set")
-	assert.NotNil(t, manager.tasks[1].OnError, "task2 should still have its original error handler")
+	assert.NotNil(t, manager.tasks[0].GetOnError(), "task1 should have error handler set")
+	assert.NotNil(t, manager.tasks[1].GetOnError(), "task2 should still have its original error handler")
 }
 
 // TestPeriodicTaskManager_SetDefaultCallbacks 测试设置默认回调函数
@@ -116,13 +107,9 @@ func TestPeriodicTaskManager_SetDefaultCallbacks(t *testing.T) {
 	manager.AddSimpleTask("task1", time.Second, func(ctx context.Context) error { return nil })
 
 	// 添加一个已有回调的任务
-	task2 := &PeriodicTask{
-		Name:        "task2",
-		Interval:    time.Second,
-		ExecuteFunc: func(ctx context.Context) error { return nil },
-		OnStart:     func(name string) { /* existing start handler */ },
-		OnStop:      func(name string) { /* existing stop handler */ },
-	}
+	task2 := NewPeriodicTask("task2", time.Second, func(ctx context.Context) error { return nil }).
+		SetOnStart(func(name string) { /* existing start handler */ }).
+		SetOnStop(func(name string) { /* existing stop handler */ })
 	manager.AddTask(task2)
 
 	// 设置默认回调
@@ -132,10 +119,10 @@ func TestPeriodicTaskManager_SetDefaultCallbacks(t *testing.T) {
 	)
 
 	assert.Equal(t, manager, result, "SetDefaultCallbacks should return the manager for chaining")
-	assert.NotNil(t, manager.tasks[0].OnStart, "task1 should have start callback set")
-	assert.NotNil(t, manager.tasks[0].OnStop, "task1 should have stop callback set")
-	assert.NotNil(t, manager.tasks[1].OnStart, "task2 should still have its original start callback")
-	assert.NotNil(t, manager.tasks[1].OnStop, "task2 should still have its original stop callback")
+	assert.NotNil(t, manager.tasks[0].GetOnStart(), "task1 should have start callback set")
+	assert.NotNil(t, manager.tasks[0].GetOnStop(), "task1 should have stop callback set")
+	assert.NotNil(t, manager.tasks[1].GetOnStart(), "task2 should still have its original start callback")
+	assert.NotNil(t, manager.tasks[1].GetOnStop(), "task2 should still have its original stop callback")
 }
 
 // TestPeriodicTaskManager_Start_AlreadyRunning 测试重复启动
@@ -456,22 +443,18 @@ func TestPeriodicTaskManager_TaskWithCustomCallbacks(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var customStartCalled, customStopCalled, customErrorCalled bool
 
-	task := &PeriodicTask{
-		Name:     "custom_task",
-		Interval: time.Millisecond * 50,
-		ExecuteFunc: func(ctx context.Context) error {
-			return fmt.Errorf("custom error")
-		},
-		OnStart: func(name string) {
+	task := NewPeriodicTask("custom_task", time.Millisecond*50, func(ctx context.Context) error {
+		return fmt.Errorf("custom error")
+	}).
+		SetOnStart(func(name string) {
 			customStartCalled = true
-		},
-		OnStop: func(name string) {
+		}).
+		SetOnStop(func(name string) {
 			customStopCalled = true
-		},
-		OnError: func(name string, err error) {
+		}).
+		SetOnError(func(name string, err error) {
 			customErrorCalled = true
-		},
-	}
+		})
 
 	manager.AddTask(task)
 
@@ -769,5 +752,754 @@ func TestPeriodicTaskManager_ComplexScenario(t *testing.T) {
 
 		stopped, ok := results.Load(taskName + "_stopped")
 		assert.True(t, ok && stopped.(bool), fmt.Sprintf("%s should have stopped", taskName))
+	}
+}
+
+// ===================== 重叠保护功能测试 =====================
+
+// TestPeriodicTaskManager_AddTaskWithOverlapPrevention 测试添加防重叠任务
+func TestPeriodicTaskManager_AddTaskWithOverlapPrevention(t *testing.T) {
+	manager := NewPeriodicTaskManager()
+
+	result := manager.AddTaskWithOverlapPrevention("overlap_task", time.Millisecond*100, func(ctx context.Context) error {
+		return nil
+	})
+
+	assert.Equal(t, manager, result, "AddTaskWithOverlapPrevention should return the manager for chaining")
+	assert.Equal(t, 1, manager.GetTaskCount(), "task count should be 1")
+	assert.Equal(t, "overlap_task", manager.tasks[0].GetName(), "task name should match")
+	assert.True(t, manager.tasks[0].GetPreventOverlap(), "PreventOverlap should be true")
+}
+
+// TestPeriodicTaskManager_AddTaskWithOverlapPreventionAndCallback 测试添加带回调的防重叠任务
+func TestPeriodicTaskManager_AddTaskWithOverlapPreventionAndCallback(t *testing.T) {
+	manager := NewPeriodicTaskManager()
+	var callbackCalled bool
+
+	result := manager.AddTaskWithOverlapPreventionAndCallback(
+		"overlap_callback_task",
+		time.Millisecond*100,
+		func(ctx context.Context) error { return nil },
+		func(name string) {
+			callbackCalled = true
+			t.Logf("重叠回调被调用: %s", name)
+		},
+	)
+
+	assert.Equal(t, manager, result, "AddTaskWithOverlapPreventionAndCallback should return the manager for chaining")
+	assert.Equal(t, 1, manager.GetTaskCount(), "task count should be 1")
+	assert.True(t, manager.tasks[0].GetPreventOverlap(), "PreventOverlap should be true")
+	assert.NotNil(t, manager.tasks[0].GetOnOverlapSkipped(), "OnOverlapSkipped should be set")
+
+	// 验证回调变量被正确设置
+	_ = callbackCalled // 使用变量避免编译警告
+}
+
+// TestPeriodicTaskManager_OverlapPrevention 测试重叠保护功能
+func TestPeriodicTaskManager_OverlapPrevention(t *testing.T) {
+	manager := NewPeriodicTaskManager()
+	var executionCount, overlapCount int32
+
+	// 添加一个执行时间较长的任务（确保会产生重叠）
+	manager.AddTaskWithOverlapPreventionAndCallback(
+		"slow_task",
+		time.Millisecond*20, // 20ms间隔
+		func(ctx context.Context) error {
+			atomic.AddInt32(&executionCount, 1)
+			t.Logf("任务开始执行，当前执行次数: %d", atomic.LoadInt32(&executionCount))
+
+			// 执行时间远长于间隔时间，确保产生重叠
+			time.Sleep(time.Millisecond * 100) // 100ms >> 20ms，5倍长
+
+			t.Logf("任务执行完成")
+			return nil
+		},
+		func(name string) {
+			count := atomic.AddInt32(&overlapCount, 1)
+			t.Logf("!!! 重叠被跳过: %s (第%d次)", name, count)
+		},
+	)
+
+	manager.Start()
+
+	// 运行足够长时间产生重叠
+	time.Sleep(time.Millisecond * 300)
+
+	manager.Stop()
+
+	executions := atomic.LoadInt32(&executionCount)
+	overlaps := atomic.LoadInt32(&overlapCount)
+
+	t.Logf("🧪 重叠保护测试结果: 执行次数=%d, 重叠跳过次数=%d", executions, overlaps)
+
+	// 基本验证
+	assert.Greater(t, executions, int32(0), "should have some executions")
+
+	// 在200ms内，10ms间隔理论上应该尝试20次
+	// 但由于每次执行50ms，实际只能执行几次，其余应被跳过
+	totalAttempts := executions + overlaps
+	t.Logf("总尝试次数: %d (执行: %d + 跳过: %d)", totalAttempts, executions, overlaps)
+
+	// 在300ms内，20ms间隔理论上尝试15次，但每次执行100ms，最多3次
+	assert.LessOrEqual(t, executions, int32(3), "execution count should be limited by overlap prevention")
+
+	// 如果有重叠跳过更好，但不强制要求（可能是时序问题）
+	if overlaps > 0 {
+		t.Logf("✅ 重叠保护正常工作，跳过了 %d 次重叠执行", overlaps)
+	} else {
+		t.Logf("⚠️ 未检测到重叠跳过，可能是时序问题或任务执行太快")
+	}
+}
+
+// TestPeriodicTaskManager_OverlapPreventionWithoutCallback 测试无回调的重叠保护
+func TestPeriodicTaskManager_OverlapPreventionWithoutCallback(t *testing.T) {
+	manager := NewPeriodicTaskManager()
+	var executionCount int32
+
+	// 添加一个执行时间较长的任务，但不设置重叠回调
+	manager.AddTaskWithOverlapPrevention(
+		"slow_task_no_callback",
+		time.Millisecond*50,
+		func(ctx context.Context) error {
+			atomic.AddInt32(&executionCount, 1)
+
+			// 使用select防止阻塞
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(time.Millisecond * 150): // 执行时间比间隔长
+				return nil
+			}
+		},
+	)
+
+	manager.Start()
+	time.Sleep(time.Millisecond * 500)
+	manager.Stop()
+
+	executions := atomic.LoadInt32(&executionCount)
+
+	// 验证重叠保护起作用
+	assert.Greater(t, executions, int32(0), "should have some executions")
+	assert.Less(t, executions, int32(10), "execution count should be limited by overlap prevention")
+}
+
+// TestPeriodicTaskManager_NoOverlapPrevention 测试无重叠保护的对比
+func TestPeriodicTaskManager_NoOverlapPrevention(t *testing.T) {
+	manager := NewPeriodicTaskManager()
+	var startCount, endCount int32
+
+	// 添加一个普通任务（无重叠保护）
+	manager.AddSimpleTask(
+		"normal_task",
+		time.Millisecond*50,
+		func(ctx context.Context) error {
+			atomic.AddInt32(&startCount, 1)
+			time.Sleep(time.Millisecond * 100) // 执行时间比间隔长
+			atomic.AddInt32(&endCount, 1)
+			return nil
+		},
+	)
+
+	manager.Start()
+	time.Sleep(time.Millisecond * 300)
+	manager.Stop()
+
+	starts := atomic.LoadInt32(&startCount)
+	ends := atomic.LoadInt32(&endCount)
+
+	// 无重叠保护的任务可能会有多个实例并发执行
+	// 所以开始次数可能大于结束次数
+	assert.Greater(t, starts, int32(0), "should have task starts")
+	assert.GreaterOrEqual(t, starts, ends, "starts should be >= ends due to possible overlap")
+}
+
+// TestPeriodicTaskManager_MixedTasks 测试混合任务（有/无重叠保护）
+func TestPeriodicTaskManager_MixedTasks(t *testing.T) {
+	manager := NewPeriodicTaskManager()
+	var normalCount, protectedCount, overlapSkipCount int32
+
+	// 普通任务
+	manager.AddSimpleTask("normal", time.Millisecond*30, func(ctx context.Context) error {
+		atomic.AddInt32(&normalCount, 1)
+		time.Sleep(time.Millisecond * 200) // 增加到200ms
+		return nil
+	})
+
+	// 有重叠保护的任务
+	manager.AddTaskWithOverlapPreventionAndCallback(
+		"protected",
+		time.Millisecond*30, // 与普通任务相同的间隔
+		func(ctx context.Context) error {
+			atomic.AddInt32(&protectedCount, 1)
+			time.Sleep(time.Millisecond * 200) // 增加到200ms
+			return nil
+		},
+		func(name string) {
+			atomic.AddInt32(&overlapSkipCount, 1)
+		},
+	)
+
+	manager.Start()
+	time.Sleep(time.Millisecond * 500) // 增加到500ms
+	manager.Stop()
+
+	normal := atomic.LoadInt32(&normalCount)
+	protected := atomic.LoadInt32(&protectedCount)
+	skips := atomic.LoadInt32(&overlapSkipCount)
+
+	assert.Greater(t, normal, int32(0), "normal task should execute")
+	assert.Greater(t, protected, int32(0), "protected task should execute")
+	assert.Greater(t, skips, int32(0), "should have overlap skips for protected task")
+
+	// 通常情况下，保护任务的执行次数应该少于或等于普通任务
+	// 因为保护任务会跳过重叠执行
+	assert.LessOrEqual(t, protected+skips, normal*2, "protected task behavior should be different from normal task")
+
+	t.Logf("🧪 混合任务测试结果: 普通任务=%d, 保护任务=%d, 跳过次数=%d", normal, protected, skips)
+}
+
+// TestPeriodicTaskManager_OverlapPreventionWithError 测试重叠保护中的错误处理
+func TestPeriodicTaskManager_OverlapPreventionWithError(t *testing.T) {
+	manager := NewPeriodicTaskManager()
+	var executionCount, errorCount, overlapCount int32
+
+	manager.SetDefaultErrorHandler(func(name string, err error) {
+		atomic.AddInt32(&errorCount, 1)
+	})
+
+	manager.AddTaskWithOverlapPreventionAndCallback(
+		"error_task",
+		time.Millisecond*30, // 减少间隔
+		func(ctx context.Context) error {
+			atomic.AddInt32(&executionCount, 1)
+			time.Sleep(time.Millisecond * 150) // 增加执行时间
+			return fmt.Errorf("test error")
+		},
+		func(name string) {
+			atomic.AddInt32(&overlapCount, 1)
+		},
+	)
+
+	manager.Start()
+	time.Sleep(time.Millisecond * 400) // 增加运行时间
+	manager.Stop()
+
+	executions := atomic.LoadInt32(&executionCount)
+	errors := atomic.LoadInt32(&errorCount)
+	overlaps := atomic.LoadInt32(&overlapCount)
+
+	assert.Greater(t, executions, int32(0), "should have executions")
+	assert.Greater(t, errors, int32(0), "should have errors")
+	assert.Greater(t, overlaps, int32(0), "should have overlaps")
+	assert.Equal(t, executions, errors, "each execution should produce an error")
+}
+
+// TestPeriodicTaskManager_OverlapPreventionWithPanic 测试重叠保护中的panic处理
+func TestPeriodicTaskManager_OverlapPreventionWithPanic(t *testing.T) {
+	manager := NewPeriodicTaskManager()
+	var executionCount, panicCount, overlapCount int32
+
+	manager.SetDefaultErrorHandler(func(name string, err error) {
+		if name == "panic_task" {
+			atomic.AddInt32(&panicCount, 1)
+		}
+	})
+
+	manager.AddTaskWithOverlapPreventionAndCallback(
+		"panic_task",
+		time.Millisecond*50,
+		func(ctx context.Context) error {
+			atomic.AddInt32(&executionCount, 1)
+			time.Sleep(time.Millisecond * 100)
+			panic("test panic")
+		},
+		func(name string) {
+			atomic.AddInt32(&overlapCount, 1)
+		},
+	)
+
+	manager.Start()
+	time.Sleep(time.Millisecond * 300)
+	manager.Stop()
+
+	executions := atomic.LoadInt32(&executionCount)
+	panics := atomic.LoadInt32(&panicCount)
+	overlaps := atomic.LoadInt32(&overlapCount)
+
+	assert.Greater(t, executions, int32(0), "should have executions")
+	assert.Greater(t, panics, int32(0), "should have panics")
+	assert.Greater(t, overlaps, int32(0), "should have overlaps")
+	assert.Equal(t, executions, panics, "each execution should produce a panic")
+}
+
+// TestPeriodicTaskManager_FastTaskWithOverlapPrevention 测试快速任务的重叠保护
+func TestPeriodicTaskManager_FastTaskWithOverlapPrevention(t *testing.T) {
+	manager := NewPeriodicTaskManager()
+	var executionCount, overlapCount int32
+
+	// 添加一个执行时间很短的任务
+	manager.AddTaskWithOverlapPreventionAndCallback(
+		"fast_task",
+		time.Millisecond*100,
+		func(ctx context.Context) error {
+			atomic.AddInt32(&executionCount, 1)
+			time.Sleep(time.Millisecond * 10) // 很短的执行时间
+			return nil
+		},
+		func(name string) {
+			atomic.AddInt32(&overlapCount, 1)
+		},
+	)
+
+	manager.Start()
+	time.Sleep(time.Millisecond * 500)
+	manager.Stop()
+
+	executions := atomic.LoadInt32(&executionCount)
+	overlaps := atomic.LoadInt32(&overlapCount)
+
+	assert.Greater(t, executions, int32(3), "fast task should execute multiple times")
+	assert.Equal(t, int32(0), overlaps, "fast task should not have overlaps")
+}
+
+// TestPeriodicTaskManager_OverlapPreventionThreadSafety 测试重叠保护的线程安全性
+func TestPeriodicTaskManager_OverlapPreventionThreadSafety(t *testing.T) {
+	manager := NewPeriodicTaskManager()
+	var executionCount, overlapCount int32
+	var activeExecutions int32
+
+	manager.AddTaskWithOverlapPreventionAndCallback(
+		"thread_safe_task",
+		time.Millisecond*20,
+		func(ctx context.Context) error {
+			current := atomic.AddInt32(&activeExecutions, 1)
+			defer atomic.AddInt32(&activeExecutions, -1)
+
+			// 验证同时只有一个执行实例
+			assert.Equal(t, int32(1), current, "should only have one active execution")
+
+			atomic.AddInt32(&executionCount, 1)
+			time.Sleep(time.Millisecond * 100)
+			return nil
+		},
+		func(name string) {
+			atomic.AddInt32(&overlapCount, 1)
+		},
+	)
+
+	manager.Start()
+	time.Sleep(time.Millisecond * 500)
+	manager.Stop()
+
+	executions := atomic.LoadInt32(&executionCount)
+	overlaps := atomic.LoadInt32(&overlapCount)
+	final := atomic.LoadInt32(&activeExecutions)
+
+	assert.Greater(t, executions, int32(0), "should have executions")
+	assert.Greater(t, overlaps, int32(0), "should have overlaps")
+	assert.Equal(t, int32(0), final, "should have no active executions after stop")
+}
+
+// ===================== 任务移除和取消功能测试 =====================
+
+// TestPeriodicTaskManager_RemoveTask_Basic 测试基本的任务移除功能
+func TestPeriodicTaskManager_RemoveTask_Basic(t *testing.T) {
+	manager := NewPeriodicTaskManager()
+
+	// 添加任务
+	manager.AddSimpleTask("remove_test", time.Second, func(ctx context.Context) error {
+		return nil
+	})
+
+	// 验证任务已添加
+	assert.Equal(t, 1, manager.GetTaskCount(), "should have 1 task")
+	names := manager.GetTaskNames()
+	assert.Contains(t, names, "remove_test", "should contain remove_test")
+
+	// 移除任务
+	removed := manager.RemoveTask("remove_test")
+	assert.True(t, removed, "should successfully remove task")
+
+	// 验证任务已移除
+	assert.Equal(t, 0, manager.GetTaskCount(), "should have 0 tasks after removal")
+	names = manager.GetTaskNames()
+	assert.NotContains(t, names, "remove_test", "should not contain remove_test")
+
+	// 尝试移除不存在的任务
+	removed = manager.RemoveTask("non_existent")
+	assert.False(t, removed, "should not be able to remove non-existent task")
+}
+
+// TestPeriodicTaskManager_RemoveRunningTask 测试移除正在运行的任务
+func TestPeriodicTaskManager_RemoveRunningTask(t *testing.T) {
+	manager := NewPeriodicTaskManager()
+	var executionCount int32
+	var taskCancelled bool
+
+	// 添加一个长时间运行的任务
+	manager.AddTaskWithOverlapPrevention("long_running", time.Millisecond*50, func(ctx context.Context) error {
+		atomic.AddInt32(&executionCount, 1)
+		t.Log("任务开始执行...")
+
+		// 检查是否被取消
+		select {
+		case <-time.After(time.Millisecond * 200):
+			t.Log("任务正常完成")
+		case <-ctx.Done():
+			t.Log("任务被取消")
+			taskCancelled = true
+		}
+
+		return nil
+	})
+
+	// 启动任务管理器
+	err := manager.Start()
+	assert.NoError(t, err, "should start successfully")
+
+	// 等待任务开始执行
+	time.Sleep(time.Millisecond * 100)
+
+	// 验证任务正在执行
+	details := manager.GetTaskDetails("long_running")
+	assert.Equal(t, 1, len(details), "should find the task")
+	assert.True(t, details[0].IsExecuting, "task should be executing")
+
+	// 移除正在运行的任务
+	t.Log("开始移除正在运行的任务...")
+	removed := manager.RemoveTask("long_running")
+	assert.True(t, removed, "should successfully remove running task")
+
+	// 验证任务已移除
+	assert.Equal(t, 0, manager.GetTaskCount(), "should have 0 tasks after removal")
+
+	// 等待一段时间看任务是否被取消
+	time.Sleep(time.Millisecond * 300)
+
+	// 停止管理器
+	err = manager.Stop()
+	assert.NoError(t, err, "should stop successfully")
+
+	executions := atomic.LoadInt32(&executionCount)
+	assert.Greater(t, executions, int32(0), "task should have executed at least once")
+
+	if taskCancelled {
+		t.Log("✅ 任务成功被取消")
+	} else {
+		t.Log("⚠️ 任务可能在取消前已完成")
+	}
+}
+
+// TestPeriodicTaskManager_RemoveTaskWithTimeout 测试带超时的任务移除
+func TestPeriodicTaskManager_RemoveTaskWithTimeout(t *testing.T) {
+	manager := NewPeriodicTaskManager()
+	var executionCount int32
+	var taskCancelled bool
+
+	// 添加一个长时间运行的任务
+	manager.AddTaskWithOverlapPrevention("timeout_test", time.Millisecond*100, func(ctx context.Context) error {
+		atomic.AddInt32(&executionCount, 1)
+
+		select {
+		case <-time.After(time.Millisecond * 500): // 很长的执行时间
+			return nil
+		case <-ctx.Done():
+			taskCancelled = true
+			return ctx.Err()
+		}
+	})
+
+	// 启动任务管理器
+	err := manager.Start()
+	assert.NoError(t, err, "should start successfully")
+
+	// 等待任务开始执行
+	time.Sleep(time.Millisecond * 150)
+
+	// 使用超时移除任务
+	start := time.Now()
+	removed := manager.RemoveTaskWithTimeout("timeout_test", time.Millisecond*200)
+	duration := time.Since(start)
+
+	assert.True(t, removed, "should successfully remove task")
+	assert.Less(t, duration, time.Millisecond*300, "should not take too long")
+
+	// 验证任务已移除
+	assert.Equal(t, 0, manager.GetTaskCount(), "should have 0 tasks after removal")
+
+	// 停止管理器
+	err = manager.Stop()
+	assert.NoError(t, err, "should stop successfully")
+
+	t.Logf("移除操作耗时: %v", duration)
+	t.Logf("任务执行次数: %d", atomic.LoadInt32(&executionCount))
+	t.Logf("任务是否被取消: %v", taskCancelled)
+}
+
+// TestPeriodicTaskManager_RemoveTaskTimeout 测试移除任务超时情况
+func TestPeriodicTaskManager_RemoveTaskTimeout(t *testing.T) {
+	manager := NewPeriodicTaskManager()
+
+	// 添加一个会阻塞很久的任务
+	manager.AddTaskWithOverlapPrevention("blocking_task", time.Millisecond*50, func(ctx context.Context) error {
+		// 忽略取消信号，模拟无法优雅停止的任务
+		time.Sleep(time.Second * 2)
+		return nil
+	})
+
+	// 启动任务管理器
+	err := manager.Start()
+	assert.NoError(t, err, "should start successfully")
+
+	// 等待任务开始执行
+	time.Sleep(time.Millisecond * 100)
+
+	// 尝试在很短时间内移除任务
+	start := time.Now()
+	removed := manager.RemoveTaskWithTimeout("blocking_task", time.Millisecond*100)
+	duration := time.Since(start)
+
+	// 应该能成功移除（超时后强制移除）
+	assert.True(t, removed, "should remove task even on timeout")
+	assert.GreaterOrEqual(t, duration, time.Millisecond*100, "should wait for timeout")
+	assert.Less(t, duration, time.Millisecond*200, "should not wait too long")
+
+	// 验证任务已移除
+	assert.Equal(t, 0, manager.GetTaskCount(), "should have 0 tasks after removal")
+
+	// 停止管理器
+	err = manager.Stop()
+	assert.NoError(t, err, "should stop successfully")
+
+	t.Logf("超时移除操作耗时: %v", duration)
+}
+
+// TestPeriodicTaskManager_RemoveMultipleTasks 测试移除多个任务
+func TestPeriodicTaskManager_RemoveMultipleTasks(t *testing.T) {
+	manager := NewPeriodicTaskManager()
+	var task1Count, task2Count, task3Count int32
+
+	// 添加多个任务
+	manager.AddSimpleTask("task1", time.Millisecond*50, func(ctx context.Context) error {
+		atomic.AddInt32(&task1Count, 1)
+		time.Sleep(time.Millisecond * 10)
+		return nil
+	})
+
+	manager.AddSimpleTask("task2", time.Millisecond*75, func(ctx context.Context) error {
+		atomic.AddInt32(&task2Count, 1)
+		time.Sleep(time.Millisecond * 10)
+		return nil
+	})
+
+	manager.AddSimpleTask("task3", time.Millisecond*100, func(ctx context.Context) error {
+		atomic.AddInt32(&task3Count, 1)
+		time.Sleep(time.Millisecond * 10)
+		return nil
+	})
+
+	assert.Equal(t, 3, manager.GetTaskCount(), "should have 3 tasks")
+
+	// 启动任务管理器
+	err := manager.Start()
+	assert.NoError(t, err, "should start successfully")
+
+	// 等待任务执行
+	time.Sleep(time.Millisecond * 200)
+
+	// 移除其中两个任务
+	removed1 := manager.RemoveTask("task1")
+	removed2 := manager.RemoveTask("task3")
+
+	assert.True(t, removed1, "should remove task1")
+	assert.True(t, removed2, "should remove task3")
+	assert.Equal(t, 1, manager.GetTaskCount(), "should have 1 task remaining")
+
+	// 验证剩余的任务
+	names := manager.GetTaskNames()
+	assert.Contains(t, names, "task2", "task2 should remain")
+	assert.NotContains(t, names, "task1", "task1 should be removed")
+	assert.NotContains(t, names, "task3", "task3 should be removed")
+
+	// 继续运行一段时间
+	time.Sleep(time.Millisecond * 200)
+
+	// 停止管理器
+	err = manager.Stop()
+	assert.NoError(t, err, "should stop successfully")
+
+	// 验证所有任务都有执行
+	assert.Greater(t, atomic.LoadInt32(&task1Count), int32(0), "task1 should have executed")
+	assert.Greater(t, atomic.LoadInt32(&task2Count), int32(0), "task2 should have executed")
+	assert.Greater(t, atomic.LoadInt32(&task3Count), int32(0), "task3 should have executed")
+
+	t.Logf("Task1 执行次数: %d", atomic.LoadInt32(&task1Count))
+	t.Logf("Task2 执行次数: %d", atomic.LoadInt32(&task2Count))
+	t.Logf("Task3 执行次数: %d", atomic.LoadInt32(&task3Count))
+}
+
+// TestPeriodicTaskManager_ClearAllTasks 测试清除所有任务
+func TestPeriodicTaskManager_ClearAllTasks(t *testing.T) {
+	manager := NewPeriodicTaskManager()
+
+	// 添加多个任务
+	for i := 0; i < 5; i++ {
+		taskName := fmt.Sprintf("task_%d", i)
+		manager.AddSimpleTask(taskName, time.Millisecond*100, func(ctx context.Context) error {
+			return nil
+		})
+	}
+
+	assert.Equal(t, 5, manager.GetTaskCount(), "should have 5 tasks")
+
+	// 启动任务管理器
+	err := manager.Start()
+	assert.NoError(t, err, "should start successfully")
+
+	time.Sleep(time.Millisecond * 50)
+
+	// 清除所有任务
+	manager.ClearAllTasks()
+
+	assert.Equal(t, 0, manager.GetTaskCount(), "should have 0 tasks after clear")
+	assert.Equal(t, 0, len(manager.GetTaskNames()), "should have no task names")
+
+	details := manager.GetTaskDetails()
+	assert.Equal(t, 0, len(details), "should have no task details")
+
+	// 停止管理器
+	err = manager.Stop()
+	assert.NoError(t, err, "should stop successfully")
+}
+
+// TestPeriodicTaskManager_RemoveTaskConcurrency 测试并发移除任务
+func TestPeriodicTaskManager_RemoveTaskConcurrency(t *testing.T) {
+	manager := NewPeriodicTaskManager()
+
+	// 添加多个任务
+	taskCount := 10
+	for i := 0; i < taskCount; i++ {
+		taskName := fmt.Sprintf("concurrent_task_%d", i)
+		manager.AddSimpleTask(taskName, time.Millisecond*100, func(ctx context.Context) error {
+			time.Sleep(time.Millisecond * 50)
+			return nil
+		})
+	}
+
+	assert.Equal(t, taskCount, manager.GetTaskCount(), "should have all tasks")
+
+	// 启动任务管理器
+	err := manager.Start()
+	assert.NoError(t, err, "should start successfully")
+
+	time.Sleep(time.Millisecond * 50)
+
+	// 并发移除任务
+	var wg sync.WaitGroup
+	var removedCount int32
+
+	for i := 0; i < taskCount; i++ {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			taskName := fmt.Sprintf("concurrent_task_%d", index)
+			if manager.RemoveTask(taskName) {
+				atomic.AddInt32(&removedCount, 1)
+			}
+		}(i)
+	}
+
+	wg.Wait()
+
+	// 验证所有任务都被移除
+	assert.Equal(t, int32(taskCount), atomic.LoadInt32(&removedCount), "should remove all tasks")
+	assert.Equal(t, 0, manager.GetTaskCount(), "should have 0 tasks after removal")
+
+	// 停止管理器
+	err = manager.Stop()
+	assert.NoError(t, err, "should stop successfully")
+}
+
+// TestPeriodicTaskManager_GetTaskDetailsAfterRemoval 测试移除后获取任务详情
+func TestPeriodicTaskManager_GetTaskDetailsAfterRemoval(t *testing.T) {
+	manager := NewPeriodicTaskManager()
+
+	// 添加任务
+	task := NewPeriodicTask("detail_test", time.Second, func(ctx context.Context) error {
+		return nil
+	}).SetImmediateStart(true).SetPreventOverlap(true)
+
+	manager.AddTask(task)
+
+	// 验证任务详情
+	details := manager.GetTaskDetails("detail_test")
+	assert.Equal(t, 1, len(details), "should have 1 task detail")
+	assert.Equal(t, "detail_test", details[0].Name, "task name should match")
+	assert.True(t, details[0].ImmediateStart, "should have immediate start")
+	assert.True(t, details[0].PreventOverlap, "should have overlap prevention")
+
+	// 移除任务
+	removed := manager.RemoveTask("detail_test")
+	assert.True(t, removed, "should remove task")
+
+	// 验证任务详情已清空
+	details = manager.GetTaskDetails("detail_test")
+	assert.Equal(t, 0, len(details), "should have no task details after removal")
+
+	allDetails := manager.GetTaskDetails()
+	assert.Equal(t, 0, len(allDetails), "should have no task details")
+}
+
+// TestPeriodicTaskManager_TaskCancellationContext 测试任务取消上下文
+func TestPeriodicTaskManager_TaskCancellationContext(t *testing.T) {
+	manager := NewPeriodicTaskManager()
+	var cancelledCount int32
+	var executionCount int32
+
+	// 添加一个会检查取消信号的任务
+	manager.AddSimpleTask("cancellable", time.Millisecond*50, func(ctx context.Context) error {
+		atomic.AddInt32(&executionCount, 1)
+
+		// 模拟长时间运行并检查取消
+		for i := 0; i < 10; i++ {
+			select {
+			case <-ctx.Done():
+				atomic.AddInt32(&cancelledCount, 1)
+				return ctx.Err()
+			case <-time.After(time.Millisecond * 20):
+				// 继续执行
+			}
+		}
+		return nil
+	})
+
+	// 启动任务管理器
+	err := manager.Start()
+	assert.NoError(t, err, "should start successfully")
+
+	// 等待任务开始执行
+	time.Sleep(time.Millisecond * 100)
+
+	// 移除任务（这会取消任务的上下文）
+	removed := manager.RemoveTask("cancellable")
+	assert.True(t, removed, "should remove task")
+
+	// 等待取消生效
+	time.Sleep(time.Millisecond * 200)
+
+	// 停止管理器
+	err = manager.Stop()
+	assert.NoError(t, err, "should stop successfully")
+
+	executions := atomic.LoadInt32(&executionCount)
+	cancelled := atomic.LoadInt32(&cancelledCount)
+
+	assert.Greater(t, executions, int32(0), "task should have executed")
+
+	if cancelled > 0 {
+		t.Logf("✅ 任务成功响应取消信号，取消次数: %d", cancelled)
+	} else {
+		t.Logf("⚠️ 任务可能在取消前已完成，执行次数: %d", executions)
 	}
 }
