@@ -14,6 +14,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/kamalyes/go-toolbox/pkg/retry"
+	"github.com/stretchr/testify/assert"
 	"math"
 	"math/rand"
 	"strings"
@@ -21,9 +23,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/kamalyes/go-toolbox/pkg/retry"
-	"github.com/stretchr/testify/assert"
 )
 
 // 测试尝试次数
@@ -315,4 +314,541 @@ func TestRetry_GetSetMethods(t *testing.T) {
 		return nil
 	})
 	assert.Equal(t, caller, r.GetCaller())
+}
+
+// 测试退避倍数（BackoffMultiplier）
+func TestRetry_BackoffMultiplier(t *testing.T) {
+	var intervals []time.Duration
+	startTime := time.Now()
+	lastCallTime := startTime
+
+	r := retry.NewRetry().
+		SetAttemptCount(4).
+		SetInterval(50 * time.Millisecond).
+		SetBackoffMultiplier(2.0).
+		SetErrCallback(func(now, remain int, err error, _ ...string) {
+			currentTime := time.Now()
+			if now > 1 {
+				intervals = append(intervals, currentTime.Sub(lastCallTime))
+			}
+			lastCallTime = currentTime
+		})
+
+	err := r.Do(func() error {
+		return errors.New("test error")
+	})
+
+	assert.Error(t, err)
+	// 验证退避倍数是否生效：间隔应该逐渐增大
+	assert.Equal(t, 2.0, r.GetBackoffMultiplier())
+}
+
+// 测试最大间隔时间（MaxInterval）
+func TestRetry_MaxInterval(t *testing.T) {
+	r := retry.NewRetry().
+		SetAttemptCount(5).
+		SetInterval(50 * time.Millisecond).
+		SetMaxInterval(100 * time.Millisecond).
+		SetBackoffMultiplier(3.0)
+
+	err := r.Do(func() error {
+		return errors.New("test error")
+	})
+
+	assert.Error(t, err)
+	assert.Equal(t, 100*time.Millisecond, r.GetMaxInterval())
+}
+
+// 测试抖动（Jitter）
+func TestRetry_Jitter(t *testing.T) {
+	r := retry.NewRetry().
+		SetAttemptCount(3).
+		SetInterval(50 * time.Millisecond).
+		SetJitter(true)
+
+	err := r.Do(func() error {
+		return errors.New("test error")
+	})
+
+	assert.Error(t, err)
+	assert.True(t, r.GetJitter())
+}
+
+// 测试抖动和退避倍数组合
+func TestRetry_JitterWithBackoff(t *testing.T) {
+	r := retry.NewRetry().
+		SetAttemptCount(4).
+		SetInterval(30 * time.Millisecond).
+		SetBackoffMultiplier(1.5).
+		SetMaxInterval(200 * time.Millisecond).
+		SetJitter(true)
+
+	start := time.Now()
+	err := r.Do(func() error {
+		return errors.New("test error")
+	})
+
+	elapsed := time.Since(start)
+	assert.Error(t, err)
+	// 确保有足够的重试时间（带抖动）
+	assert.True(t, elapsed >= 30*time.Millisecond)
+}
+
+// 测试无回调函数情况
+func TestRetry_NoCallbacks(t *testing.T) {
+	r := retry.NewRetry().
+		SetAttemptCount(3).
+		SetInterval(time.Millisecond)
+
+	// 测试成功情况无回调
+	err := r.Do(func() error {
+		return nil
+	})
+	assert.NoError(t, err)
+
+	// 测试失败情况无回调
+	err = r.Do(func() error {
+		return errors.New("test error")
+	})
+	assert.Error(t, err)
+}
+
+// 测试空函数名场景
+func TestRetry_EmptyFuncName(t *testing.T) {
+	successCalled := false
+	errCalled := false
+
+	r := retry.NewRetry().
+		SetAttemptCount(2).
+		SetInterval(time.Millisecond).
+		SetSuccessCallback(func(funcName ...string) {
+			successCalled = true
+			// funcName 应该不为空（由 caller 自动填充）
+		}).
+		SetErrCallback(func(now, remain int, err error, funcName ...string) {
+			errCalled = true
+		})
+
+	// 测试成功路径
+	err := r.Do(func() error {
+		return nil
+	})
+	assert.NoError(t, err)
+	assert.True(t, successCalled)
+
+	// 测试失败路径
+	err = r.Do(func() error {
+		return errors.New("test error")
+	})
+	assert.Error(t, err)
+	assert.True(t, errCalled)
+}
+
+// 测试条件函数返回 true 的情况（继续重试）
+func TestRetry_ConditionFuncAllowRetry(t *testing.T) {
+	var attemptCount int32 = 0
+
+	r := retry.NewRetry().
+		SetAttemptCount(3).
+		SetInterval(time.Millisecond).
+		SetConditionFunc(func(err error) bool {
+			return true // 总是允许重试
+		})
+
+	err := r.Do(func() error {
+		atomic.AddInt32(&attemptCount, 1)
+		return errors.New("test error")
+	})
+
+	assert.Error(t, err)
+	assert.Equal(t, int32(3), atomic.LoadInt32(&attemptCount))
+}
+
+// 测试条件函数返回 false 的情况（不重试）
+func TestRetry_ConditionFuncDenyRetry(t *testing.T) {
+	var attemptCount int32 = 0
+
+	r := retry.NewRetry().
+		SetAttemptCount(5).
+		SetInterval(time.Millisecond).
+		SetConditionFunc(func(err error) bool {
+			return false // 总是不允许重试
+		})
+
+	err := r.Do(func() error {
+		atomic.AddInt32(&attemptCount, 1)
+		return errors.New("test error")
+	})
+
+	assert.Error(t, err)
+	assert.Equal(t, int32(1), atomic.LoadInt32(&attemptCount)) // 只执行一次
+}
+
+// 测试零间隔时间
+func TestRetry_ZeroInterval(t *testing.T) {
+	var counter int32 = 0
+
+	r := retry.NewRetry().
+		SetAttemptCount(5).
+		SetInterval(0)
+
+	start := time.Now()
+	err := r.Do(func() error {
+		atomic.AddInt32(&counter, 1)
+		return errors.New("test error")
+	})
+
+	elapsed := time.Since(start)
+	assert.Error(t, err)
+	assert.Equal(t, int32(5), atomic.LoadInt32(&counter))
+	// 零间隔应该很快完成
+	assert.True(t, elapsed < 100*time.Millisecond)
+}
+
+// 测试退避倍数小于等于1的情况（不应用退避）
+func TestRetry_BackoffMultiplierLessThanOne(t *testing.T) {
+	r := retry.NewRetry().
+		SetAttemptCount(3).
+		SetInterval(10 * time.Millisecond).
+		SetBackoffMultiplier(0.5) // 小于1，不应用退避
+
+	start := time.Now()
+	err := r.Do(func() error {
+		return errors.New("test error")
+	})
+
+	elapsed := time.Since(start)
+	assert.Error(t, err)
+	// 由于退避倍数小于1，间隔保持不变
+	assert.True(t, elapsed < 100*time.Millisecond)
+}
+
+// 测试退避倍数等于1的情况
+func TestRetry_BackoffMultiplierEqualOne(t *testing.T) {
+	r := retry.NewRetry().
+		SetAttemptCount(3).
+		SetInterval(10 * time.Millisecond).
+		SetBackoffMultiplier(1.0)
+
+	err := r.Do(func() error {
+		return errors.New("test error")
+	})
+
+	assert.Error(t, err)
+}
+
+// 测试最大间隔为0的情况（不限制最大间隔）
+func TestRetry_ZeroMaxInterval(t *testing.T) {
+	r := retry.NewRetry().
+		SetAttemptCount(3).
+		SetInterval(10 * time.Millisecond).
+		SetBackoffMultiplier(2.0).
+		SetMaxInterval(0) // 不限制
+
+	err := r.Do(func() error {
+		return errors.New("test error")
+	})
+
+	assert.Error(t, err)
+	assert.Equal(t, time.Duration(0), r.GetMaxInterval())
+}
+
+// 测试上下文已经取消的情况
+func TestRetry_ContextAlreadyCanceled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // 立即取消
+
+	r := retry.NewRetryWithCtx(ctx).
+		SetAttemptCount(5).
+		SetInterval(time.Second)
+
+	err := r.Do(func() error {
+		return errors.New("should not reach here")
+	})
+
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+// 测试链式调用
+func TestRetry_ChainedCalls(t *testing.T) {
+	successCalled := false
+	errCalled := false
+
+	r := retry.NewRetry().
+		SetCaller("TestCaller").
+		SetAttemptCount(3).
+		SetInterval(time.Millisecond).
+		SetMaxInterval(time.Second).
+		SetBackoffMultiplier(2.0).
+		SetJitter(true).
+		SetSuccessCallback(func(_ ...string) { successCalled = true }).
+		SetErrCallback(func(_, _ int, _ error, _ ...string) { errCalled = true }).
+		SetConditionFunc(func(err error) bool { return true })
+
+	// 验证所有设置
+	assert.Equal(t, "TestCaller", r.GetCaller())
+	assert.Equal(t, 3, r.GetAttemptCount())
+	assert.Equal(t, time.Millisecond, r.GetInterval())
+	assert.Equal(t, time.Second, r.GetMaxInterval())
+	assert.Equal(t, 2.0, r.GetBackoffMultiplier())
+	assert.True(t, r.GetJitter())
+	assert.NotNil(t, r.GetSuccessCallback())
+	assert.NotNil(t, r.GetErrCallback())
+	assert.NotNil(t, r.GetConditionFunc())
+
+	err := r.Do(func() error {
+		return nil
+	})
+	assert.NoError(t, err)
+	assert.True(t, successCalled)
+	assert.False(t, errCalled) // 成功时不应调用错误回调
+}
+
+// 测试多次执行 Do
+func TestRetry_MultipleDoCalls(t *testing.T) {
+	r := retry.NewRetry().
+		SetAttemptCount(2).
+		SetInterval(time.Millisecond)
+
+	// 第一次执行成功
+	err1 := r.Do(func() error {
+		return nil
+	})
+	assert.NoError(t, err1)
+
+	// 第二次执行失败
+	err2 := r.Do(func() error {
+		return errors.New("error")
+	})
+	assert.Error(t, err2)
+
+	// 第三次执行成功
+	err3 := r.Do(func() error {
+		return nil
+	})
+	assert.NoError(t, err3)
+}
+
+// 测试并发执行多个 Retry 实例
+func TestRetry_ConcurrentInstances(t *testing.T) {
+	var wg sync.WaitGroup
+	const goroutines = 10
+
+	for i := 0; i < goroutines; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+
+			r := retry.NewRetry().
+				SetAttemptCount(3).
+				SetInterval(time.Millisecond)
+
+			counter := 0
+			err := r.Do(func() error {
+				counter++
+				if counter < 2 {
+					return errors.New("temp error")
+				}
+				return nil
+			})
+
+			assert.NoError(t, err)
+			assert.Equal(t, 2, counter)
+		}(i)
+	}
+
+	wg.Wait()
+}
+
+// 测试第一次就成功的情况（不触发重试逻辑）
+func TestRetry_FirstAttemptSuccess(t *testing.T) {
+	errCallbackCalled := false
+	successCallbackCalled := false
+
+	r := retry.NewRetry().
+		SetAttemptCount(5).
+		SetInterval(time.Second). // 设置较长间隔，确保不会等待
+		SetErrCallback(func(_, _ int, _ error, _ ...string) {
+			errCallbackCalled = true
+		}).
+		SetSuccessCallback(func(_ ...string) {
+			successCallbackCalled = true
+		})
+
+	start := time.Now()
+	err := r.Do(func() error {
+		return nil
+	})
+
+	elapsed := time.Since(start)
+	assert.NoError(t, err)
+	assert.False(t, errCallbackCalled) // 成功时不应调用错误回调
+	assert.True(t, successCallbackCalled)
+	assert.True(t, elapsed < 100*time.Millisecond) // 应该立即返回
+}
+
+// 测试最后一次尝试成功的情况
+func TestRetry_LastAttemptSuccess(t *testing.T) {
+	var counter int32 = 0
+
+	r := retry.NewRetry().
+		SetAttemptCount(3).
+		SetInterval(time.Millisecond)
+
+	err := r.Do(func() error {
+		count := atomic.AddInt32(&counter, 1)
+		if count < 3 {
+			return errors.New("temp error")
+		}
+		return nil
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, int32(3), atomic.LoadInt32(&counter))
+}
+
+// 测试错误回调函数参数正确性
+func TestRetry_ErrCallbackParams(t *testing.T) {
+	var callParams []struct {
+		now    int
+		remain int
+	}
+
+	r := retry.NewRetry().
+		SetAttemptCount(4).
+		SetInterval(time.Millisecond).
+		SetErrCallback(func(now, remain int, err error, _ ...string) {
+			callParams = append(callParams, struct {
+				now    int
+				remain int
+			}{now, remain})
+		})
+
+	err := r.Do(func() error {
+		return errors.New("test error")
+	})
+
+	assert.Error(t, err)
+	assert.Len(t, callParams, 4)
+
+	// 验证参数正确性
+	for i, p := range callParams {
+		assert.Equal(t, i+1, p.now)        // 当前尝试次数
+		assert.Equal(t, 4-(i+1), p.remain) // 剩余尝试次数
+	}
+}
+
+// 测试条件函数为 nil 的情况（默认全部重试）
+func TestRetry_NilConditionFunc(t *testing.T) {
+	var counter int32 = 0
+
+	r := retry.NewRetry().
+		SetAttemptCount(3).
+		SetInterval(time.Millisecond)
+	// 不设置 ConditionFunc
+
+	err := r.Do(func() error {
+		atomic.AddInt32(&counter, 1)
+		return errors.New("test error")
+	})
+
+	assert.Error(t, err)
+	assert.Equal(t, int32(3), atomic.LoadInt32(&counter)) // 应该重试3次
+	assert.Nil(t, r.GetConditionFunc())
+}
+
+// 测试大量重试次数
+func TestRetry_LargeAttemptCount(t *testing.T) {
+	var counter int32 = 0
+
+	r := retry.NewRetry().
+		SetAttemptCount(100).
+		SetInterval(0) // 无间隔
+
+	err := r.Do(func() error {
+		count := atomic.AddInt32(&counter, 1)
+		if count < 50 {
+			return errors.New("temp error")
+		}
+		return nil
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, int32(50), atomic.LoadInt32(&counter))
+}
+
+// 测试不同类型的错误
+func TestRetry_DifferentErrorTypes(t *testing.T) {
+	testCases := []struct {
+		name string
+		err  error
+	}{
+		{"simple error", errors.New("simple error")},
+		{"wrapped error", fmt.Errorf("wrapped: %w", errors.New("inner"))},
+		{"custom error", &customError{msg: "custom"}},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := retry.NewRetry().
+				SetAttemptCount(2).
+				SetInterval(time.Millisecond)
+
+			err := r.Do(func() error {
+				return tc.err
+			})
+
+			assert.Error(t, err)
+		})
+	}
+}
+
+// 自定义错误类型用于测试
+type customError struct {
+	msg string
+}
+
+func (e *customError) Error() string {
+	return e.msg
+}
+
+// 测试带抖动的最大间隔限制
+func TestRetry_JitterWithMaxInterval(t *testing.T) {
+	r := retry.NewRetry().
+		SetAttemptCount(5).
+		SetInterval(50 * time.Millisecond).
+		SetBackoffMultiplier(3.0).
+		SetMaxInterval(100 * time.Millisecond).
+		SetJitter(true)
+
+	start := time.Now()
+	err := r.Do(func() error {
+		return errors.New("test error")
+	})
+
+	elapsed := time.Since(start)
+	assert.Error(t, err)
+	// 由于最大间隔限制，总时间应该有上限
+	assert.True(t, elapsed < 2*time.Second)
+}
+
+// 测试上下文超时在执行过程中触发
+func TestRetry_ContextTimeoutDuringExecution(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	defer cancel()
+
+	r := retry.NewRetryWithCtx(ctx).
+		SetAttemptCount(10).
+		SetInterval(100 * time.Millisecond)
+
+	var counter int32 = 0
+	err := r.Do(func() error {
+		atomic.AddInt32(&counter, 1)
+		return errors.New("test error")
+	})
+
+	// 应该因为上下文超时而停止
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+	// 不应该完成所有10次尝试
+	assert.True(t, atomic.LoadInt32(&counter) < 10)
 }
