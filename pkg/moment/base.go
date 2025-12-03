@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-11 18:16:16
+ * @LastEditTime: 2025-12-03 15:41:12
  * @FilePath: \go-toolbox\pkg\moment\base.go
  * @Description:
  *
@@ -71,7 +71,7 @@ func SafeParseTimeToUnixNano(timeStr string) int64 {
 // GetCurrentTimeInfo 获取当前日期、小时和时间的通用函数
 func GetCurrentTimeInfo() (string, int, time.Time) {
 	currentTime := time.Now()
-	return currentTime.Format("2006-01-02"), currentTime.Hour(), currentTime
+	return currentTime.Format(time.DateOnly), currentTime.Hour(), currentTime
 }
 
 // GetServerTimezone 获取服务器的本地时区信息
@@ -126,7 +126,7 @@ func ConvertStringToTimestamp(dateString, layout string, timeZone string) (int64
 // 计算年龄的函数，currentTime 为计算年龄时的参考时间
 func CalculateAge(birthday string, currentTime time.Time) (int, error) {
 	// 解析生日字符串为 time.Time 对象
-	birthDate, err := time.Parse("2006-01-02", birthday)
+	birthDate, err := time.Parse(time.DateOnly, birthday)
 	if err != nil {
 		return 0, err // 如果解析失败，返回错误
 	}
@@ -465,4 +465,78 @@ func HumanDuration(start, end time.Time) string {
 	}
 
 	return result
+}
+
+// ParseFlexibleDate 灵活的日期解析函数，支持多种格式
+// 支持格式: 2006-01-02, 2006-01-02T15:04:05Z07:00, 2006-01-02 15:04:05 等
+func ParseFlexibleDate(dateStr string) (time.Time, error) {
+	// 尝试的日期格式列表，按常用程度排序
+	formats := []string{
+		// 标准日期格式
+		time.DateOnly,    // 2006-01-02 (最常用)
+		time.RFC3339,     // 2006-01-02T15:04:05Z07:00
+		time.DateTime,    // 2006-01-02 15:04:05
+		time.RFC3339Nano, // 2006-01-02T15:04:05.999999999Z07:00
+
+		// ISO 格式变体
+		"2006-01-02T15:04:05",            // 不带时区的 ISO 格式
+		"2006-01-02T15:04:05Z",           // 带 Z 的 UTC 格式
+		"2006-01-02T15:04:05.000Z",       // 带毫秒的 UTC 格式
+		"2006-01-02T15:04:05.000000Z",    // 带微秒的 UTC 格式
+		"2006-01-02T15:04:05.000000000Z", // 带纳秒的 UTC 格式
+
+		// 带时区偏移的格式
+		"2006-01-02T15:04:05+07:00",           // 带正时区偏移
+		"2006-01-02T15:04:05-07:00",           // 带负时区偏移
+		"2006-01-02T15:04:05.000+07:00",       // 带毫秒和时区偏移
+		"2006-01-02T15:04:05.000000+07:00",    // 带微秒和时区偏移
+		"2006-01-02T15:04:05.000000000+07:00", // 带纳秒和时区偏移
+
+		// 中国常用格式
+		"2006年01月02日", // 中文日期格式
+		"2006年1月2日",   // 中文日期格式（无前导零）
+		"2006/01/02",  // 斜杠分隔
+		"2006/1/2",    // 斜杠分隔（无前导零）
+		"01/02/2006",  // 美式日期格式
+		"1/2/2006",    // 美式日期格式（无前导零）
+		"02/01/2006",  // 欧式日期格式
+		"2/1/2006",    // 欧式日期格式（无前导零）
+
+		// 时间格式
+		"15:04:05",  // 时间格式
+		"15:04",     // 时间格式（无秒）
+		"3:04:05PM", // 12小时制
+		"3:04PM",    // 12小时制（无秒）
+
+		// 完整日期时间格式
+		"2006-01-02 15:04:05",  // 空格分隔的日期时间
+		"2006/01/02 15:04:05",  // 斜杠日期 + 空格 + 时间
+		"2006年01月02日 15:04:05", // 中文日期 + 时间
+		"2006年1月2日 15:04:05",   // 中文日期（无前导零）+ 时间
+
+		// 数据库常见格式
+		"2006-01-02 15:04:05.000",       // 带毫秒
+		"2006-01-02 15:04:05.000000",    // 带微秒
+		"2006-01-02 15:04:05.000000000", // 带纳秒
+
+		// Unix 风格
+		time.RFC822,   // 02 Jan 06 15:04 MST
+		time.RFC822Z,  // 02 Jan 06 15:04 -0700
+		time.RFC850,   // Monday, 02-Jan-06 15:04:05 MST
+		time.RFC1123,  // Mon, 02 Jan 2006 15:04:05 MST
+		time.RFC1123Z, // Mon, 02 Jan 2006 15:04:05 -0700
+
+		// 其他常见格式
+		"20060102",       // 紧凑日期格式 YYYYMMDD
+		"200601021504",   // 紧凑日期时间格式 YYYYMMDDHHMM
+		"20060102150405", // 紧凑日期时间格式 YYYYMMDDHHMMSS
+	}
+
+	for _, format := range formats {
+		if date, err := time.Parse(format, dateStr); err == nil {
+			return date, nil
+		}
+	}
+
+	return time.Time{}, fmt.Errorf("无法解析日期格式: %s", dateStr)
 }
