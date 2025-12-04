@@ -14,6 +14,7 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"strconv"
 
 	"github.com/kamalyes/go-toolbox/pkg/stringx"
 	"github.com/kamalyes/go-toolbox/pkg/types"
@@ -74,6 +75,21 @@ func Between[T types.Numerical](x, lower, upper T) T {
 		return upper
 	}
 	return x
+}
+
+// Abs 返回数值的绝对值
+// 支持所有数值类型的泛型版本
+func Abs[T types.Numerical](x T) T {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
+// ParseInt64 将字符串解析为int64
+// 支持常见的字符串到int64的转换，解析失败时返回错误
+func ParseInt64(s string) (int64, error) {
+	return strconv.ParseInt(s, 10, 64)
 }
 
 // LongestCommonPrefix 返回两个字符串的最长公共前缀的长度

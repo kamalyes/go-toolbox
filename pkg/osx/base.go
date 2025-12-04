@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-09-16 09:26:55
+ * @LastEditTime: 2025-12-04 19:31:22
  * @FilePath: \go-toolbox\pkg\osx\base.go
  * @Description:
  *
@@ -58,19 +58,63 @@ func HashUnixMicroCipherText() string {
 	return cipherText
 }
 
-// GetWorkerId 获取唯一的 Worker ID
+// GetWorkerId 获取唯一的 Worker ID (智能增强版)
+// 优先级: 环境变量 WORKER_ID > 主机名哈希
+// 支持环境变量: WORKER_ID, NODE_ID, POD_ORDINAL
+// 返回范围: 0-1023
 func GetWorkerId() int64 {
-	// 获取主机名
-	hostName := SafeGetHostName()
+	// 1. 尝试从环境变量获取
+	envVars := []string{"WORKER_ID", "NODE_ID", "POD_ORDINAL"}
+	for _, envVar := range envVars {
+		if workerID := os.Getenv(envVar); workerID != "" {
+			if id, err := mathx.ParseInt64(workerID); err == nil {
+				// 确保在 0-1023 范围内
+				return mathx.Abs(id) % 1024
+			}
+		}
+	}
 
-	// 结合主机名生成唯一的 Worker ID
+	// 2. 从主机名生成唯一的 Worker ID
+	hostName := SafeGetHostName()
 	hash := sha256.Sum256([]byte(hostName))
 	hostNameHash := int64(binary.BigEndian.Uint64(hash[:8]))
 
-	// 计算 Worker ID，确保在 0-1023 范围内
-	workerId := hostNameHash % 1024
-
+	// 确保在 0-1023 范围内
+	workerId := mathx.Abs(hostNameHash) % 1024
 	return workerId
+}
+
+// GetDatacenterId 获取数据中心ID (新增)
+// 优先级: 环境变量 DATACENTER_ID > 区域环境变量 > 默认值1
+// 返回范围: 0-31 (雪花算法标准)
+func GetDatacenterId() int64 {
+	// 1. 尝试从环境变量获取
+	envVars := []string{"DATACENTER_ID", "DC_ID", "ZONE_ID", "REGION_ID"}
+	for _, envVar := range envVars {
+		if dcID := os.Getenv(envVar); dcID != "" {
+			if id, err := mathx.ParseInt64(dcID); err == nil {
+				// 确保在 0-31 范围内 (雪花算法的datacenter位数限制)
+				return mathx.Abs(id) % 32
+			}
+		}
+	}
+
+	// 2. 从Kubernetes相关环境变量推导
+	if namespace := os.Getenv("KUBERNETES_NAMESPACE"); namespace != "" {
+		hash := sha256.Sum256([]byte(namespace))
+		return int64(binary.BigEndian.Uint32(hash[:4])) % 32
+	}
+
+	// 3. 默认返回 1
+	return 1
+}
+
+// GetWorkerIdForSnowflake 专门为雪花算法获取WorkerId (新增)
+// 返回范围: 0-31 (雪花算法标准的5位worker id)
+func GetWorkerIdForSnowflake() int64 {
+	workerId := GetWorkerId()
+	// 雪花算法的worker id只有5位，范围0-31
+	return workerId % 32
 }
 
 // StableHashSlot 根据输入字符串 s 和范围 [minNum, maxNum]，返回一个稳定且范围内的整数

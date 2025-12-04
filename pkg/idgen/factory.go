@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-11-21 00:00:00
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-11-21 21:00:00
+ * @LastEditTime: 2025-12-04 19:31:55
  * @FilePath: \go-toolbox\pkg\idgen\factory.go
  * @Description: ID 生成器工厂
  *
