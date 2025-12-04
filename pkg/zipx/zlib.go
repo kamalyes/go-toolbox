@@ -2,8 +2,8 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-10-24 11:25:16
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-11-29 10:31:27
- * @FilePath: \engine-im-service\go-toolbox\pkg\zipx\zlib.go
+ * @LastEditTime: 2025-12-04 18:26:12
+ * @FilePath: \go-toolbox\pkg\zipx\zlib.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
@@ -13,6 +13,7 @@ package zipx
 import (
 	"bytes"
 	"compress/zlib"
+	"encoding/json"
 	"io"
 	"sync"
 )
@@ -110,4 +111,71 @@ func MultiZlibDecompress(compressedData []byte, times int) ([]byte, error) {
 		}
 	}
 	return decompressedData, nil // 返回最终的解压数据
+}
+
+// ZlibCompressObject 泛型压缩函数，支持任意类型自动JSON序列化
+func ZlibCompressObject[T any](obj T) ([]byte, error) {
+	// 序列化对象为JSON
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+	// 压缩JSON数据
+	return ZlibCompress(data)
+}
+
+// ZlibCompressObjectWithSize 泛型压缩函数，返回压缩后的数据和原始JSON数据大小
+func ZlibCompressObjectWithSize[T any](obj T) ([]byte, int, error) {
+	// 序列化对象为JSON
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return nil, 0, err
+	}
+	// 压缩JSON数据
+	compressedData, err := ZlibCompress(data)
+	if err != nil {
+		return nil, 0, err
+	}
+	return compressedData, len(data), nil
+}
+
+// ZlibDecompressObject 泛型解压缩函数，支持自动JSON反序列化
+func ZlibDecompressObject[T any](compressedData []byte) (T, error) {
+	var result T
+
+	// 解压缩数据
+	data, err := ZlibDecompress(compressedData)
+	if err != nil {
+		return result, err
+	}
+
+	// 反序列化JSON
+	err = json.Unmarshal(data, &result)
+	return result, err
+}
+
+// MultiZlibCompressObject 泛型多次压缩函数，支持任意类型自动JSON序列化
+func MultiZlibCompressObject[T any](obj T, times int) ([]byte, error) {
+	// 序列化对象为JSON
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+	// 多次压缩JSON数据
+	return MultiZlibCompress(data, times)
+}
+
+// MultiZlibDecompressObject 泛型多次解压缩函数，支持自动JSON反序列化
+func MultiZlibDecompressObject[T any](compressedData []byte, times int) (T, error) {
+	var result T
+
+	// 多次解压缩数据
+	data, err := MultiZlibDecompress(compressedData, times)
+	if err != nil {
+		return result, err
+	}
+
+	// 反序列化JSON
+	err = json.Unmarshal(data, &result)
+	return result, err
 }

@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-10-24 11:25:16
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-08 12:05:55
+ * @LastEditTime: 2025-12-04 18:37:14
  * @FilePath: \go-toolbox\pkg\zipx\gzip.go
  * @Description:
  *
@@ -14,6 +14,7 @@ package zipx
 import (
 	"bytes"
 	"compress/gzip"
+	"encoding/json"
 	"io"
 	"sync"
 )
@@ -109,4 +110,71 @@ func MultiGZipDecompress(compressedData []byte, times int) ([]byte, error) {
 		}
 	}
 	return decompressedData, nil // 返回最终的解压数据
+}
+
+// GzipCompressObject 泛型压缩函数，支持任意类型自动JSON序列化
+func GzipCompressObject[T any](obj T) ([]byte, error) {
+	// 序列化对象为JSON
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+	// 压缩JSON数据
+	return GzipCompress(data)
+}
+
+// GzipCompressObjectWithSize 泛型压缩函数，返回压缩后的数据和原始JSON数据大小
+func GzipCompressObjectWithSize[T any](obj T) ([]byte, int, error) {
+	// 序列化对象为JSON
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return nil, 0, err
+	}
+	// 压缩JSON数据
+	compressedData, err := GzipCompress(data)
+	if err != nil {
+		return nil, 0, err
+	}
+	return compressedData, len(data), nil
+}
+
+// GzipDecompressObject 泛型解压缩函数，支持自动JSON反序列化
+func GzipDecompressObject[T any](compressedData []byte) (T, error) {
+	var result T
+
+	// 解压缩数据
+	data, err := GzipDecompress(compressedData)
+	if err != nil {
+		return result, err
+	}
+
+	// 反序列化JSON
+	err = json.Unmarshal(data, &result)
+	return result, err
+}
+
+// MultiGZipCompressObject 泛型多次压缩函数，支持任意类型自动JSON序列化
+func MultiGZipCompressObject[T any](obj T, times int) ([]byte, error) {
+	// 序列化对象为JSON
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+	// 多次压缩JSON数据
+	return MultiGZipCompress(data, times)
+}
+
+// MultiGZipDecompressObject 泛型多次解压缩函数，支持自动JSON反序列化
+func MultiGZipDecompressObject[T any](compressedData []byte, times int) (T, error) {
+	var result T
+
+	// 多次解压缩数据
+	data, err := MultiGZipDecompress(compressedData, times)
+	if err != nil {
+		return result, err
+	}
+
+	// 反序列化JSON
+	err = json.Unmarshal(data, &result)
+	return result, err
 }
