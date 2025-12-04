@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-12-04 09:59:53
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-12-04 10:13:10
+ * @LastEditTime: 2025-12-04 10:15:07
  * @FilePath: \go-toolbox\pkg\safe\protobuf_test.go
  * @Description:
  *
@@ -135,4 +135,79 @@ func TestPtrKV(t *testing.T) {
 	kv := KV[string, int]{"key1": 1, "key2": 2}
 	assert.Equal(t, kv, PtrKV(&kv))
 	assert.Equal(t, KV[string, int]{}, PtrKV[string, int](nil))
+}
+
+func TestPtrToTime(t *testing.T) {
+	now := time.Now().In(time.UTC) // 确保使用 UTC 时区
+	timestamp := timestamppb.New(now)
+	result := PtrToTime(timestamp)
+
+	// 将预期值转换为 UTC
+	assert.NotNil(t, result)
+	assert.Equal(t, now.UTC(), *result) // 使用 UTC 进行比较
+
+	assert.Nil(t, PtrToTime(nil))
+}
+
+func TestPtrToString(t *testing.T) {
+	strValue := wrapperspb.String("test")
+	result := PtrToString(strValue)
+	assert.NotNil(t, result)
+	assert.Equal(t, "test", *result)
+
+	assert.Nil(t, PtrToString(nil))
+}
+
+func TestPtrToBool(t *testing.T) {
+	boolValue := wrapperspb.Bool(true)
+	result := PtrToBool(boolValue)
+	assert.NotNil(t, result)
+	assert.True(t, *result)
+
+	assert.Nil(t, PtrToBool(nil))
+}
+
+func TestPtrToInt32(t *testing.T) {
+	int32Value := wrapperspb.Int32(42)
+	result := PtrToInt32(int32Value)
+	assert.NotNil(t, result)
+	assert.Equal(t, int32(42), *result)
+
+	assert.Nil(t, PtrToInt32(nil))
+}
+
+func TestPtrToInt64(t *testing.T) {
+	int64Value := wrapperspb.Int64(42)
+	result := PtrToInt64(int64Value)
+	assert.NotNil(t, result)
+	assert.Equal(t, int64(42), *result)
+
+	assert.Nil(t, PtrToInt64(nil))
+}
+
+func TestPtrToDouble(t *testing.T) {
+	doubleValue := wrapperspb.Double(3.14)
+	result := PtrToDouble(doubleValue)
+	assert.NotNil(t, result)
+	assert.Equal(t, 3.14, *result)
+
+	assert.Nil(t, PtrToDouble(nil))
+}
+
+func TestPtrToBytes(t *testing.T) {
+	bytes := []byte{1, 2, 3}
+	result := PtrToBytes(&bytes)
+	assert.NotNil(t, result)
+	assert.Equal(t, bytes, *result)
+
+	assert.Nil(t, PtrToBytes(nil))
+}
+
+func TestPtrKVToSafe(t *testing.T) {
+	kv := KV[string, int]{"key": 1}
+	result := PtrKVToSafe(&kv) // 显式指定类型参数
+	assert.NotNil(t, result)
+	assert.Equal(t, kv, *result)
+
+	assert.Nil(t, PtrKVToSafe[string, int](nil)) // 显式指定类型参数
 }

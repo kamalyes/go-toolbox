@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-12-04 09:59:53
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-12-04 10:10:09
+ * @LastEditTime: 2025-12-04 10:28:55
  * @FilePath: \go-toolbox\pkg\safe\protobuf.go
  * @Description:
  *
@@ -171,4 +171,74 @@ func PtrKV[K comparable, V any](src *KV[K, V]) KV[K, V] {
 		return make(KV[K, V])
 	}
 	return *src
+}
+
+// PtrToTime 安全转换 *timestamppb.Timestamp 到 *time.Time
+func PtrToTime(src *timestamppb.Timestamp) *time.Time {
+	if src == nil {
+		return nil
+	}
+	t := src.AsTime()
+	return &t
+}
+
+// PtrToString 安全转换 *wrapperspb.StringValue 到 *string
+func PtrToString(src *wrapperspb.StringValue) *string {
+	if src == nil {
+		return nil
+	}
+	s := src.GetValue()
+	return &s
+}
+
+// PtrToBool 安全转换 *wrapperspb.BoolValue 到 *bool
+func PtrToBool(src *wrapperspb.BoolValue) *bool {
+	if src == nil {
+		return nil
+	}
+	b := src.GetValue()
+	return &b
+}
+
+// PtrToInt32 安全转换 *wrapperspb.Int32Value 到 *int32
+func PtrToInt32(src *wrapperspb.Int32Value) *int32 {
+	if src == nil {
+		return nil
+	}
+	i := src.GetValue()
+	return &i
+}
+
+// PtrToInt64 安全转换 *wrapperspb.Int64Value 到 *int64
+func PtrToInt64(src *wrapperspb.Int64Value) *int64 {
+	if src == nil {
+		return nil
+	}
+	i := src.GetValue()
+	return &i
+}
+
+// PtrToDouble 安全转换 *wrapperspb.DoubleValue 到 *float64
+func PtrToDouble(src *wrapperspb.DoubleValue) *float64 {
+	if src == nil {
+		return nil
+	}
+	f := src.GetValue()
+	return &f
+}
+
+// PtrToBytes 安全转换 *[]byte 到 *[]byte
+func PtrToBytes(src *[]byte) *[]byte {
+	if src == nil {
+		return nil
+	}
+	return src
+}
+
+// PtrKVToSafe 安全转换 *KV[K, V] 到 *KV[K, V]
+func PtrKVToSafe[K comparable, V any](src *KV[K, V]) *KV[K, V] {
+	if src == nil {
+		return nil
+	}
+	return src
 }
