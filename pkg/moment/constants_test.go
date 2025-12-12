@@ -2,19 +2,17 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-10-17 15:59:36
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-01 01:37:37
- * @FilePath: \go-toolbox\tests\moment_constants_test.go
+ * @LastEditTime: 2025-12-12 22:00:20
+ * @FilePath: \go-toolbox\pkg\moment\constants_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package moment
 
 import (
 	"testing"
 	"time"
-
-	"github.com/kamalyes/go-toolbox/pkg/moment"
 )
 
 func TestTimeUnits(t *testing.T) {
@@ -35,15 +33,15 @@ func TestTimeUnits(t *testing.T) {
 		expected time.Duration
 		actual   time.Duration
 	}{
-		{"Nanosecond", nanosecond, moment.NanosecondDuration},
-		{"Microsecond", microsecond, moment.MicrosecondDuration},
-		{"Millisecond", millisecond, moment.MillisecondDuration},
-		{"Second", second, moment.SecondDuration},
-		{"Minute", minute, moment.MinuteDuration},
-		{"Hour", hour, moment.HourDuration},
-		{"Day", day, moment.DayDuration},
-		{"Week", week, moment.WeekDuration},
-		{"Year", year, moment.Year366Duration},
+		{"Nanosecond", nanosecond, NanosecondDuration},
+		{"Microsecond", microsecond, MicrosecondDuration},
+		{"Millisecond", millisecond, MillisecondDuration},
+		{"Second", second, SecondDuration},
+		{"Minute", minute, MinuteDuration},
+		{"Hour", hour, HourDuration},
+		{"Day", day, DayDuration},
+		{"Week", week, WeekDuration},
+		{"Year", year, Year366Duration},
 	}
 
 	for _, test := range tests {

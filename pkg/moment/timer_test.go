@@ -2,20 +2,19 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-01-09 19:15:01
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-02-19 13:15:18
- * @FilePath: \go-toolbox\tests\moment_timer_test.go
+ * @LastEditTime: 2025-12-12 22:00:55
+ * @FilePath: \go-toolbox\pkg\moment\timer_test.go
  * @Description:
  *
  * Copyright (c) 2025 by kamalyes, All Rights Reserved.
  */
-package tests
+package moment
 
 import (
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/kamalyes/go-toolbox/pkg/moment"
 	"github.com/kamalyes/go-toolbox/pkg/osx"
 	"github.com/stretchr/testify/assert"
 )
@@ -23,7 +22,7 @@ import (
 // TestTimer 测试 Timer 结构体的功能
 func TestTimer(t *testing.T) {
 	// 创建一个计时器
-	timer := moment.NewTimer()
+	timer := NewTimer()
 	timer.Run()
 
 	// 等待一段时间，以便计时器可以打印时差
@@ -40,7 +39,7 @@ func TestTimer(t *testing.T) {
 
 	traceId := osx.HashUnixMicroCipherText()
 	// 创建一个带有自定义TraceId的Timer
-	newTimer := moment.NewTimerWithTraceId(traceId)
+	newTimer := NewTimerWithTraceId(traceId)
 	assert.Equal(t, newTimer.GetTraceId(), traceId, "TraceId 不正确")
 	// 检查timeout是否影响日志打印
 	newTimer.SetTimeOut(100).Run()
@@ -60,7 +59,7 @@ func TestTimerConcurrent(t *testing.T) {
 			defer wg.Done() // 完成时减少计数
 
 			// 创建并运行计时器
-			timer := moment.NewTimer()
+			timer := NewTimer()
 			timer.Run()
 
 			// 等待一段时间
@@ -81,7 +80,7 @@ func TestTimerConcurrent(t *testing.T) {
 }
 
 func TestPauseAndResumeTimer(t *testing.T) {
-	timer := moment.NewTimer()
+	timer := NewTimer()
 	// 启动计时器
 	timer.Run()
 	time.Sleep(100 * time.Millisecond) // 等待一定时间
@@ -122,7 +121,7 @@ func TestPauseAndResumeTimer(t *testing.T) {
 
 // TestPauseWithoutRun 测试在未运行时暂停计时器
 func TestPauseWithoutRun(t *testing.T) {
-	timer := moment.NewTimer()
+	timer := NewTimer()
 	verifyTimerState(t, timer, "新初始化的计时器的状态应正确")
 
 	timer.Pause() // 尝试暂停计时器
@@ -144,7 +143,7 @@ func TestPauseWithoutRun(t *testing.T) {
 }
 
 // verifyTimerState 验证计时器的状态
-func verifyTimerState(t *testing.T, timer *moment.Timer, msg string) {
+func verifyTimerState(t *testing.T, timer *Timer, msg string) {
 	assert.NotEmpty(t, timer.GetTraceId(), msg+"，跟踪ID应为空")
 	assert.False(t, timer.GetPaused(), msg+"，不应处于暂停状态")
 	assert.Equal(t, time.Time{}, timer.GetStartTime(), msg+"，开始时间应为零值")
@@ -161,7 +160,7 @@ func TestTrackTime(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// 调用 TrackTime
-	elapsed := moment.TrackTime(startTime)
+	elapsed := TrackTime(startTime)
 
 	// 断言 elapsed 是否大于等于 100 毫秒
 	assert.True(t, elapsed >= 100*time.Millisecond, "Expected elapsed time to be at least 100 milliseconds")
@@ -173,7 +172,7 @@ func TestDeferTrackTime(t *testing.T) {
 
 	// 使用 defer 调用 TrackTime
 	defer func() {
-		elapsed := moment.TrackTime(startTime)
+		elapsed := TrackTime(startTime)
 		// 断言 elapsed 是否大于等于 100 毫秒
 		assert.True(t, elapsed >= 100*time.Millisecond, "Expected elapsed time to be at least 100 milliseconds")
 	}()
