@@ -3,17 +3,16 @@
  * @Date:2024-12-18 22:53:55
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2024-12-19 08:15:19
- * @FilePath: \go-toolbox\tests\desensitize_adapter_test.go
+ * @FilePath: \go-toolbox\pkg\desensitize\desensitize_adapter_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package desensitize
 
 import (
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/desensitize"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -35,7 +34,7 @@ func (d *MyCustomDesensitizer) Desensitize(value string) string {
 
 func init() {
 	// 注册自定义脱敏器
-	desensitize.RegisterDesensitizer("myCustom", &MyCustomDesensitizer{})
+	RegisterDesensitizer("myCustom", &MyCustomDesensitizer{})
 }
 
 func TestDesensitization(t *testing.T) {
@@ -48,7 +47,7 @@ func TestDesensitization(t *testing.T) {
 	}
 
 	// 执行脱敏操作
-	err := desensitize.Desensitization(testObj)
+	err := Desensitization(testObj)
 
 	// 断言没有错误
 	assert.NoError(t, err)
@@ -62,7 +61,7 @@ func TestDesensitization(t *testing.T) {
 
 func TestDesensitization_NonStruct(t *testing.T) {
 	// 测试非结构体输入
-	err := desensitize.Desensitization("not a struct")
+	err := Desensitization("not a struct")
 	assert.Error(t, err)
 	assert.Equal(t, "expected a non-nil pointer to a struct", err.Error())
 }
@@ -77,7 +76,7 @@ func TestDesensitization_EmptyDesensitizer(t *testing.T) {
 		A: "10",
 	}
 
-	err := desensitize.Desensitization(testObj)
+	err := Desensitization(testObj)
 	assert.NoError(t, err)           // 不会报错
 	assert.Equal(t, "10", testObj.A) // 应保持原值
 }
@@ -94,7 +93,7 @@ func TestDesensitization_CustomDesensitizer(t *testing.T) {
 	}
 
 	// 执行脱敏操作
-	err := desensitize.Desensitization(testObj)
+	err := Desensitization(testObj)
 
 	// 断言没有错误
 	assert.NoError(t, err)
@@ -113,7 +112,7 @@ func TestDesensitization_Slice(t *testing.T) {
 		Emails: []string{"user123@example.com", "a123568@example.com"},
 	}
 
-	err := desensitize.Desensitization(testObj)
+	err := Desensitization(testObj)
 	assert.NoError(t, err)
 
 	expectedEmails := []string{"u****23@example.com", "a****68@example.com"}
@@ -130,7 +129,7 @@ func TestDesensitization_Array(t *testing.T) {
 		PhoneNumbers: [2]string{"1234567890", "0987654321"},
 	}
 
-	err := desensitize.Desensitization(testObj)
+	err := Desensitization(testObj)
 	assert.NoError(t, err)
 
 	expectedPhoneNumbers := [2]string{"123****7890", "098****4321"}
@@ -150,7 +149,7 @@ func TestDesensitization_Map(t *testing.T) {
 		},
 	}
 
-	err := desensitize.Desensitization(testObj)
+	err := Desensitization(testObj)
 	assert.NoError(t, err)
 
 	expectedContacts := map[string]string{
@@ -204,7 +203,7 @@ func TestDesensitization_ComplexStruct(t *testing.T) {
 	}
 
 	// 执行脱敏操作
-	err := desensitize.Desensitization(testObj)
+	err := Desensitization(testObj)
 
 	// 断言没有错误
 	assert.NoError(t, err)

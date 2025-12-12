@@ -3,19 +3,18 @@
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2025-09-18 17:36:32
- * @FilePath: \go-toolbox\tests\osx_base_test.go
+ * @FilePath: \go-toolbox\pkg\osx\base_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package osx
 
 import (
 	"fmt"
 	"sync"
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/osx"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,28 +24,28 @@ func TestAllSysBaseFunctions(t *testing.T) {
 }
 
 func TestSafeGetHostName(t *testing.T) {
-	actual := osx.SafeGetHostName()
+	actual := SafeGetHostName()
 	assert.NotEmpty(t, actual, "HostNames should match")
 }
 
 // BenchmarkGetHostName 测试 GetHostName 的性能
 func BenchmarkGetHostName(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		osx.GetHostName()
+		GetHostName()
 	}
 }
 
 // BenchmarkSafeGetHostName 测试 SafeGetHostName 的性能
 func BenchmarkSafeGetHostName(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		osx.SafeGetHostName()
+		SafeGetHostName()
 	}
 }
 
 // TestHashUnixMicroCipherText 测试 HashUnixMicroCipherText 函数
 func TestHashUnixMicroCipherText(t *testing.T) {
-	hash1 := osx.HashUnixMicroCipherText()
-	hash2 := osx.HashUnixMicroCipherText()
+	hash1 := HashUnixMicroCipherText()
+	hash2 := HashUnixMicroCipherText()
 
 	// 验证生成的哈希值不为空
 	assert.NotEqual(t, hash1, "")
@@ -56,7 +55,7 @@ func TestHashUnixMicroCipherText(t *testing.T) {
 }
 
 func TestGetWorkerId(t *testing.T) {
-	workerId := osx.GetWorkerId()
+	workerId := GetWorkerId()
 	fmt.Printf("TestGetWorkerId workerId %#v", workerId)
 	assert.NotEmpty(t, workerId)
 	assert.Less(t, workerId, int64(1024)) // Worker ID 范围为 0-1023
@@ -74,7 +73,7 @@ func TestGetWorkerIdConsistency(t *testing.T) {
 		wg.Add(1)
 		go func(index int) {
 			defer wg.Done()
-			results[index] = osx.GetWorkerId()
+			results[index] = GetWorkerId()
 		}(i)
 	}
 
@@ -95,7 +94,7 @@ func TestGetWorkerIdConsistency(t *testing.T) {
 // BenchmarkGetWorkerId 测试 GetWorkerId 的性能
 func BenchmarkGetWorkerId(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		osx.GetWorkerId()
+		GetWorkerId()
 	}
 }
 
@@ -124,7 +123,7 @@ func TestStableHashSlot_Complex(t *testing.T) {
 			// 先计算所有输入的预期槽位，确保稳定性
 			expectedSlots := make(map[string]int, len(data.inputs))
 			for _, input := range data.inputs {
-				slot := osx.StableHashSlot(input, data.minNum, data.maxNum)
+				slot := StableHashSlot(input, data.minNum, data.maxNum)
 				expectedSlots[input] = slot
 				// 断言单次调用结果一定在范围内
 				assert.True(t, slot >= data.minNum && slot <= data.maxNum,
@@ -134,7 +133,7 @@ func TestStableHashSlot_Complex(t *testing.T) {
 
 			// 再次调用，确保稳定性和一致性
 			for input, expected := range expectedSlots {
-				got := osx.StableHashSlot(input, data.minNum, data.maxNum)
+				got := StableHashSlot(input, data.minNum, data.maxNum)
 				assert.Equal(t, expected, got, "input %q stable slot mismatch", input)
 			}
 		})
@@ -143,14 +142,14 @@ func TestStableHashSlot_Complex(t *testing.T) {
 	// 测试 panic 情况
 	t.Run("panic_when_max_less_than_min", func(t *testing.T) {
 		assert.Panics(t, func() {
-			osx.StableHashSlot("test", 10, 5)
+			StableHashSlot("test", 10, 5)
 		}, "should panic when maxNum < minNum")
 	})
 }
 
 func TestGetRuntimeCaller(t *testing.T) {
 	// 调用 GetRuntimeCaller，skip=1 表示跳过测试函数本身，获取调用该函数的调用者信息
-	caller := osx.GetRuntimeCaller(1)
+	caller := GetRuntimeCaller(1)
 	defer caller.Release()
 
 	// 断言 File 不为空且不是 unknown_file
@@ -169,7 +168,7 @@ func TestGetRuntimeCaller(t *testing.T) {
 }
 
 func TestReleaseClearsFields(t *testing.T) {
-	caller := osx.GetRuntimeCaller(2)
+	caller := GetRuntimeCaller(2)
 
 	// 先断言字段有值
 	assert.NotEmpty(t, caller.File)
@@ -194,7 +193,7 @@ func TestCommand(t *testing.T) {
 	var expectedOutput string
 
 	// 根据操作系统选择合适的命令
-	if osx.IsWindows() {
+	if IsWindows() {
 		// Windows 环境使用 cmd /c echo（不使用引号）
 		cmd = "cmd"
 		args = []string{"/c", "echo", "Hello, World!"}
@@ -206,7 +205,7 @@ func TestCommand(t *testing.T) {
 		expectedOutput = "Hello, World!\n"
 	}
 
-	output, err := osx.Command(cmd, args, "")
+	output, err := Command(cmd, args, "")
 	assert.NoError(t, err, "Command execution should not return error")
 	assert.Equal(t, expectedOutput, string(output), "Command output should match expected")
 }

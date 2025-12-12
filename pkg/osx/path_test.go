@@ -3,12 +3,12 @@
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2025-01-09 11:52:49
- * @FilePath: \go-toolbox\tests\osx_path_test.go
+ * @FilePath: \go-toolbox\pkg\osx\path_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package osx
 
 import (
 	"fmt"
@@ -21,21 +21,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kamalyes/go-toolbox/pkg/osx"
 	"github.com/stretchr/testify/assert"
 )
 
 // TestMkdirIfNotExist 测试 MkdirIfNotExist 函数
 func TestMkdirIfNotExist(t *testing.T) {
 	// 创建一个临时目录用于测试
-	tempDir := osx.MkdirTemp()
+	tempDir := MkdirTemp()
 	defer os.RemoveAll(tempDir) // 测试完成后删除临时目录
 
 	// 创建一个子目录路径
 	subDir := filepath.Join(tempDir, "subdir")
 
 	// 调用 MkdirIfNotExist
-	err := osx.MkdirIfNotExist(subDir)
+	err := MkdirIfNotExist(subDir)
 	assert.NoError(t, err, "MkdirIfNotExist 应该成功创建目录")
 
 	// 检查目录是否存在
@@ -46,7 +45,7 @@ func TestMkdirIfNotExist(t *testing.T) {
 
 func TestDirHasContent(t *testing.T) {
 	// 创建一个临时目录
-	tempDir := osx.MkdirTemp()
+	tempDir := MkdirTemp()
 	defer os.RemoveAll(tempDir)
 
 	// 创建一个空文件
@@ -58,14 +57,14 @@ func TestDirHasContent(t *testing.T) {
 	os.WriteFile(nonEmptyFile, []byte("Hello, World!"), 0644)
 
 	// 测试空目录（有空文件）
-	fileExists, files, _ := osx.DirHasContent(tempDir)
+	fileExists, files, _ := DirHasContent(tempDir)
 	assert.Equal(t, false, !fileExists, fmt.Sprintf("Expected directory no non-empty files :%#v", files))
 
 	// 删除空文件，添加非空文件
 	os.Remove(emptyFile)
 
 	// 测试非空目录
-	fileExists2, files2, _ := osx.DirHasContent(tempDir)
+	fileExists2, files2, _ := DirHasContent(tempDir)
 	assert.Equal(t, false, !fileExists2, fmt.Sprintf("Expected directory to have no non-empty files :%#v", files2))
 }
 
@@ -80,12 +79,12 @@ func TestCopy(t *testing.T) {
 	srcFile.Close()
 
 	// 创建一个临时目录作为目标目录
-	tempDir := osx.MkdirTemp()
+	tempDir := MkdirTemp()
 	defer os.RemoveAll(tempDir)
 	destFile := filepath.Join(tempDir, "destFile.txt")
 
 	// 执行复制操作
-	err = osx.Copy(srcFile.Name(), destFile)
+	err = Copy(srcFile.Name(), destFile)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +115,7 @@ func TestJoinPaths(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := osx.JoinPaths(test.absolutePath, test.relativePath)
+		result := JoinPaths(test.absolutePath, test.relativePath)
 		assert.Equal(t, test.expected, result, fmt.Sprintf("JoinPaths(%q, %q) = %q; want %q", test.absolutePath, test.relativePath, result, test.expected))
 	}
 }
@@ -165,7 +164,7 @@ func TestCopyFail(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			err := osx.Copy(tt.src, tt.dest)
+			err := Copy(tt.src, tt.dest)
 			if tt.expectErr {
 				assert.Error(t, err) // 断言应该返回错误
 			} else {
@@ -239,7 +238,7 @@ func TestJoinURLRandom(t *testing.T) {
 		p := genPath()
 
 		// 直接调用 JoinURL
-		result, err := osx.JoinURL(base, p)
+		result, err := JoinURL(base, p)
 		assert.NoError(t, err)
 
 		// 计算期望结果（用标准库path.Join拼接baseURL.Path和p）
@@ -266,7 +265,7 @@ func TestParseUrlPath(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.urlString, func(t *testing.T) {
-			result := osx.ParseUrlPath(test.urlString)
+			result := ParseUrlPath(test.urlString)
 			assert.Equal(t, test.expected, result)
 		})
 	}

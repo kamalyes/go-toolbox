@@ -2,19 +2,18 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-09-21 03:56:15
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-09-21 03:57:15
- * @FilePath: \go-toolbox\tests\osx_env_test.go
+ * @LastEditTime: 2025-12-12 22:17:06
+ * @FilePath: \go-toolbox\pkg\osx\env_test.go
  * @Description:
  *
  * Copyright (c) 2025 by kamalyes, All Rights Reserved.
  */
-package tests
+package osx
 
 import (
 	"os"
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/osx"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -40,49 +39,49 @@ func TestGetenv(t *testing.T) {
 	assert := assert.New(t)
 
 	// 测试字符串类型
-	assert.Equal("hello", osx.Getenv("TEST_STRING", "default"), "应该返回环境变量的值")
+	assert.Equal("hello", Getenv("TEST_STRING", "default"), "应该返回环境变量的值")
 
 	// 测试整数类型
-	assert.Equal(123, osx.Getenv("TEST_INT", 0), "应该返回解析后的整数值")
+	assert.Equal(123, Getenv("TEST_INT", 0), "应该返回解析后的整数值")
 
 	// 测试无符号整数类型
-	assert.Equal(uint(456), osx.Getenv("TEST_UINT", uint(0)), "应该返回解析后的无符号整数值")
+	assert.Equal(uint(456), Getenv("TEST_UINT", uint(0)), "应该返回解析后的无符号整数值")
 
 	// 测试浮点数类型
-	assert.Equal(123.45, osx.Getenv("TEST_FLOAT", 0.0), "应该返回解析后的浮点数值")
+	assert.Equal(123.45, Getenv("TEST_FLOAT", 0.0), "应该返回解析后的浮点数值")
 
 	// 测试浮点数类型 float32
-	assert.Equal(float32(123.456), osx.Getenv("TEST_FLOAT32", float32(0)), "应该返回解析后的 float32 值")
+	assert.Equal(float32(123.456), Getenv("TEST_FLOAT32", float32(0)), "应该返回解析后的 float32 值")
 
 	// 测试浮点数类型 float64
-	assert.Equal(654.321, osx.Getenv("TEST_FLOAT64", 0.0), "应该返回解析后的 float64 值")
+	assert.Equal(654.321, Getenv("TEST_FLOAT64", 0.0), "应该返回解析后的 float64 值")
 
 	// 测试布尔类型
-	assert.Equal(true, osx.Getenv("TEST_BOOL", false), "应该返回解析后的布尔值")
+	assert.Equal(true, Getenv("TEST_BOOL", false), "应该返回解析后的布尔值")
 
 	// 测试空字符串，应该返回默认值
-	assert.Equal("default", osx.Getenv("TEST_EMPTY_STRING", "default"), "应该返回空字符串")
+	assert.Equal("default", Getenv("TEST_EMPTY_STRING", "default"), "应该返回空字符串")
 
 	// 测试不存在的环境变量，应该返回默认值
-	assert.Equal("default", osx.Getenv("NON_EXISTENT", "default"), "应该返回默认值")
+	assert.Equal("default", Getenv("NON_EXISTENT", "default"), "应该返回默认值")
 
 	// 测试解析错误的整数值
-	assert.Equal(0, osx.Getenv("TEST_INVALID_INT", 0), "应该返回默认值，因为解析失败")
+	assert.Equal(0, Getenv("TEST_INVALID_INT", 0), "应该返回默认值，因为解析失败")
 
 	// 测试解析错误的浮点数值
-	assert.Equal(0.0, osx.Getenv("TEST_INVALID_FLOAT", 0.0), "应该返回默认值，因为解析失败")
+	assert.Equal(0.0, Getenv("TEST_INVALID_FLOAT", 0.0), "应该返回默认值，因为解析失败")
 
 	// 测试解析错误的布尔值
-	assert.Equal(false, osx.Getenv("TEST_INVALID_BOOL", false), "应该返回默认值，因为解析失败")
+	assert.Equal(false, Getenv("TEST_INVALID_BOOL", false), "应该返回默认值，因为解析失败")
 
 	// 测试负数整数
-	assert.Equal(-10, osx.Getenv("TEST_NEGATIVE_INT", 0), "应该返回解析后的负整数值")
+	assert.Equal(-10, Getenv("TEST_NEGATIVE_INT", 0), "应该返回解析后的负整数值")
 
 	// 测试零浮点数
-	assert.Equal(0.0, osx.Getenv("TEST_ZERO_FLOAT", 1.0), "应该返回解析后的零浮点数值")
+	assert.Equal(0.0, Getenv("TEST_ZERO_FLOAT", 1.0), "应该返回解析后的零浮点数值")
 
 	// 测试无符号整数类型 uint64
-	assert.Equal(uint64(789), osx.Getenv("TEST_UINT64", uint64(0)), "应该返回解析后的 uint64 值")
+	assert.Equal(uint64(789), Getenv("TEST_UINT64", uint64(0)), "应该返回解析后的 uint64 值")
 
 	// 清理测试环境变量
 	os.Unsetenv("TEST_STRING")

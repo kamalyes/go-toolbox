@@ -3,12 +3,12 @@
  * @Date: 2024-12-13 01:15:55
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2025-01-07 17:27:17
- * @FilePath: \go-toolbox\tests\imgix_drawer_test.go
+ * @FilePath: \go-toolbox\pkg\imgix\drawer_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package imgix
 
 import (
 	"image"
@@ -21,7 +21,6 @@ import (
 
 	"github.com/disintegration/imaging"
 	"github.com/fogleman/gg"
-	"github.com/kamalyes/go-toolbox/pkg/imgix"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -58,23 +57,23 @@ func compareImages(img1, img2 image.Image) bool {
 
 func TestNewGraphicsRenderer(t *testing.T) {
 	ctx := gg.NewContext(800, 600)
-	renderer := imgix.NewGraphicsRenderer(ctx)
+	renderer := NewGraphicsRenderer(ctx)
 
 	assert.NotNil(t, renderer)
 	assert.Equal(t, ctx, renderer.GgCtx)
 
-	dashOptions := imgix.NewDashOptions(0, 0, 0)
+	dashOptions := NewDashOptions(0, 0, 0)
 	dashOptionsDashLength := dashOptions.DashLength()
 	dashOptionsGapLength := dashOptions.GapLength()
 	dashOptionsLineWidth := dashOptions.LineWidth()
 
-	assert.Equal(t, dashOptionsDashLength, imgix.DashStyle(3), "dashOptionsDashLength should return the correct DashOptions")
-	assert.Equal(t, dashOptionsGapLength, imgix.DashStyle(6), "dashOptionsGapLength should return the correct DashOptions")
-	assert.Equal(t, dashOptionsLineWidth, imgix.DashStyle(2), "dashOptionsLineWidth should return the correct DashOptions")
+	assert.Equal(t, dashOptionsDashLength, DashStyle(3), "dashOptionsDashLength should return the correct DashOptions")
+	assert.Equal(t, dashOptionsGapLength, DashStyle(6), "dashOptionsGapLength should return the correct DashOptions")
+	assert.Equal(t, dashOptionsLineWidth, DashStyle(2), "dashOptionsLineWidth should return the correct DashOptions")
 
-	dashOptions = imgix.NewDashOptions(5, 7, 6)
+	dashOptions = NewDashOptions(5, 7, 6)
 
-	rendererX := imgix.NewGraphicsRenderer(ctx, dashOptions)
+	rendererX := NewGraphicsRenderer(ctx, dashOptions)
 	renderXDashOptions := rendererX.GetDashOptions()
 
 	assert.NotNil(t, rendererX, "NewGraphicsRenderer should return a non-nil renderer")
@@ -86,7 +85,7 @@ func TestNewGraphicsRenderer(t *testing.T) {
 
 func TestUseDefaultDashed(t *testing.T) {
 	ctx := gg.NewContext(800, 600)
-	renderer := imgix.NewGraphicsRenderer(ctx)
+	renderer := NewGraphicsRenderer(ctx)
 	renderer.DrawLineXYLineWidth(100, 100, 200, 200)
 	filePath := "test_default_dashed.png"
 	err := saveImgixDrawerImage(ctx, filePath)
@@ -96,7 +95,7 @@ func TestUseDefaultDashed(t *testing.T) {
 
 func TestUseSolidLine(t *testing.T) {
 	ctx := gg.NewContext(800, 600)
-	renderer := imgix.NewGraphicsRenderer(ctx)
+	renderer := NewGraphicsRenderer(ctx)
 
 	renderer.UseSolidLine() // 使用实线
 	renderer.DrawLineXYLineWidth(100, 100, 200, 200)
@@ -109,7 +108,7 @@ func TestUseSolidLine(t *testing.T) {
 // TestDrawWithStroke 测试 DrawWithStroke 方法
 func TestDrawWithStroke(t *testing.T) {
 	ctx := gg.NewContext(800, 600)
-	renderer := imgix.NewGraphicsRenderer(ctx)
+	renderer := NewGraphicsRenderer(ctx)
 
 	drawCalled := false
 	drawFunc := func() {
@@ -123,7 +122,7 @@ func TestDrawWithStroke(t *testing.T) {
 
 func TestSetDashed(t *testing.T) {
 	ctx := gg.NewContext(800, 600)
-	renderer := imgix.NewGraphicsRenderer(ctx)
+	renderer := NewGraphicsRenderer(ctx)
 
 	renderer.SetDashed(5, 5) // 设置虚线样式
 	renderer.DrawLineXYLineWidth(100, 100, 200, 200)
@@ -135,11 +134,11 @@ func TestSetDashed(t *testing.T) {
 
 func TestDrawCurvedLine(t *testing.T) {
 	ctx := gg.NewContext(800, 600)
-	renderer := imgix.NewGraphicsRenderer(ctx)
+	renderer := NewGraphicsRenderer(ctx)
 
 	start := &gg.Point{X: 100, Y: 100}
 	end := &gg.Point{X: 200, Y: 200}
-	control := imgix.CalculateControlPoint(start, end, 50, 0) // 计算控制点
+	control := CalculateControlPoint(start, end, 50, 0) // 计算控制点
 
 	renderer.DrawCurvedLine(start, end, control)
 	filePath := "test_curved_line.png"
@@ -156,14 +155,14 @@ func TestDrawHorizontalLine(t *testing.T) {
 
 	// 设置线条颜色为黑色
 	ctx.SetColor(color.Black)
-	renderer := imgix.NewGraphicsRenderer(ctx)
+	renderer := NewGraphicsRenderer(ctx)
 
-	renderer.DrawHorizontalLine(imgix.HorizontalLine{
+	renderer.DrawHorizontalLine(HorizontalLine{
 		Y:      10,
 		LeftX:  0,
 		RightX: 20,
 	})
-	renderer.DrawVerticalLine(imgix.VerticalLine{
+	renderer.DrawVerticalLine(VerticalLine{
 		X:       10,
 		TopY:    0,
 		BottomY: 20,
@@ -176,7 +175,7 @@ func TestDrawHorizontalLine(t *testing.T) {
 
 func TestDrawPolygon(t *testing.T) {
 	ctx := gg.NewContext(800, 600)
-	renderer := imgix.NewGraphicsRenderer(ctx)
+	renderer := NewGraphicsRenderer(ctx)
 
 	points := []gg.Point{
 		{X: 100, Y: 100},
@@ -192,7 +191,7 @@ func TestDrawPolygon(t *testing.T) {
 
 func DrawLineXYLineWidth(t *testing.T) {
 	ctx := gg.NewContext(800, 600)
-	renderer := imgix.NewGraphicsRenderer(ctx)
+	renderer := NewGraphicsRenderer(ctx)
 
 	// 绘制线条
 	renderer.DrawLineXYLineWidth(100, 100, 200, 200)
@@ -222,10 +221,10 @@ func DrawLineXYLineWidth(t *testing.T) {
 
 func TestDrawRectangle(t *testing.T) {
 	ctx := gg.NewContext(800, 600)
-	renderer := imgix.NewGraphicsRenderer(ctx)
+	renderer := NewGraphicsRenderer(ctx)
 
 	// 绘制矩形
-	renderer.DrawRectangle(imgix.Rectangle{
+	renderer.DrawRectangle(Rectangle{
 		TopLeft:     &gg.Point{X: 100, Y: 100},
 		BottomRight: &gg.Point{X: 200, Y: 200},
 	}, 0)
@@ -254,7 +253,7 @@ func TestDrawRectangle(t *testing.T) {
 
 func TestDrawCircle(t *testing.T) {
 	ctx := gg.NewContext(800, 600)
-	renderer := imgix.NewGraphicsRenderer(ctx)
+	renderer := NewGraphicsRenderer(ctx)
 
 	// 绘制圆形
 	renderer.DrawCircle(&gg.Point{X: 400, Y: 300}, 50)
@@ -288,18 +287,18 @@ func TestCalculateFractionPoint(t *testing.T) {
 
 	tests := []struct {
 		fraction float64
-		mode     imgix.CalculateFractionPointMode
+		mode     CalculateFractionPointMode
 		expected *gg.Point
 	}{
-		{2.0, imgix.Add, &gg.Point{X: 12.0, Y: 12.0}},    // 加法模式
-		{2.0, imgix.Subtract, &gg.Point{X: 8.0, Y: 8.0}}, // 减法模式
-		{0.5, imgix.Multiply, &gg.Point{X: 5.0, Y: 5.0}}, // 乘法模式
-		{2.0, imgix.Divide, &gg.Point{X: 5.0, Y: 5.0}},   // 除法模式
-		{0.0, imgix.Divide, &gg.Point{X: 10.0, Y: 10.0}}, // 除法模式，分母为零
+		{2.0, Add, &gg.Point{X: 12.0, Y: 12.0}},    // 加法模式
+		{2.0, Subtract, &gg.Point{X: 8.0, Y: 8.0}}, // 减法模式
+		{0.5, Multiply, &gg.Point{X: 5.0, Y: 5.0}}, // 乘法模式
+		{2.0, Divide, &gg.Point{X: 5.0, Y: 5.0}},   // 除法模式
+		{0.0, Divide, &gg.Point{X: 10.0, Y: 10.0}}, // 除法模式，分母为零
 	}
 
 	for _, test := range tests {
-		point := imgix.CalculateFractionPoint(startPoint, endPoint, test.fraction, test.mode)
+		point := CalculateFractionPoint(startPoint, endPoint, test.fraction, test.mode)
 		assert.Equal(t, test.expected.X, point.X, "X coordinate mismatch")
 		assert.Equal(t, test.expected.Y, point.Y, "Y coordinate mismatch")
 	}
@@ -312,7 +311,7 @@ func TestGetLTRB(t *testing.T) {
 		"point3": {X: 50, Y: 50},
 	}
 
-	ltrb := imgix.GetLTRB(features)
+	ltrb := GetLTRB(features)
 
 	assert.Equal(t, 50.0, ltrb.Left)
 	assert.Equal(t, 50.0, ltrb.Top)
@@ -322,7 +321,7 @@ func TestGetLTRB(t *testing.T) {
 
 func TestImageLTRB(t *testing.T) {
 	// 创建一个 ImageLTRB 实例
-	ltrb := imgix.ImageLTRB{
+	ltrb := ImageLTRB{
 		Left:   10,
 		Top:    20,
 		Right:  50,
@@ -355,14 +354,14 @@ func TestImageLTRB(t *testing.T) {
 
 func TestUpdateBounds(t *testing.T) {
 	left, top, right, bottom := float64(100), float64(100), float64(200), float64(200)
-	imgix.UpdateBounds(50, 50, &left, &top, &right, &bottom)
+	UpdateBounds(50, 50, &left, &top, &right, &bottom)
 
 	assert.Equal(t, 50.0, left)
 	assert.Equal(t, 50.0, top)
 	assert.Equal(t, 200.0, right)
 	assert.Equal(t, 200.0, bottom)
 
-	imgix.UpdateBounds(250, 250, &left, &top, &right, &bottom)
+	UpdateBounds(250, 250, &left, &top, &right, &bottom)
 
 	assert.Equal(t, 50.0, left)
 	assert.Equal(t, 50.0, top)
@@ -372,7 +371,7 @@ func TestUpdateBounds(t *testing.T) {
 
 func TestConcurrentDrawLine(t *testing.T) {
 	ctx := gg.NewContext(800, 600)
-	renderer := imgix.NewGraphicsRenderer(ctx)
+	renderer := NewGraphicsRenderer(ctx)
 
 	const numGoroutines = 5
 	var wg sync.WaitGroup
@@ -415,7 +414,7 @@ func TestDrawLine(t *testing.T) {
 	endPoint := &gg.Point{X: 20, Y: 20}
 
 	ctx := gg.NewContext(800, 600)
-	renderer := imgix.NewGraphicsRenderer(ctx)
+	renderer := NewGraphicsRenderer(ctx)
 	// 调用要测试的方法
 	renderer.DrawLine(startPoint, endPoint)
 }
@@ -424,7 +423,7 @@ func TestCleanCoordinates(t *testing.T) {
 	tests := []struct {
 		name     string
 		points   map[string]gg.Point
-		expected imgix.Coordinates
+		expected Coordinates
 	}{
 		{
 			name: "Normal case with multiple points",
@@ -434,11 +433,11 @@ func TestCleanCoordinates(t *testing.T) {
 				"point3": {X: 0, Y: 5},
 				"point4": {X: 2, Y: 1},
 			},
-			expected: imgix.Coordinates{
-				Top:    imgix.HorizontalEdge{LeftMost: &gg.Point{X: 0, Y: 5}, RightMost: &gg.Point{X: 3, Y: 5}},
-				Bottom: imgix.HorizontalEdge{LeftMost: &gg.Point{X: 0, Y: 1}, RightMost: &gg.Point{X: 3, Y: 1}},
-				Left:   imgix.VerticalEdge{Nadir: &gg.Point{X: 0, Y: 1}, Vertex: &gg.Point{X: 0, Y: 5}},
-				Right:  imgix.VerticalEdge{Nadir: &gg.Point{X: 3, Y: 1}, Vertex: &gg.Point{X: 3, Y: 5}},
+			expected: Coordinates{
+				Top:    HorizontalEdge{LeftMost: &gg.Point{X: 0, Y: 5}, RightMost: &gg.Point{X: 3, Y: 5}},
+				Bottom: HorizontalEdge{LeftMost: &gg.Point{X: 0, Y: 1}, RightMost: &gg.Point{X: 3, Y: 1}},
+				Left:   VerticalEdge{Nadir: &gg.Point{X: 0, Y: 1}, Vertex: &gg.Point{X: 0, Y: 5}},
+				Right:  VerticalEdge{Nadir: &gg.Point{X: 3, Y: 1}, Vertex: &gg.Point{X: 3, Y: 5}},
 			},
 		},
 		{
@@ -446,17 +445,17 @@ func TestCleanCoordinates(t *testing.T) {
 			points: map[string]gg.Point{
 				"point1": {X: 2, Y: 3},
 			},
-			expected: imgix.Coordinates{
-				Top:    imgix.HorizontalEdge{LeftMost: &gg.Point{X: 2, Y: 3}, RightMost: &gg.Point{X: 2, Y: 3}},
-				Bottom: imgix.HorizontalEdge{LeftMost: &gg.Point{X: 2, Y: 3}, RightMost: &gg.Point{X: 2, Y: 3}},
-				Left:   imgix.VerticalEdge{Nadir: &gg.Point{X: 2, Y: 3}, Vertex: &gg.Point{X: 2, Y: 3}},
-				Right:  imgix.VerticalEdge{Nadir: &gg.Point{X: 2, Y: 3}, Vertex: &gg.Point{X: 2, Y: 3}},
+			expected: Coordinates{
+				Top:    HorizontalEdge{LeftMost: &gg.Point{X: 2, Y: 3}, RightMost: &gg.Point{X: 2, Y: 3}},
+				Bottom: HorizontalEdge{LeftMost: &gg.Point{X: 2, Y: 3}, RightMost: &gg.Point{X: 2, Y: 3}},
+				Left:   VerticalEdge{Nadir: &gg.Point{X: 2, Y: 3}, Vertex: &gg.Point{X: 2, Y: 3}},
+				Right:  VerticalEdge{Nadir: &gg.Point{X: 2, Y: 3}, Vertex: &gg.Point{X: 2, Y: 3}},
 			},
 		},
 		{
 			name:     "Empty case",
 			points:   map[string]gg.Point{},
-			expected: imgix.Coordinates{},
+			expected: Coordinates{},
 		},
 		{
 			name: "Overlapping points",
@@ -466,11 +465,11 @@ func TestCleanCoordinates(t *testing.T) {
 				"point3": {X: 2, Y: 2},
 				"point4": {X: 3, Y: 3},
 			},
-			expected: imgix.Coordinates{
-				Top:    imgix.HorizontalEdge{LeftMost: &gg.Point{X: 1, Y: 3}, RightMost: &gg.Point{X: 3, Y: 3}},
-				Bottom: imgix.HorizontalEdge{LeftMost: &gg.Point{X: 1, Y: 1}, RightMost: &gg.Point{X: 3, Y: 1}},
-				Left:   imgix.VerticalEdge{Nadir: &gg.Point{X: 1, Y: 1}, Vertex: &gg.Point{X: 1, Y: 3}},
-				Right:  imgix.VerticalEdge{Nadir: &gg.Point{X: 3, Y: 1}, Vertex: &gg.Point{X: 3, Y: 3}},
+			expected: Coordinates{
+				Top:    HorizontalEdge{LeftMost: &gg.Point{X: 1, Y: 3}, RightMost: &gg.Point{X: 3, Y: 3}},
+				Bottom: HorizontalEdge{LeftMost: &gg.Point{X: 1, Y: 1}, RightMost: &gg.Point{X: 3, Y: 1}},
+				Left:   VerticalEdge{Nadir: &gg.Point{X: 1, Y: 1}, Vertex: &gg.Point{X: 1, Y: 3}},
+				Right:  VerticalEdge{Nadir: &gg.Point{X: 3, Y: 1}, Vertex: &gg.Point{X: 3, Y: 3}},
 			},
 		},
 		{
@@ -481,11 +480,11 @@ func TestCleanCoordinates(t *testing.T) {
 				"point3": {X: -5, Y: -1},
 				"point4": {X: -2, Y: -3},
 			},
-			expected: imgix.Coordinates{
-				Top:    imgix.HorizontalEdge{LeftMost: &gg.Point{X: -5, Y: -1}, RightMost: &gg.Point{X: -1, Y: -1}},
-				Bottom: imgix.HorizontalEdge{LeftMost: &gg.Point{X: -5, Y: -4}, RightMost: &gg.Point{X: -1, Y: -4}},
-				Left:   imgix.VerticalEdge{Nadir: &gg.Point{X: -5, Y: -4}, Vertex: &gg.Point{X: -5, Y: -1}},
-				Right:  imgix.VerticalEdge{Nadir: &gg.Point{X: -1, Y: -4}, Vertex: &gg.Point{X: -1, Y: -1}},
+			expected: Coordinates{
+				Top:    HorizontalEdge{LeftMost: &gg.Point{X: -5, Y: -1}, RightMost: &gg.Point{X: -1, Y: -1}},
+				Bottom: HorizontalEdge{LeftMost: &gg.Point{X: -5, Y: -4}, RightMost: &gg.Point{X: -1, Y: -4}},
+				Left:   VerticalEdge{Nadir: &gg.Point{X: -5, Y: -4}, Vertex: &gg.Point{X: -5, Y: -1}},
+				Right:  VerticalEdge{Nadir: &gg.Point{X: -1, Y: -4}, Vertex: &gg.Point{X: -1, Y: -1}},
 			},
 		},
 		{
@@ -495,11 +494,11 @@ func TestCleanCoordinates(t *testing.T) {
 				"point2": {X: -1000000, Y: -2000000},
 				"point3": {X: 0, Y: 0},
 			},
-			expected: imgix.Coordinates{
-				Top:    imgix.HorizontalEdge{LeftMost: &gg.Point{X: -1000000, Y: 2000000}, RightMost: &gg.Point{X: 1000000, Y: 2000000}},
-				Bottom: imgix.HorizontalEdge{LeftMost: &gg.Point{X: -1000000, Y: -2000000}, RightMost: &gg.Point{X: 1000000, Y: -2000000}},
-				Left:   imgix.VerticalEdge{Nadir: &gg.Point{X: -1000000, Y: -2000000}, Vertex: &gg.Point{X: -1000000, Y: 2000000}},
-				Right:  imgix.VerticalEdge{Nadir: &gg.Point{X: 1000000, Y: -2000000}, Vertex: &gg.Point{X: 1000000, Y: 2000000}},
+			expected: Coordinates{
+				Top:    HorizontalEdge{LeftMost: &gg.Point{X: -1000000, Y: 2000000}, RightMost: &gg.Point{X: 1000000, Y: 2000000}},
+				Bottom: HorizontalEdge{LeftMost: &gg.Point{X: -1000000, Y: -2000000}, RightMost: &gg.Point{X: 1000000, Y: -2000000}},
+				Left:   VerticalEdge{Nadir: &gg.Point{X: -1000000, Y: -2000000}, Vertex: &gg.Point{X: -1000000, Y: 2000000}},
+				Right:  VerticalEdge{Nadir: &gg.Point{X: 1000000, Y: -2000000}, Vertex: &gg.Point{X: 1000000, Y: 2000000}},
 			},
 		},
 		{
@@ -512,18 +511,18 @@ func TestCleanCoordinates(t *testing.T) {
 				"point5": {X: 0, Y: 0},
 				"point6": {X: -2, Y: 3},
 			},
-			expected: imgix.Coordinates{
-				Top:    imgix.HorizontalEdge{LeftMost: &gg.Point{X: -3, Y: 7}, RightMost: &gg.Point{X: 5, Y: 7}},
-				Bottom: imgix.HorizontalEdge{LeftMost: &gg.Point{X: -3, Y: -1}, RightMost: &gg.Point{X: 5, Y: -1}},
-				Left:   imgix.VerticalEdge{Nadir: &gg.Point{X: -3, Y: -1}, Vertex: &gg.Point{X: -3, Y: 7}},
-				Right:  imgix.VerticalEdge{Nadir: &gg.Point{X: 5, Y: -1}, Vertex: &gg.Point{X: 5, Y: 7}},
+			expected: Coordinates{
+				Top:    HorizontalEdge{LeftMost: &gg.Point{X: -3, Y: 7}, RightMost: &gg.Point{X: 5, Y: 7}},
+				Bottom: HorizontalEdge{LeftMost: &gg.Point{X: -3, Y: -1}, RightMost: &gg.Point{X: 5, Y: -1}},
+				Left:   VerticalEdge{Nadir: &gg.Point{X: -3, Y: -1}, Vertex: &gg.Point{X: -3, Y: 7}},
+				Right:  VerticalEdge{Nadir: &gg.Point{X: 5, Y: -1}, Vertex: &gg.Point{X: 5, Y: 7}},
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := imgix.CleanCoordinates(tt.points)
+			result := CleanCoordinates(tt.points)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -534,42 +533,42 @@ func TestCalculatePoint(t *testing.T) {
 	tests := []struct {
 		a        *gg.Point
 		b        *gg.Point
-		mode     imgix.CalculateMode
-		axis     imgix.AxisPointMode
+		mode     CalculateMode
+		axis     AxisPointMode
 		expected *gg.Point
 	}{
 		{
 			a:        &gg.Point{X: 1, Y: 2},
 			b:        &gg.Point{X: 3, Y: 4},
-			mode:     imgix.CalculateMax,
-			axis:     imgix.AxisX,
+			mode:     CalculateMax,
+			axis:     AxisX,
 			expected: &gg.Point{X: 3, Y: 4},
 		},
 		{
 			a:        &gg.Point{X: 1, Y: 2},
 			b:        &gg.Point{X: 3, Y: 4},
-			mode:     imgix.CalculateMax,
-			axis:     imgix.AxisY,
+			mode:     CalculateMax,
+			axis:     AxisY,
 			expected: &gg.Point{X: 3, Y: 4},
 		},
 		{
 			a:        &gg.Point{X: 1, Y: 2},
 			b:        &gg.Point{X: 3, Y: 4},
-			mode:     imgix.CalculateMin,
-			axis:     imgix.AxisX,
+			mode:     CalculateMin,
+			axis:     AxisX,
 			expected: &gg.Point{X: 1, Y: 2},
 		},
 		{
 			a:        &gg.Point{X: 1, Y: 2},
 			b:        &gg.Point{X: 3, Y: 4},
-			mode:     imgix.CalculateMin,
-			axis:     imgix.AxisY,
+			mode:     CalculateMin,
+			axis:     AxisY,
 			expected: &gg.Point{X: 1, Y: 2},
 		},
 	}
 
 	for _, test := range tests {
-		result := imgix.CalculatePoint(test.a, test.b, test.mode, test.axis)
+		result := CalculatePoint(test.a, test.b, test.mode, test.axis)
 		assert.Equal(t, test.expected, result, "Expected result for input (%v, %v, %v, %v) does not match", test.a, test.b, test.mode, test.axis)
 	}
 }
@@ -585,12 +584,12 @@ func TestCalculateMultiplePoints(t *testing.T) {
 
 	// 测试最大值
 	expectedMax := &gg.Point{X: 5, Y: 1} // 在X轴上最大值
-	resultMax := imgix.CalculateMultiplePoints(points, imgix.CalculateMax, imgix.AxisX)
+	resultMax := CalculateMultiplePoints(points, CalculateMax, AxisX)
 	assert.Equal(t, expectedMax, resultMax, "Expected max point does not match")
 
 	// 测试最小值
 	expectedMin := &gg.Point{X: 0, Y: 6} // 在X轴上最小值
-	resultMin := imgix.CalculateMultiplePoints(points, imgix.CalculateMin, imgix.AxisX)
+	resultMin := CalculateMultiplePoints(points, CalculateMin, AxisX)
 	assert.Equal(t, expectedMin, resultMin, "Expected min point does not match")
 }
 
@@ -610,7 +609,7 @@ func TestCanFormTriangle(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		area, result, err := imgix.CanFormTriangle(test.points)
+		area, result, err := CanFormTriangle(test.points)
 		if test.expect {
 			assert.NoError(t, err) // 期望没有错误
 			assert.NotEqual(t, 0.0, area, "Area should not be zero for a valid triangle")
@@ -630,7 +629,7 @@ func TestResizeX(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := imgix.ResizeX(test.point, test.resize)
+		result := ResizeX(test.point, test.resize)
 		assert.Equal(t, test.expected.X, result.X, "X坐标不匹配")
 		assert.Equal(t, test.expected.Y, result.Y, "Y坐标应保持不变")
 	}
@@ -648,7 +647,7 @@ func TestResizeY(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := imgix.ResizeY(test.point, test.resize)
+		result := ResizeY(test.point, test.resize)
 		assert.Equal(t, test.expected.X, result.X, "X坐标应保持不变")
 		assert.Equal(t, test.expected.Y, result.Y, "Y坐标不匹配")
 	}
@@ -684,7 +683,7 @@ func TestResizePoint(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		scaledPoint := imgix.ResizePoint(test.point, test.resize, test.resize)
+		scaledPoint := ResizePoint(test.point, test.resize, test.resize)
 		assert.Equal(t, test.expected.X, scaledPoint.X, "X coordinate mismatch")
 		assert.Equal(t, test.expected.Y, scaledPoint.Y, "Y coordinate mismatch")
 	}
@@ -719,7 +718,7 @@ func TestResizePoints(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		scaledPoints := imgix.ResizePoints(test.points, test.resize, test.resize)
+		scaledPoints := ResizePoints(test.points, test.resize, test.resize)
 		assert.Equal(t, len(test.expected), len(scaledPoints)) // 确保长度相等
 
 		for i, point := range scaledPoints {
@@ -735,18 +734,18 @@ func TestResizePointOneselfX(t *testing.T) {
 
 	tests := []struct {
 		scaleFactor float64
-		operation   imgix.CalculateFractionPointMode
+		operation   CalculateFractionPointMode
 		expectedX   float64
 	}{
-		{2.0, imgix.Add, 30.0},       // 10 + (10 * 2) = 30
-		{0.5, imgix.Subtract, 5.0},   // 10 - (10 * 0.5) = 5
-		{2.0, imgix.Multiply, 200.0}, // 10 * (10 * 2) = 200
-		{2.0, imgix.Divide, 0.5},     // 10 / (10 * 2) = 0.5
-		{1.0, imgix.Subtract, 0.0},   // 10 - (10 * 1) = 0
+		{2.0, Add, 30.0},       // 10 + (10 * 2) = 30
+		{0.5, Subtract, 5.0},   // 10 - (10 * 0.5) = 5
+		{2.0, Multiply, 200.0}, // 10 * (10 * 2) = 200
+		{2.0, Divide, 0.5},     // 10 / (10 * 2) = 0.5
+		{1.0, Subtract, 0.0},   // 10 - (10 * 1) = 0
 	}
 
 	for _, test := range tests {
-		result := imgix.ResizePointOneselfX(point, test.scaleFactor, test.operation)
+		result := ResizePointOneselfX(point, test.scaleFactor, test.operation)
 		assert.Equal(t, test.expectedX, result.X, "Expected X value did not match")
 	}
 }
@@ -757,18 +756,18 @@ func TestResizePointOneselfY(t *testing.T) {
 
 	tests := []struct {
 		scaleFactor float64
-		operation   imgix.CalculateFractionPointMode
+		operation   CalculateFractionPointMode
 		expectedY   float64
 	}{
-		{2.0, imgix.Add, 60.0},       // 20 + (20 * 2) = 60
-		{0.5, imgix.Subtract, 10.0},  // 20 - (20 * 0.5) = 10
-		{2.0, imgix.Multiply, 800.0}, // 20 * (20 * 2) = 800
-		{2.0, imgix.Divide, 0.5},     // 20 / (20 * 2) = 0.5
-		{1.0, imgix.Subtract, 0.0},   // 20 - (20 * 1) = 0
+		{2.0, Add, 60.0},       // 20 + (20 * 2) = 60
+		{0.5, Subtract, 10.0},  // 20 - (20 * 0.5) = 10
+		{2.0, Multiply, 800.0}, // 20 * (20 * 2) = 800
+		{2.0, Divide, 0.5},     // 20 / (20 * 2) = 0.5
+		{1.0, Subtract, 0.0},   // 20 - (20 * 1) = 0
 	}
 
 	for _, test := range tests {
-		result := imgix.ResizePointOneselfY(point, test.scaleFactor, test.operation)
+		result := ResizePointOneselfY(point, test.scaleFactor, test.operation)
 		assert.Equal(t, test.expectedY, result.Y, "Expected Y value did not match")
 	}
 }
@@ -779,18 +778,18 @@ func TestOffsetPointX(t *testing.T) {
 
 	tests := []struct {
 		offset    float64
-		operation imgix.CalculateFractionPointMode
+		operation CalculateFractionPointMode
 		expectedX float64
 	}{
-		{5.0, imgix.Add, 15.0},      // 10 + 5 = 15
-		{3.0, imgix.Subtract, 7.0},  // 10 - 3 = 7
-		{2.0, imgix.Multiply, 20.0}, // 10 * 2 = 20
-		{2.0, imgix.Divide, 5.0},    // 10 / 2 = 5
-		{0.0, imgix.Subtract, 10.0}, // 10 - 0 = 10
+		{5.0, Add, 15.0},      // 10 + 5 = 15
+		{3.0, Subtract, 7.0},  // 10 - 3 = 7
+		{2.0, Multiply, 20.0}, // 10 * 2 = 20
+		{2.0, Divide, 5.0},    // 10 / 2 = 5
+		{0.0, Subtract, 10.0}, // 10 - 0 = 10
 	}
 
 	for _, test := range tests {
-		result := imgix.OffsetPointX(point, test.offset, test.operation)
+		result := OffsetPointX(point, test.offset, test.operation)
 		assert.Equal(t, test.expectedX, result.X, "Expected X value did not match")
 	}
 }
@@ -801,18 +800,18 @@ func TestOffsetPointY(t *testing.T) {
 
 	tests := []struct {
 		offset    float64
-		operation imgix.CalculateFractionPointMode
+		operation CalculateFractionPointMode
 		expectedY float64
 	}{
-		{5.0, imgix.Add, 25.0},      // 20 + 5 = 25
-		{3.0, imgix.Subtract, 17.0}, // 20 - 3 = 17
-		{2.0, imgix.Multiply, 40.0}, // 20 * 2 = 40
-		{2.0, imgix.Divide, 10.0},   // 20 / 2 = 10
-		{0.0, imgix.Subtract, 20.0}, // 20 - 0 = 20
+		{5.0, Add, 25.0},      // 20 + 5 = 25
+		{3.0, Subtract, 17.0}, // 20 - 3 = 17
+		{2.0, Multiply, 40.0}, // 20 * 2 = 40
+		{2.0, Divide, 10.0},   // 20 / 2 = 10
+		{0.0, Subtract, 20.0}, // 20 - 0 = 20
 	}
 
 	for _, test := range tests {
-		result := imgix.OffsetPointY(point, test.offset, test.operation)
+		result := OffsetPointY(point, test.offset, test.operation)
 		assert.Equal(t, test.expectedY, result.Y, "Expected Y value did not match")
 	}
 }
@@ -838,7 +837,7 @@ func TestResizeUpTriangle(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		newVertexB, newVertexC := imgix.ResizeUpTriangle(test.vertexA, test.vertexB, test.vertexC, test.resize)
+		newVertexB, newVertexC := ResizeUpTriangle(test.vertexA, test.vertexB, test.vertexC, test.resize)
 
 		assert.Equal(t, test.expectedB.X, newVertexB.X, "vertexB X坐标不匹配")
 		assert.Equal(t, test.expectedB.Y, newVertexB.Y, "vertexB Y坐标不匹配")
@@ -892,7 +891,7 @@ func TestResizeDownTriangle(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		newVertexB, newVertexC := imgix.ResizeDownTriangle(test.vertexA, test.vertexB, test.vertexC, test.resize)
+		newVertexB, newVertexC := ResizeDownTriangle(test.vertexA, test.vertexB, test.vertexC, test.resize)
 
 		assert.Equal(t, test.expectedB.X, newVertexB.X, "vertexB X坐标不匹配")
 		assert.Equal(t, test.expectedB.Y, newVertexB.Y, "vertexB Y坐标不匹配")
@@ -917,7 +916,7 @@ func TestExtendLine(t *testing.T) {
 
 	// 执行测试
 	for _, test := range tests {
-		result := imgix.ExtendLine(&test.p1, &test.p2, test.length)
+		result := ExtendLine(&test.p1, &test.p2, test.length)
 		if result.X != test.expect.X || result.Y != test.expect.Y {
 			t.Errorf("ExtendLine(%v, %v, %v) = %v; want %v", test.p1, test.p2, test.length, result, test.expect)
 		}
@@ -935,14 +934,14 @@ func TestResizeImage(t *testing.T) {
 	}
 
 	// 定义缩放选项
-	resizeOptions := &imgix.ResizeImgOptions{
+	resizeOptions := &ResizeImgOptions{
 		Width:  50,
 		Height: 50,
 		Filter: imaging.Lanczos,
 	}
 
 	// 调用 ResizeImage 函数
-	resizedImg := imgix.ResizeImage(testImg, resizeOptions)
+	resizedImg := ResizeImage(testImg, resizeOptions)
 
 	// 断言结果
 	assert.NotNil(t, resizedImg, "Resized image should not be nil")
@@ -956,6 +955,25 @@ func TestResizeImage(t *testing.T) {
 
 	err = jpeg.Encode(outFile, resizedImg, nil)
 	assert.NoError(t, err, "Error encoding image to JPEG")
+}
+
+// createTestImage 创建一个简单的测试图像并保存到指定文件
+func createTestImage(filename string) error {
+	img := image.NewRGBA(image.Rect(0, 0, 100, 100))
+	// 填充图像为红色
+	for y := 0; y < 100; y++ {
+		for x := 0; x < 100; x++ {
+			img.Set(x, y, color.RGBA{255, 0, 0, 255})
+		}
+	}
+
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	return png.Encode(file, img)
 }
 
 // TestCropImage 测试 CropImage 函数
@@ -975,7 +993,7 @@ func TestCropImage(t *testing.T) {
 	}
 
 	// 定义裁剪选项
-	cropOptions := &imgix.CropImgOptions{
+	cropOptions := &CropImgOptions{
 		MinWidth:  10,
 		MinHeight: 10,
 		MaxWidth:  50,
@@ -983,7 +1001,7 @@ func TestCropImage(t *testing.T) {
 	}
 
 	// 调用 CropImage 函数
-	croppedImg := imgix.CropImage(testImg, cropOptions)
+	croppedImg := CropImage(testImg, cropOptions)
 
 	// 断言裁剪后的图像尺寸
 	assert.Equal(t, 40, croppedImg.Bounds().Dx(), "裁剪后的宽度应为 40")
@@ -1035,7 +1053,7 @@ func TestAdjustValues(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		start, end := imgix.AdjustValues(test.start, test.end, test.target)
+		start, end := AdjustValues(test.start, test.end, test.target)
 		assert.Equal(t, test.wantStart, start, "起始值不匹配")
 		assert.Equal(t, test.wantEnd, end, "结束值不匹配")
 	}

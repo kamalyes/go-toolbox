@@ -2,13 +2,13 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-10 00:15:15
- * @FilePath: \go-toolbox\tests\osx_file_test.go
+ * @LastEditTime: 2025-12-12 22:17:11
+ * @FilePath: \go-toolbox\pkg\osx\file_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package osx
 
 import (
 	"fmt"
@@ -19,7 +19,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/osx"
 	"github.com/kamalyes/go-toolbox/pkg/sign"
 	"github.com/stretchr/testify/assert"
 )
@@ -40,7 +39,7 @@ func TestGetDirFiles(t *testing.T) {
 	os.WriteFile(subTestFile, []byte("test content 3"), 0644)
 
 	// 获取目录中的文件
-	files, err := osx.GetDirFiles(tempDir)
+	files, err := GetDirFiles(tempDir)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -100,7 +99,7 @@ func TestCheckImageExists(t *testing.T) {
 
 	for filename, tc := range testCases {
 		t.Run(filename, func(t *testing.T) {
-			exists := osx.CheckImageExists(filename) == nil
+			exists := CheckImageExists(filename) == nil
 			if exists != tc.shouldExist {
 				t.Errorf("Expected existence of %s to be %v, but got %v", filename, tc.shouldExist, exists)
 			}
@@ -135,12 +134,12 @@ func TestSaveImage(t *testing.T) {
 				t.Fatalf("Failed to read temp image data: %v", err)
 			}
 
-			err = osx.SaveImage(filename, imgData, tc.quality)
+			err = SaveImage(filename, imgData, tc.quality)
 			if (err != nil) != tc.expectErr {
 				t.Errorf("Expected error status %v for %s, but got %v", tc.expectErr, filename, err != nil)
 			}
 			t.Cleanup(func() { os.Remove(filename) }) // 清理测试文件
-			if err == nil && osx.CheckImageExists(filename) != nil {
+			if err == nil && CheckImageExists(filename) != nil {
 				t.Errorf("Expected %s to exist after saving, but it does not", filename)
 			}
 		})
@@ -153,7 +152,7 @@ func TestWriteContentToFile(t *testing.T) {
 	testContent := "Hello, World!"
 
 	// 调用 WriteContentToFile 函数
-	err := osx.WriteContentToFile(testFilePath, testContent)
+	err := WriteContentToFile(testFilePath, testContent)
 
 	// 断言没有错误发生
 	assert.NoError(t, err)
@@ -184,7 +183,7 @@ func TestFileNameWithoutExt(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		result := osx.FileNameWithoutExt(testCase.input)
+		result := FileNameWithoutExt(testCase.input)
 		assert.Equal(t, testCase.expected, result, fmt.Sprintf("FileNameWithoutExt(%q) 应该返回 %q", testCase.input, testCase.expected))
 	}
 }
@@ -192,7 +191,7 @@ func TestFileNameWithoutExt(t *testing.T) {
 // TestRemoveIfExist 测试 RemoveIfExist 函数
 func TestRemoveIfExist(t *testing.T) {
 	// 创建一个临时文件用于测试
-	tempFile := filepath.Join(osx.MkdirTemp(), "tempfile")
+	tempFile := filepath.Join(MkdirTemp(), "tempfile")
 	defer os.Remove(tempFile) // 清理：如果测试失败，将在测试完成后删除文件
 	// 但注意，如果 RemoveIfExist 成功，这个文件将在测试中被删除
 
@@ -201,32 +200,32 @@ func TestRemoveIfExist(t *testing.T) {
 	assert.NoError(t, err, "ioutil.WriteFile 应该成功创建文件")
 
 	// 调用 RemoveIfExist
-	err = osx.RemoveIfExist(tempFile)
+	err = RemoveIfExist(tempFile)
 	assert.NoError(t, err, "RemoveIfExist 应该成功删除文件")
 
 	// 检查文件是否已删除
-	assert.False(t, osx.FileExists(tempFile), "文件应该已被删除")
+	assert.False(t, FileExists(tempFile), "文件应该已被删除")
 }
 
 // TestCreateIfNotExist 测试 CreateIfNotExist 函数
 func TestCreateIfNotExist(t *testing.T) {
 	// 创建一个临时文件用于测试
-	tempFile := filepath.Join(osx.MkdirTemp(), "tempfile")
+	tempFile := filepath.Join(MkdirTemp(), "tempfile")
 	defer os.Remove(tempFile) // 测试完成后删除临时文件
 
 	// 调用 CreateIfNotExist
-	file, err := osx.CreateIfNotExist(tempFile)
+	file, err := CreateIfNotExist(tempFile)
 	assert.NoError(t, err, "CreateIfNotExist 应该成功创建文件")
 	assert.NotNil(t, file, "返回的文件句柄不应该为空")
 
 	// 检查文件是否存在
-	assert.True(t, osx.FileExists(tempFile), "文件应该存在")
+	assert.True(t, FileExists(tempFile), "文件应该存在")
 
 	// 关闭文件句柄
 	file.Close()
 
 	// 尝试再次创建同一个文件，应该返回错误
-	_, err = osx.CreateIfNotExist(tempFile)
+	_, err = CreateIfNotExist(tempFile)
 	assert.Error(t, err, "CreateIfNotExist 应该返回错误，因为文件已经存在")
 }
 
@@ -246,7 +245,7 @@ func TestHash(t *testing.T) {
 	tempFile.Close()
 
 	// 计算哈希，返回map
-	hashMap, err := osx.ComputeHashes(tempFile.Name())
+	hashMap, err := ComputeHashes(tempFile.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
