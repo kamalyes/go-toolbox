@@ -2,20 +2,19 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-05-29 13:15:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-05-29 16:15:27
- * @FilePath: \go-toolbox\tests\mathx_filter_test.go
+ * @LastEditTime: 2025-12-11 21:28:15
+ * @FilePath: \go-toolbox\pkg\mathx\filter_test.go
  * @Description:
  *
  * Copyright (c) 2025 by kamalyes, All Rights Reserved.
  */
-package tests
+package mathx
 
 import (
 	"reflect"
 	"strconv"
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/mathx"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -77,16 +76,16 @@ func TestMapSliceByKey(t *testing.T) {
 	for _, c := range cases {
 		switch tc := c.(type) {
 		case mapCase[int, int]:
-			got := mathx.MapSliceByKey(tc.input, tc.keyFunc)
+			got := MapSliceByKey(tc.input, tc.keyFunc)
 			assert.Equal(t, tc.want, got, tc.name)
 		case mapCase[string, string]:
-			got := mathx.MapSliceByKey(tc.input, tc.keyFunc)
+			got := MapSliceByKey(tc.input, tc.keyFunc)
 			assert.Equal(t, tc.want, got, tc.name)
 		case mapCase[Person, int]:
-			got := mathx.MapSliceByKey(tc.input, tc.keyFunc)
+			got := MapSliceByKey(tc.input, tc.keyFunc)
 			assert.Equal(t, tc.want, got, tc.name)
 		case mapCase[*Person, int]:
-			got := mathx.MapSliceByKey(tc.input, tc.keyFunc)
+			got := MapSliceByKey(tc.input, tc.keyFunc)
 			assert.Equal(t, tc.want, got, tc.name)
 		default:
 			t.Errorf("unsupported case type %T", tc)
@@ -112,7 +111,7 @@ func TestFilterSliceByFunc(t *testing.T) {
 		{key: "123"},
 	}
 
-	result := mathx.FilterSliceByFunc(input, func(d ABC) bool {
+	result := FilterSliceByFunc(input, func(d ABC) bool {
 		return d.key == "123"
 	})
 
@@ -121,14 +120,14 @@ func TestFilterSliceByFunc(t *testing.T) {
 	}
 }
 
-func TestSliceFilter_BasicFilter(t *testing.T) {
+func TestSliceFilterBasicFilter(t *testing.T) {
 	data := []ABC{
 		{key: "a"},
 		{key: "b"},
 		{key: "a"},
 	}
 
-	filtered := mathx.NewSliceFilter(data).
+	filtered := NewSliceFilter(data).
 		Condition(func(d ABC) bool {
 			return d.key == "a"
 		}).
@@ -140,14 +139,14 @@ func TestSliceFilter_BasicFilter(t *testing.T) {
 	}
 }
 
-func TestSliceFilter_OnMatchCallback(t *testing.T) {
+func TestSliceFilterOnMatchCallback(t *testing.T) {
 	data := []ABC{
 		{key: "x", count: 1},
 		{key: "y", count: 2},
 	}
 
 	called := 0
-	filtered := mathx.NewSliceFilter(data).
+	filtered := NewSliceFilter(data).
 		Condition(func(d ABC) bool {
 			return d.key == "x"
 		}).
@@ -163,14 +162,14 @@ func TestSliceFilter_OnMatchCallback(t *testing.T) {
 	assert.Equal(t, 1, called)
 }
 
-func TestSliceFilter_OnNotMatchCallback(t *testing.T) {
+func TestSliceFilterOnNotMatchCallback(t *testing.T) {
 	data := []ABC{
 		{key: "x", count: 1},
 		{key: "y", count: 2},
 	}
 
 	notMatchedKeys := []string{}
-	filtered := mathx.NewSliceFilter(data).
+	filtered := NewSliceFilter(data).
 		Condition(func(d ABC) bool {
 			return d.key == "x"
 		}).
@@ -184,7 +183,7 @@ func TestSliceFilter_OnNotMatchCallback(t *testing.T) {
 	assert.ElementsMatch(t, []string{"y"}, notMatchedKeys)
 }
 
-func TestSliceFilter_MultipleCallbacks(t *testing.T) {
+func TestSliceFilterMultipleCallbacks(t *testing.T) {
 	data := []ABC{
 		{key: "a"},
 		{key: "b"},
@@ -193,7 +192,7 @@ func TestSliceFilter_MultipleCallbacks(t *testing.T) {
 	matchCalls := 0
 	notMatchCalls := 0
 
-	filtered := mathx.NewSliceFilter(data).
+	filtered := NewSliceFilter(data).
 		Condition(func(d ABC) bool {
 			return d.key == "a"
 		}).
@@ -214,25 +213,25 @@ func TestSliceFilter_MultipleCallbacks(t *testing.T) {
 	assert.Equal(t, 1, notMatchCalls)
 }
 
-func TestSliceFilter_NoPredicate(t *testing.T) {
+func TestSliceFilterNoPredicate(t *testing.T) {
 	data := []ABC{
 		{key: "x"},
 		{key: "y"},
 	}
 
-	filtered := mathx.NewSliceFilter(data).Result()
+	filtered := NewSliceFilter(data).Result()
 
 	// 无筛选条件，应该返回全部
 	assert.Len(t, filtered, 2)
 }
 
-func TestSliceFilter_ResultCalledMultipleTimes(t *testing.T) {
+func TestSliceFilterResultCalledMultipleTimes(t *testing.T) {
 	data := []ABC{
 		{key: "a"},
 		{key: "b"},
 	}
 
-	f := mathx.NewSliceFilter(data).
+	f := NewSliceFilter(data).
 		Condition(func(d ABC) bool {
 			return d.key == "a"
 		})
@@ -243,10 +242,10 @@ func TestSliceFilter_ResultCalledMultipleTimes(t *testing.T) {
 	assert.Equal(t, res1, res2)
 }
 
-func TestSliceFilter_EmptySlice(t *testing.T) {
+func TestSliceFilterEmptySlice(t *testing.T) {
 	data := []ABC{}
 
-	filtered := mathx.NewSliceFilter(data).
+	filtered := NewSliceFilter(data).
 		Condition(func(d ABC) bool {
 			return d.key == "a"
 		}).
@@ -255,14 +254,14 @@ func TestSliceFilter_EmptySlice(t *testing.T) {
 	assert.Empty(t, filtered)
 }
 
-func TestSliceFilter_NilCallbacks(t *testing.T) {
+func TestSliceFilterNilCallbacks(t *testing.T) {
 	data := []ABC{
 		{key: "a"},
 		{key: "b"},
 	}
 
 	// 测试传入nil回调不会panic
-	filtered := mathx.NewSliceFilter(data).
+	filtered := NewSliceFilter(data).
 		Condition(func(d ABC) bool {
 			return d.key == "a"
 		}).
@@ -274,7 +273,7 @@ func TestSliceFilter_NilCallbacks(t *testing.T) {
 	assert.Equal(t, "a", filtered[0].key)
 }
 
-func TestSliceFilter_MultipleConditions(t *testing.T) {
+func TestSliceFilterMultipleConditions(t *testing.T) {
 	data := []ABC{
 		{key: "a", count: 10},
 		{key: "b", count: 5},
@@ -283,7 +282,7 @@ func TestSliceFilter_MultipleConditions(t *testing.T) {
 		{key: "e", count: 1},
 	}
 
-	filtered := mathx.NewSliceFilter(data).
+	filtered := NewSliceFilter(data).
 		Condition(func(d ABC) bool {
 			return d.key == "a"
 		}, func(d ABC) bool {
@@ -317,12 +316,12 @@ func generateTestData(n int) []ABC {
 }
 
 // 基准测试：测试 SliceFilter 在大数据量下的性能
-func BenchmarkSliceFilter_Result(b *testing.B) {
+func BenchmarkSliceFilterResult(b *testing.B) {
 	data := generateTestData(100000) // 10 万条数据
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = mathx.NewSliceFilter(data).
+		_ = NewSliceFilter(data).
 			Condition(func(d ABC) bool {
 				// 筛选 key == "key50" 且 count >= 50000
 				return d.key == "key50"
@@ -340,7 +339,7 @@ func BenchmarkFilterSliceByFunc(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = mathx.FilterSliceByFunc(data, func(d ABC) bool {
+		_ = FilterSliceByFunc(data, func(d ABC) bool {
 			return d.key == "key50" && d.count >= 50000
 		})
 	}
@@ -362,20 +361,20 @@ func keyFunc(i *TestItem, args ...any) string {
 	return i.Key
 }
 
-func TestFindUpdate_Generic(t *testing.T) {
+func TestFindUpdateGeneric(t *testing.T) {
 	dataMap := map[string]TestValue{
 		"item1": {Info: "InitialInfo", Count: 1},
 	}
 
 	item := &TestItem{Key: "item1"}
 
-	mathx.FindUpdate(item, dataMap, keyFunc).
+	FindUpdate(item, dataMap, keyFunc).
 		IfFound(func(i *TestItem, v *TestValue) {
 			i.Data = v.Info
 			v.Count++
 		}).
-		When(item.Flag, func(r *mathx.FindResult[TestItem, TestValue]) {
-			r.Do(func(r2 *mathx.FindResult[TestItem, TestValue]) {
+		When(item.Flag, func(r *FindResult[TestItem, TestValue]) {
+			r.Do(func(r2 *FindResult[TestItem, TestValue]) {
 				r2.Item().Data += " (flagged)"
 			})
 		}).

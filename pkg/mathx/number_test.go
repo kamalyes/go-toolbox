@@ -2,19 +2,23 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-08-20 16:30:58
- * @FilePath: \go-toolbox\tests\mathx_number_test.go
+ * @LastEditTime: 2025-12-11 21:28:15
+ * @FilePath: \go-toolbox\pkg\mathx\number_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package mathx
 
 import (
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/mathx"
 	"github.com/stretchr/testify/assert"
+)
+
+const (
+	equalSlicesMsg       = "EqualSlices(%v, %v) = %v; expected %v"
+	testStringWithSpaces = " d e f "
 )
 
 // Decimals 测试
@@ -37,7 +41,7 @@ func TestDecimals(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := mathx.Decimals(tt.num, tt.digit)
+			result := Decimals(tt.num, tt.digit)
 			assert.Equal(t, tt.want, result)
 		})
 	}
@@ -54,7 +58,7 @@ func TestMathxAtLeast(t *testing.T) {
 		{-1, -5, -5},
 	}
 	for _, tt := range tests {
-		result := mathx.AtLeast(tt.x, tt.lower)
+		result := AtLeast(tt.x, tt.lower)
 		assert.Equal(tt.expected, result)
 	}
 }
@@ -70,7 +74,7 @@ func TestMathxAtMost(t *testing.T) {
 		{-3, -7, -3},
 	}
 	for _, tt := range tests {
-		result := mathx.AtMost(tt.x, tt.upper)
+		result := AtMost(tt.x, tt.upper)
 		assert.Equal(tt.expected, result)
 	}
 }
@@ -87,7 +91,7 @@ func TestMathxBetween(t *testing.T) {
 		{-8, -5, -3, -5},
 	}
 	for _, tt := range tests {
-		result := mathx.Between(tt.x, tt.lower, tt.upper)
+		result := Between(tt.x, tt.lower, tt.upper)
 		assert.Equal(tt.expected, result)
 	}
 }
@@ -103,7 +107,7 @@ func TestAtLeastFloat64(t *testing.T) {
 		{-1.1, -5.5, -5.5},
 	}
 	for _, tt := range tests {
-		result := mathx.AtLeast(tt.x, tt.lower)
+		result := AtLeast(tt.x, tt.lower)
 		assert.Equal(tt.expected, result)
 	}
 }
@@ -120,7 +124,7 @@ func TestBetweenFloat64(t *testing.T) {
 		{-8.8, -5.5, -3.3, -5.5},
 	}
 	for _, tt := range tests {
-		result := mathx.Between(tt.x, tt.lower, tt.upper)
+		result := Between(tt.x, tt.lower, tt.upper)
 		assert.Equal(tt.expected, result)
 	}
 }
@@ -151,33 +155,33 @@ func TestZeroValue(t *testing.T) {
 			var result any
 			switch tt.expected.(type) {
 			case int:
-				result = mathx.ZeroValue[int]()
+				result = ZeroValue[int]()
 			case int8:
-				result = mathx.ZeroValue[int8]()
+				result = ZeroValue[int8]()
 			case int16:
-				result = mathx.ZeroValue[int16]()
+				result = ZeroValue[int16]()
 			case int32:
-				result = mathx.ZeroValue[int32]()
+				result = ZeroValue[int32]()
 			case int64:
-				result = mathx.ZeroValue[int64]()
+				result = ZeroValue[int64]()
 			case uint:
-				result = mathx.ZeroValue[uint]()
+				result = ZeroValue[uint]()
 			case uint8:
-				result = mathx.ZeroValue[uint8]()
+				result = ZeroValue[uint8]()
 			case uint16:
-				result = mathx.ZeroValue[uint16]()
+				result = ZeroValue[uint16]()
 			case uint32:
-				result = mathx.ZeroValue[uint32]()
+				result = ZeroValue[uint32]()
 			case uint64:
-				result = mathx.ZeroValue[uint64]()
+				result = ZeroValue[uint64]()
 			case float32:
-				result = mathx.ZeroValue[float32]()
+				result = ZeroValue[float32]()
 			case float64:
-				result = mathx.ZeroValue[float64]()
+				result = ZeroValue[float64]()
 			case string:
-				result = mathx.ZeroValue[string]()
+				result = ZeroValue[string]()
 			case bool:
-				result = mathx.ZeroValue[bool]()
+				result = ZeroValue[bool]()
 			}
 
 			if result != tt.expected {
@@ -203,7 +207,7 @@ func TestEqualIntSlices(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := mathx.EqualSlices(test.a, test.b)
+		result := EqualSlices(test.a, test.b)
 		assert.Equal(t, test.expected, result, "EqualSlices(%v, %v) = %v; expected %v", test.a, test.b, result, test.expected)
 	}
 }
@@ -224,8 +228,8 @@ func TestEqualFloatSlices(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := mathx.EqualSlices(test.a, test.b)
-		assert.Equal(t, test.expected, result, "EqualSlices(%v, %v) = %v; expected %v", test.a, test.b, result, test.expected)
+		result := EqualSlices(test.a, test.b)
+		assert.Equal(t, test.expected, result, equalSlicesMsg, test.a, test.b, result, test.expected)
 	}
 }
 
@@ -245,8 +249,8 @@ func TestEqualStringSlices(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := mathx.EqualSlices(test.a, test.b)
-		assert.Equal(t, test.expected, result, "EqualSlices(%v, %v) = %v; expected %v", test.a, test.b, result, test.expected)
+		result := EqualSlices(test.a, test.b)
+		assert.Equal(t, test.expected, result, equalSlicesMsg, test.a, test.b, result, test.expected)
 	}
 }
 
@@ -266,8 +270,8 @@ func TestEqualBoolSlices(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := mathx.EqualSlices(test.a, test.b)
-		assert.Equal(t, test.expected, result, "EqualSlices(%v, %v) = %v; expected %v", test.a, test.b, result, test.expected)
+		result := EqualSlices(test.a, test.b)
+		assert.Equal(t, test.expected, result, equalSlicesMsg, test.a, test.b, result, test.expected)
 	}
 }
 
@@ -291,7 +295,7 @@ func TestLongestCommonPrefix(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.a+"_"+tt.b, func(t *testing.T) {
-			got := mathx.LongestCommonPrefix(tt.a, tt.b)
+			got := LongestCommonPrefix(tt.a, tt.b)
 			if got != tt.expected {
 				t.Errorf("LongestCommonPrefix(%q, %q) = %d; want %d", tt.a, tt.b, got, tt.expected)
 			}
@@ -308,13 +312,13 @@ type Person struct {
 func TestSafeGetIndexWithErr(t *testing.T) {
 	// 字符串切片
 	strSlice := []string{"apple", "banana", "cherry"}
-	valStr, err := mathx.SafeGetIndexWithErr(strSlice, 1)
+	valStr, err := SafeGetIndexWithErr(strSlice, 1)
 	assert.NoError(t, err)
 	assert.Equal(t, "banana", valStr)
 
 	// 整型切片
 	intSlice := []int{10, 20, 30}
-	valInt, err := mathx.SafeGetIndexWithErr(intSlice, 2)
+	valInt, err := SafeGetIndexWithErr(intSlice, 2)
 	assert.NoError(t, err)
 	assert.Equal(t, 30, valInt)
 
@@ -323,7 +327,7 @@ func TestSafeGetIndexWithErr(t *testing.T) {
 		{"Alice", 30},
 		{"Bob", 25},
 	}
-	valPerson, err := mathx.SafeGetIndexWithErr(personSlice, 0)
+	valPerson, err := SafeGetIndexWithErr(personSlice, 0)
 	assert.NoError(t, err)
 	assert.Equal(t, Person{"Alice", 30}, valPerson)
 
@@ -332,35 +336,35 @@ func TestSafeGetIndexWithErr(t *testing.T) {
 		{"Charlie", 40},
 		nil,
 	}
-	valPtr, err := mathx.SafeGetIndexWithErr(ptrSlice, 1)
+	valPtr, err := SafeGetIndexWithErr(ptrSlice, 1)
 	assert.NoError(t, err)
 	assert.Nil(t, valPtr) // 索引1是nil指针
 
 	// 索引越界测试
-	_, err = mathx.SafeGetIndexWithErr(strSlice, 5)
+	_, err = SafeGetIndexWithErr(strSlice, 5)
 	assert.Error(t, err)
 
-	_, err = mathx.SafeGetIndexWithErr(intSlice, -1)
+	_, err = SafeGetIndexWithErr(intSlice, -1)
 	assert.Error(t, err)
 }
 
 func TestSafeGetIndexOrDefault(t *testing.T) {
 	// 字符串切片，索引合法
 	strSlice := []string{"apple", "banana", "cherry"}
-	valStr := mathx.SafeGetIndexOrDefault(strSlice, 1, "default")
+	valStr := SafeGetIndexOrDefault(strSlice, 1, "default")
 	assert.Equal(t, "banana", valStr)
 
 	// 字符串切片，索引越界
-	valStr = mathx.SafeGetIndexOrDefault(strSlice, 5, "default")
+	valStr = SafeGetIndexOrDefault(strSlice, 5, "default")
 	assert.Equal(t, "default", valStr)
 
 	// 整型切片，索引合法
 	intSlice := []int{10, 20, 30}
-	valInt := mathx.SafeGetIndexOrDefault(intSlice, 2, -1)
+	valInt := SafeGetIndexOrDefault(intSlice, 2, -1)
 	assert.Equal(t, 30, valInt)
 
 	// 整型切片，索引越界
-	valInt = mathx.SafeGetIndexOrDefault(intSlice, -1, -1)
+	valInt = SafeGetIndexOrDefault(intSlice, -1, -1)
 	assert.Equal(t, -1, valInt)
 
 	// 结构体切片，索引合法
@@ -368,11 +372,11 @@ func TestSafeGetIndexOrDefault(t *testing.T) {
 		{"Alice", 30},
 		{"Bob", 25},
 	}
-	valPerson := mathx.SafeGetIndexOrDefault(personSlice, 0, Person{"Default", 0})
+	valPerson := SafeGetIndexOrDefault(personSlice, 0, Person{"Default", 0})
 	assert.Equal(t, Person{"Alice", 30}, valPerson)
 
 	// 结构体切片，索引越界
-	valPerson = mathx.SafeGetIndexOrDefault(personSlice, 5, Person{"Default", 0})
+	valPerson = SafeGetIndexOrDefault(personSlice, 5, Person{"Default", 0})
 	assert.Equal(t, Person{"Default", 0}, valPerson)
 
 	// 指针切片，索引合法且元素为nil指针
@@ -380,11 +384,11 @@ func TestSafeGetIndexOrDefault(t *testing.T) {
 		{"Charlie", 40},
 		nil,
 	}
-	valPtr := mathx.SafeGetIndexOrDefault(ptrSlice, 1, nil)
+	valPtr := SafeGetIndexOrDefault(ptrSlice, 1, nil)
 	assert.Nil(t, valPtr)
 
 	// 指针切片，索引越界
-	valPtr = mathx.SafeGetIndexOrDefault(ptrSlice, 10, nil)
+	valPtr = SafeGetIndexOrDefault(ptrSlice, 10, nil)
 	assert.Nil(t, valPtr)
 }
 
@@ -395,16 +399,16 @@ func TestSafeGetIndexOrDefaultNoSpace(t *testing.T) {
 		defaultVal string
 		want       string
 	}{
-		{[]string{"a b c", " d e f ", "g h i"}, 0, "default", "abc"},
-		{[]string{"a b c", " d e f ", "g h i"}, 1, "default", "def"},
-		{[]string{"a b c", " d e f ", "g h i"}, 2, "default", "ghi"},
-		{[]string{"a b c", " d e f ", "g h i"}, 3, "default", "default"}, // 越界返回默认值
-		{[]string{}, 0, "default", "default"},                            // 空切片返回默认值
+		{[]string{"a b c", testStringWithSpaces, "g h i"}, 0, "default", "abc"},
+		{[]string{"a b c", testStringWithSpaces, "g h i"}, 1, "default", "def"},
+		{[]string{"a b c", testStringWithSpaces, "g h i"}, 2, "default", "ghi"},
+		{[]string{"a b c", testStringWithSpaces, "g h i"}, 3, "default", "default"}, // 越界返回默认值
+		{[]string{}, 0, "default", "default"},                                       // 空切片返回默认值
 		{[]string{" no space "}, 0, "default", "nospace"},
 	}
 
 	for _, tt := range tests {
-		got := mathx.SafeGetIndexOrDefaultNoSpace(tt.slice, tt.index, tt.defaultVal)
+		got := SafeGetIndexOrDefaultNoSpace(tt.slice, tt.index, tt.defaultVal)
 		if got != tt.want {
 			t.Errorf("SafeGetIndexOrDefaultNoSpace(%v, %d, %q) = %q; want %q",
 				tt.slice, tt.index, tt.defaultVal, got, tt.want)

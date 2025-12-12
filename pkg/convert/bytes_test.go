@@ -2,13 +2,13 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 10:50:50
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-11 18:00:08
- * @FilePath: \go-toolbox\tests\convert_bytes_test.go
+ * @LastEditTime: 2025-12-11 21:28:15
+ * @FilePath: \go-toolbox\pkg\convert\bytes_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package convert
 
 import (
 	"bytes"
@@ -19,8 +19,12 @@ import (
 	"image/png"
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/convert"
 	"github.com/kamalyes/go-toolbox/pkg/mathx"
+	"github.com/stretchr/testify/assert"
+)
+
+const (
+	testPathWithParams = "/users/:id/products/*"
 )
 
 func TestBytesToBCC(t *testing.T) {
@@ -34,10 +38,8 @@ func TestBytesToBCC(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := convert.BytesToBCC(test.input)
-		if result != test.expected {
-			t.Errorf("BytesBCC(%v) = %v; want %v", test.input, result, test.expected)
-		}
+		result := BytesToBCC(test.input)
+		assert.Equal(t, test.expected, result, "BytesBCC(%v) = %v; want %v", test.input, result, test.expected)
 	}
 }
 
@@ -52,10 +54,8 @@ func TestByteToBinStr(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := convert.ByteToBinStr(test.input)
-		if result != test.expected {
-			t.Errorf("ByteToBinStr(%d) = %s; want %s", test.input, result, test.expected)
-		}
+		result := ByteToBinStr(test.input)
+		assert.Equal(t, test.expected, result, "ByteToBinStr(%d) = %s; want %s", test.input, result, test.expected)
 	}
 }
 
@@ -70,10 +70,8 @@ func TestBytesToBinStr(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := convert.BytesToBinStr(test.input)
-		if result != test.expected {
-			t.Errorf("BytesToBinStr(%v) = %s; want %s", test.input, result, test.expected)
-		}
+		result := BytesToBinStr(test.input)
+		assert.Equal(t, test.expected, result, "BytesToBinStr(%v) = %s; want %s", test.input, result, test.expected)
 	}
 }
 
@@ -89,23 +87,9 @@ func TestBytesToBinStrWithSplit(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := convert.BytesToBinStrWithSplit(test.input, test.split)
-		if result != test.expected {
-			t.Errorf("BytesToBinStrWithSplit(%v, %s) = %s; want %s", test.input, test.split, result, test.expected)
-		}
+		result := BytesToBinStrWithSplit(test.input, test.split)
+		assert.Equal(t, test.expected, result, "BytesToBinStrWithSplit(%v, %s) = %s; want %s", test.input, test.split, result, test.expected)
 	}
-}
-
-func equalBytes(a, b []byte) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }
 
 // createImage 创建一张简单的图像并返回其 Base64 编码
@@ -136,27 +120,18 @@ func createImage() (string, error) {
 // TestB64ToByte 测试 B64ToByte 函数
 func TestB64ToByte(t *testing.T) {
 	validB64, err := createImage()
-	if err != nil {
-		t.Fatalf("Error creating image: %v", err)
-	}
+	assert.NoError(t, err, "Error creating image")
 
-	imageBytes, err := convert.B64ToByte(validB64)
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
-
-	if len(imageBytes) == 0 {
-		t.Fatal("Expected non-empty byte slice")
-	}
+	imageBytes, err := B64ToByte(validB64)
+	assert.NoError(t, err, "Expected no error")
+	assert.NotEmpty(t, imageBytes, "Expected non-empty byte slice")
 }
 
 func TestSliceByteToString(t *testing.T) {
 	b := []byte("hello world")
-	s := convert.SliceByteToString(b)
+	s := SliceByteToString(b)
 
-	if s != "hello world" {
-		t.Errorf("expected 'hello world', got '%s'", s)
-	}
+	assert.Equal(t, "hello world", s, "expected 'hello world', got '%s'", s)
 }
 
 func TestCountPathSegments(t *testing.T) {
@@ -165,18 +140,16 @@ func TestCountPathSegments(t *testing.T) {
 		prefixes []string
 		expected int
 	}{
-		{"/users/:id/products/*", nil, 2},                     // 默认前缀 ":" AND "*"
-		{"/users/:id/products/*", []string{":"}, 1},           // 自定义前缀 ":"
-		{"/users/:id/products/*", []string{"*"}, 1},           // 自定义前缀 "*"
-		{"/users/:id/products/*", []string{":", "*"}, 2},      // 自定义前缀 ":"
-		{"/users/:id/products/*", []string{"users"}, 1},       // 自定义前缀 "users"
-		{"/users/:id/products/*", []string{"nonexistent"}, 0}, // 不存在的前缀
+		{testPathWithParams, nil, 2},                     // 默认前缀 ":" AND "*"
+		{testPathWithParams, []string{":"}, 1},           // 自定义前缀 ":"
+		{testPathWithParams, []string{"*"}, 1},           // 自定义前缀 "*"
+		{testPathWithParams, []string{":", "*"}, 2},      // 自定义前缀 ":"
+		{testPathWithParams, []string{"users"}, 1},       // 自定义前缀 "users"
+		{testPathWithParams, []string{"nonexistent"}, 0}, // 不存在的前缀
 	}
 
 	for _, test := range tests {
 		result := mathx.CountPathSegments(test.path, test.prefixes...)
-		if result != test.expected {
-			t.Errorf("For path %q with prefixes %v, expected %d, got %d", test.path, test.prefixes, test.expected, result)
-		}
+		assert.Equal(t, test.expected, result, "For path %q with prefixes %v, expected %d, got %d", test.path, test.prefixes, test.expected, result)
 	}
 }

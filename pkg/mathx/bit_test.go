@@ -2,19 +2,18 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-10 15:26:58
- * @FilePath: \go-toolbox\tests\mathx_bit_test.go
+ * @LastEditTime: 2025-12-11 21:28:15
+ * @FilePath: \go-toolbox\pkg\mathx\bit_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package mathx
 
 import (
 	"math/big"
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/mathx"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -44,7 +43,7 @@ func TestGetBit64(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := mathx.GetBit64(tt.min, tt.max, tt.step)
+		got := GetBit64(tt.min, tt.max, tt.step)
 		assert.Equalf(t, tt.expected, got, "GetBit64(%d, %d, %d) got wrong result", tt.min, tt.max, tt.step)
 	}
 }
@@ -67,7 +66,7 @@ func TestBit64ToArray(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := mathx.Bit64ToArray(tt.bit)
+		got := Bit64ToArray(tt.bit)
 		assert.Equal(t, tt.expected, got, "Bit64ToArray(%b) got wrong result", tt.bit)
 	}
 }
@@ -103,7 +102,7 @@ func TestGetBitBig(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		got := mathx.GetBitBig(c.min, c.max, c.step)
+		got := GetBitBig(c.min, c.max, c.step)
 		assert.Equalf(t, 0, got.Cmp(c.exp), "GetBitBig(%d,%d,%d) failed", c.min, c.max, c.step)
 	}
 }
@@ -151,7 +150,7 @@ func TestBitToArrayBig(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		got := mathx.BitToArrayBig(c.input)
+		got := BitToArrayBig(c.input)
 		assert.Equalf(t, c.expected, got, "BitToArrayBig(%b) failed", c.input)
 	}
 }
@@ -176,8 +175,8 @@ func TestBit64GenerateAndParse(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		mask := mathx.GetBit64(tt.min, tt.max, tt.step)
-		got := mathx.Bit64ToArray(mask)
+		mask := GetBit64(tt.min, tt.max, tt.step)
+		got := Bit64ToArray(mask)
 		assert.Equalf(t, tt.expected, got, "Generate and parse failed for min=%d max=%d step=%d", tt.min, tt.max, tt.step)
 	}
 }
@@ -194,8 +193,8 @@ func TestBitBigGenerateAndParse(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		mask := mathx.GetBitBig(tt.min, tt.max, tt.step)
-		got := mathx.BitToArrayBig(mask)
+		mask := GetBitBig(tt.min, tt.max, tt.step)
+		got := BitToArrayBig(mask)
 		assert.Equalf(t, tt.expected, got, "Generate and parse big.Int failed for min=%d max=%d step=%d", tt.min, tt.max, tt.step)
 	}
 }

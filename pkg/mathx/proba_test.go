@@ -2,19 +2,18 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-10 00:17:09
- * @FilePath: \go-toolbox\tests\mathx_proba_test.go
+ * @LastEditTime: 2025-12-11 21:28:15
+ * @FilePath: \go-toolbox\pkg\mathx\proba_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package mathx
 
 import (
 	"math"
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/mathx"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,7 +23,7 @@ func TestTrueOnProba(t *testing.T) {
 	const total = 100000
 	const epsilon = 0.05
 	var count int
-	p := mathx.NewProba()
+	p := NewProba()
 	for i := 0; i < total; i++ {
 		if p.TrueOnProba(proba) {
 			count++

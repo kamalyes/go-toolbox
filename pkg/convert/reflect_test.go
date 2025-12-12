@@ -2,19 +2,18 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-05-27 18:51:53
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-20 13:07:52
- * @FilePath: \go-toolbox\tests\convert_reflect_test.go
+ * @LastEditTime: 2025-12-11 21:28:15
+ * @FilePath: \go-toolbox\pkg\convert\reflect_test.go
  * @Description:
  *
  * Copyright (c) 2025 by kamalyes, All Rights Reserved.
  */
-package tests
+package convert
 
 import (
 	"testing"
 	"time"
 
-	"github.com/kamalyes/go-toolbox/pkg/convert"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -86,7 +85,7 @@ type AllTypesDst struct {
 	TimeField string
 }
 
-func TestTransformFields_AllTypes(t *testing.T) {
+func TestTransformFieldsAllTypes(t *testing.T) {
 	now := time.Date(2025, 5, 27, 18, 52, 0, 0, time.UTC)
 
 	src := AllTypesSrc{
@@ -135,7 +134,7 @@ func TestTransformFields_AllTypes(t *testing.T) {
 
 	var dst AllTypesDst
 
-	err := convert.TransformFields(&dst, src, &convert.TransformFieldsOptions{
+	err := TransformFields(&dst, src, &TransformFieldsOptions{
 		StrictTypeCheck: true,
 	})
 	assert.NoError(t, err)
@@ -186,7 +185,7 @@ func TestTransformFields_AllTypes(t *testing.T) {
 	assert.Equal(t, now.Format(time.DateTime), dst.TimeField)
 }
 
-func TestTransformValue_NilSourceCases(t *testing.T) {
+func TestTransformValueNilSourceCases(t *testing.T) {
 	type Inner struct {
 		Field int
 	}
@@ -233,7 +232,7 @@ func TestTransformValue_NilSourceCases(t *testing.T) {
 	var src Src // 所有指针、slice、map、interface、func、chan 字段默认 nil，非指针基本类型为零值
 	var dst Dst
 
-	err := convert.TransformFields(&dst, &src, nil)
+	err := TransformFields(&dst, &src, nil)
 	assert.NoError(t, err)
 
 	// 指针字段 nil -> 目标为 nil 或零值
@@ -258,7 +257,7 @@ func TestTransformValue_NilSourceCases(t *testing.T) {
 
 }
 
-func TestTransformFields_StrictTypeCheck_Error(t *testing.T) {
+func TestTransformFieldsStrictTypeCheckError(t *testing.T) {
 	src := struct {
 		Field int
 	}{
@@ -268,13 +267,13 @@ func TestTransformFields_StrictTypeCheck_Error(t *testing.T) {
 		Field string
 	}{}
 
-	err := convert.TransformFields(&dst, src, &convert.TransformFieldsOptions{
+	err := TransformFields(&dst, src, &TransformFieldsOptions{
 		StrictTypeCheck: true,
 	})
 	assert.Error(t, err)
 }
 
-func TestTransformFields_NonStrict_NoError(t *testing.T) {
+func TestTransformFieldsNonStrictNoError(t *testing.T) {
 	src := struct {
 		Field int
 	}{
@@ -284,19 +283,19 @@ func TestTransformFields_NonStrict_NoError(t *testing.T) {
 		Field string
 	}{}
 
-	err := convert.TransformFields(&dst, src, &convert.TransformFieldsOptions{
+	err := TransformFields(&dst, src, &TransformFieldsOptions{
 		StrictTypeCheck: false,
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, "10", dst.Field)
 }
 
-func TestTransformer_Setters_Chaining(t *testing.T) {
-	t1 := convert.NewTransformer()
+func TestTransformerSettersChaining(t *testing.T) {
+	t1 := NewTransformer()
 
 	dst := &struct{ A int }{A: 1}
 	src := map[string]interface{}{"A": 2}
-	opts := &convert.TransformFieldsOptions{StrictTypeCheck: true}
+	opts := &TransformFieldsOptions{StrictTypeCheck: true}
 
 	t2 := t1.SetDst(dst).SetSrc(src).SetOptions(opts)
 
@@ -309,7 +308,7 @@ func TestTransformer_Setters_Chaining(t *testing.T) {
 	assert.Equal(t, opts, t1.GetOptions())
 }
 
-func TestTransformFields_NilPointerSrcToNonPtrDst(t *testing.T) {
+func TestTransformFieldsNilPointerSrcToNonPtrDst(t *testing.T) {
 	type Src struct {
 		Ptr *int
 	}
@@ -319,12 +318,12 @@ func TestTransformFields_NilPointerSrcToNonPtrDst(t *testing.T) {
 	src := Src{Ptr: nil}
 	var dst Dst
 
-	err := convert.TransformFields(&dst, src, nil)
+	err := TransformFields(&dst, src, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, dst.Ptr) // nil指针源转目标值类型，目标字段应为零值
 }
 
-func TestTransformFields_SrcPointerToDstPointer(t *testing.T) {
+func TestTransformFieldsSrcPointerToDstPointer(t *testing.T) {
 	type Src struct {
 		Val *int
 	}
@@ -335,13 +334,13 @@ func TestTransformFields_SrcPointerToDstPointer(t *testing.T) {
 	src := Src{Val: &v}
 	var dst Dst
 
-	err := convert.TransformFields(&dst, src, nil)
+	err := TransformFields(&dst, src, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, dst.Val)
 	assert.Equal(t, 123, *dst.Val)
 }
 
-func TestTransformFields_SliceNilSrc(t *testing.T) {
+func TestTransformFieldsSliceNilSrc(t *testing.T) {
 	type Src struct {
 		S []int
 	}
@@ -351,12 +350,12 @@ func TestTransformFields_SliceNilSrc(t *testing.T) {
 	src := Src{S: nil}
 	var dst Dst
 
-	err := convert.TransformFields(&dst, src, nil)
+	err := TransformFields(&dst, src, nil)
 	assert.NoError(t, err)
 	assert.Nil(t, dst.S)
 }
 
-func TestTransformFields_SliceEmptySrc(t *testing.T) {
+func TestTransformFieldsSliceEmptySrc(t *testing.T) {
 	type Src struct {
 		S []int
 	}
@@ -366,13 +365,13 @@ func TestTransformFields_SliceEmptySrc(t *testing.T) {
 	src := Src{S: []int{}}
 	var dst Dst
 
-	err := convert.TransformFields(&dst, src, nil)
+	err := TransformFields(&dst, src, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, dst.S)
 	assert.Len(t, dst.S, 0)
 }
 
-func TestTransformFields_MapNilSrc(t *testing.T) {
+func TestTransformFieldsMapNilSrc(t *testing.T) {
 	type Src struct {
 		M map[string]int
 	}
@@ -382,12 +381,12 @@ func TestTransformFields_MapNilSrc(t *testing.T) {
 	src := Src{M: nil}
 	var dst Dst
 
-	err := convert.TransformFields(&dst, src, nil)
+	err := TransformFields(&dst, src, nil)
 	assert.NoError(t, err)
 	assert.Nil(t, dst.M)
 }
 
-func TestTransformFields_MapEmptySrc(t *testing.T) {
+func TestTransformFieldsMapEmptySrc(t *testing.T) {
 	type Src struct {
 		M map[string]int
 	}
@@ -397,13 +396,13 @@ func TestTransformFields_MapEmptySrc(t *testing.T) {
 	src := Src{M: map[string]int{}}
 	var dst Dst
 
-	err := convert.TransformFields(&dst, src, nil)
+	err := TransformFields(&dst, src, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, dst.M)
 	assert.Len(t, dst.M, 0)
 }
 
-func TestTransformFields_UnsupportedType(t *testing.T) {
+func TestTransformFieldsUnsupportedType(t *testing.T) {
 	// 结构体字段类型不匹配且不支持转换
 	type Src struct {
 		Field chan int
@@ -414,11 +413,11 @@ func TestTransformFields_UnsupportedType(t *testing.T) {
 	src := Src{Field: make(chan int)}
 	var dst Dst
 
-	err := convert.TransformFields(&dst, src, &convert.TransformFieldsOptions{StrictTypeCheck: true})
+	err := TransformFields(&dst, src, &TransformFieldsOptions{StrictTypeCheck: true})
 	assert.Error(t, err)
 }
 
-func TestTransformFields_PtrToNonPtrWithNilSrc(t *testing.T) {
+func TestTransformFieldsPtrToNonPtrWithNilSrc(t *testing.T) {
 	type Src struct {
 		Val *int
 	}
@@ -428,12 +427,12 @@ func TestTransformFields_PtrToNonPtrWithNilSrc(t *testing.T) {
 	src := Src{Val: nil}
 	var dst Dst
 
-	err := convert.TransformFields(&dst, src, nil)
+	err := TransformFields(&dst, src, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, dst.Val)
 }
 
-func TestTransformFields_NonPtrToPtrDst(t *testing.T) {
+func TestTransformFieldsNonPtrToPtrDst(t *testing.T) {
 	type Src struct {
 		Val int
 	}
@@ -443,23 +442,23 @@ func TestTransformFields_NonPtrToPtrDst(t *testing.T) {
 	src := Src{Val: 42}
 	var dst Dst
 
-	err := convert.TransformFields(&dst, src, nil)
+	err := TransformFields(&dst, src, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, dst.Val)
 	assert.Equal(t, 42, *dst.Val)
 }
 
-func TestTransformFields_EmptyStructs(t *testing.T) {
+func TestTransformFieldsEmptyStructs(t *testing.T) {
 	type Src struct{}
 	type Dst struct{}
 	src := Src{}
 	var dst Dst
 
-	err := convert.TransformFields(&dst, src, nil)
+	err := TransformFields(&dst, src, nil)
 	assert.NoError(t, err)
 }
 
-func TestTransformFields_IgnorePrivateFields(t *testing.T) {
+func TestTransformFieldsIgnorePrivateFields(t *testing.T) {
 	type Src struct {
 		Public  int
 		private int
@@ -471,13 +470,13 @@ func TestTransformFields_IgnorePrivateFields(t *testing.T) {
 	src := Src{Public: 1, private: 2}
 	var dst Dst
 
-	err := convert.TransformFields(&dst, src, nil)
+	err := TransformFields(&dst, src, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, dst.Public)
 	assert.Equal(t, 0, dst.private) // 私有字段不赋值，保持默认零值
 }
 
-func TestTransformFields_TagNameMapping(t *testing.T) {
+func TestTransformFieldsTagNameMapping(t *testing.T) {
 	type Src struct {
 		Foo int
 	}
@@ -487,12 +486,12 @@ func TestTransformFields_TagNameMapping(t *testing.T) {
 	src := Src{Foo: 100}
 	var dst Dst
 
-	err := convert.TransformFields(&dst, src, &convert.TransformFieldsOptions{TransTagName: "convert"})
+	err := TransformFields(&dst, src, &TransformFieldsOptions{TransTagName: "convert"})
 	assert.NoError(t, err)
 	assert.Equal(t, 100, dst.Bar)
 }
 
-func TestTransformFields_TimeFormatCustom(t *testing.T) {
+func TestTransformFieldsTimeFormatCustom(t *testing.T) {
 	type Src struct {
 		T time.Time
 	}
@@ -503,7 +502,7 @@ func TestTransformFields_TimeFormatCustom(t *testing.T) {
 	src := Src{T: now}
 	var dst Dst
 
-	err := convert.TransformFields(&dst, src, &convert.TransformFieldsOptions{TimeFormat: time.RFC1123})
+	err := TransformFields(&dst, src, &TransformFieldsOptions{TimeFormat: time.RFC1123})
 	assert.NoError(t, err)
 	assert.Equal(t, now.Format(time.RFC1123), dst.T)
 }

@@ -594,3 +594,336 @@ func (sc *SliceChain[T]) String() string {
 		return fmt.Sprintf("%v", sc.data)
 	})
 }
+
+// TransformSlice 将切片的每个元素通过函数转换为新类型
+// 使用泛型支持任意类型转换，如 []int -> []string
+func TransformSlice[T any, R any](slice []T, transform func(T) R) []R {
+	if len(slice) == 0 {
+		return []R{}
+	}
+	result := make([]R, len(slice))
+	for i, v := range slice {
+		result[i] = transform(v)
+	}
+	return result
+}
+
+// FilterSlice 过滤切片，保留满足条件的元素
+// 与 SliceRemove 的区别：FilterSlice 保留满足条件的，SliceRemove 也是保留满足条件的
+// 这个函数提供更直观的命名
+func FilterSlice[T any](slice []T, predicate func(T) bool) []T {
+	if len(slice) == 0 {
+		return slice
+	}
+	result := make([]T, 0, len(slice))
+	for _, v := range slice {
+		if predicate(v) {
+			result = append(result, v)
+		}
+	}
+	return result
+}
+
+// ReduceSlice 将切片归约为单个值
+func ReduceSlice[T any, R any](slice []T, initial R, accumulator func(R, T) R) R {
+	result := initial
+	for _, v := range slice {
+		result = accumulator(result, v)
+	}
+	return result
+}
+
+// FlattenSlice 扁平化嵌套切片
+func FlattenSlice[T any](slices [][]T) []T {
+	if len(slices) == 0 {
+		return []T{}
+	}
+
+	totalLen := 0
+	for _, s := range slices {
+		totalLen += len(s)
+	}
+
+	result := make([]T, 0, totalLen)
+	for _, s := range slices {
+		result = append(result, s...)
+	}
+	return result
+}
+
+// ReverseSlice 反转切片（返回新切片）
+func ReverseSlice[T any](slice []T) []T {
+	if len(slice) == 0 {
+		return slice
+	}
+	result := make([]T, len(slice))
+	for i, v := range slice {
+		result[len(slice)-1-i] = v
+	}
+	return result
+}
+
+// ReverseSliceInPlace 原地反转切片
+func ReverseSliceInPlace[T any](slice []T) {
+	for i, j := 0, len(slice)-1; i < j; i, j = i+1, j-1 {
+		slice[i], slice[j] = slice[j], slice[i]
+	}
+}
+
+// TakeSlice 获取前 n 个元素
+func TakeSlice[T any](slice []T, n int) []T {
+	if n <= 0 {
+		return []T{}
+	}
+	if n >= len(slice) {
+		return slice
+	}
+	return slice[:n]
+}
+
+// TakeLastSlice 获取后 n 个元素
+func TakeLastSlice[T any](slice []T, n int) []T {
+	if n <= 0 {
+		return []T{}
+	}
+	if n >= len(slice) {
+		return slice
+	}
+	return slice[len(slice)-n:]
+}
+
+// SkipSlice 跳过前 n 个元素
+func SkipSlice[T any](slice []T, n int) []T {
+	if n <= 0 {
+		return slice
+	}
+	if n >= len(slice) {
+		return []T{}
+	}
+	return slice[n:]
+}
+
+// SkipLastSlice 跳过后 n 个元素
+func SkipLastSlice[T any](slice []T, n int) []T {
+	if n <= 0 {
+		return slice
+	}
+	if n >= len(slice) {
+		return []T{}
+	}
+	return slice[:len(slice)-n]
+}
+
+// CompactSlice 移除切片中的零值元素
+func CompactSlice[T comparable](slice []T) []T {
+	var zero T
+	result := make([]T, 0, len(slice))
+	for _, v := range slice {
+		if v != zero {
+			result = append(result, v)
+		}
+	}
+	return result
+}
+
+// PartitionSlice 将切片分为两部分：满足条件的和不满足条件的
+func PartitionSlice[T any](slice []T, predicate func(T) bool) (truthy, falsy []T) {
+	truthy = make([]T, 0)
+	falsy = make([]T, 0)
+	for _, v := range slice {
+		if predicate(v) {
+			truthy = append(truthy, v)
+		} else {
+			falsy = append(falsy, v)
+		}
+	}
+	return
+}
+
+// GroupSliceBy 按照键函数对切片元素分组
+func GroupSliceBy[T any, K comparable](slice []T, keyFunc func(T) K) map[K][]T {
+	result := make(map[K][]T)
+	for _, v := range slice {
+		key := keyFunc(v)
+		result[key] = append(result[key], v)
+	}
+	return result
+}
+
+// FindSlice 查找第一个满足条件的元素
+func FindSlice[T any](slice []T, predicate func(T) bool) (T, bool) {
+	for _, v := range slice {
+		if predicate(v) {
+			return v, true
+		}
+	}
+	var zero T
+	return zero, false
+}
+
+// FindLastSlice 查找最后一个满足条件的元素
+func FindLastSlice[T any](slice []T, predicate func(T) bool) (T, bool) {
+	for i := len(slice) - 1; i >= 0; i-- {
+		if predicate(slice[i]) {
+			return slice[i], true
+		}
+	}
+	var zero T
+	return zero, false
+}
+
+// AllSlice 检查是否所有元素都满足条件
+func AllSlice[T any](slice []T, predicate func(T) bool) bool {
+	for _, v := range slice {
+		if !predicate(v) {
+			return false
+		}
+	}
+	return true
+}
+
+// AnySlice 检查是否有任何元素满足条件
+func AnySlice[T any](slice []T, predicate func(T) bool) bool {
+	for _, v := range slice {
+		if predicate(v) {
+			return true
+		}
+	}
+	return false
+}
+
+// NoneSlice 检查是否没有元素满足条件
+func NoneSlice[T any](slice []T, predicate func(T) bool) bool {
+	return !AnySlice(slice, predicate)
+}
+
+// CountSlice 计算满足条件的元素数量
+func CountSlice[T any](slice []T, predicate func(T) bool) int {
+	count := 0
+	for _, v := range slice {
+		if predicate(v) {
+			count++
+		}
+	}
+	return count
+}
+
+// IndexOfSlice 返回元素在切片中的索引，不存在返回 -1
+func IndexOfSlice[T comparable](slice []T, item T) int {
+	for i, v := range slice {
+		if v == item {
+			return i
+		}
+	}
+	return -1
+}
+
+// LastIndexOfSlice 返回元素在切片中最后一次出现的索引，不存在返回 -1
+func LastIndexOfSlice[T comparable](slice []T, item T) int {
+	for i := len(slice) - 1; i >= 0; i-- {
+		if slice[i] == item {
+			return i
+		}
+	}
+	return -1
+}
+
+// RemoveSliceAt 移除指定索引的元素
+func RemoveSliceAt[T any](slice []T, index int) []T {
+	if index < 0 || index >= len(slice) {
+		return slice
+	}
+	return append(slice[:index], slice[index+1:]...)
+}
+
+// ContainsAnySlice 检查切片是否包含任意一个指定元素
+func ContainsAnySlice[T comparable](slice []T, items ...T) bool {
+	for _, item := range items {
+		if SliceContainsComparable(slice, item) {
+			return true
+		}
+	}
+	return false
+}
+
+// ContainsAllSlice 检查切片是否包含所有指定元素
+func ContainsAllSlice[T comparable](slice []T, items ...T) bool {
+	for _, item := range items {
+		if !SliceContainsComparable(slice, item) {
+			return false
+		}
+	}
+	return true
+}
+
+// UniqueSliceBy 使用自定义键函数去重
+// keyFunc 用于提取每个元素的唯一标识
+func UniqueSliceBy[T any, K comparable](slice []T, keyFunc func(T) K) []T {
+	if len(slice) == 0 {
+		return slice
+	}
+
+	seen := make(map[K]struct{}, len(slice))
+	result := make([]T, 0, len(slice))
+
+	for _, item := range slice {
+		key := keyFunc(item)
+		if _, exists := seen[key]; !exists {
+			seen[key] = struct{}{}
+			result = append(result, item)
+		}
+	}
+
+	return result
+}
+
+// AddUniqueSlice 向切片中添加元素（如果不存在）
+// 返回新切片和是否实际添加了元素
+func AddUniqueSlice[T comparable](slice []T, items ...T) ([]T, bool) {
+	if len(items) == 0 {
+		return slice, false
+	}
+
+	// 构建已存在元素的集合
+	existing := make(map[T]struct{}, len(slice))
+	for _, item := range slice {
+		existing[item] = struct{}{}
+	}
+
+	// 添加新元素
+	added := false
+	for _, item := range items {
+		if _, exists := existing[item]; !exists {
+			slice = append(slice, item)
+			existing[item] = struct{}{}
+			added = true
+		}
+	}
+
+	return slice, added
+}
+
+// EqualUnorderedSlice 检查两个切片是否包含相同元素（忽略顺序）
+func EqualUnorderedSlice[T comparable](a, b []T) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	aCount := make(map[T]int, len(a))
+	for _, item := range a {
+		aCount[item]++
+	}
+
+	bCount := make(map[T]int, len(b))
+	for _, item := range b {
+		bCount[item]++
+	}
+
+	for k, v := range aCount {
+		if bCount[k] != v {
+			return false
+		}
+	}
+
+	return true
+}

@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-11-23 00:00:00
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-11-23 09:00:15
+ * @LastEditTime: 2025-12-11 21:28:15
  * @FilePath: \go-toolbox\pkg\mathx\chain_test.go
  * @Description: 链式条件构建器测试 - 全面覆盖所有功能
  *
@@ -13,8 +13,18 @@ package mathx
 
 import (
 	"errors"
-	"github.com/stretchr/testify/assert"
+	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
+const (
+	conditionFalseTestName   = "condition false"
+	alreadyExecutedTestName  = "already executed"
+	conditionTrueNotExecuted = "condition true, not executed"
+	nilActionTestName        = "nil action"
+	hasReturnValueTestName   = "has return value"
 )
 
 // TestNewIFChain 测试创建新的链式构建器
@@ -58,7 +68,7 @@ func TestIFChainBuilderWhen(t *testing.T) {
 		assert.Equal(t, chain, condition.chain)
 	})
 
-	t.Run("condition false", func(t *testing.T) {
+	t.Run(conditionFalseTestName, func(t *testing.T) {
 		chain := NewIFChain[int]()
 		condition := chain.When(false)
 		assert.NotNil(t, condition)
@@ -66,7 +76,7 @@ func TestIFChainBuilderWhen(t *testing.T) {
 		assert.Equal(t, chain, condition.chain)
 	})
 
-	t.Run("already executed", func(t *testing.T) {
+	t.Run(alreadyExecutedTestName, func(t *testing.T) {
 		chain := NewIFChain[int]()
 		chain.executed = true
 		condition := chain.When(true)
@@ -90,7 +100,7 @@ func TestIFChainBuilderConditionThen(t *testing.T) {
 
 // TestIFChainBuilderConditionThenReturn 测试 ThenReturn 方法
 func TestIFChainBuilderConditionThenReturn(t *testing.T) {
-	t.Run("condition true, not executed", func(t *testing.T) {
+	t.Run(conditionTrueNotExecuted, func(t *testing.T) {
 		executed := false
 		chain := NewIFChain[int]()
 		result := chain.When(true).ThenReturn(42, func() {
@@ -114,7 +124,7 @@ func TestIFChainBuilderConditionThenReturn(t *testing.T) {
 		assert.Equal(t, 42, chain.returnValue)
 	})
 
-	t.Run("condition false", func(t *testing.T) {
+	t.Run(conditionFalseTestName, func(t *testing.T) {
 		executed := false
 		chain := NewIFChain[int]()
 		result := chain.When(false).ThenReturn(42, func() {
@@ -128,7 +138,7 @@ func TestIFChainBuilderConditionThenReturn(t *testing.T) {
 		assert.Zero(t, chain.returnValue)
 	})
 
-	t.Run("already executed", func(t *testing.T) {
+	t.Run(alreadyExecutedTestName, func(t *testing.T) {
 		executed := false
 		chain := NewIFChain[int]()
 		chain.executed = true
@@ -140,7 +150,7 @@ func TestIFChainBuilderConditionThenReturn(t *testing.T) {
 		assert.False(t, executed) // 不应该执行
 	})
 
-	t.Run("nil action", func(t *testing.T) {
+	t.Run(nilActionTestName, func(t *testing.T) {
 		chain := NewIFChain[int]()
 		result := chain.When(true).ThenReturn(42, nil)
 
@@ -174,7 +184,7 @@ func TestIFChainBuilderConditionThenReturnNil(t *testing.T) {
 		assert.Nil(t, chain.returnValue)
 	})
 
-	t.Run("condition false", func(t *testing.T) {
+	t.Run(conditionFalseTestName, func(t *testing.T) {
 		chain := NewIFChain[*string]()
 		result := chain.When(false).ThenReturnNil(func() {})
 
@@ -185,7 +195,7 @@ func TestIFChainBuilderConditionThenReturnNil(t *testing.T) {
 
 // TestIFChainBuilderActionReturn 测试 Return 方法
 func TestIFChainBuilderActionReturn(t *testing.T) {
-	t.Run("condition true, not executed", func(t *testing.T) {
+	t.Run(conditionTrueNotExecuted, func(t *testing.T) {
 		executed := false
 		chain := NewIFChain[int]()
 		result := chain.When(true).Then(func() {
@@ -199,7 +209,7 @@ func TestIFChainBuilderActionReturn(t *testing.T) {
 		assert.Equal(t, 42, chain.returnValue)
 	})
 
-	t.Run("condition false", func(t *testing.T) {
+	t.Run(conditionFalseTestName, func(t *testing.T) {
 		executed := false
 		chain := NewIFChain[int]()
 		result := chain.When(false).Then(func() {
@@ -213,7 +223,7 @@ func TestIFChainBuilderActionReturn(t *testing.T) {
 		assert.Zero(t, chain.returnValue)
 	})
 
-	t.Run("already executed", func(t *testing.T) {
+	t.Run(alreadyExecutedTestName, func(t *testing.T) {
 		executed := false
 		chain := NewIFChain[int]()
 		chain.executed = true
@@ -225,7 +235,7 @@ func TestIFChainBuilderActionReturn(t *testing.T) {
 		assert.False(t, executed)
 	})
 
-	t.Run("nil action", func(t *testing.T) {
+	t.Run(nilActionTestName, func(t *testing.T) {
 		chain := NewIFChain[int]()
 		result := chain.When(true).Then(nil).Return(42)
 
@@ -247,7 +257,7 @@ func TestIFChainBuilderActionReturnNil(t *testing.T) {
 
 // TestIFChainBuilderActionContinueChain 测试 ContinueChain 方法
 func TestIFChainBuilderActionContinueChain(t *testing.T) {
-	t.Run("condition true, not executed", func(t *testing.T) {
+	t.Run(conditionTrueNotExecuted, func(t *testing.T) {
 		executed := false
 		chain := NewIFChain[int]()
 		result := chain.When(true).Then(func() {
@@ -259,7 +269,7 @@ func TestIFChainBuilderActionContinueChain(t *testing.T) {
 		assert.False(t, chain.executed) // ContinueChain 不设置 executed
 	})
 
-	t.Run("condition false", func(t *testing.T) {
+	t.Run(conditionFalseTestName, func(t *testing.T) {
 		executed := false
 		chain := NewIFChain[int]()
 		result := chain.When(false).Then(func() {
@@ -270,7 +280,7 @@ func TestIFChainBuilderActionContinueChain(t *testing.T) {
 		assert.False(t, executed)
 	})
 
-	t.Run("already executed", func(t *testing.T) {
+	t.Run(alreadyExecutedTestName, func(t *testing.T) {
 		executed := false
 		chain := NewIFChain[int]()
 		chain.executed = true
@@ -282,7 +292,7 @@ func TestIFChainBuilderActionContinueChain(t *testing.T) {
 		assert.False(t, executed)
 	})
 
-	t.Run("nil action", func(t *testing.T) {
+	t.Run(nilActionTestName, func(t *testing.T) {
 		chain := NewIFChain[int]()
 		result := chain.When(true).Then(nil).ContinueChain()
 
@@ -293,7 +303,7 @@ func TestIFChainBuilderActionContinueChain(t *testing.T) {
 
 // TestIFChainBuilderExecute 测试 Execute 方法
 func TestIFChainBuilderExecute(t *testing.T) {
-	t.Run("has return value", func(t *testing.T) {
+	t.Run(hasReturnValueTestName, func(t *testing.T) {
 		chain := NewIFChain[int]()
 		chain.When(true).ThenReturn(42)
 
@@ -314,7 +324,7 @@ func TestIFChainBuilderExecute(t *testing.T) {
 
 // TestIFChainBuilderMustExecute 测试 MustExecute 方法
 func TestIFChainBuilderMustExecute(t *testing.T) {
-	t.Run("has return value", func(t *testing.T) {
+	t.Run(hasReturnValueTestName, func(t *testing.T) {
 		chain := NewIFChain[int]()
 		chain.When(true).ThenReturn(42)
 
@@ -334,7 +344,7 @@ func TestIFChainBuilderMustExecute(t *testing.T) {
 
 // TestIFChainBuilderExecuteOr 测试 ExecuteOr 方法
 func TestIFChainBuilderExecuteOr(t *testing.T) {
-	t.Run("has return value", func(t *testing.T) {
+	t.Run(hasReturnValueTestName, func(t *testing.T) {
 		chain := NewIFChain[int]()
 		chain.When(true).ThenReturn(42)
 
@@ -534,7 +544,9 @@ func TestEdgeCases(t *testing.T) {
 	t.Run("empty action function", func(t *testing.T) {
 		value, hasValue := NewIFChain[int]().
 			When(true).
-			ThenReturn(42, func() {}).
+			ThenReturn(42, func() {
+				// intentionally left empty: no action needed for this test case
+			}).
 			Execute()
 
 		assert.True(t, hasValue)
@@ -603,4 +615,242 @@ func BenchmarkIFChainBuilder(b *testing.B) {
 				Execute()
 		}
 	})
+}
+
+// 通用断言函数
+func assertSliceChainEqual[T comparable](t *testing.T, sc *SliceChain[T], want []T) {
+	t.Helper()
+	assert.Equal(t, want, sc.Data())
+}
+
+func TestSliceChainAppend(t *testing.T) {
+	sc := FromSlice([]int{1, 2}).Append(3, 4)
+	assertSliceChainEqual(t, sc, []int{1, 2, 3, 4})
+
+	// 追加空元素不改变切片
+	sc.Append()
+	assertSliceChainEqual(t, sc, []int{1, 2, 3, 4})
+
+	// 空切片追加元素
+	scEmpty := FromSlice([]int{}).Append(10)
+	assertSliceChainEqual(t, scEmpty, []int{10})
+}
+
+func TestSliceChainUniq(t *testing.T) {
+	tests := []struct {
+		name string
+		data []int
+		want []int
+	}{
+		{"normal", []int{1, 2, 2, 3, 1, 4}, []int{1, 2, 3, 4}},
+		{"empty", []int{}, []int{}},
+		{"single", []int{5}, []int{5}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sc := FromSlice(tt.data)
+			sc.Uniq()
+			assertSliceChainEqual(t, sc, tt.want)
+		})
+	}
+}
+
+func TestSliceChainRemoveValue(t *testing.T) {
+	tests := []struct {
+		name   string
+		data   []string
+		remove string
+		want   []string
+	}{
+		{"remove exists", []string{"a", "b", "a", "c"}, "a", []string{"b", "c"}},
+		{"remove not exists", []string{"b", "c"}, "x", []string{"b", "c"}},
+		{"empty slice", []string{}, "a", []string{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sc := FromSlice(tt.data)
+			sc.RemoveValue(tt.remove)
+			assertSliceChainEqual(t, sc, tt.want)
+		})
+	}
+}
+
+func TestSliceChainRemoveEmpty(t *testing.T) {
+	tests := []struct {
+		name string
+		data []string
+		want []string
+	}{
+		{"mixed empty", []string{"", "a", "", "b"}, []string{"a", "b"}},
+		{"all empty", []string{"", "", ""}, []string{}},
+		{"empty slice", []string{}, []string{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sc := FromSlice(tt.data)
+			sc.RemoveEmpty()
+			assertSliceChainEqual(t, sc, tt.want)
+		})
+	}
+}
+
+func TestSliceChainFilter(t *testing.T) {
+	sc := FromSlice([]int{1, 2, 3, 4, 5})
+	sc.Filter(func(x int) bool { return x%2 == 1 })
+	assertSliceChainEqual(t, sc, []int{1, 3, 5})
+
+	sc.Filter(func(x int) bool { return false })
+	assertSliceChainEqual(t, sc, []int{})
+
+	scEmpty := FromSlice([]int{})
+	scEmpty.Filter(func(x int) bool { return true })
+	assertSliceChainEqual(t, scEmpty, []int{})
+}
+
+func TestSliceChainSort(t *testing.T) {
+	tests := []struct {
+		name string
+		data []int
+		want []int
+	}{
+		{"normal", []int{5, 3, 4, 1, 2}, []int{1, 2, 3, 4, 5}},
+		{"empty", []int{}, []int{}},
+		{"single", []int{42}, []int{42}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sc := FromSlice(tt.data)
+			sc.Sort(func(a, b int) bool { return a < b })
+			assertSliceChainEqual(t, sc, tt.want)
+		})
+	}
+}
+
+func TestSliceChainData(t *testing.T) {
+	original := []string{"x", "y", "z"}
+	sc := FromSlice(original)
+	data := sc.Data()
+	assertSliceChainEqual(t, sc, original)
+
+	// 修改返回切片会影响内部数据，因为是同一引用
+	data[0] = "changed"
+	assertSliceChainEqual(t, sc, data)
+}
+
+func TestSliceChainChainUsage(t *testing.T) {
+	sc := FromSlice([]int{5, 3, 3, 2, 1, 1, 4})
+
+	// 链式调用模拟
+	ops := []func(*SliceChain[int]) *SliceChain[int]{
+		func(sc *SliceChain[int]) *SliceChain[int] { return sc.Uniq() },
+		func(sc *SliceChain[int]) *SliceChain[int] {
+			return sc.Sort(func(a, b int) bool { return a < b })
+		},
+		func(sc *SliceChain[int]) *SliceChain[int] {
+			return sc.Filter(func(x int) bool { return x > 2 })
+		},
+		func(sc *SliceChain[int]) *SliceChain[int] { return sc.Append(6, 7) },
+		func(sc *SliceChain[int]) *SliceChain[int] { return sc.RemoveValue(3) },
+	}
+
+	for _, op := range ops {
+		sc = op(sc)
+	}
+
+	assertSliceChainEqual(t, sc, []int{4, 5, 6, 7})
+}
+
+// 并发安全测试
+func TestSliceChainConcurrentSafety(t *testing.T) {
+	sc := FromSlice([]int{})
+
+	var wg sync.WaitGroup
+	concurrency := 50
+
+	for i := 0; i < concurrency; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			sc.Append(id)
+			sc.RemoveValue(id - 1)                        // 尝试移除不存在的元素，测试稳定性
+			sc.Filter(func(x int) bool { return x >= 0 }) // 过滤所有元素（不过滤）
+			sc.Uniq()
+		}(i)
+	}
+
+	wg.Wait()
+
+	// 最终切片元素个数不超过并发数，且无重复
+	data := sc.Data()
+	seen := make(map[int]struct{})
+	for _, v := range data {
+		if _, ok := seen[v]; ok {
+			t.Errorf("duplicate element detected: %v", v)
+		}
+		seen[v] = struct{}{}
+	}
+	assert.LessOrEqual(t, len(data), concurrency)
+}
+
+// 性能基准测试
+
+func BenchmarkSliceChainAppend(b *testing.B) {
+	sc := FromSlice([]int{})
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		sc.Append(i)
+	}
+}
+
+func BenchmarkSliceChainRemoveValue(b *testing.B) {
+	// 预填充大量数据
+	data := make([]int, 10000)
+	for i := range data {
+		data[i] = i % 100 // 0~99重复
+	}
+	sc := FromSlice(data)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		sc.RemoveValue(i % 100)
+	}
+}
+
+func BenchmarkSliceChainUniq(b *testing.B) {
+	data := make([]int, 10000)
+	for i := range data {
+		data[i] = i % 1000 // 0~999重复
+	}
+	sc := FromSlice(data)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		sc.Uniq()
+	}
+}
+
+func BenchmarkSliceChainFilter(b *testing.B) {
+	data := make([]int, 10000)
+	for i := range data {
+		data[i] = i
+	}
+	sc := FromSlice(data)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		sc.Filter(func(x int) bool { return x%2 == 0 })
+	}
+}
+
+func BenchmarkSliceChainSort(b *testing.B) {
+	data := make([]int, 10000)
+	for i := range data {
+		data[i] = 10000 - i
+	}
+	sc := FromSlice(data)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		sc.Sort(func(a, b int) bool { return a < b })
+	}
 }

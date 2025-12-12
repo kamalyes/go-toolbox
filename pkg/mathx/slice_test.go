@@ -2,21 +2,27 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-11 15:55:06
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-11-29 13:03:31
- * @FilePath: \go-toolbox\tests\mathx_slice_test.go
+ * @LastEditTime: 2025-12-11 21:28:15
+ * @FilePath: \go-toolbox\pkg\mathx\slice_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package mathx
 
 import (
 	"errors"
+	"math/rand"
 	"testing"
+	"time"
 
-	"github.com/kamalyes/go-toolbox/pkg/mathx"
 	"github.com/kamalyes/go-toolbox/pkg/types"
 	"github.com/stretchr/testify/assert"
+)
+
+const (
+	expectedSlicesEqual     = "Expected slices to be equal"
+	expectedSlicesDifferent = "Expected slices to be different"
 )
 
 // TestSliceMinMax 测试 SliceMinMax 函数
@@ -28,15 +34,15 @@ func TestSliceMinMax(t *testing.T) {
 		expected  int
 		expectErr bool
 	}{
-		{"Empty list", []int{}, mathx.AtLeast[int], 0, true},
-		{"Single element", []int{5}, mathx.AtMost[int], 5, false},
-		{"Multiple elements - Min", []int{3, 1, 4, 1, 5, 9}, mathx.AtLeast[int], 1, false},
-		{"Multiple elements - Max", []int{3, 1, 4, 1, 5, 9}, mathx.AtMost[int], 9, false},
+		{"Empty list", []int{}, AtLeast[int], 0, true},
+		{"Single element", []int{5}, AtMost[int], 5, false},
+		{"Multiple elements - Min", []int{3, 1, 4, 1, 5, 9}, AtLeast[int], 1, false},
+		{"Multiple elements - Max", []int{3, 1, 4, 1, 5, 9}, AtMost[int], 9, false},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			result, err := mathx.SliceMinMax(test.list, test.f)
+			result, err := SliceMinMax(test.list, test.f)
 			if test.expectErr {
 				assert.Error(t, err) // 断言期望错误
 			} else {
@@ -73,8 +79,8 @@ func TestSliceAtMostAtLeast(t *testing.T) {
 				max = tt.list[0]
 
 				for _, v := range tt.list {
-					min = mathx.AtLeast(min, v)
-					max = mathx.AtMost(max, v)
+					min = AtLeast(min, v)
+					max = AtMost(max, v)
 				}
 			}
 
@@ -105,7 +111,7 @@ func TestSliceUnion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := mathx.SliceUnion(tt.a, tt.b)
+			result := SliceUnion(tt.a, tt.b)
 			assert.ElementsMatch(t, tt.want, result)
 		})
 	}
@@ -117,16 +123,16 @@ func TestSliceEqual(t *testing.T) {
 	intSlice2 := []int{1, 2, 3, 4, 5}
 	intSlice3 := []int{1, 2, 3, 4, 6}
 
-	assert.True(t, mathx.SliceEqual(intSlice1, intSlice2), "Expected slices to be equal")
-	assert.False(t, mathx.SliceEqual(intSlice1, intSlice3), "Expected slices to be different")
+	assert.True(t, SliceEqual(intSlice1, intSlice2), expectedSlicesEqual)
+	assert.False(t, SliceEqual(intSlice1, intSlice3), expectedSlicesDifferent)
 
 	// 测试字符串切片
 	strSlice1 := []string{"a", "b", "c"}
 	strSlice2 := []string{"a", "b", "c"}
 	strSlice3 := []string{"a", "b", "d"}
 
-	assert.True(t, mathx.SliceEqual(strSlice1, strSlice2), "Expected slices to be equal")
-	assert.False(t, mathx.SliceEqual(strSlice1, strSlice3), "Expected slices to be different")
+	assert.True(t, SliceEqual(strSlice1, strSlice2), expectedSlicesEqual)
+	assert.False(t, SliceEqual(strSlice1, strSlice3), expectedSlicesDifferent)
 
 	// 测试自定义结构体切片
 	type Person struct {
@@ -138,8 +144,8 @@ func TestSliceEqual(t *testing.T) {
 	personSlice2 := []Person{{Name: "Alice", Age: 30}, {Name: "Bob", Age: 25}}
 	personSlice3 := []Person{{Name: "Charlie", Age: 35}}
 
-	assert.True(t, mathx.SliceEqual(personSlice1, personSlice2), "Expected slices to be equal")
-	assert.False(t, mathx.SliceEqual(personSlice1, personSlice3), "Expected slices to be different")
+	assert.True(t, SliceEqual(personSlice1, personSlice2), "Expected slices to be equal")
+	assert.False(t, SliceEqual(personSlice1, personSlice3), "Expected slices to be different")
 }
 
 // TestSliceFisherYates 测试 Fisher-Yates 洗牌算法
@@ -158,14 +164,14 @@ func TestSliceFisherYates(t *testing.T) {
 			copy(testSlice, original)
 
 			// 调用洗牌函数，设置最大重试次数为 100
-			err := mathx.SliceFisherYates(testSlice, 100)
+			err := SliceFisherYates(testSlice, 100)
 			if err != nil {
 				t.Errorf("Error during shuffling: %v", err)
 				continue // 继续进行下一个测试
 			}
 
 			// 检查洗牌后的数组是否与原数组相同
-			if !mathx.SliceEqual(original, testSlice) {
+			if !SliceEqual(original, testSlice) {
 				shuffledCount++
 			}
 		}
@@ -189,7 +195,7 @@ func TestSliceQuickSortInPlace(t *testing.T) {
 
 	for _, test := range tests {
 		// 调用快速排序
-		mathx.InsertionSort(test.input)
+		InsertionSort(test.input)
 
 		// 使用 assert 验证排序结果
 		assert.Equal(t, test.expected, test.input, "InsertionSort(%v) = %v; expected %v", test.input, test.input, test.expected)
@@ -213,7 +219,7 @@ func TestQuickSort(t *testing.T) {
 		arr := make([]int, len(test.input))
 		copy(arr, test.input)
 
-		mathx.QuickSort(arr, 0, len(arr)-1)
+		QuickSort(arr, 0, len(arr)-1)
 
 		// 使用 assert 进行验证
 		assert.Equal(t, test.expected, arr, "对于输入 %v，期望 %v，但得到 %v", test.input, test.expected, arr)
@@ -237,7 +243,7 @@ func TestBubbleSort(t *testing.T) {
 		arr := make([]int, len(test.input))
 		copy(arr, test.input)
 
-		mathx.BubbleSort(arr)
+		BubbleSort(arr)
 
 		// 使用 assert 进行验证
 		assert.Equal(t, test.expected, arr, "对于输入 %v，期望 %v，但得到 %v", test.input, test.expected, arr)
@@ -314,43 +320,43 @@ func TestSliceContains(t *testing.T) {
 			// 使用类型断言来调用 SliceContains
 			switch s := tt.slice.(type) {
 			case []int:
-				result := mathx.SliceContains(s, tt.element.(int))
+				result := SliceContains(s, tt.element.(int))
 				assert.Equal(t, tt.expected, result)
 			case []int8:
-				result := mathx.SliceContains(s, tt.element.(int8))
+				result := SliceContains(s, tt.element.(int8))
 				assert.Equal(t, tt.expected, result)
 			case []int16:
-				result := mathx.SliceContains(s, tt.element.(int16))
+				result := SliceContains(s, tt.element.(int16))
 				assert.Equal(t, tt.expected, result)
 			case []int32:
-				result := mathx.SliceContains(s, tt.element.(int32))
+				result := SliceContains(s, tt.element.(int32))
 				assert.Equal(t, tt.expected, result)
 			case []int64:
-				result := mathx.SliceContains(s, tt.element.(int64))
+				result := SliceContains(s, tt.element.(int64))
 				assert.Equal(t, tt.expected, result)
 			case []uint:
-				result := mathx.SliceContains(s, tt.element.(uint))
+				result := SliceContains(s, tt.element.(uint))
 				assert.Equal(t, tt.expected, result)
 			case []uint8:
-				result := mathx.SliceContains(s, tt.element.(uint8))
+				result := SliceContains(s, tt.element.(uint8))
 				assert.Equal(t, tt.expected, result)
 			case []uint16:
-				result := mathx.SliceContains(s, tt.element.(uint16))
+				result := SliceContains(s, tt.element.(uint16))
 				assert.Equal(t, tt.expected, result)
 			case []uint32:
-				result := mathx.SliceContains(s, tt.element.(uint32))
+				result := SliceContains(s, tt.element.(uint32))
 				assert.Equal(t, tt.expected, result)
 			case []uint64:
-				result := mathx.SliceContains(s, tt.element.(uint64))
+				result := SliceContains(s, tt.element.(uint64))
 				assert.Equal(t, tt.expected, result)
 			case []float32:
-				result := mathx.SliceContains(s, tt.element.(float32))
+				result := SliceContains(s, tt.element.(float32))
 				assert.Equal(t, tt.expected, result)
 			case []float64:
-				result := mathx.SliceContains(s, tt.element.(float64))
+				result := SliceContains(s, tt.element.(float64))
 				assert.Equal(t, tt.expected, result)
 			case []string:
-				result := mathx.SliceContains(s, tt.element.(string))
+				result := SliceContains(s, tt.element.(string))
 				assert.Equal(t, tt.expected, result)
 			default:
 				t.Fatalf("unsupported slice type %T", s)
@@ -373,7 +379,7 @@ func TestSliceHasDuplicates(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := mathx.SliceHasDuplicates(tt.slice)
+			result := SliceHasDuplicates(tt.slice)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -393,7 +399,7 @@ func TestSliceRemoveEmpty(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := mathx.SliceRemoveEmpty(tt.slice)
+			result := SliceRemoveEmpty(tt.slice)
 			assert.ElementsMatch(t, tt.expected, result)
 		})
 	}
@@ -413,7 +419,7 @@ func TestSliceRemoveDuplicates(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := mathx.SliceRemoveDuplicates(tt.slice)
+			result := SliceRemoveDuplicates(tt.slice)
 			assert.ElementsMatch(t, tt.expected, result)
 		})
 	}
@@ -433,7 +439,7 @@ func TestSliceRemoveZero(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := mathx.SliceRemoveZero(tt.slice)
+			result := SliceRemoveZero(tt.slice)
 			assert.ElementsMatch(t, tt.expected, result)
 		})
 	}
@@ -452,7 +458,7 @@ func TestSliceRemoveValue(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := mathx.SliceRemoveValue(test.input, test.value)
+		result := SliceRemoveValue(test.input, test.value)
 		assert.ElementsMatch(t, test.expected, result)
 	}
 }
@@ -473,7 +479,7 @@ func TestSliceChunk(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := mathx.SliceChunk(tt.slice, tt.size)
+			result := SliceChunk(tt.slice, tt.size)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -498,7 +504,7 @@ func TestSliceDiffSetStrings(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		result := mathx.SliceDiffSetSorted(tc.arr1, tc.arr2)
+		result := SliceDiffSetSorted(tc.arr1, tc.arr2)
 		assert.ElementsMatch(t, tc.want, result, "SliceDiffSetSorted(%v, %v) = %v; want %v", tc.arr1, tc.arr2, result, tc.want)
 	}
 }
@@ -516,7 +522,7 @@ func TestSliceDiffSetInts(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		result := mathx.SliceDiffSetSorted(tc.arr1, tc.arr2)
+		result := SliceDiffSetSorted(tc.arr1, tc.arr2)
 		assert.ElementsMatch(t, tc.want, result, "SliceDiffSet(%v, %v) = %v; want %v", tc.arr1, tc.arr2, result, tc.want)
 	}
 }
@@ -533,7 +539,7 @@ func TestSliceDiffSetFloats(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		result := mathx.SliceDiffSetSorted(tc.arr1, tc.arr2)
+		result := SliceDiffSetSorted(tc.arr1, tc.arr2)
 		assert.ElementsMatch(t, tc.want, result, "SliceDiffSet(%v, %v) = %v; want %v", tc.arr1, tc.arr2, result, tc.want)
 	}
 }
@@ -553,7 +559,7 @@ func TestSliceUniq(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			result := mathx.SliceUniq(test.input)
+			result := SliceUniq(test.input)
 			assert.Equal(t, test.expected, result)
 		})
 	}
@@ -575,7 +581,7 @@ func TestSliceDiff(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			result1, result2 := mathx.SliceDiff(test.list1, test.list2)
+			result1, result2 := SliceDiff(test.list1, test.list2)
 			assert.Equal(t, test.expected1, result1)
 			assert.Equal(t, test.expected2, result2)
 		})
@@ -597,7 +603,7 @@ func TestSliceWithout(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			result := mathx.SliceWithout(test.input, test.exclude...)
+			result := SliceWithout(test.input, test.exclude...)
 			assert.Equal(t, test.expected, result)
 		})
 	}
@@ -618,7 +624,7 @@ func TestSliceIntersect(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			result := mathx.SliceIntersect(test.list1, test.list2)
+			result := SliceIntersect(test.list1, test.list2)
 			assert.Equal(t, test.expected, result)
 		})
 	}
@@ -627,7 +633,7 @@ func TestSliceIntersect(t *testing.T) {
 // 简化RepeatField测试函数
 func runRepeatTest[T any](t *testing.T, name string, field T, count int, want []T) {
 	t.Run(name, func(t *testing.T) {
-		got := mathx.RepeatField(field, count)
+		got := RepeatField(field, count)
 		assert.Equal(t, want, got)
 	})
 }
@@ -662,7 +668,7 @@ func TestRepeatField(t *testing.T) {
 	// 指针类型
 	pPtr := &Person{"Bob", 25}
 	t.Run("pointer 3 times", func(t *testing.T) {
-		got := mathx.RepeatField(pPtr, 3)
+		got := RepeatField(pPtr, 3)
 		want := []*Person{pPtr, pPtr, pPtr}
 		assert.Equal(t, want, got)
 	})
@@ -714,7 +720,7 @@ func TestRepeatField(t *testing.T) {
 	b := true
 	bp := &b
 	t.Run("bool pointer 2 times", func(t *testing.T) {
-		got := mathx.RepeatField(bp, 2)
+		got := RepeatField(bp, 2)
 		want := []*bool{bp, bp}
 		assert.Equal(t, want, got)
 	})
@@ -787,11 +793,11 @@ func TestSliceContainsComparable(t *testing.T) {
 
 			switch s := tt.slice.(type) {
 			case []string:
-				result = mathx.SliceContainsComparable(s, tt.element.(string))
+				result = SliceContainsComparable(s, tt.element.(string))
 			case []int:
-				result = mathx.SliceContainsComparable(s, tt.element.(int))
+				result = SliceContainsComparable(s, tt.element.(int))
 			case []TestStatus:
-				result = mathx.SliceContainsComparable(s, tt.element.(TestStatus))
+				result = SliceContainsComparable(s, tt.element.(TestStatus))
 			}
 
 			if result != tt.expected {
@@ -808,19 +814,19 @@ func BenchmarkSliceContainsComparable(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		mathx.SliceContainsComparable(slice, element)
+		SliceContainsComparable(slice, element)
 	}
 }
 
 // 与原有遍历方式的对比测试
-func BenchmarkSliceContainsComparable_vs_ManualLoop(b *testing.B) {
+func BenchmarkSliceContainsComparablevsManualLoop(b *testing.B) {
 	slice := []TestStatus{StatusActive, StatusInactive, StatusPending}
 	element := StatusPending
 
 	// 测试新函数
 	b.Run("SliceContainsComparable", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			mathx.SliceContainsComparable(slice, element)
+			SliceContainsComparable(slice, element)
 		}
 	})
 
@@ -837,4 +843,194 @@ func BenchmarkSliceContainsComparable_vs_ManualLoop(b *testing.B) {
 			_ = found
 		}
 	})
+}
+
+// 辅助函数：生成随机整数
+func randInt(min, max int) int {
+	if max == min {
+		return min
+	}
+	if max < min {
+		min, max = max, min
+	}
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	return r.Intn(max-min) + min
+}
+
+// 辅助函数：生成随机数字切片
+func randNumericalLargeSlice[T int](largeSize ...int) []T {
+	defaultSliceSize := 1000
+	if len(largeSize) > 0 {
+		defaultSliceSize = largeSize[0]
+	}
+	slice := make([]T, defaultSliceSize)
+	for i := 0; i < defaultSliceSize; i++ {
+		slice[i] = T(i % 100) // 重复一些值以测试去重和重复检查
+	}
+	return slice
+}
+
+// 基准测试 SliceMinMax
+func BenchmarkSliceMinMax(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		list := randNumericalLargeSlice()
+		minMaxFunc := func(a, b int) int {
+			if a < b {
+				return a
+			}
+			return b
+		}
+		_, err := SliceMinMax(list, minMaxFunc)
+		if err != nil {
+			b.Fatalf("expected no error, got %v", err)
+		}
+	}
+}
+
+// 基准测试 SliceDiffSet
+func BenchmarkSliceDiffSet(b *testing.B) {
+
+	for i := 0; i < b.N; i++ {
+		arr1 := randNumericalLargeSlice(200)
+		arr2 := randNumericalLargeSlice(200)
+
+		for i := 0; i < len(arr2); i++ {
+			arr2[i] = i + len(arr1)/2 // 使得部分重叠
+		}
+		_ = SliceDiffSetSorted(arr1, arr2)
+	}
+}
+
+// 基准测试 SliceUnion
+func BenchmarkSliceUnion(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		arr1 := randNumericalLargeSlice(200)
+		arr2 := randNumericalLargeSlice(200)
+
+		for i := 0; i < len(arr1); i++ {
+			arr2[i] = i + len(arr1)/2 // 使得部分重叠
+		}
+
+		_ = SliceUnion(arr1, arr2)
+	}
+}
+
+// 基准测试 SliceContains = 300
+func BenchmarkSliceContains300(b *testing.B) {
+
+	for i := 0; i < b.N; i++ {
+		intSlice := randNumericalLargeSlice(300)
+
+		for i := 0; i < len(intSlice); i++ {
+			intSlice[i] = i + len(intSlice)/2 // 使得部分重叠
+		}
+
+		element := randInt(len(intSlice)/2, len(intSlice)*2) // 测试查找的元素
+		_ = SliceContains(intSlice, element)
+	}
+}
+
+// 基准测试 SliceContains = 3000
+func BenchmarkSliceContains3000(b *testing.B) {
+
+	for i := 0; i < b.N; i++ {
+		intSlice := randNumericalLargeSlice(3000)
+
+		for i := 0; i < len(intSlice); i++ {
+			intSlice[i] = i + len(intSlice)/2 // 使得部分重叠
+		}
+
+		element := randInt(len(intSlice)/2, len(intSlice)*2) // 测试查找的元素
+		_ = SliceContains(intSlice, element)
+	}
+}
+
+// 基准测试 SliceContains > 3000
+func BenchmarkSliceContains20000(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		intSlice := randNumericalLargeSlice(20000)
+
+		for i := 0; i < len(intSlice); i++ {
+			intSlice[i] = i + len(intSlice)/2 // 使得部分重叠
+		}
+
+		element := randInt(len(intSlice)/2, len(intSlice)*2) // 测试查找的元素
+
+		_ = SliceContains(intSlice, element)
+	}
+}
+
+// 基准测试 SliceHasDuplicates
+func BenchmarkSliceHasDuplicates(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		intSlice := randNumericalLargeSlice(20000)
+		_ = SliceHasDuplicates(intSlice)
+	}
+}
+
+// 基准测试 SliceRemoveEmpty
+func BenchmarkSliceRemoveEmpty(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		defaultSliceSize := 10000
+		intSlice := make([]interface{}, defaultSliceSize)
+		for i := 0; i < defaultSliceSize; i++ {
+			if i%10 == 0 {
+				intSlice[i] = nil // 每10个元素放一个空值
+			} else {
+				intSlice[i] = i
+			}
+		}
+		_ = SliceRemoveEmpty(intSlice)
+	}
+}
+
+// 基准测试 SliceRemoveDuplicates
+func BenchmarkSliceRemoveDuplicates(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		intSlice := randNumericalLargeSlice()
+		_ = SliceRemoveDuplicates(intSlice)
+	}
+}
+
+// 基准测试 SliceRemoveZero
+func BenchmarkSliceRemoveZero(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		defaultSliceSize := 1000
+		arr := make([]int, defaultSliceSize)
+		for i := 0; i < defaultSliceSize; i++ {
+			arr[i] = i % 10 // 生成一些零值
+		}
+		_ = SliceRemoveZero(arr)
+	}
+}
+
+// 基准测试 SliceChunk
+func BenchmarkSliceChunk(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		slice := randNumericalLargeSlice()
+		size := 1000 // 每个子切片的大小
+		_ = SliceChunk(slice, size)
+	}
+}
+
+func BenchmarkInsertionSort100(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		slice := randNumericalLargeSlice(100)
+		InsertionSort(slice)
+	}
+}
+
+func BenchmarkQuickSort100(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		slice := randNumericalLargeSlice(100)
+		QuickSort(slice, 0, len(slice)-1)
+	}
+}
+
+func BenchmarkBubbleSort100(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		// 生成随机数组
+		slice := randNumericalLargeSlice(100)
+		BubbleSort(slice)
+	}
 }

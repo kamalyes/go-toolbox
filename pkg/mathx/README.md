@@ -37,6 +37,7 @@ value := mathx.IfSafeIndex(slice, index, "默认值")
 ### 基础三元运算
 
 #### `IF[T any](condition bool, trueVal, falseVal T) T`
+
 基础的三元运算符，类似于 `condition ? trueVal : falseVal`。
 
 ```go
@@ -46,6 +47,7 @@ status := mathx.IF(age >= 18, "成年人", "未成年人")
 ```
 
 #### `IfNotNil[T any](val *T, defaultVal T) T`
+
 空指针检查，如果指针不为 nil 则返回指针值，否则返回默认值。
 
 ```go
@@ -59,6 +61,7 @@ result = mathx.IfNotNil(nilPtr, 100)
 ```
 
 #### `IfNotEmpty(str string, defaultVal string) string`
+
 字符串空值检查。
 
 ```go
@@ -70,6 +73,7 @@ username = mathx.IfNotEmpty("john", "guest")
 ```
 
 #### `IfNotZero[T comparable](val T, defaultVal T) T`
+
 零值检查，支持任意可比较类型。
 
 ```go
@@ -83,6 +87,7 @@ count = mathx.IfNotZero(5, 1)
 ### 集合操作
 
 #### `IfContains[T comparable](slice []T, target T, trueVal, falseVal T) T`
+
 检查切片是否包含指定元素。
 
 ```go
@@ -92,6 +97,7 @@ result := mathx.IfContains(fruits, "banana", "找到了", "没找到")
 ```
 
 #### `IfSafeIndex[T any](slice []T, index int, defaultVal T) T`
+
 安全的切片索引访问。
 
 ```go
@@ -104,6 +110,7 @@ result = mathx.IfSafeIndex(arr, 1, "默认值")
 ```
 
 #### `IfSafeKey[K comparable, V any](m map[K]V, key K, defaultVal V) V`
+
 安全的 map 键访问。
 
 ```go
@@ -122,6 +129,7 @@ timeout := mathx.IfSafeKey(config, "timeout", "30s")
 ### 条件组合
 
 #### `IfAny[T any](conditions []bool, trueVal, falseVal T) T`
+
 任意条件满足时返回真值。
 
 ```go
@@ -131,6 +139,7 @@ result := mathx.IfAny(conditions, "有条件满足", "无条件满足")
 ```
 
 #### `IfAll[T any](conditions []bool, trueVal, falseVal T) T`
+
 所有条件都满足时返回真值。
 
 ```go
@@ -140,6 +149,7 @@ result := mathx.IfAll(conditions, "全部满足", "部分不满足")
 ```
 
 #### `IfCount[T any](conditions []bool, threshold int, trueVal, falseVal T) T`
+
 满足条件的数量达到阈值时返回真值。
 
 ```go
@@ -151,6 +161,7 @@ result := mathx.IfCount(conditions, 2, "达到阈值", "未达到阈值")
 ### 函数式操作
 
 #### `IfMap[T, R any](condition bool, val T, mapper func(T) R, defaultVal R) R`
+
 条件映射转换。
 
 ```go
@@ -160,6 +171,7 @@ result := mathx.IfMap(true, text, strings.ToUpper, "默认值")
 ```
 
 #### `IfMapElse[T, R any](condition bool, val T, trueMapper, falseMapper func(T) R) R`
+
 双向映射转换。
 
 ```go
@@ -169,6 +181,7 @@ result := mathx.IfMapElse(true, text, strings.ToUpper, strings.ToLower)
 ```
 
 #### `IfFilter[T any](useFilter bool, slice []T, predicate func(T) bool) []T`
+
 条件过滤。
 
 ```go
@@ -178,6 +191,7 @@ evens := mathx.IfFilter(true, numbers, func(n int) bool { return n%2 == 0 })
 ```
 
 #### `IfValidate[T, R any](val T, validator func(T) bool, validVal, invalidVal R) R`
+
 验证函数。
 
 ```go
@@ -190,6 +204,7 @@ result := mathx.IfValidate(email, isValid, "有效邮箱", "无效邮箱")
 ### 类型转换
 
 #### `IfCast[R any](val any, defaultVal R) R`
+
 安全的类型转换。
 
 ```go
@@ -202,6 +217,7 @@ result = mathx.IfCast[int](value, 0)
 ```
 
 #### `IfBetween[T int | int64 | float32 | float64](val, min, max T, trueVal, falseVal T) T`
+
 数值区间检查。
 
 ```go
@@ -213,6 +229,7 @@ grade := mathx.IfBetween(score, 80, 100, 90, 60)
 ### 高级功能
 
 #### `IfSwitch[K comparable, V any](key K, cases map[K]V, defaultVal V) V`
+
 开关式选择。
 
 ```go
@@ -227,6 +244,7 @@ message := mathx.IfSwitch(status, cases, "未知状态")
 ```
 
 #### `IfTryParse[T, R any](input T, parser func(T) (R, error), defaultVal R) R`
+
 尝试解析操作。
 
 ```go
@@ -241,6 +259,7 @@ result = mathx.IfTryParse("abc", parser, 0)
 ### 异步操作
 
 #### `IfDoAsync[T any](condition bool, do DoFunc[T], defaultVal T) <-chan T`
+
 异步执行函数。
 
 ```go
@@ -254,6 +273,7 @@ result := <-ch
 ```
 
 #### `IfDoAsyncWithTimeout[T any](condition bool, do DoFunc[T], defaultVal T, timeoutMs int) <-chan T`
+
 带超时的异步执行。
 
 ```go
@@ -269,6 +289,7 @@ result := <-ch
 ### 错误处理
 
 #### `IfDoWithError[T any](condition bool, do DoFuncWithError[T], defaultVal T) (T, error)`
+
 带错误处理的函数执行。
 
 ```go
@@ -279,6 +300,7 @@ result, err := mathx.IfDoWithError(true, func() (int, error) {
 ```
 
 #### `ReturnIfErr[T any](val T, err error) (T, error)`
+
 错误检查简化。
 
 ```go
@@ -289,6 +311,7 @@ return mathx.ReturnIfErr(value, err)
 ### 链式调用
 
 #### 执行链
+
 ```go
 mathx.When(err != nil).
     Then(func() { log.Error("操作失败") }).
@@ -297,6 +320,7 @@ mathx.When(err != nil).
 ```
 
 #### 值链
+
 ```go
 result := mathx.WhenValue(score >= 90).
     ThenReturn("优秀").
@@ -307,6 +331,7 @@ result := mathx.WhenValue(score >= 90).
 ### 实用功能
 
 #### `IfPipeline[T any](condition bool, input T, funcs []func(T) T, defaultVal T) T`
+
 管道式处理。
 
 ```go
@@ -321,6 +346,7 @@ result := mathx.IfPipeline(true, "hello", funcs, "默认值")
 ```
 
 #### `IfLazy[T any](condition bool, trueFn, falseFn func() T) T`
+
 惰性求值。
 
 ```go
@@ -330,6 +356,7 @@ result := mathx.IfLazy(condition,
 ```
 
 #### `IfMemoized[T any](condition bool, key string, cache map[string]T, computeFn func() T, defaultVal T) T`
+
 带缓存的计算。
 
 ```go
@@ -342,6 +369,7 @@ result := mathx.IfMemoized(true, "key1", cache,
 ## 使用场景
 
 ### 1. 配置处理
+
 ```go
 config := map[string]string{
     "env": "production",
@@ -359,6 +387,7 @@ dbHost := mathx.IfSwitch(
 ```
 
 ### 2. 用户输入验证
+
 ```go
 username := mathx.IfNotEmpty(
     strings.TrimSpace(input.Username), 
@@ -369,6 +398,7 @@ age := mathx.IfBetween(input.Age, 0, 150, input.Age, 0)
 ```
 
 ### 3. API 响应处理
+
 ```go
 status := mathx.IfValidate(user, 
     func(u User) bool { return u.IsActive }, 
@@ -385,6 +415,7 @@ response := mathx.IfMap(len(results) > 0, results,
 ```
 
 ### 4. 错误处理
+
 ```go
 mathx.When(err != nil).
     Then(func() {
@@ -428,6 +459,7 @@ MIT License - 详见 [LICENSE](../../LICENSE) 文件。
 ## 更新日志
 
 ### v1.0.0
+
 - 初始版本发布
 - 基础三元运算符功能
 - 泛型支持

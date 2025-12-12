@@ -2,18 +2,18 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-08-03 21:32:26
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-09 10:56:16
- * @FilePath: \go-toolbox\tests\convert_base64_test.go
+ * @LastEditTime: 2025-12-11 21:28:15
+ * @FilePath: \go-toolbox\pkg\convert\base64_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package convert
 
 import (
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/convert"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestB64Encode(t *testing.T) {
@@ -27,13 +27,9 @@ func TestB64Encode(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result, err := convert.B64Encode(test.input)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if result != test.expected {
-			t.Errorf("B64Encode(%s) = %s; want %s", test.input, result, test.expected)
-		}
+		result, err := B64Encode(test.input)
+		assert.NoError(t, err, "B64Encode(%s) returned an error", test.input)
+		assert.Equal(t, test.expected, result, "B64Encode(%s) = %s; want %s", test.input, result, test.expected)
 	}
 }
 
@@ -48,13 +44,11 @@ func TestB64Decode(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result, err := convert.B64Decode(test.input)
+		result, err := B64Decode(test.input)
 		if err != nil {
-			t.Errorf("B64Decode(%s) returned an error: %v", test.input, err)
+			assert.Fail(t, "B64Decode(%s) returned an error: %v", test.input, err)
 			continue
 		}
-		if !equalBytes(result, test.expected) {
-			t.Errorf("B64Decode(%s) = %v; want %v", test.input, result, test.expected)
-		}
+		assert.Equal(t, test.expected, result, "B64Decode(%s) = %v; want %v", test.input, result, test.expected)
 	}
 }

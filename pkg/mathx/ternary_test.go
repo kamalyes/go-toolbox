@@ -2,13 +2,13 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-17 13:20:56
- * @FilePath: \go-toolbox\tests\mathx_ternary_test.go
+ * @LastEditTime: 2025-12-11 21:28:15
+ * @FilePath: \go-toolbox\pkg\mathx\ternary_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package mathx
 
 import (
 	"errors"
@@ -16,9 +16,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kamalyes/go-toolbox/pkg/mathx"
 	"github.com/kamalyes/go-toolbox/pkg/validator"
 	"github.com/stretchr/testify/assert"
+)
+
+const (
+	stringTrueTestName      = "string true"
+	stringFalseTestName     = "string false"
+	intTrueTestName         = "int true"
+	intFalseTestName        = "int false"
+	boolTrueTestName        = "bool true"
+	boolFalseTestName       = "bool false"
+	floatTrueTestName       = "float true"
+	floatFalseTestName      = "float false"
+	customTypeTrueTestName  = "custom type true"
+	customTypeFalseTestName = "custom type false"
 )
 
 // 自定义类型
@@ -34,23 +46,23 @@ func TestIF(t *testing.T) {
 		falseVal  interface{}
 		expected  interface{}
 	}{
-		"condition true":    {60 > 50, "Hello", "World", "Hello"},
-		"condition false":   {15 > 60, "Hello", "World", "World"},
-		"string true":       {true, "Hello", "World", "Hello"},
-		"string false":      {false, "Hello", "World", "World"},
-		"int true":          {true, 10, 20, 10},
-		"int false":         {false, 10, 20, 20},
-		"bool true":         {true, true, false, true},
-		"bool false":        {false, true, false, false},
-		"float true":        {true, 3.14, 2.71, 3.14},
-		"float false":       {false, 3.14, 2.71, 2.71},
-		"custom type true":  {true, IFType{Value: "Hello"}, IFType{Value: "World"}, IFType{Value: "Hello"}},
-		"custom type false": {false, IFType{Value: "Hello"}, IFType{Value: "World"}, IFType{Value: "World"}},
+		"condition true":        {60 > 50, "Hello", "World", "Hello"},
+		"condition false":       {15 > 60, "Hello", "World", "World"},
+		stringTrueTestName:      {true, "Hello", "World", "Hello"},
+		stringFalseTestName:     {false, "Hello", "World", "World"},
+		intTrueTestName:         {true, 10, 20, 10},
+		intFalseTestName:        {false, 10, 20, 20},
+		boolTrueTestName:        {true, true, false, true},
+		boolFalseTestName:       {false, true, false, false},
+		floatTrueTestName:       {true, 3.14, 2.71, 3.14},
+		floatFalseTestName:      {false, 3.14, 2.71, 2.71},
+		customTypeTrueTestName:  {true, IFType{Value: "Hello"}, IFType{Value: "World"}, IFType{Value: "Hello"}},
+		customTypeFalseTestName: {false, IFType{Value: "Hello"}, IFType{Value: "World"}, IFType{Value: "World"}},
 	}
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, mathx.IF(tt.condition, tt.trueVal, tt.falseVal))
+			assert.Equal(t, tt.expected, IF(tt.condition, tt.trueVal, tt.falseVal))
 		})
 	}
 }
@@ -63,21 +75,21 @@ func TestIfDo(t *testing.T) {
 		defaultVal interface{}
 		expected   interface{}
 	}{
-		"string true":       {true, func() interface{} { return "Hello" }, "World", "Hello"},
-		"string false":      {false, func() interface{} { return "Hello" }, "World", "World"},
-		"int true":          {true, func() interface{} { return 100 }, 0, 100},
-		"int false":         {false, func() interface{} { return 100 }, 0, 0},
-		"bool true":         {true, func() interface{} { return true }, false, true},
-		"bool false":        {false, func() interface{} { return true }, false, false},
-		"float true":        {true, func() interface{} { return 3.14 }, 2.71, 3.14},
-		"float false":       {false, func() interface{} { return 3.14 }, 2.71, 2.71},
-		"custom type true":  {true, func() interface{} { return IFType{Value: "Hello"} }, IFType{Value: "World"}, IFType{Value: "Hello"}},
-		"custom type false": {false, func() interface{} { return IFType{Value: "Hello"} }, IFType{Value: "World"}, IFType{Value: "World"}},
+		stringTrueTestName:      {true, func() interface{} { return "Hello" }, "World", "Hello"},
+		stringFalseTestName:     {false, func() interface{} { return "Hello" }, "World", "World"},
+		intTrueTestName:         {true, func() interface{} { return 100 }, 0, 100},
+		intFalseTestName:        {false, func() interface{} { return 100 }, 0, 0},
+		boolTrueTestName:        {true, func() interface{} { return true }, false, true},
+		boolFalseTestName:       {false, func() interface{} { return true }, false, false},
+		floatTrueTestName:       {true, func() interface{} { return 3.14 }, 2.71, 3.14},
+		floatFalseTestName:      {false, func() interface{} { return 3.14 }, 2.71, 2.71},
+		customTypeTrueTestName:  {true, func() interface{} { return IFType{Value: "Hello"} }, IFType{Value: "World"}, IFType{Value: "Hello"}},
+		customTypeFalseTestName: {false, func() interface{} { return IFType{Value: "Hello"} }, IFType{Value: "World"}, IFType{Value: "World"}},
 	}
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, mathx.IfDo(tt.condition, tt.do, tt.defaultVal))
+			assert.Equal(t, tt.expected, IfDo(tt.condition, tt.do, tt.defaultVal))
 		})
 	}
 }
@@ -90,21 +102,21 @@ func TestIfDoAF(t *testing.T) {
 		defaultFunc func() interface{}
 		expected    interface{}
 	}{
-		"string true":       {true, func() interface{} { return "Hello" }, func() interface{} { return "World" }, "Hello"},
-		"string false":      {false, func() interface{} { return "Hello" }, func() interface{} { return "World" }, "World"},
-		"int true":          {true, func() interface{} { return 100 }, func() interface{} { return 0 }, 100},
-		"int false":         {false, func() interface{} { return 100 }, func() interface{} { return 0 }, 0},
-		"bool true":         {true, func() interface{} { return true }, func() interface{} { return false }, true},
-		"bool false":        {false, func() interface{} { return true }, func() interface{} { return false }, false},
-		"float true":        {true, func() interface{} { return 3.14 }, func() interface{} { return 2.71 }, 3.14},
-		"float false":       {false, func() interface{} { return 3.14 }, func() interface{} { return 2.71 }, 2.71},
-		"custom type true":  {true, func() interface{} { return IFType{Value: "Hello"} }, func() interface{} { return IFType{Value: "World"} }, IFType{Value: "Hello"}},
-		"custom type false": {false, func() interface{} { return IFType{Value: "Hello"} }, func() interface{} { return IFType{Value: "World"} }, IFType{Value: "World"}},
+		stringTrueTestName:      {true, func() interface{} { return "Hello" }, func() interface{} { return "World" }, "Hello"},
+		stringFalseTestName:     {false, func() interface{} { return "Hello" }, func() interface{} { return "World" }, "World"},
+		intTrueTestName:         {true, func() interface{} { return 100 }, func() interface{} { return 0 }, 100},
+		intFalseTestName:        {false, func() interface{} { return 100 }, func() interface{} { return 0 }, 0},
+		boolTrueTestName:        {true, func() interface{} { return true }, func() interface{} { return false }, true},
+		boolFalseTestName:       {false, func() interface{} { return true }, func() interface{} { return false }, false},
+		floatTrueTestName:       {true, func() interface{} { return 3.14 }, func() interface{} { return 2.71 }, 3.14},
+		floatFalseTestName:      {false, func() interface{} { return 3.14 }, func() interface{} { return 2.71 }, 2.71},
+		customTypeTrueTestName:  {true, func() interface{} { return IFType{Value: "Hello"} }, func() interface{} { return IFType{Value: "World"} }, IFType{Value: "Hello"}},
+		customTypeFalseTestName: {false, func() interface{} { return IFType{Value: "Hello"} }, func() interface{} { return IFType{Value: "World"} }, IFType{Value: "World"}},
 	}
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, mathx.IfDoAF(tt.condition, tt.do, tt.defaultFunc))
+			assert.Equal(t, tt.expected, IfDoAF(tt.condition, tt.do, tt.defaultFunc))
 		})
 	}
 }
@@ -118,15 +130,15 @@ func TestIfDoWithError(t *testing.T) {
 		return "", errors.New("fail")
 	}
 
-	val, err := mathx.IfDoWithError(true, doFuncSuccess, "default")
+	val, err := IfDoWithError(true, doFuncSuccess, "default")
 	assert.NoError(t, err)
 	assert.Equal(t, "ok", val)
 
-	val, err = mathx.IfDoWithError(true, doFuncFail, "default")
+	val, err = IfDoWithError(true, doFuncFail, "default")
 	assert.Error(t, err)
 	assert.Equal(t, "", val)
 
-	val, err = mathx.IfDoWithError(false, doFuncFail, "default")
+	val, err = IfDoWithError(false, doFuncFail, "default")
 	assert.NoError(t, err)
 	assert.Equal(t, "default", val)
 }
@@ -138,11 +150,11 @@ func TestIfDoAsync(t *testing.T) {
 		return 42
 	}
 
-	ch := mathx.IfDoAsync(true, doFunc, 0)
+	ch := IfDoAsync(true, doFunc, 0)
 	val := <-ch
 	assert.Equal(t, 42, val)
 
-	ch = mathx.IfDoAsync(false, doFunc, 99)
+	ch = IfDoAsync(false, doFunc, 99)
 	val = <-ch
 	assert.Equal(t, 99, val)
 }
@@ -157,17 +169,17 @@ func TestIfDoAsyncWithTimeout(t *testing.T) {
 	}
 
 	// 执行时间小于超时，返回正常结果
-	ch1 := mathx.IfDoAsyncWithTimeout(true, slowFunc, 0, 100)
+	ch1 := IfDoAsyncWithTimeout(true, slowFunc, 0, 100)
 	res1 := <-ch1
 	assert.Equal(42, res1, "未超时应返回正常结果")
 
 	// 执行时间大于超时，返回零值
-	ch2 := mathx.IfDoAsyncWithTimeout(true, slowFunc, 0, 10)
+	ch2 := IfDoAsyncWithTimeout(true, slowFunc, 0, 10)
 	res2 := <-ch2
 	assert.Equal(0, res2, "超时应返回类型零值")
 
 	// 条件为 false，直接返回默认值
-	ch3 := mathx.IfDoAsyncWithTimeout(false, slowFunc, 99, 100)
+	ch3 := IfDoAsyncWithTimeout(false, slowFunc, 99, 100)
 	res3 := <-ch3
 	assert.Equal(99, res3, "条件为 false 应返回默认值")
 }
@@ -180,15 +192,15 @@ func TestIfElseAndIfChain(t *testing.T) {
 	values := []string{"a", "b", "c"}
 	defVal := "default"
 
-	res := mathx.IfElse(conds, values, defVal)
+	res := IfElse(conds, values, defVal)
 	assert.Equal("b", res, "IfElse 应返回第一个为 true 的对应值")
 
-	pairs := []mathx.ConditionValue[int]{
+	pairs := []ConditionValue[int]{
 		{Cond: false, Value: 1},
 		{Cond: true, Value: 2},
 		{Cond: false, Value: 3},
 	}
-	res2 := mathx.IfChain(pairs, 999)
+	res2 := IfChain(pairs, 999)
 	assert.Equal(2, res2, "IfChain 应返回第一个为 true 的对应值")
 }
 
@@ -207,19 +219,19 @@ func TestIfDoWithErrorAsync(t *testing.T) {
 	}
 
 	// 条件为 true，成功执行
-	ch1 := mathx.IfDoWithErrorAsync(true, successFunc, 999)
+	ch1 := IfDoWithErrorAsync(true, successFunc, 999)
 	res1 := <-ch1
 	assert.NoError(res1.Err, "成功执行时错误应为 nil")
 	assert.Equal(100, res1.Result, "应返回成功结果")
 
 	// 条件为 true，执行失败
-	ch2 := mathx.IfDoWithErrorAsync(true, failFunc, 999)
+	ch2 := IfDoWithErrorAsync(true, failFunc, 999)
 	res2 := <-ch2
 	assert.Error(res2.Err, "执行失败应返回错误")
 	assert.Equal(0, res2.Result, "失败时结果应为函数返回值")
 
 	// 条件为 false，返回默认值且无错误
-	ch3 := mathx.IfDoWithErrorAsync(false, successFunc, 999)
+	ch3 := IfDoWithErrorAsync(false, successFunc, 999)
 	res3 := <-ch3
 	assert.NoError(res3.Err, "条件为 false 时错误应为 nil")
 	assert.Equal(999, res3.Result, "条件为 false 应返回默认值")
@@ -243,7 +255,7 @@ type FuncType func(int) int
 
 func testReturnIfErr[T any](t *testing.T, name string, val T, err error, wantVal T, wantErr error) {
 	t.Run(name, func(t *testing.T) {
-		gotVal, gotErr := mathx.ReturnIfErr(val, err)
+		gotVal, gotErr := ReturnIfErr(val, err)
 
 		// 特殊处理函数类型，避免直接比较
 		if validator.IsFuncType[T]() {
@@ -271,7 +283,7 @@ func testReturnIfErr[T any](t *testing.T, name string, val T, err error, wantVal
 	})
 }
 
-func TestReturnIfErr_ComplexTypes(t *testing.T) {
+func TestReturnIfErrComplexTypes(t *testing.T) {
 	err := errors.New("test err")
 
 	// 基础类型
@@ -325,7 +337,7 @@ func TestIfDoWithErrorDefault(t *testing.T) {
 	type testCase[T any] struct {
 		name       string
 		condition  bool
-		do         mathx.DoFuncWithError[T]
+		do         DoFuncWithError[T]
 		defaultVal T
 		want       T
 	}
@@ -338,13 +350,13 @@ func TestIfDoWithErrorDefault(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := mathx.IfDoWithErrorDefault(tt.condition, tt.do, tt.defaultVal)
+			got := IfDoWithErrorDefault(tt.condition, tt.do, tt.defaultVal)
 			assert.Equal(t, tt.want, got)
 		})
 	}
 }
 
-func TestIfCall_ConditionTrue_Calls(t *testing.T) {
+func TestIfCallConditionTrueCalls(t *testing.T) {
 	type testResult struct {
 		called bool
 		val    int
@@ -359,7 +371,7 @@ func TestIfCall_ConditionTrue_Calls(t *testing.T) {
 	}
 	// condition=true，onTrue 不为空，onFalse 为空
 
-	mathx.IfCall(true, 42, nil, onTrue, nil)
+	IfCall(true, 42, nil, onTrue, nil)
 
 	assert.True(t, tr.called, "onTrue should be called")
 	assert.Equal(t, 42, tr.val)
@@ -371,36 +383,36 @@ func TestIfCall_ConditionTrue_Calls(t *testing.T) {
 		tr.err = e
 	}
 	// condition=false，onFalse 不为空，onTrue 为空
-	mathx.IfCall(false, 100, errors.New("error"), nil, onFalse)
+	IfCall(false, 100, errors.New("error"), nil, onFalse)
 
 	assert.True(t, tr.called, "onFalse should be called")
 	assert.Equal(t, 100, tr.val)
 	assert.EqualError(t, tr.err, "error")
 }
 
-func TestIfCall_BothCallbacksNil_ConditionTrue(t *testing.T) {
+func TestIfCallBothCallbacksNilConditionTrue(t *testing.T) {
 	assert.NotPanics(t, func() {
-		mathx.IfCall(true, 1, nil, nil, nil)
+		IfCall(true, 1, nil, nil, nil)
 	}, "IfCall should not panic when both callbacks are nil and condition is true")
 }
 
-func TestIfCall_BothCallbacksNil_ConditionFalse(t *testing.T) {
+func TestIfCallBothCallbacksNilConditionFalse(t *testing.T) {
 	assert.NotPanics(t, func() {
-		mathx.IfCall(false, 1, nil, nil, nil)
+		IfCall(false, 1, nil, nil, nil)
 	}, "IfCall should not panic when both callbacks are nil and condition is false")
 }
 
 func adjustScore(age, score int32) int32 {
-	pairs := []mathx.ConditionValue[int32]{
+	pairs := []ConditionValue[int32]{
 		{Cond: score < 30, Value: age + 5},
 		{Cond: score < 40, Value: age + 4},
 		{Cond: score < 50, Value: age + 3},
 		{Cond: score < 60, Value: age + 2},
 		{Cond: score < 70, Value: age + 1},
-		{Cond: score < 80, Value: mathx.IF(age < 1, 0, age-1)},
-		{Cond: score < 90, Value: mathx.IF(age < 2, 0, age-2)},
+		{Cond: score < 80, Value: IF(age < 1, 0, age-1)},
+		{Cond: score < 90, Value: IF(age < 2, 0, age-2)},
 	}
-	return mathx.IfChain(pairs, age)
+	return IfChain(pairs, age)
 }
 
 func TestAdjustScore(t *testing.T) {

@@ -2,24 +2,23 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-09 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-12-06 09:37:26
- * @FilePath: \go-toolbox\tests\mathx_unstable_test.go
+ * @LastEditTime: 2025-12-11 21:28:15
+ * @FilePath: \go-toolbox\pkg\mathx\unstable_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package mathx
 
 import (
 	"testing"
 	"time"
 
-	"github.com/kamalyes/go-toolbox/pkg/mathx"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestUnstable_AroundDuration(t *testing.T) {
-	unstable := mathx.NewUnstable(0.05)
+func TestUnstableAroundDuration(t *testing.T) {
+	unstable := NewUnstable(0.05)
 	for i := 0; i < 1000; i++ {
 		val := unstable.AroundDuration(time.Second)
 		assert.True(t, float64(time.Second)*0.95 <= float64(val))
@@ -27,9 +26,9 @@ func TestUnstable_AroundDuration(t *testing.T) {
 	}
 }
 
-func TestUnstable_AroundInt(t *testing.T) {
+func TestUnstableAroundInt(t *testing.T) {
 	const target = 10000
-	unstable := mathx.NewUnstable(0.05)
+	unstable := NewUnstable(0.05)
 	for i := 0; i < 1000; i++ {
 		val := unstable.AroundInt(target)
 		assert.True(t, float64(target)*0.95 <= float64(val))
@@ -37,9 +36,9 @@ func TestUnstable_AroundInt(t *testing.T) {
 	}
 }
 
-func TestUnstable_AroundIntLarge(t *testing.T) {
+func TestUnstableAroundIntLarge(t *testing.T) {
 	const target int64 = 10000
-	unstable := mathx.NewUnstable(5)
+	unstable := NewUnstable(5)
 	for i := 0; i < 1000; i++ {
 		val := unstable.AroundInt(target)
 		assert.True(t, 0 <= val)
@@ -47,23 +46,23 @@ func TestUnstable_AroundIntLarge(t *testing.T) {
 	}
 }
 
-func TestUnstable_AroundIntNegative(t *testing.T) {
+func TestUnstableAroundIntNegative(t *testing.T) {
 	const target int64 = 10000
-	unstable := mathx.NewUnstable(-0.05)
+	unstable := NewUnstable(-0.05)
 	for i := 0; i < 1000; i++ {
 		val := unstable.AroundInt(target)
 		assert.Equal(t, target, val)
 	}
 }
 
-func TestUnstable_Distribution(t *testing.T) {
+func TestUnstableDistribution(t *testing.T) {
 	const (
 		seconds = 10000
 		total   = 10000
 	)
 
 	m := make(map[int]int)
-	expiry := mathx.NewUnstable(0.05)
+	expiry := NewUnstable(0.05)
 	for i := 0; i < total; i++ {
 		val := int(expiry.AroundInt(seconds))
 		m[val]++
@@ -76,7 +75,7 @@ func TestUnstable_Distribution(t *testing.T) {
 	for k, v := range m {
 		mi[k] = v
 	}
-	entropy := mathx.CalcEntropy(mi)
+	entropy := CalcEntropy(mi)
 	assert.True(t, len(m) > 1)
 	assert.True(t, entropy > 0.95)
 }
@@ -143,7 +142,7 @@ func TestCloneComplex(t *testing.T) {
 	alice.Friends = append(alice.Friends, bob)
 
 	// 深拷贝
-	clonedAlice := mathx.Clone(alice, nil).(*PersonClone)
+	clonedAlice := Clone(alice, nil).(*PersonClone)
 
 	// 修改原始结构以验证克隆是否成功
 	alice.Name = "Alice Updated"
