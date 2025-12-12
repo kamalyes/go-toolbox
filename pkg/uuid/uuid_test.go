@@ -2,19 +2,18 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-13 18:09:25
- * @FilePath: \go-toolbox\tests\uuid_test.go
+ * @LastEditTime: 2025-12-12 23:20:15
+ * @FilePath: \go-toolbox\pkg\uuid\uuid_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
 
-package tests
+package uuid
 
 import (
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,19 +29,19 @@ func TestSameSubStr(t *testing.T) {
 	repeat := 3
 	expected := "abcabcabc"
 
-	result := uuid.SameSubStr(subStr, repeat)
+	result := SameSubStr(subStr, repeat)
 	assert.Equal(t, expected, result)
 }
 
 func TestUUID(t *testing.T) {
-	uuid := uuid.UUID()
+	uuid := UUID()
 	assert.NotEmpty(t, uuid)
 }
 
 func TestUniqueID(t *testing.T) {
-	id := uuid.UniqueID("hello", "world")
+	id := UniqueID("hello", "world")
 	assert.NotEmpty(t, id)
-	id = uuid.UniqueID()
+	id = UniqueID()
 	assert.NotEmpty(t, id)
 }
 
@@ -50,6 +49,6 @@ func TestMd5(t *testing.T) {
 	src := "hello"
 	expected := "5d41402abc4b2a76b9719d911017c592"
 
-	result := uuid.Md5(src)
+	result := Md5(src)
 	assert.Equal(t, expected, result)
 }

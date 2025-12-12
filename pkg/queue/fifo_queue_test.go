@@ -3,25 +3,24 @@
  * @Date: 2024-11-10 21:51:58
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2025-08-21 18:55:55
- * @FilePath: \go-toolbox\tests\fifo_queue_test.go
+ * @FilePath: \go-toolbox\pkg\queue\fifo_queue_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package queue
 
 import (
 	"context"
 	"sync"
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/queue"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestFIFOQueue(t *testing.T) {
 	// 创建一个新的 FIFOQueue，初始容量为 2，启用自动扩容
-	q := queue.NewFIFOQueue(2, true)
+	q := NewFIFOQueue(2, true)
 
 	// 测试入队
 	err := q.Enqueue(context.Background(), "item1")
@@ -86,7 +85,7 @@ func TestFIFOQueue(t *testing.T) {
 
 func TestFIFOQueue_ContextCancel(t *testing.T) {
 	// 创建一个新的 FIFOQueue
-	q := queue.NewFIFOQueue(2, true)
+	q := NewFIFOQueue(2, true)
 
 	// 测试入队
 	err := q.Enqueue(context.Background(), "item1")
@@ -113,7 +112,7 @@ func TestFIFOQueue_ContextCancel(t *testing.T) {
 }
 
 func TestFIFOQueue_Concurrent(t *testing.T) {
-	q := queue.NewFIFOQueue(2, true)
+	q := NewFIFOQueue(2, true)
 
 	// 使用 WaitGroup 来等待所有 goroutine 完成
 	var wg sync.WaitGroup
@@ -148,7 +147,7 @@ func TestFIFOQueue_Concurrent(t *testing.T) {
 }
 
 func TestFIFOQueue_SetGrowthFactor(t *testing.T) {
-	q := queue.NewFIFOQueue(2, true)
+	q := NewFIFOQueue(2, true)
 
 	// 设置新的扩容因子
 	q.SetGrowthFactor(1.5)
@@ -158,7 +157,7 @@ func TestFIFOQueue_SetGrowthFactor(t *testing.T) {
 }
 
 func TestFIFOQueue_SetShrinkFactor(t *testing.T) {
-	q := queue.NewFIFOQueue(2, true)
+	q := NewFIFOQueue(2, true)
 
 	// 设置新的缩容因子
 	q.SetShrinkFactor(0.75)
@@ -168,7 +167,7 @@ func TestFIFOQueue_SetShrinkFactor(t *testing.T) {
 }
 
 func TestFIFOQueue_MinCapacity(t *testing.T) {
-	q := queue.NewFIFOQueue(2, true)
+	q := NewFIFOQueue(2, true)
 
 	// 确保最小容量限制正常工作
 	assert.Equal(t, 1, q.MinCapacity(), "最小容量应该是 1")

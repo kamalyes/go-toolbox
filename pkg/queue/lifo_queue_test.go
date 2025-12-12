@@ -2,20 +2,19 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-10 21:51:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-11 00:55:15
- * @FilePath: \go-toolbox\tests\lifo_queue_test.go
+ * @LastEditTime: 2025-12-12 23:09:12
+ * @FilePath: \go-toolbox\pkg\queue\lifo_queue_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package queue
 
 import (
 	"context"
 	"sync"
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/queue"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -45,14 +44,14 @@ const (
 
 // 测试创建新的 LIFO 队列
 func TestNewLIFOQueue(t *testing.T) {
-	q := queue.NewLIFOQueue()
+	q := NewLIFOQueue()
 	assert.NotNil(t, q, msgNewLIFOQueueEmpty)
 	assert.True(t, q.IsEmpty(), msgQueueEmpty)
 }
 
 // 测试 LIFO 队列的入队和出队功能
 func TestLIFOQueueEnqueueDequeue(t *testing.T) {
-	q := queue.NewLIFOQueue()
+	q := NewLIFOQueue()
 	assert := assert.New(t)
 
 	// 测试入队
@@ -74,7 +73,7 @@ func TestLIFOQueueEnqueueDequeue(t *testing.T) {
 
 // 测试从空队列中出队
 func TestLIFOQueueEmptyDequeue(t *testing.T) {
-	q := queue.NewLIFOQueue()
+	q := NewLIFOQueue()
 	_, err := q.Dequeue(context.Background())
 	assert.Error(t, err, msgEmptyDequeueErr)
 	assert.Equal(t, emptyQueueErr, err.Error(), "错误信息应指示队列为空")
@@ -82,7 +81,7 @@ func TestLIFOQueueEmptyDequeue(t *testing.T) {
 
 // 测试上下文取消对队列操作的影响
 func TestLIFOQueueContextCancellation(t *testing.T) {
-	q := queue.NewLIFOQueue()
+	q := NewLIFOQueue()
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// 在操作前取消上下文
@@ -97,7 +96,7 @@ func TestLIFOQueueContextCancellation(t *testing.T) {
 
 // 测试队列大小
 func TestLIFOQueueSize(t *testing.T) {
-	q := queue.NewLIFOQueue()
+	q := NewLIFOQueue()
 	assert := assert.New(t)
 
 	assert.Equal(0, q.Size(), "新队列的大小应为0")
@@ -112,7 +111,7 @@ func TestLIFOQueueSize(t *testing.T) {
 
 // 测试队列的并发安全性
 func TestLIFOQueueConcurrency(t *testing.T) {
-	q := queue.NewLIFOQueue()
+	q := NewLIFOQueue()
 	assert := assert.New(t)
 
 	// 并发入队测试

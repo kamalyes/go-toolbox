@@ -2,20 +2,18 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-20 19:11:55
- * @FilePath: \go-toolbox\tests\retry_test.go
+ * @LastEditTime: 2025-12-12 23:07:40
+ * @FilePath: \go-toolbox\pkg\retry\retry_test.go
  * @Description: 重试机制单元测试文件
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package retry
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/kamalyes/go-toolbox/pkg/retry"
-	"github.com/stretchr/testify/assert"
 	"math"
 	"math/rand"
 	"strings"
@@ -23,6 +21,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // 测试尝试次数
@@ -40,7 +40,7 @@ func TestRetryWithAttemptCount(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			retryInstance := retry.NewRetry().
+			retryInstance := NewRetry().
 				SetAttemptCount(tt.attemptCount).
 				SetInterval(time.Microsecond).
 				SetErrCallback(func(now, remain int, err error, _ ...string) {
@@ -59,7 +59,7 @@ func TestRetryWithAttemptCount(t *testing.T) {
 	}
 }
 
-func TestRetry_SetConditionFunc(t *testing.T) {
+func TestRetrySetConditionFunc(t *testing.T) {
 	var attemptCounter int32 = 0
 
 	operation := func() error {
@@ -74,7 +74,7 @@ func TestRetry_SetConditionFunc(t *testing.T) {
 		return err != nil && strings.Contains(err.Error(), "network")
 	}
 
-	r := retry.NewRetry().
+	r := NewRetry().
 		SetAttemptCount(5).
 		SetInterval(10 * time.Millisecond).
 		SetConditionFunc(conditionFunc).
@@ -98,7 +98,7 @@ func TestRetry_SetConditionFunc(t *testing.T) {
 // 测试重试机制在出错时的行为
 func TestRetryWithError(t *testing.T) {
 	// 初始化重试实例：最大尝试3次，间隔1秒
-	retryInstance := retry.NewRetry().
+	retryInstance := NewRetry().
 		SetAttemptCount(3).
 		SetInterval(time.Microsecond).
 		SetErrCallback(func(now, remain int, err error, funcName ...string) {
@@ -114,7 +114,7 @@ func TestRetryWithError(t *testing.T) {
 
 // 测试首次执行即成功的场景
 func TestRetrySuccess(t *testing.T) {
-	retryInstance := retry.NewRetry().
+	retryInstance := NewRetry().
 		SetAttemptCount(3).
 		SetInterval(0) // 无间隔立即重试
 
@@ -129,7 +129,7 @@ func TestRetryCountValidation(t *testing.T) {
 	const attempts = 3
 	var counter int // 执行计数器
 
-	retryInstance := retry.NewRetry().
+	retryInstance := NewRetry().
 		SetAttemptCount(attempts).
 		SetInterval(0)
 
@@ -149,7 +149,7 @@ func TestRetryCountValidation(t *testing.T) {
 // 测试上下文取消功能
 func TestContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	retryInstance := retry.NewRetryWithCtx(ctx).
+	retryInstance := NewRetryWithCtx(ctx).
 		SetAttemptCount(5).
 		SetInterval(time.Second)
 
@@ -171,7 +171,7 @@ func TestContextTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	retryInstance := retry.NewRetryWithCtx(ctx).
+	retryInstance := NewRetryWithCtx(ctx).
 		SetAttemptCount(10).
 		SetInterval(time.Second)
 
@@ -185,7 +185,7 @@ func TestContextTimeout(t *testing.T) {
 // 熔断
 func TestOptimizedBackoff(t *testing.T) {
 	t.Parallel()
-	retryInstance := retry.NewRetry().
+	retryInstance := NewRetry().
 		SetAttemptCount(2).
 		SetInterval(100 * time.Millisecond). // 基础间隔降为100ms
 		SetErrCallback(func(now, _ int, _ error, _ ...string) {
@@ -209,7 +209,7 @@ func TestOptimizedBackoff(t *testing.T) {
 
 // 并发安全测试
 func TestConcurrentSafety(t *testing.T) {
-	retryInstance := retry.NewRetry().
+	retryInstance := NewRetry().
 		SetAttemptCount(100).
 		SetInterval(0)
 
@@ -233,7 +233,7 @@ func TestCallbackCoverage(t *testing.T) {
 		errorCalled   bool
 	)
 
-	retryInstance := retry.NewRetry().
+	retryInstance := NewRetry().
 		SetAttemptCount(2).
 		SetInterval(0).
 		SetSuccessCallback(func(_ ...string) {
@@ -252,8 +252,8 @@ func TestCallbackCoverage(t *testing.T) {
 	assert.True(t, errorCalled)
 }
 
-func TestRetry_GetSetMethods(t *testing.T) {
-	r := retry.NewRetryWithCtx(context.Background())
+func TestRetryGetSetMethods(t *testing.T) {
+	r := NewRetryWithCtx(context.Background())
 
 	// 测试 SetAttemptCount 和 GetAttemptCount
 	r.SetAttemptCount(5)
@@ -305,9 +305,9 @@ func TestRetry_GetSetMethods(t *testing.T) {
 	r.Do(func() error {
 		return nil
 	})
-	assert.Contains(t, r.GetCaller(), "FuncName:TestRetry_GetSetMethods, File")
+	assert.Contains(t, r.GetCaller(), "FuncName:TestRetryGetSetMethods, File")
 	// 设置自定义调用者
-	var caller = "TestRetry_GetSetMethods_12356789"
+	var caller = "TestRetryGetSetMethods_12356789"
 	r.SetCaller(caller)
 	// 再次检查
 	r.Do(func() error {
@@ -317,12 +317,12 @@ func TestRetry_GetSetMethods(t *testing.T) {
 }
 
 // 测试退避倍数（BackoffMultiplier）
-func TestRetry_BackoffMultiplier(t *testing.T) {
+func TestRetryBackoffMultiplier(t *testing.T) {
 	var intervals []time.Duration
 	startTime := time.Now()
 	lastCallTime := startTime
 
-	r := retry.NewRetry().
+	r := NewRetry().
 		SetAttemptCount(4).
 		SetInterval(50 * time.Millisecond).
 		SetBackoffMultiplier(2.0).
@@ -344,8 +344,8 @@ func TestRetry_BackoffMultiplier(t *testing.T) {
 }
 
 // 测试最大间隔时间（MaxInterval）
-func TestRetry_MaxInterval(t *testing.T) {
-	r := retry.NewRetry().
+func TestRetryMaxInterval(t *testing.T) {
+	r := NewRetry().
 		SetAttemptCount(5).
 		SetInterval(50 * time.Millisecond).
 		SetMaxInterval(100 * time.Millisecond).
@@ -360,8 +360,8 @@ func TestRetry_MaxInterval(t *testing.T) {
 }
 
 // 测试抖动（Jitter）
-func TestRetry_Jitter(t *testing.T) {
-	r := retry.NewRetry().
+func TestRetryJitter(t *testing.T) {
+	r := NewRetry().
 		SetAttemptCount(3).
 		SetInterval(50 * time.Millisecond).
 		SetJitter(true)
@@ -375,8 +375,8 @@ func TestRetry_Jitter(t *testing.T) {
 }
 
 // 测试抖动和退避倍数组合
-func TestRetry_JitterWithBackoff(t *testing.T) {
-	r := retry.NewRetry().
+func TestRetryJitterWithBackoff(t *testing.T) {
+	r := NewRetry().
 		SetAttemptCount(4).
 		SetInterval(30 * time.Millisecond).
 		SetBackoffMultiplier(1.5).
@@ -395,8 +395,8 @@ func TestRetry_JitterWithBackoff(t *testing.T) {
 }
 
 // 测试无回调函数情况
-func TestRetry_NoCallbacks(t *testing.T) {
-	r := retry.NewRetry().
+func TestRetryNoCallbacks(t *testing.T) {
+	r := NewRetry().
 		SetAttemptCount(3).
 		SetInterval(time.Millisecond)
 
@@ -414,11 +414,11 @@ func TestRetry_NoCallbacks(t *testing.T) {
 }
 
 // 测试空函数名场景
-func TestRetry_EmptyFuncName(t *testing.T) {
+func TestRetryEmptyFuncName(t *testing.T) {
 	successCalled := false
 	errCalled := false
 
-	r := retry.NewRetry().
+	r := NewRetry().
 		SetAttemptCount(2).
 		SetInterval(time.Millisecond).
 		SetSuccessCallback(func(funcName ...string) {
@@ -445,10 +445,10 @@ func TestRetry_EmptyFuncName(t *testing.T) {
 }
 
 // 测试条件函数返回 true 的情况（继续重试）
-func TestRetry_ConditionFuncAllowRetry(t *testing.T) {
+func TestRetryConditionFuncAllowRetry(t *testing.T) {
 	var attemptCount int32 = 0
 
-	r := retry.NewRetry().
+	r := NewRetry().
 		SetAttemptCount(3).
 		SetInterval(time.Millisecond).
 		SetConditionFunc(func(err error) bool {
@@ -465,10 +465,10 @@ func TestRetry_ConditionFuncAllowRetry(t *testing.T) {
 }
 
 // 测试条件函数返回 false 的情况（不重试）
-func TestRetry_ConditionFuncDenyRetry(t *testing.T) {
+func TestRetryConditionFuncDenyRetry(t *testing.T) {
 	var attemptCount int32 = 0
 
-	r := retry.NewRetry().
+	r := NewRetry().
 		SetAttemptCount(5).
 		SetInterval(time.Millisecond).
 		SetConditionFunc(func(err error) bool {
@@ -485,10 +485,10 @@ func TestRetry_ConditionFuncDenyRetry(t *testing.T) {
 }
 
 // 测试零间隔时间
-func TestRetry_ZeroInterval(t *testing.T) {
+func TestRetryZeroInterval(t *testing.T) {
 	var counter int32 = 0
 
-	r := retry.NewRetry().
+	r := NewRetry().
 		SetAttemptCount(5).
 		SetInterval(0)
 
@@ -506,8 +506,8 @@ func TestRetry_ZeroInterval(t *testing.T) {
 }
 
 // 测试退避倍数小于等于1的情况（不应用退避）
-func TestRetry_BackoffMultiplierLessThanOne(t *testing.T) {
-	r := retry.NewRetry().
+func TestRetryBackoffMultiplierLessThanOne(t *testing.T) {
+	r := NewRetry().
 		SetAttemptCount(3).
 		SetInterval(10 * time.Millisecond).
 		SetBackoffMultiplier(0.5) // 小于1，不应用退避
@@ -524,8 +524,8 @@ func TestRetry_BackoffMultiplierLessThanOne(t *testing.T) {
 }
 
 // 测试退避倍数等于1的情况
-func TestRetry_BackoffMultiplierEqualOne(t *testing.T) {
-	r := retry.NewRetry().
+func TestRetryBackoffMultiplierEqualOne(t *testing.T) {
+	r := NewRetry().
 		SetAttemptCount(3).
 		SetInterval(10 * time.Millisecond).
 		SetBackoffMultiplier(1.0)
@@ -538,8 +538,8 @@ func TestRetry_BackoffMultiplierEqualOne(t *testing.T) {
 }
 
 // 测试最大间隔为0的情况（不限制最大间隔）
-func TestRetry_ZeroMaxInterval(t *testing.T) {
-	r := retry.NewRetry().
+func TestRetryZeroMaxInterval(t *testing.T) {
+	r := NewRetry().
 		SetAttemptCount(3).
 		SetInterval(10 * time.Millisecond).
 		SetBackoffMultiplier(2.0).
@@ -554,11 +554,11 @@ func TestRetry_ZeroMaxInterval(t *testing.T) {
 }
 
 // 测试上下文已经取消的情况
-func TestRetry_ContextAlreadyCanceled(t *testing.T) {
+func TestRetryContextAlreadyCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // 立即取消
 
-	r := retry.NewRetryWithCtx(ctx).
+	r := NewRetryWithCtx(ctx).
 		SetAttemptCount(5).
 		SetInterval(time.Second)
 
@@ -570,11 +570,11 @@ func TestRetry_ContextAlreadyCanceled(t *testing.T) {
 }
 
 // 测试链式调用
-func TestRetry_ChainedCalls(t *testing.T) {
+func TestRetryChainedCalls(t *testing.T) {
 	successCalled := false
 	errCalled := false
 
-	r := retry.NewRetry().
+	r := NewRetry().
 		SetCaller("TestCaller").
 		SetAttemptCount(3).
 		SetInterval(time.Millisecond).
@@ -605,8 +605,8 @@ func TestRetry_ChainedCalls(t *testing.T) {
 }
 
 // 测试多次执行 Do
-func TestRetry_MultipleDoCalls(t *testing.T) {
-	r := retry.NewRetry().
+func TestRetryMultipleDoCalls(t *testing.T) {
+	r := NewRetry().
 		SetAttemptCount(2).
 		SetInterval(time.Millisecond)
 
@@ -630,7 +630,7 @@ func TestRetry_MultipleDoCalls(t *testing.T) {
 }
 
 // 测试并发执行多个 Retry 实例
-func TestRetry_ConcurrentInstances(t *testing.T) {
+func TestRetryConcurrentInstances(t *testing.T) {
 	var wg sync.WaitGroup
 	const goroutines = 10
 
@@ -639,7 +639,7 @@ func TestRetry_ConcurrentInstances(t *testing.T) {
 		go func(idx int) {
 			defer wg.Done()
 
-			r := retry.NewRetry().
+			r := NewRetry().
 				SetAttemptCount(3).
 				SetInterval(time.Millisecond)
 
@@ -661,11 +661,11 @@ func TestRetry_ConcurrentInstances(t *testing.T) {
 }
 
 // 测试第一次就成功的情况（不触发重试逻辑）
-func TestRetry_FirstAttemptSuccess(t *testing.T) {
+func TestRetryFirstAttemptSuccess(t *testing.T) {
 	errCallbackCalled := false
 	successCallbackCalled := false
 
-	r := retry.NewRetry().
+	r := NewRetry().
 		SetAttemptCount(5).
 		SetInterval(time.Second). // 设置较长间隔，确保不会等待
 		SetErrCallback(func(_, _ int, _ error, _ ...string) {
@@ -688,10 +688,10 @@ func TestRetry_FirstAttemptSuccess(t *testing.T) {
 }
 
 // 测试最后一次尝试成功的情况
-func TestRetry_LastAttemptSuccess(t *testing.T) {
+func TestRetryLastAttemptSuccess(t *testing.T) {
 	var counter int32 = 0
 
-	r := retry.NewRetry().
+	r := NewRetry().
 		SetAttemptCount(3).
 		SetInterval(time.Millisecond)
 
@@ -708,13 +708,13 @@ func TestRetry_LastAttemptSuccess(t *testing.T) {
 }
 
 // 测试错误回调函数参数正确性
-func TestRetry_ErrCallbackParams(t *testing.T) {
+func TestRetryErrCallbackParams(t *testing.T) {
 	var callParams []struct {
 		now    int
 		remain int
 	}
 
-	r := retry.NewRetry().
+	r := NewRetry().
 		SetAttemptCount(4).
 		SetInterval(time.Millisecond).
 		SetErrCallback(func(now, remain int, err error, _ ...string) {
@@ -739,10 +739,10 @@ func TestRetry_ErrCallbackParams(t *testing.T) {
 }
 
 // 测试条件函数为 nil 的情况（默认全部重试）
-func TestRetry_NilConditionFunc(t *testing.T) {
+func TestRetryNilConditionFunc(t *testing.T) {
 	var counter int32 = 0
 
-	r := retry.NewRetry().
+	r := NewRetry().
 		SetAttemptCount(3).
 		SetInterval(time.Millisecond)
 	// 不设置 ConditionFunc
@@ -758,10 +758,10 @@ func TestRetry_NilConditionFunc(t *testing.T) {
 }
 
 // 测试大量重试次数
-func TestRetry_LargeAttemptCount(t *testing.T) {
+func TestRetryLargeAttemptCount(t *testing.T) {
 	var counter int32 = 0
 
-	r := retry.NewRetry().
+	r := NewRetry().
 		SetAttemptCount(100).
 		SetInterval(0) // 无间隔
 
@@ -778,7 +778,7 @@ func TestRetry_LargeAttemptCount(t *testing.T) {
 }
 
 // 测试不同类型的错误
-func TestRetry_DifferentErrorTypes(t *testing.T) {
+func TestRetryDifferentErrorTypes(t *testing.T) {
 	testCases := []struct {
 		name string
 		err  error
@@ -790,7 +790,7 @@ func TestRetry_DifferentErrorTypes(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			r := retry.NewRetry().
+			r := NewRetry().
 				SetAttemptCount(2).
 				SetInterval(time.Millisecond)
 
@@ -813,8 +813,8 @@ func (e *customError) Error() string {
 }
 
 // 测试带抖动的最大间隔限制
-func TestRetry_JitterWithMaxInterval(t *testing.T) {
-	r := retry.NewRetry().
+func TestRetryJitterWithMaxInterval(t *testing.T) {
+	r := NewRetry().
 		SetAttemptCount(5).
 		SetInterval(50 * time.Millisecond).
 		SetBackoffMultiplier(3.0).
@@ -833,11 +833,11 @@ func TestRetry_JitterWithMaxInterval(t *testing.T) {
 }
 
 // 测试上下文超时在执行过程中触发
-func TestRetry_ContextTimeoutDuringExecution(t *testing.T) {
+func TestRetryContextTimeoutDuringExecution(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 	defer cancel()
 
-	r := retry.NewRetryWithCtx(ctx).
+	r := NewRetryWithCtx(ctx).
 		SetAttemptCount(10).
 		SetInterval(100 * time.Millisecond)
 

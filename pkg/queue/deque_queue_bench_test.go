@@ -2,36 +2,34 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-10 21:51:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-08-21 18:57:15
- * @FilePath: \go-toolbox\tests\deque_queue_bench_test.go
+ * @LastEditTime: 2025-12-12 23:09:42
+ * @FilePath: \go-toolbox\pkg\queue\deque_queue_bench_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package queue
 
 import (
 	"testing"
-
-	"github.com/kamalyes/go-toolbox/pkg/queue"
 )
 
 func BenchmarkDequePushBack(b *testing.B) {
-	q := queue.NewDeque()
+	q := NewDeque()
 	for i := 0; i < b.N; i++ {
 		q.PushBack(i)
 	}
 }
 
 func BenchmarkDequePushFront(b *testing.B) {
-	q := queue.NewDeque()
+	q := NewDeque()
 	for i := 0; i < b.N; i++ {
 		q.PushFront(i)
 	}
 }
 
 func BenchmarkDequePopFront(b *testing.B) {
-	q := queue.NewDeque()
+	q := NewDeque()
 	for i := 0; i < b.N; i++ {
 		q.PushBack(i)
 	}
@@ -42,7 +40,7 @@ func BenchmarkDequePopFront(b *testing.B) {
 }
 
 func BenchmarkDequePopBack(b *testing.B) {
-	q := queue.NewDeque()
+	q := NewDeque()
 	for i := 0; i < b.N; i++ {
 		q.PushBack(i)
 	}
@@ -53,7 +51,7 @@ func BenchmarkDequePopBack(b *testing.B) {
 }
 
 func BenchmarkDequeInsert(b *testing.B) {
-	q := queue.NewDeque()
+	q := NewDeque()
 	for i := 0; i < b.N; i++ {
 		q.PushBack(i)
 	}
@@ -64,7 +62,7 @@ func BenchmarkDequeInsert(b *testing.B) {
 }
 
 func BenchmarkDequeRotate(b *testing.B) {
-	q := queue.NewDeque()
+	q := NewDeque()
 	for i := 0; i < 1000; i++ { // 初始化 1000 个元素
 		q.PushBack(i)
 	}
@@ -75,7 +73,7 @@ func BenchmarkDequeRotate(b *testing.B) {
 }
 
 func BenchmarkDequeIter(b *testing.B) {
-	q := queue.NewDeque()
+	q := NewDeque()
 	for i := 0; i < 1000; i++ {
 		q.PushBack(i)
 	}
@@ -90,7 +88,7 @@ func BenchmarkDequeIter(b *testing.B) {
 }
 
 func BenchmarkDequeRIter(b *testing.B) {
-	q := queue.NewDeque()
+	q := NewDeque()
 	for i := 0; i < 1000; i++ {
 		q.PushBack(i)
 	}
@@ -105,7 +103,7 @@ func BenchmarkDequeRIter(b *testing.B) {
 }
 
 func BenchmarkDequeIterPopFront(b *testing.B) {
-	q := queue.NewDeque()
+	q := NewDeque()
 	for i := 0; i < 1000; i++ {
 		q.PushBack(i)
 	}
@@ -119,7 +117,7 @@ func BenchmarkDequeIterPopFront(b *testing.B) {
 }
 
 func BenchmarkDequeIterPopBack(b *testing.B) {
-	q := queue.NewDeque()
+	q := NewDeque()
 	for i := 0; i < 1000; i++ {
 		q.PushBack(i)
 	}
@@ -133,7 +131,7 @@ func BenchmarkDequeIterPopBack(b *testing.B) {
 }
 
 func BenchmarkDequeIterPopFrontPartial(b *testing.B) {
-	q := queue.NewDeque()
+	q := NewDeque()
 	for i := 0; i < 1000; i++ {
 		q.PushBack(i)
 	}
@@ -149,7 +147,7 @@ func BenchmarkDequeIterPopFrontPartial(b *testing.B) {
 }
 
 func BenchmarkDequeIterPopBackPartial(b *testing.B) {
-	q := queue.NewDeque()
+	q := NewDeque()
 	for i := 0; i < 1000; i++ {
 		q.PushBack(i)
 	}

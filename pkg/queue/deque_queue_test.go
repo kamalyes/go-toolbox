@@ -3,22 +3,21 @@
  * @Date: 2024-11-10 21:51:58
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2025-08-21 17:20:15
- * @FilePath: \go-toolbox\tests\deque_queue_test.go
+ * @FilePath: \go-toolbox\pkg\queue\deque_queue_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package queue
 
 import (
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/queue"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestDequePushPop(t *testing.T) {
-	q := queue.NewDeque()
+	q := NewDeque()
 
 	// 测试 PushBack 和 PopFront
 	q.PushBack(1)
@@ -34,7 +33,7 @@ func TestDequePushPop(t *testing.T) {
 }
 
 func TestDequePushFront(t *testing.T) {
-	q := queue.NewDeque()
+	q := NewDeque()
 
 	q.PushFront(1)
 	q.PushFront(2)
@@ -49,7 +48,7 @@ func TestDequePushFront(t *testing.T) {
 }
 
 func TestDequeFrontBack(t *testing.T) {
-	q := queue.NewDeque()
+	q := NewDeque()
 
 	q.PushBack(1)
 	q.PushBack(2)
@@ -74,7 +73,7 @@ func TestDequeFrontBack(t *testing.T) {
 }
 
 func TestDequeInsert(t *testing.T) {
-	q := queue.NewDeque()
+	q := NewDeque()
 
 	q.PushBack(1)
 	q.PushBack(2)
@@ -91,7 +90,7 @@ func TestDequeInsert(t *testing.T) {
 }
 
 func TestDequeClear(t *testing.T) {
-	q := queue.NewDeque()
+	q := NewDeque()
 	q.PushBack(1)
 	q.PushBack(2)
 
@@ -101,7 +100,7 @@ func TestDequeClear(t *testing.T) {
 }
 
 func TestDequeRotate(t *testing.T) {
-	q := queue.NewDeque()
+	q := NewDeque()
 
 	q.PushBack(1)
 	q.PushBack(2)
@@ -123,7 +122,7 @@ func TestDequeRotate(t *testing.T) {
 }
 
 func TestDequeIndex(t *testing.T) {
-	q := queue.NewDeque()
+	q := NewDeque()
 	q.PushBack(1)
 	q.PushBack(2)
 	q.PushBack(3)
@@ -145,7 +144,7 @@ func TestDequeIndex(t *testing.T) {
 }
 
 func TestDequeGrow(t *testing.T) {
-	q := queue.NewDeque()
+	q := NewDeque()
 
 	// 测试 Grow 方法
 	q.Grow(20) // 增长容量以容纳 20 个项目
@@ -153,12 +152,12 @@ func TestDequeGrow(t *testing.T) {
 }
 
 func TestDequeGrowNegative(t *testing.T) {
-	q := queue.NewDeque()
+	q := NewDeque()
 	assert.Panics(t, func() { q.Grow(-1) }, "Expected panic when trying to grow with a negative number")
 }
 
 func TestDequeRotateNegativeTooLarge(t *testing.T) {
-	q := queue.NewDeque()
+	q := NewDeque()
 	q.PushBack(1)
 	q.PushBack(2)
 	q.PushBack(3)
@@ -169,7 +168,7 @@ func TestDequeRotateNegativeTooLarge(t *testing.T) {
 }
 
 func TestDequeInsertAtHead(t *testing.T) {
-	q := queue.NewDeque()
+	q := NewDeque()
 	q.PushBack(1)
 	q.PushBack(2)
 	q.Insert(0, 3) // 在索引 0 插入 3
@@ -180,7 +179,7 @@ func TestDequeInsertAtHead(t *testing.T) {
 }
 
 func TestDequeInsertAtTail(t *testing.T) {
-	q := queue.NewDeque()
+	q := NewDeque()
 	q.PushBack(1)
 	q.PushBack(2)
 	q.Insert(2, 3) // 在索引 2 插入 3
@@ -191,7 +190,7 @@ func TestDequeInsertAtTail(t *testing.T) {
 }
 
 func TestDequeIter(t *testing.T) {
-	q := queue.NewDeque()
+	q := NewDeque()
 	q.PushBack(1)
 	q.PushBack(2)
 	q.PushBack(3)
@@ -199,7 +198,7 @@ func TestDequeIter(t *testing.T) {
 	count := 0
 	iter := q.Iter()
 	iter(func(item interface{}) bool {
-		assert.Equal(t, count+1, item, "Expected item to be in sequential order")
+		assert.Equal(t, count+1, item, "Expected item to be in iter sequential order")
 		count++
 		return true
 	})
@@ -207,7 +206,7 @@ func TestDequeIter(t *testing.T) {
 }
 
 func TestDequeRIter(t *testing.T) {
-	q := queue.NewDeque()
+	q := NewDeque()
 	q.PushBack(1)
 	q.PushBack(2)
 	q.PushBack(3)
@@ -215,7 +214,7 @@ func TestDequeRIter(t *testing.T) {
 	count := 3
 	rIter := q.RIter() // 获取反向迭代器
 	rIter(func(item interface{}) bool {
-		assert.Equal(t, count, item, "Expected item to be in reverse sequential order")
+		assert.Equal(t, count, item, "Expected item to be in iter reverse sequential order")
 		count--
 		return true
 	})
@@ -223,17 +222,17 @@ func TestDequeRIter(t *testing.T) {
 }
 
 func TestDequePopFrontEmpty(t *testing.T) {
-	q := queue.NewDeque()
+	q := NewDeque()
 	assert.Panics(t, func() { q.PopFront() }, "Expected panic when popping from an empty deque")
 }
 
 func TestDequePopBackEmpty(t *testing.T) {
-	q := queue.NewDeque()
+	q := NewDeque()
 	assert.Panics(t, func() { q.PopBack() }, "Expected panic when popping from an empty deque")
 }
 
 func TestDequeIterPopFront(t *testing.T) {
-	q := queue.NewDeque()
+	q := NewDeque()
 	q.PushBack(1)
 	q.PushBack(2)
 	q.PushBack(3)
@@ -252,7 +251,7 @@ func TestDequeIterPopFront(t *testing.T) {
 }
 
 func TestDequeIterPopBack(t *testing.T) {
-	q := queue.NewDeque()
+	q := NewDeque()
 	q.PushBack(1)
 	q.PushBack(2)
 	q.PushBack(3)
@@ -271,7 +270,7 @@ func TestDequeIterPopBack(t *testing.T) {
 }
 
 func TestDequeIterPopFrontPartial(t *testing.T) {
-	q := queue.NewDeque()
+	q := NewDeque()
 	q.PushBack(1)
 	q.PushBack(2)
 	q.PushBack(3)
@@ -291,7 +290,7 @@ func TestDequeIterPopFrontPartial(t *testing.T) {
 }
 
 func TestDequeIterPopBackPartial(t *testing.T) {
-	q := queue.NewDeque()
+	q := NewDeque()
 	q.PushBack(1)
 	q.PushBack(2)
 	q.PushBack(3)

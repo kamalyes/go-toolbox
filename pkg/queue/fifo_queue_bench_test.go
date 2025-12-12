@@ -3,25 +3,23 @@
  * @Date: 2024-11-10 21:51:58
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2025-08-21 18:57:15
- * @FilePath: \go-toolbox\tests\fifo_queue_bench_test.go
+ * @FilePath: \go-toolbox\pkg\queue\fifo_queue_bench_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
 
-package tests
+package queue
 
 import (
 	"context"
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/kamalyes/go-toolbox/pkg/queue"
 )
 
-func BenchmarkFIFOQueue_Enqueue(b *testing.B) {
-	q := queue.NewFIFOQueue(1000, true)
+func BenchmarkFIFOQueueEnqueue(b *testing.B) {
+	q := NewFIFOQueue(1000, true)
 	ctx := context.Background()
 
 	b.ResetTimer() // 重置计时器，确保不包括设置时间
@@ -32,8 +30,8 @@ func BenchmarkFIFOQueue_Enqueue(b *testing.B) {
 	}
 }
 
-func BenchmarkFIFOQueue_Dequeue(b *testing.B) {
-	q := queue.NewFIFOQueue(1000, true)
+func BenchmarkFIFOQueueDequeue(b *testing.B) {
+	q := NewFIFOQueue(1000, true)
 	ctx := context.Background()
 
 	// 先填充队列
@@ -51,8 +49,8 @@ func BenchmarkFIFOQueue_Dequeue(b *testing.B) {
 	}
 }
 
-func BenchmarkFIFOQueue_Concurrent(b *testing.B) {
-	q := queue.NewFIFOQueue(1000, true)
+func BenchmarkFIFOQueueConcurrent(b *testing.B) {
+	q := NewFIFOQueue(1000, true)
 	ctx := context.Background()
 	var wg sync.WaitGroup
 	var errChan = make(chan error, 10) // 用于收集错误

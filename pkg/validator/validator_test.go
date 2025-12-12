@@ -3,18 +3,17 @@
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2025-06-11 17:17:15
- * @FilePath: \go-toolbox\tests\validator_test.go
+ * @FilePath: \go-toolbox\pkg\validator\validator_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package validator
 
 import (
 	"reflect"
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/validator"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -84,7 +83,7 @@ func TestIsEmptyValue(t *testing.T) {
 			}
 			return reflect.TypeOf(test.value).String()
 		}(), func(t *testing.T) {
-			result := validator.IsEmptyValue(reflect.ValueOf(test.value))
+			result := IsEmptyValue(reflect.ValueOf(test.value))
 			assert.Equal(t, test.expected, result)
 		})
 	}
@@ -104,7 +103,7 @@ func TestHasEmpty(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run("HasEmpty", func(t *testing.T) {
-			result, count := validator.HasEmpty(test.elems)
+			result, count := HasEmpty(test.elems)
 			assert.Equal(t, test.expected, result)
 			assert.Equal(t, test.count, count)
 		})
@@ -124,7 +123,7 @@ func TestIsAllEmpty(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run("IsAllEmpty", func(t *testing.T) {
-			result := validator.IsAllEmpty(test.elems)
+			result := IsAllEmpty(test.elems)
 			assert.Equal(t, test.expected, result)
 		})
 	}
@@ -144,7 +143,7 @@ func TestIsUndefined(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.str, func(t *testing.T) {
-			result := validator.IsUndefined(test.str)
+			result := IsUndefined(test.str)
 			assert.Equal(t, test.expected, result)
 		})
 	}
@@ -163,7 +162,7 @@ func TestContainsChinese(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.str, func(t *testing.T) {
-			result := validator.ContainsChinese(test.str)
+			result := ContainsChinese(test.str)
 			assert.Equal(t, test.expected, result)
 		})
 	}
@@ -181,7 +180,7 @@ func TestEmptyToDefault(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.str, func(t *testing.T) {
-			result := validator.EmptyToDefault(test.str, test.defaultStr)
+			result := EmptyToDefault(test.str, test.defaultStr)
 			assert.Equal(t, test.expected, result)
 		})
 	}
@@ -190,77 +189,77 @@ func TestEmptyToDefault(t *testing.T) {
 func TestIsNil(t *testing.T) {
 	// 测试 nil interface
 	var nilInterface interface{}
-	assert.True(t, validator.IsNil(nilInterface), "Expected nil interface to return true")
+	assert.True(t, IsNil(nilInterface), "Expected nil interface to return true")
 
 	// 测试 nil map
 	var nilMap map[string]int
-	assert.True(t, validator.IsNil(nilMap), "Expected nil map to return true")
+	assert.True(t, IsNil(nilMap), "Expected nil map to return true")
 
 	// 测试空 map
 	emptyMap := make(map[string]int)
-	assert.False(t, validator.IsNil(emptyMap), "Expected empty map to return false")
+	assert.False(t, IsNil(emptyMap), "Expected empty map to return false")
 
 	// 测试非 nil map
 	nonNilMap := map[string]int{"key": 1}
-	assert.False(t, validator.IsNil(nonNilMap), "Expected non-nil map to return false")
+	assert.False(t, IsNil(nonNilMap), "Expected non-nil map to return false")
 
 	// 测试指向 nil 的 map
 	var ptrToNilMap *map[string]int
-	assert.True(t, validator.IsNil(ptrToNilMap), "Expected pointer to nil map to return true")
+	assert.True(t, IsNil(ptrToNilMap), "Expected pointer to nil map to return true")
 
 	// 测试指向空 map 的指针
 	ptrToEmptyMap := &emptyMap
-	assert.False(t, validator.IsNil(ptrToEmptyMap), "Expected pointer to empty map to return false")
+	assert.False(t, IsNil(ptrToEmptyMap), "Expected pointer to empty map to return false")
 
 	// 测试非 nil 指针
 	num := 42
 	ptrToNum := &num
-	assert.False(t, validator.IsNil(ptrToNum), "Expected pointer to non-nil value to return false")
+	assert.False(t, IsNil(ptrToNum), "Expected pointer to non-nil value to return false")
 
 	// 测试 nil 切片
 	var nilSlice []int
-	assert.True(t, validator.IsNil(nilSlice), "Expected nil slice to return true")
+	assert.True(t, IsNil(nilSlice), "Expected nil slice to return true")
 
 	// 测试空切片
 	emptySlice := []int{}
-	assert.False(t, validator.IsNil(emptySlice), "Expected empty slice to return false")
+	assert.False(t, IsNil(emptySlice), "Expected empty slice to return false")
 
 	// 测试非 nil 切片
 	nonNilSlice := []int{1, 2, 3}
-	assert.False(t, validator.IsNil(nonNilSlice), "Expected non-nil slice to return false")
+	assert.False(t, IsNil(nonNilSlice), "Expected non-nil slice to return false")
 
 	// 测试指向 nil 切片的指针
 	var ptrToNilSlice *[]int
-	assert.True(t, validator.IsNil(ptrToNilSlice), "Expected pointer to nil slice to return true")
+	assert.True(t, IsNil(ptrToNilSlice), "Expected pointer to nil slice to return true")
 
 	// 测试指向空切片的指针
 	ptrToEmptySlice := &emptySlice
-	assert.False(t, validator.IsNil(ptrToEmptySlice), "Expected pointer to empty slice to return false")
+	assert.False(t, IsNil(ptrToEmptySlice), "Expected pointer to empty slice to return false")
 
 	// 测试 nil 通道
 	var nilChan chan int
-	assert.True(t, validator.IsNil(nilChan), "Expected nil channel to return true")
+	assert.True(t, IsNil(nilChan), "Expected nil channel to return true")
 
 	// 测试空通道
 	emptyChan := make(chan int)
-	assert.False(t, validator.IsNil(emptyChan), "Expected empty channel to return false")
+	assert.False(t, IsNil(emptyChan), "Expected empty channel to return false")
 
 	// 测试指向 nil 通道的指针
 	var ptrToNilChan *chan int
-	assert.True(t, validator.IsNil(ptrToNilChan), "Expected pointer to nil channel to return true")
+	assert.True(t, IsNil(ptrToNilChan), "Expected pointer to nil channel to return true")
 
 	// 测试指向非 nil 通道的指针
 	nonNilChan := make(chan int, 1)
-	assert.False(t, validator.IsNil(nonNilChan), "Expected non-nil channel to return false")
+	assert.False(t, IsNil(nonNilChan), "Expected non-nil channel to return false")
 
 	// 测试 nil 接口
 	var nilInterfaceValue interface{}
-	assert.True(t, validator.IsNil(nilInterfaceValue), "Expected nil interface value to return true")
+	assert.True(t, IsNil(nilInterfaceValue), "Expected nil interface value to return true")
 
 	// 测试指向非 nil 接口的指针
 	var nonNilInterfaceValue interface{} = 42
 	ptrToNonNilInterface := &nonNilInterfaceValue
-	assert.False(t, validator.IsNil(ptrToNonNilInterface), "Expected pointer to non-nil interface to return false")
+	assert.False(t, IsNil(ptrToNonNilInterface), "Expected pointer to non-nil interface to return false")
 }
 
 func TestIsIPAllowed(t *testing.T) {
@@ -350,7 +349,7 @@ func TestIsIPAllowed(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := validator.IsIPAllowed(tt.ip, tt.cidrList)
+			got := IsIPAllowed(tt.ip, tt.cidrList)
 			assert.Equal(t, tt.want, got, "IP: %s, Rules: %v", tt.ip, tt.cidrList)
 		})
 	}
@@ -365,14 +364,14 @@ func TestIsFuncType(t *testing.T) {
 		typCheck func() bool
 		want     bool
 	}{
-		{"int", func() bool { return validator.IsFuncType[int]() }, false},
-		{"string", func() bool { return validator.IsFuncType[string]() }, false},
-		{"struct", func() bool { return validator.IsFuncType[MyStruct]() }, false},
-		{"pointer", func() bool { return validator.IsFuncType[*MyStruct]() }, false},
-		{"slice", func() bool { return validator.IsFuncType[[]int]() }, false},
-		{"map", func() bool { return validator.IsFuncType[map[string]int]() }, false},
-		{"func type", func() bool { return validator.IsFuncType[FuncType]() }, true},
-		{"func literal type", func() bool { return validator.IsFuncType[func(int) int]() }, true},
+		{"int", func() bool { return IsFuncType[int]() }, false},
+		{"string", func() bool { return IsFuncType[string]() }, false},
+		{"struct", func() bool { return IsFuncType[MyStruct]() }, false},
+		{"pointer", func() bool { return IsFuncType[*MyStruct]() }, false},
+		{"slice", func() bool { return IsFuncType[[]int]() }, false},
+		{"map", func() bool { return IsFuncType[map[string]int]() }, false},
+		{"func type", func() bool { return IsFuncType[FuncType]() }, true},
+		{"func literal type", func() bool { return IsFuncType[func(int) int]() }, true},
 	}
 
 	for _, tt := range tests {

@@ -2,20 +2,19 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-09 00:25:15
- * @FilePath: \go-toolbox\tests\location_amap_test.go
+ * @LastEditTime: 2025-12-12 23:18:58
+ * @FilePath: \go-toolbox\pkg\location\amap_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package location
 
 import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/location"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -43,7 +42,7 @@ func TestGetGPSByIpAmap(t *testing.T) {
 	ip := "8.8.8.8"       // 示例 IP 地址
 
 	// 调用被测试的函数
-	data, err := location.GetGPSByIpAmap(amapKey, amapSign, amapUrl, ip)
+	data, err := GetGPSByIpAmap(amapKey, amapSign, amapUrl, ip)
 	assert.NoError(t, err, "期望没有错误，但得到 %v", err)
 
 	// 验证响应
@@ -69,7 +68,7 @@ func TestGetGPSByIpAmap_Error(t *testing.T) {
 	ip := "8.8.8.8"       // 示例 IP 地址
 
 	// 调用被测试的函数
-	data, err := location.GetGPSByIpAmap(amapKey, amapSign, amapUrl, ip)
+	data, err := GetGPSByIpAmap(amapKey, amapSign, amapUrl, ip)
 	assert.Error(t, err, "期望有错误，但没有得到")
 
 	// 验证数据为空
@@ -79,7 +78,7 @@ func TestGetGPSByIpAmap_Error(t *testing.T) {
 // TestGetGPSByIpAmap_MissingConfig 测试 GetGPSByIpAmap 函数缺少配置的情况
 func TestGetGPSByIpAmap_MissingConfig(t *testing.T) {
 	// 调用被测试的函数，缺少参数
-	data, err := location.GetGPSByIpAmap("", "", "", "")
+	data, err := GetGPSByIpAmap("", "", "", "")
 	assert.Error(t, err, "期望缺少配置时有错误，但没有得到")
 
 	// 验证数据为空

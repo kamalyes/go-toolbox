@@ -2,25 +2,24 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-10 21:51:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-11 00:55:15
- * @FilePath: \go-toolbox\tests\priority_queue_test.go
+ * @LastEditTime: 2025-12-12 23:19:20
+ * @FilePath: \go-toolbox\pkg\queue\priority_queue_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package queue
 
 import (
 	"context"
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/queue"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestPriorityQueue(t *testing.T) {
 	ctx := context.Background()
-	pq := queue.NewPriorityQueue() // 创建一个新的优先队列
+	pq := NewPriorityQueue() // 创建一个新的优先队列
 
 	// 测试队列是否为空
 	assert.True(t, pq.IsEmpty(), "期望队列为空")
@@ -58,7 +57,7 @@ func TestPriorityQueue(t *testing.T) {
 }
 
 func TestEnqueueWithCancel(t *testing.T) {
-	pq := queue.NewPriorityQueue() // 创建一个新的优先队列
+	pq := NewPriorityQueue() // 创建一个新的优先队列
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// 测试上下文取消
@@ -68,7 +67,7 @@ func TestEnqueueWithCancel(t *testing.T) {
 }
 
 func TestDequeueWithCancel(t *testing.T) {
-	pq := queue.NewPriorityQueue() // 创建一个新的优先队列
+	pq := NewPriorityQueue() // 创建一个新的优先队列
 	ctx, cancel := context.WithCancel(context.Background())
 	pq.Enqueue(ctx, "task1", 1) // 入队一个任务
 

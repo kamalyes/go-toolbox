@@ -2,26 +2,26 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-06-11 15:57:27
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-16 10:15:03
- * @FilePath: \go-toolbox\tests\retry_runner_test.go
+ * @LastEditTime: 2025-12-12 23:07:29
+ * @FilePath: \go-toolbox\pkg\retry\retry_runner_test.go
  * @Description:
  *
  * Copyright (c) 2025 by kamalyes, All Rights Reserved.
  */
-package tests
+package retry
 
 import (
 	"context"
 	"errors"
-	"github.com/kamalyes/go-toolbox/pkg/retry"
-	"github.com/stretchr/testify/assert"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
-func TestRunner_Run_Success(t *testing.T) {
-	r := retry.NewRunner[int]()
+func TestRunnerRunSuccess(t *testing.T) {
+	r := NewRunner[int]()
 
 	result, err := r.Run(func(ctx context.Context) (int, error) {
 		return 42, nil
@@ -31,18 +31,18 @@ func TestRunner_Run_Success(t *testing.T) {
 	assert.Equal(t, 42, result)
 }
 
-func TestRunner_Run_FnIsNil(t *testing.T) {
-	r := retry.NewRunner[int]()
+func TestRunnerRunFnIsNil(t *testing.T) {
+	r := NewRunner[int]()
 	result, err := r.Run(nil)
 
 	assert.Error(t, err)
-	assert.Equal(t, retry.ErrFunIsNil, err)
+	assert.Equal(t, ErrFunIsNil, err)
 	var zero int
 	assert.Equal(t, zero, result)
 }
 
-func TestRunner_Run_PanicRecovered(t *testing.T) {
-	r := retry.NewRunner[int]()
+func TestRunnerRunPanicRecovered(t *testing.T) {
+	r := NewRunner[int]()
 
 	result, err := r.Run(func(ctx context.Context) (int, error) {
 		panic("something went wrong")
@@ -54,8 +54,8 @@ func TestRunner_Run_PanicRecovered(t *testing.T) {
 	assert.Equal(t, zero, result)
 }
 
-func TestRunner_Run_Timeout(t *testing.T) {
-	r := retry.NewRunner[int]().Timeout(50 * time.Millisecond)
+func TestRunnerRunTimeout(t *testing.T) {
+	r := NewRunner[int]().Timeout(50 * time.Millisecond)
 
 	timeoutCalled := false
 	r.OnTimeout(func() {
@@ -69,15 +69,15 @@ func TestRunner_Run_Timeout(t *testing.T) {
 	})
 
 	assert.Error(t, err)
-	assert.True(t, errors.Is(err, retry.ErrTimeout))
+	assert.True(t, errors.Is(err, ErrTimeout))
 	assert.True(t, timeoutCalled)
 	var zero int
 	assert.Equal(t, zero, result)
 }
 
-func TestRunner_Run_CustomTimeoutErr(t *testing.T) {
+func TestRunnerRunCustomTimeoutErr(t *testing.T) {
 	customErr := errors.New("custom timeout error")
-	r := retry.NewRunner[int]().Timeout(50 * time.Millisecond).CustomTimeoutErr(customErr)
+	r := NewRunner[int]().Timeout(50 * time.Millisecond).CustomTimeoutErr(customErr)
 
 	result, err := r.Run(func(ctx context.Context) (int, error) {
 		time.Sleep(100 * time.Millisecond)
@@ -90,8 +90,8 @@ func TestRunner_Run_CustomTimeoutErr(t *testing.T) {
 	assert.Equal(t, zero, result)
 }
 
-func TestRunner_Run_OnSuccessCalled(t *testing.T) {
-	r := retry.NewRunner[int]()
+func TestRunnerRunOnSuccessCalled(t *testing.T) {
+	r := NewRunner[int]()
 
 	doneCalled := false
 	var doneResult int
@@ -117,8 +117,8 @@ func TestRunner_Run_OnSuccessCalled(t *testing.T) {
 	assert.NoError(t, doneErr)
 }
 
-func TestRunner_Run_OnErrorCalled(t *testing.T) {
-	r := retry.NewRunner[int]()
+func TestRunnerRunOnErrorCalled(t *testing.T) {
+	r := NewRunner[int]()
 
 	errorCalled := false
 	var errorResult int
@@ -146,8 +146,8 @@ func TestRunner_Run_OnErrorCalled(t *testing.T) {
 	assert.Equal(t, testErr, errorErr)
 }
 
-func TestRunner_RunWithLock_Success(t *testing.T) {
-	r := retry.NewRunner[int]()
+func TestRunnerRunWithLockSuccess(t *testing.T) {
+	r := NewRunner[int]()
 	mu := &sync.Mutex{}
 
 	result, err := r.RunWithLock(mu, func(ctx context.Context) (int, error) {
@@ -158,21 +158,21 @@ func TestRunner_RunWithLock_Success(t *testing.T) {
 	assert.Equal(t, 99, result)
 }
 
-func TestRunner_RunWithLock_LockIsNil(t *testing.T) {
-	r := retry.NewRunner[int]()
+func TestRunnerRunWithLockLockIsNil(t *testing.T) {
+	r := NewRunner[int]()
 
 	result, err := r.RunWithLock(nil, func(ctx context.Context) (int, error) {
 		return 1, nil
 	})
 
 	assert.Error(t, err)
-	assert.Equal(t, retry.ErrLockIsNil, err)
+	assert.Equal(t, ErrLockIsNil, err)
 	var zero int
 	assert.Equal(t, zero, result)
 }
 
-func TestRunner_RunWithLock_Concurrent(t *testing.T) {
-	r := retry.NewRunner[int]()
+func TestRunnerRunWithLockConcurrent(t *testing.T) {
+	r := NewRunner[int]()
 	mu := &sync.Mutex{}
 
 	counter := 0
@@ -197,8 +197,8 @@ func TestRunner_RunWithLock_Concurrent(t *testing.T) {
 }
 
 // 测试 GetTimeout 方法
-func TestRunner_GetTimeout(t *testing.T) {
-	r := retry.NewRunner[int]()
+func TestRunnerGetTimeout(t *testing.T) {
+	r := NewRunner[int]()
 
 	// 默认值应该是0
 	assert.Equal(t, time.Duration(0), r.GetTimeout())
@@ -209,12 +209,12 @@ func TestRunner_GetTimeout(t *testing.T) {
 }
 
 // 测试链式调用
-func TestRunner_ChainedCalls(t *testing.T) {
+func TestRunnerChainedCalls(t *testing.T) {
 	successCalled := false
 	errorCalled := false
 	timeoutCalled := false
 
-	r := retry.NewRunner[string]().
+	r := NewRunner[string]().
 		Timeout(time.Second).
 		OnSuccess(func(result string, err error) { successCalled = true }).
 		OnError(func(result string, err error) { errorCalled = true }).
@@ -236,8 +236,8 @@ func TestRunner_ChainedCalls(t *testing.T) {
 }
 
 // 测试无超时情况下的 panic
-func TestRunner_PanicWithoutTimeout(t *testing.T) {
-	r := retry.NewRunner[int]()
+func TestRunnerPanicWithoutTimeout(t *testing.T) {
+	r := NewRunner[int]()
 	// 不设置超时
 
 	result, err := r.Run(func(ctx context.Context) (int, error) {
@@ -250,8 +250,8 @@ func TestRunner_PanicWithoutTimeout(t *testing.T) {
 }
 
 // 测试无超时情况下的错误
-func TestRunner_ErrorWithoutTimeout(t *testing.T) {
-	r := retry.NewRunner[string]()
+func TestRunnerErrorWithoutTimeout(t *testing.T) {
+	r := NewRunner[string]()
 	testErr := errors.New("test error without timeout")
 
 	result, err := r.Run(func(ctx context.Context) (string, error) {
@@ -263,8 +263,8 @@ func TestRunner_ErrorWithoutTimeout(t *testing.T) {
 }
 
 // 测试无超时情况下的成功
-func TestRunner_SuccessWithoutTimeout(t *testing.T) {
-	r := retry.NewRunner[float64]()
+func TestRunnerSuccessWithoutTimeout(t *testing.T) {
+	r := NewRunner[float64]()
 
 	result, err := r.Run(func(ctx context.Context) (float64, error) {
 		return 3.14, nil
@@ -275,8 +275,8 @@ func TestRunner_SuccessWithoutTimeout(t *testing.T) {
 }
 
 // 测试带超时的 panic
-func TestRunner_PanicWithTimeout(t *testing.T) {
-	r := retry.NewRunner[int]().
+func TestRunnerPanicWithTimeout(t *testing.T) {
+	r := NewRunner[int]().
 		Timeout(time.Second)
 
 	result, err := r.Run(func(ctx context.Context) (int, error) {
@@ -289,9 +289,9 @@ func TestRunner_PanicWithTimeout(t *testing.T) {
 }
 
 // 测试带超时的错误
-func TestRunner_ErrorWithTimeout(t *testing.T) {
+func TestRunnerErrorWithTimeout(t *testing.T) {
 	errorCalled := false
-	r := retry.NewRunner[int]().
+	r := NewRunner[int]().
 		Timeout(time.Second).
 		OnError(func(result int, err error) {
 			errorCalled = true
@@ -308,9 +308,9 @@ func TestRunner_ErrorWithTimeout(t *testing.T) {
 }
 
 // 测试带超时的成功
-func TestRunner_SuccessWithTimeout(t *testing.T) {
+func TestRunnerSuccessWithTimeout(t *testing.T) {
 	successCalled := false
-	r := retry.NewRunner[int]().
+	r := NewRunner[int]().
 		Timeout(time.Second).
 		OnSuccess(func(result int, err error) {
 			successCalled = true
@@ -326,9 +326,9 @@ func TestRunner_SuccessWithTimeout(t *testing.T) {
 }
 
 // 测试超时回调在超时时被调用
-func TestRunner_TimeoutCallbackCalled(t *testing.T) {
+func TestRunnerTimeoutCallbackCalled(t *testing.T) {
 	timeoutCalled := false
-	r := retry.NewRunner[int]().
+	r := NewRunner[int]().
 		Timeout(50 * time.Millisecond).
 		OnTimeout(func() {
 			timeoutCalled = true
@@ -344,8 +344,8 @@ func TestRunner_TimeoutCallbackCalled(t *testing.T) {
 }
 
 // 测试超时时不设置超时回调
-func TestRunner_TimeoutWithoutCallback(t *testing.T) {
-	r := retry.NewRunner[int]().
+func TestRunnerTimeoutWithoutCallback(t *testing.T) {
+	r := NewRunner[int]().
 		Timeout(50 * time.Millisecond)
 	// 不设置 OnTimeout
 
@@ -355,12 +355,12 @@ func TestRunner_TimeoutWithoutCallback(t *testing.T) {
 	})
 
 	assert.Error(t, err)
-	assert.True(t, errors.Is(err, retry.ErrTimeout))
+	assert.True(t, errors.Is(err, ErrTimeout))
 }
 
 // 测试不设置任何回调的情况
-func TestRunner_NoCallbacks(t *testing.T) {
-	r := retry.NewRunner[int]().
+func TestRunnerNoCallbacks(t *testing.T) {
+	r := NewRunner[int]().
 		Timeout(time.Second)
 
 	// 成功情况
@@ -379,9 +379,9 @@ func TestRunner_NoCallbacks(t *testing.T) {
 }
 
 // 测试不同泛型类型
-func TestRunner_DifferentGenericTypes(t *testing.T) {
+func TestRunnerDifferentGenericTypes(t *testing.T) {
 	t.Run("string type", func(t *testing.T) {
-		r := retry.NewRunner[string]()
+		r := NewRunner[string]()
 		result, err := r.Run(func(ctx context.Context) (string, error) {
 			return "hello", nil
 		})
@@ -394,7 +394,7 @@ func TestRunner_DifferentGenericTypes(t *testing.T) {
 			Name string
 			Age  int
 		}
-		r := retry.NewRunner[Person]()
+		r := NewRunner[Person]()
 		result, err := r.Run(func(ctx context.Context) (Person, error) {
 			return Person{Name: "Alice", Age: 30}, nil
 		})
@@ -404,7 +404,7 @@ func TestRunner_DifferentGenericTypes(t *testing.T) {
 	})
 
 	t.Run("slice type", func(t *testing.T) {
-		r := retry.NewRunner[[]int]()
+		r := NewRunner[[]int]()
 		result, err := r.Run(func(ctx context.Context) ([]int, error) {
 			return []int{1, 2, 3}, nil
 		})
@@ -413,7 +413,7 @@ func TestRunner_DifferentGenericTypes(t *testing.T) {
 	})
 
 	t.Run("map type", func(t *testing.T) {
-		r := retry.NewRunner[map[string]int]()
+		r := NewRunner[map[string]int]()
 		result, err := r.Run(func(ctx context.Context) (map[string]int, error) {
 			return map[string]int{"a": 1, "b": 2}, nil
 		})
@@ -423,7 +423,7 @@ func TestRunner_DifferentGenericTypes(t *testing.T) {
 	})
 
 	t.Run("pointer type", func(t *testing.T) {
-		r := retry.NewRunner[*int]()
+		r := NewRunner[*int]()
 		val := 42
 		result, err := r.Run(func(ctx context.Context) (*int, error) {
 			return &val, nil
@@ -433,7 +433,7 @@ func TestRunner_DifferentGenericTypes(t *testing.T) {
 	})
 
 	t.Run("interface type", func(t *testing.T) {
-		r := retry.NewRunner[interface{}]()
+		r := NewRunner[interface{}]()
 		result, err := r.Run(func(ctx context.Context) (interface{}, error) {
 			return "interface value", nil
 		})
@@ -443,9 +443,9 @@ func TestRunner_DifferentGenericTypes(t *testing.T) {
 }
 
 // 测试零值返回
-func TestRunner_ZeroValueReturn(t *testing.T) {
+func TestRunnerZeroValueReturn(t *testing.T) {
 	t.Run("int zero value on error", func(t *testing.T) {
-		r := retry.NewRunner[int]()
+		r := NewRunner[int]()
 		result, err := r.Run(func(ctx context.Context) (int, error) {
 			return 0, errors.New("error")
 		})
@@ -454,7 +454,7 @@ func TestRunner_ZeroValueReturn(t *testing.T) {
 	})
 
 	t.Run("string zero value on panic", func(t *testing.T) {
-		r := retry.NewRunner[string]()
+		r := NewRunner[string]()
 		result, err := r.Run(func(ctx context.Context) (string, error) {
 			panic("oops")
 		})
@@ -463,7 +463,7 @@ func TestRunner_ZeroValueReturn(t *testing.T) {
 	})
 
 	t.Run("bool zero value on timeout", func(t *testing.T) {
-		r := retry.NewRunner[bool]().Timeout(10 * time.Millisecond)
+		r := NewRunner[bool]().Timeout(10 * time.Millisecond)
 		result, err := r.Run(func(ctx context.Context) (bool, error) {
 			time.Sleep(100 * time.Millisecond)
 			return true, nil
@@ -474,7 +474,7 @@ func TestRunner_ZeroValueReturn(t *testing.T) {
 }
 
 // 测试并发执行多个 Runner
-func TestRunner_ConcurrentRunners(t *testing.T) {
+func TestRunnerConcurrentRunners(t *testing.T) {
 	var wg sync.WaitGroup
 	const goroutines = 10
 
@@ -482,7 +482,7 @@ func TestRunner_ConcurrentRunners(t *testing.T) {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			r := retry.NewRunner[int]().Timeout(time.Second)
+			r := NewRunner[int]().Timeout(time.Second)
 			result, err := r.Run(func(ctx context.Context) (int, error) {
 				return idx * 2, nil
 			})
@@ -495,8 +495,8 @@ func TestRunner_ConcurrentRunners(t *testing.T) {
 }
 
 // 测试 RunWithLock 带 panic
-func TestRunner_RunWithLock_Panic(t *testing.T) {
-	r := retry.NewRunner[int]()
+func TestRunnerRunWithLockPanic(t *testing.T) {
+	r := NewRunner[int]()
 	mu := &sync.Mutex{}
 
 	result, err := r.RunWithLock(mu, func(ctx context.Context) (int, error) {
@@ -509,8 +509,8 @@ func TestRunner_RunWithLock_Panic(t *testing.T) {
 }
 
 // 测试 RunWithLock 带超时
-func TestRunner_RunWithLock_Timeout(t *testing.T) {
-	r := retry.NewRunner[int]().Timeout(50 * time.Millisecond)
+func TestRunnerRunWithLockTimeout(t *testing.T) {
+	r := NewRunner[int]().Timeout(50 * time.Millisecond)
 	mu := &sync.Mutex{}
 
 	result, err := r.RunWithLock(mu, func(ctx context.Context) (int, error) {
@@ -519,14 +519,14 @@ func TestRunner_RunWithLock_Timeout(t *testing.T) {
 	})
 
 	assert.Error(t, err)
-	assert.True(t, errors.Is(err, retry.ErrTimeout))
+	assert.True(t, errors.Is(err, ErrTimeout))
 	assert.Equal(t, 0, result)
 }
 
 // 测试 RunWithLock 带自定义超时错误
-func TestRunner_RunWithLock_CustomTimeout(t *testing.T) {
+func TestRunnerRunWithLockCustomTimeout(t *testing.T) {
 	customErr := errors.New("custom lock timeout")
-	r := retry.NewRunner[int]().
+	r := NewRunner[int]().
 		Timeout(50 * time.Millisecond).
 		CustomTimeoutErr(customErr)
 	mu := &sync.Mutex{}
@@ -541,20 +541,20 @@ func TestRunner_RunWithLock_CustomTimeout(t *testing.T) {
 }
 
 // 测试 RunWithLock fn 为 nil
-func TestRunner_RunWithLock_FnIsNil(t *testing.T) {
-	r := retry.NewRunner[int]()
+func TestRunnerRunWithLockFnIsNil(t *testing.T) {
+	r := NewRunner[int]()
 	mu := &sync.Mutex{}
 
 	result, err := r.RunWithLock(mu, nil)
 
 	assert.Error(t, err)
-	assert.Equal(t, retry.ErrFunIsNil, err)
+	assert.Equal(t, ErrFunIsNil, err)
 	assert.Equal(t, 0, result)
 }
 
 // 测试上下文检测
-func TestRunner_ContextRespect(t *testing.T) {
-	r := retry.NewRunner[int]().Timeout(time.Second)
+func TestRunnerContextRespect(t *testing.T) {
+	r := NewRunner[int]().Timeout(time.Second)
 
 	// 任务应该能够检测到上下文
 	result, err := r.Run(func(ctx context.Context) (int, error) {
@@ -571,9 +571,9 @@ func TestRunner_ContextRespect(t *testing.T) {
 }
 
 // 测试快速成功（不应该触发超时）
-func TestRunner_FastSuccess(t *testing.T) {
+func TestRunnerFastSuccess(t *testing.T) {
 	timeoutCalled := false
-	r := retry.NewRunner[int]().
+	r := NewRunner[int]().
 		Timeout(time.Second).
 		OnTimeout(func() {
 			timeoutCalled = true
@@ -589,10 +589,10 @@ func TestRunner_FastSuccess(t *testing.T) {
 }
 
 // 测试快速错误（不应该触发超时）
-func TestRunner_FastError(t *testing.T) {
+func TestRunnerFastError(t *testing.T) {
 	timeoutCalled := false
 	errorCalled := false
-	r := retry.NewRunner[int]().
+	r := NewRunner[int]().
 		Timeout(time.Second).
 		OnTimeout(func() {
 			timeoutCalled = true
@@ -612,12 +612,12 @@ func TestRunner_FastError(t *testing.T) {
 }
 
 // 测试回调接收正确的参数
-func TestRunner_CallbackParams(t *testing.T) {
+func TestRunnerCallbackParams(t *testing.T) {
 	t.Run("success callback params", func(t *testing.T) {
 		var cbResult int
 		var cbErr error
 
-		r := retry.NewRunner[int]().
+		r := NewRunner[int]().
 			OnSuccess(func(result int, err error) {
 				cbResult = result
 				cbErr = err
@@ -638,7 +638,7 @@ func TestRunner_CallbackParams(t *testing.T) {
 		var cbErr error
 		testErr := errors.New("test error")
 
-		r := retry.NewRunner[int]().
+		r := NewRunner[int]().
 			OnError(func(result int, err error) {
 				cbResult = result
 				cbErr = err
@@ -656,8 +656,8 @@ func TestRunner_CallbackParams(t *testing.T) {
 }
 
 // 测试多次设置超时
-func TestRunner_MultipleTimeoutSets(t *testing.T) {
-	r := retry.NewRunner[int]()
+func TestRunnerMultipleTimeoutSets(t *testing.T) {
+	r := NewRunner[int]()
 
 	r.Timeout(100 * time.Millisecond)
 	assert.Equal(t, 100*time.Millisecond, r.GetTimeout())
@@ -670,11 +670,11 @@ func TestRunner_MultipleTimeoutSets(t *testing.T) {
 }
 
 // 测试多次设置回调
-func TestRunner_MultipleCallbackSets(t *testing.T) {
+func TestRunnerMultipleCallbackSets(t *testing.T) {
 	call1 := false
 	call2 := false
 
-	r := retry.NewRunner[int]().
+	r := NewRunner[int]().
 		OnSuccess(func(result int, err error) {
 			call1 = true
 		}).
@@ -693,8 +693,8 @@ func TestRunner_MultipleCallbackSets(t *testing.T) {
 }
 
 // 测试超时边界值
-func TestRunner_TimeoutBoundary(t *testing.T) {
-	r := retry.NewRunner[int]().Timeout(100 * time.Millisecond)
+func TestRunnerTimeoutBoundary(t *testing.T) {
+	r := NewRunner[int]().Timeout(100 * time.Millisecond)
 
 	// 任务执行时间刚好在边界
 	result, err := r.Run(func(ctx context.Context) (int, error) {
@@ -707,8 +707,8 @@ func TestRunner_TimeoutBoundary(t *testing.T) {
 }
 
 // 测试非常短的超时
-func TestRunner_VeryShortTimeout(t *testing.T) {
-	r := retry.NewRunner[int]().Timeout(1 * time.Nanosecond)
+func TestRunnerVeryShortTimeout(t *testing.T) {
+	r := NewRunner[int]().Timeout(1 * time.Nanosecond)
 
 	result, err := r.Run(func(ctx context.Context) (int, error) {
 		time.Sleep(100 * time.Millisecond)
@@ -720,9 +720,9 @@ func TestRunner_VeryShortTimeout(t *testing.T) {
 }
 
 // 测试错误变量
-func TestRunner_ErrorVariables(t *testing.T) {
-	assert.Equal(t, "function execution timeout", retry.ErrTimeout.Error())
-	assert.Equal(t, "fn cannot be nil", retry.ErrFunIsNil.Error())
-	assert.Equal(t, "lock cannot be nil", retry.ErrLockIsNil.Error())
-	assert.Equal(t, "panic recovered", retry.ErrPanic)
+func TestRunnerErrorVariables(t *testing.T) {
+	assert.Equal(t, "function execution timeout", ErrTimeout.Error())
+	assert.Equal(t, "fn cannot be nil", ErrFunIsNil.Error())
+	assert.Equal(t, "lock cannot be nil", ErrLockIsNil.Error())
+	assert.Equal(t, "panic recovered", ErrPanic)
 }

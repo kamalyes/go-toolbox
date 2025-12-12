@@ -2,32 +2,31 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date:2024-10-24 10:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-04 09:59:38
- * @FilePath: \go-toolbox\tests\json_base_test.go
+ * @LastEditTime: 2025-12-12 23:15:50
+ * @FilePath: \go-toolbox\pkg\json\base_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package json
 
 import (
 	"reflect"
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/json"
 	"github.com/stretchr/testify/assert"
 )
 
 // 辅助函数，创建测试用例
-func newTestCase(originalJSON string, pairs *json.KeyValuePairs, expected map[string]interface{}, expectError bool) struct {
+func newTestCase(originalJSON string, pairs *KeyValuePairs, expected map[string]interface{}, expectError bool) struct {
 	originalJSON string
-	pairs        *json.KeyValuePairs
+	pairs        *KeyValuePairs
 	expected     map[string]interface{}
 	expectError  bool
 } {
 	return struct {
 		originalJSON string
-		pairs        *json.KeyValuePairs
+		pairs        *KeyValuePairs
 		expected     map[string]interface{}
 		expectError  bool
 	}{
@@ -50,7 +49,7 @@ func checkJSONEquality(t testing.TB, result, expected map[string]interface{}) {
 // 辅助函数，解析 JSON 字符串并返回 map
 func parseJSON(t testing.TB, jsonStr []byte) map[string]interface{} {
 	var result map[string]interface{}
-	if err := json.Unmarshal(jsonStr, &result); err != nil {
+	if err := Unmarshal(jsonStr, &result); err != nil {
 		t.Fatalf("解析 JSON 失败: %v", err)
 	}
 	return result
@@ -60,13 +59,13 @@ func parseJSON(t testing.TB, jsonStr []byte) map[string]interface{} {
 func TestAppendKeysToJSON(t *testing.T) {
 	tests := []struct {
 		originalJSON string
-		pairs        *json.KeyValuePairs
+		pairs        *KeyValuePairs
 		expected     map[string]interface{}
 		expectError  bool // 新增字段，指示是否期望错误
 	}{
 		newTestCase(
 			`{"name": "Alice", "age": 30}`,
-			json.NewKeyValuePairs().Add("city", "New York").Add("country", "USA"),
+			NewKeyValuePairs().Add("city", "New York").Add("country", "USA"),
 			map[string]interface{}{
 				"name":    "Alice",
 				"age":     float64(30),
@@ -77,7 +76,7 @@ func TestAppendKeysToJSON(t *testing.T) {
 		),
 		newTestCase(
 			`{}`,
-			json.NewKeyValuePairs().Add("key1", "value1"),
+			NewKeyValuePairs().Add("key1", "value1"),
 			map[string]interface{}{
 				"key1": "value1",
 			},
@@ -85,7 +84,7 @@ func TestAppendKeysToJSON(t *testing.T) {
 		),
 		newTestCase(
 			`{"existing": "value"}`,
-			json.NewKeyValuePairs().Add("newKey", "newValue"),
+			NewKeyValuePairs().Add("newKey", "newValue"),
 			map[string]interface{}{
 				"existing": "value",
 				"newKey":   "newValue",
@@ -94,7 +93,7 @@ func TestAppendKeysToJSON(t *testing.T) {
 		),
 		newTestCase(
 			`{"a": 1}`,
-			json.NewKeyValuePairs().Add("b", 2).Add("c", 3),
+			NewKeyValuePairs().Add("b", 2).Add("c", 3),
 			map[string]interface{}{
 				"a": float64(1),
 				"b": float64(2),
@@ -105,14 +104,14 @@ func TestAppendKeysToJSON(t *testing.T) {
 		// 无效的 JSON 字符串
 		newTestCase(
 			`{"name": "Alice", "age": 30,}`,
-			json.NewKeyValuePairs().Add("city", "New York"),
+			NewKeyValuePairs().Add("city", "New York"),
 			nil,  // 预期返回 nil
 			true, // 期望错误
 		),
 		// 传入 nil 的 JSON 字符串
 		newTestCase(
 			`nil`,
-			json.NewKeyValuePairs().Add("key", "value"),
+			NewKeyValuePairs().Add("key", "value"),
 			nil,  // 预期返回 nil
 			true, // 期望错误
 		),
@@ -120,7 +119,7 @@ func TestAppendKeysToJSON(t *testing.T) {
 
 	// 遍历测试用例
 	for _, tt := range tests {
-		updatedJSON, err := json.AppendKeysToJSONMarshal(tt.originalJSON, tt.pairs)
+		updatedJSON, err := AppendKeysToJSONMarshal(tt.originalJSON, tt.pairs)
 		if tt.expectError {
 			// 如果期望错误，检查是否返回了错误
 			if err == nil {
@@ -168,17 +167,17 @@ func TestReplaceKeysComplex(t *testing.T) {
 
 	for _, test := range tests {
 		var data map[string]interface{}
-		if err := json.Unmarshal([]byte(test.input), &data); err != nil {
+		if err := Unmarshal([]byte(test.input), &data); err != nil {
 			t.Fatalf("Failed to unmarshal input: %v", err)
 		}
 
-		replacedData, err := json.ReplaceKeys(data, "_", "-")
+		replacedData, err := ReplaceKeys(data, "_", "-")
 		if err != nil {
 			t.Fatalf("Error during replacement: %v", err)
 		}
 
 		var expectedData map[string]interface{}
-		if err := json.Unmarshal([]byte(test.expected), &expectedData); err != nil {
+		if err := Unmarshal([]byte(test.expected), &expectedData); err != nil {
 			t.Fatalf("Failed to unmarshal expected output: %v", err)
 		}
 
@@ -195,13 +194,13 @@ type JsonUser struct {
 
 func TestMarshalWithExtraField_Object(t *testing.T) {
 	u := JsonUser{Name: "Alice", Age: 30}
-	b, err := json.MarshalWithExtraField(u, "extra", "hello")
+	b, err := MarshalWithExtraField(u, "extra", "hello")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	var result map[string]interface{}
-	if err := json.Unmarshal(b, &result); err != nil {
+	if err := Unmarshal(b, &result); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
 
@@ -221,13 +220,13 @@ func TestMarshalWithExtraField_Object(t *testing.T) {
 
 func TestMarshalWithExtraField_Map(t *testing.T) {
 	m := map[string]int{"a": 1, "b": 2}
-	b, err := json.MarshalWithExtraField(m, "x", 123)
+	b, err := MarshalWithExtraField(m, "x", 123)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	var result map[string]interface{}
-	if err := json.Unmarshal(b, &result); err != nil {
+	if err := Unmarshal(b, &result); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
 
@@ -241,7 +240,7 @@ func TestMarshalWithExtraField_Map(t *testing.T) {
 
 func TestMarshalWithExtraField_Array_Fail(t *testing.T) {
 	arr := []int{1, 2, 3}
-	_, err := json.MarshalWithExtraField(arr, "extra", "fail")
+	_, err := MarshalWithExtraField(arr, "extra", "fail")
 	if err == nil {
 		t.Errorf("expected error for array input, got nil")
 	}
@@ -249,7 +248,7 @@ func TestMarshalWithExtraField_Array_Fail(t *testing.T) {
 
 func TestMarshalWithExtraField_String_Fail(t *testing.T) {
 	s := "hello"
-	_, err := json.MarshalWithExtraField(s, "extra", "fail")
+	_, err := MarshalWithExtraField(s, "extra", "fail")
 	if err == nil {
 		t.Errorf("expected error for string input, got nil")
 	}
@@ -257,7 +256,7 @@ func TestMarshalWithExtraField_String_Fail(t *testing.T) {
 
 func TestMarshalWithExtraField_Number_Fail(t *testing.T) {
 	n := 42
-	_, err := json.MarshalWithExtraField(n, "extra", "fail")
+	_, err := MarshalWithExtraField(n, "extra", "fail")
 	if err == nil {
 		t.Errorf("expected error for number input, got nil")
 	}
@@ -275,15 +274,15 @@ func TestCompact(t *testing.T) {
 	}
 
 	for _, input := range cases {
-		compacted := json.Compact([]byte(input))
+		compacted := Compact([]byte(input))
 
 		var expectedObj interface{}
 		var actualObj interface{}
 
 		// 尝试解析原始输入
-		err1 := json.Unmarshal([]byte(input), &expectedObj)
+		err1 := Unmarshal([]byte(input), &expectedObj)
 		// 尝试解析压缩结果
-		err2 := json.Unmarshal([]byte(compacted), &actualObj)
+		err2 := Unmarshal([]byte(compacted), &actualObj)
 
 		if err1 == nil && err2 == nil {
 			// 都是合法 JSON，比较解析后结构是否相等
