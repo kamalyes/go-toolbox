@@ -1,3 +1,13 @@
+/*
+ * @Author: kamalyes 501893067@qq.com
+ * @Date: 2023-07-28 00:50:58
+ * @LastEditors: kamalyes 501893067@qq.com
+ * @LastEditTime: 2025-12-12 23:03:57
+ * @FilePath: \go-toolbox\pkg\random\generate.go
+ * @Description: 随机数据生成器
+ *
+ * Copyright (c) 2024 by kamalyes, All Rights Reserved.
+ */
 package random
 
 import (
@@ -32,7 +42,7 @@ func RegisterGenerator(name string, generator RandGeneratorFunc) {
 	if generator == nil {
 		return
 	}
-	
+
 	globalRegistry.mu.Lock()
 	defer globalRegistry.mu.Unlock()
 	globalRegistry.generators[name] = generator
@@ -57,7 +67,7 @@ func UnregisterGenerator(name string) {
 func ListRegisteredGenerators() []string {
 	globalRegistry.mu.RLock()
 	defer globalRegistry.mu.RUnlock()
-	
+
 	names := make([]string, 0, len(globalRegistry.generators))
 	for name := range globalRegistry.generators {
 		names = append(names, name)
@@ -72,13 +82,12 @@ func ClearAllGenerators() {
 	globalRegistry.generators = make(map[string]RandGeneratorFunc)
 }
 
-
 // isJSONSerializable 检查类型是否可以JSON序列化
 func isJSONSerializable(t reflect.Type) bool {
 	switch t.Kind() {
 	case reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		 reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
-		 reflect.Float32, reflect.Float64, reflect.String:
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64, reflect.String:
 		return true
 	case reflect.Array, reflect.Slice:
 		return isJSONSerializable(t.Elem())
@@ -109,12 +118,12 @@ func shouldSkipField(field reflect.StructField) bool {
 	if tag := field.Tag.Get("json"); tag == "-" {
 		return true
 	}
-	
+
 	// 检查是否可导出
 	if !field.IsExported() {
 		return true
 	}
-	
+
 	// 检查类型是否可JSON序列化（对于字段级别的检查）
 	return !isFieldJSONSerializable(field.Type)
 }
@@ -123,8 +132,8 @@ func shouldSkipField(field reflect.StructField) bool {
 func isFieldJSONSerializable(t reflect.Type) bool {
 	switch t.Kind() {
 	case reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		 reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
-		 reflect.Float32, reflect.Float64, reflect.String:
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64, reflect.String:
 		return true
 	case reflect.Array, reflect.Slice:
 		return isFieldJSONSerializable(t.Elem())
@@ -159,6 +168,7 @@ func isFieldJSONSerializable(t reflect.Type) bool {
 		return false
 	}
 }
+
 type GenerateRandModelOptions struct {
 	MaxDepth      int  // 最大递归深度，防止无限嵌套
 	MaxSliceLen   int  // 切片最大长度
@@ -217,7 +227,7 @@ func safeJSONMarshal(model interface{}) ([]byte, error) {
 	if data, err := convert.MustJSONIndent(model); err == nil {
 		return []byte(data), nil
 	}
-	
+
 	// 如果直接序列化失败，创建一个只包含支持字段的新结构体
 	return createSerializableStruct(model)
 }
@@ -228,39 +238,39 @@ func createSerializableStruct(model interface{}) ([]byte, error) {
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
 	}
-	
+
 	if v.Kind() != reflect.Struct {
 		return nil, fmt.Errorf("expected struct, got %s", v.Kind())
 	}
-	
+
 	// 创建一个map来存储可序列化的字段
 	result := make(map[string]interface{})
 	t := v.Type()
-	
+
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i)
 		fieldType := t.Field(i)
-		
+
 		// 跳过不支持的字段
 		if shouldSkipField(fieldType) {
 			continue
 		}
-		
+
 		// 获取JSON标签名
 		jsonName := getJSONName(fieldType)
 		if jsonName == "" {
 			continue
 		}
-		
+
 		// 递归处理字段值
 		value, err := getSerializableValue(field)
 		if err != nil {
 			continue // 跳过无法序列化的值
 		}
-		
+
 		result[jsonName] = value
 	}
-	
+
 	return json.Marshal(result)
 }
 
@@ -273,7 +283,7 @@ func getJSONName(field reflect.StructField) string {
 	if tag == "-" {
 		return ""
 	}
-	
+
 	// 处理 "name,omitempty" 这样的标签
 	parts := strings.Split(tag, ",")
 	return parts[0]
@@ -283,10 +293,10 @@ func getJSONName(field reflect.StructField) string {
 func getSerializableValue(v reflect.Value) (interface{}, error) {
 	switch v.Kind() {
 	case reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		 reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
-		 reflect.Float32, reflect.Float64, reflect.String:
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64, reflect.String:
 		return v.Interface(), nil
-		
+
 	case reflect.Slice, reflect.Array:
 		length := v.Len()
 		result := make([]interface{}, length)
@@ -298,7 +308,7 @@ func getSerializableValue(v reflect.Value) (interface{}, error) {
 			result[i] = item
 		}
 		return result, nil
-		
+
 	case reflect.Map:
 		if v.Type().Key().Kind() != reflect.String {
 			return nil, fmt.Errorf("map key must be string for JSON")
@@ -312,50 +322,50 @@ func getSerializableValue(v reflect.Value) (interface{}, error) {
 			result[key.String()] = val
 		}
 		return result, nil
-		
+
 	case reflect.Ptr:
 		if v.IsNil() {
 			return nil, nil
 		}
 		return getSerializableValue(v.Elem())
-		
+
 	case reflect.Struct:
 		if v.Type() == reflect.TypeOf(time.Time{}) {
 			return v.Interface(), nil
 		}
-		
+
 		// 对于嵌套结构体，递归处理
 		result := make(map[string]interface{})
 		t := v.Type()
-		
+
 		for i := 0; i < v.NumField(); i++ {
 			field := v.Field(i)
 			fieldType := t.Field(i)
-			
+
 			if shouldSkipField(fieldType) {
 				continue
 			}
-			
+
 			jsonName := getJSONName(fieldType)
 			if jsonName == "" {
 				continue
 			}
-			
+
 			value, err := getSerializableValue(field)
 			if err != nil {
 				continue
 			}
-			
+
 			result[jsonName] = value
 		}
 		return result, nil
-		
+
 	case reflect.Interface:
 		if v.IsNil() {
 			return nil, nil
 		}
 		return getSerializableValue(v.Elem())
-		
+
 	default:
 		return nil, fmt.Errorf("unsupported type: %s", v.Kind())
 	}
@@ -376,12 +386,12 @@ func populateFieldsEnhanced(v reflect.Value, opts *GenerateRandModelOptions, dep
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i)
 		fieldType := v.Type().Field(i)
-		
+
 		// 检查是否应该跳过此字段
 		if shouldSkipField(fieldType) {
 			continue
 		}
-		
+
 		// 仅处理导出字段
 		if field.CanSet() {
 			// 根据字段类型设置随机值
@@ -405,47 +415,47 @@ func setRandValueEnhanced(field reflect.Value, fieldType reflect.StructField, op
 	switch fieldType.Type.Kind() {
 	case reflect.String:
 		field.SetString(FRandString(opts.StringLength))
-		
+
 	case reflect.Bool:
 		field.SetBool(FRandBool())
-		
+
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		field.SetInt(int64(FRandInt(1, 100)))
-		
+
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		field.SetUint(uint64(FRandInt(1, 100)))
-		
+
 	case reflect.Float32, reflect.Float64:
 		field.SetFloat(RandFloat(1.0, 100.0))
-		
+
 	case reflect.Complex64, reflect.Complex128:
 		// 复数类型无法JSON序列化，不设置任何值，保持零值
 		// 这样JSON序列化时这些字段会被忽略或者导致错误被捕获
-		
+
 	case reflect.Struct:
 		return handleStructField(field, fieldType, opts, depth)
-		
+
 	case reflect.Slice:
 		return setRandSliceEnhanced(field, fieldType, opts, depth)
-		
+
 	case reflect.Array:
 		return setRandArrayEnhanced(field, fieldType, opts, depth)
-		
+
 	case reflect.Map:
 		return setRandMapEnhanced(field, fieldType, opts, depth)
-		
+
 	case reflect.Ptr:
 		return setRandPointerEnhanced(field, fieldType, opts, depth)
-		
+
 	case reflect.Interface:
 		return setRandInterfaceEnhanced(field, opts, depth)
-		
+
 	case reflect.Chan:
 		return setRandChannelEnhanced()
-		
+
 	case reflect.Func:
 		return setRandFuncEnhanced()
-		
+
 	default:
 		// 对于不支持的类型，保持零值
 	}
@@ -471,7 +481,7 @@ func setCustomValue(field reflect.Value, customValue string, kind reflect.Kind) 
 			return setValueFromInterface(field, value, kind)
 		}
 	}
-	
+
 	// 如果没有找到注册的生成器，使用内置的生成器
 	switch kind {
 	case reflect.String:
@@ -491,7 +501,7 @@ func setCustomValue(field reflect.Value, customValue string, kind reflect.Kind) 
 		case "ipv4":
 			field.SetString(fmt.Sprintf("%d.%d.%d.%d", FRandInt(1, 255), FRandInt(1, 255), FRandInt(1, 255), FRandInt(1, 255)))
 		case "mac":
-			field.SetString(fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%02x", 
+			field.SetString(fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%02x",
 				FRandInt(0, 255), FRandInt(0, 255), FRandInt(0, 255),
 				FRandInt(0, 255), FRandInt(0, 255), FRandInt(0, 255)))
 		case "color":
@@ -526,13 +536,13 @@ func setCustomValue(field reflect.Value, customValue string, kind reflect.Kind) 
 // setValueFromInterface 从interface{}值设置到反射字段
 func setValueFromInterface(field reflect.Value, value interface{}, kind reflect.Kind) error {
 	valueRef := reflect.ValueOf(value)
-	
+
 	// 如果类型完全匹配，直接设置
 	if valueRef.Type() == field.Type() {
 		field.Set(valueRef)
 		return nil
 	}
-	
+
 	// 尝试类型转换
 	switch kind {
 	case reflect.String:
@@ -556,7 +566,7 @@ func setValueFromInterface(field reflect.Value, value interface{}, kind reflect.
 	default:
 		return fmt.Errorf("unsupported type conversion from %T to %s", value, kind)
 	}
-	
+
 	return nil
 }
 
@@ -695,12 +705,12 @@ func setRandPointerEnhanced(field reflect.Value, fieldType reflect.StructField, 
 	if !opts.FillNilPtr && field.IsNil() {
 		return nil // 不填充 nil 指针
 	}
-	
+
 	// 确保指针被分配
 	if field.IsNil() {
 		field.Set(reflect.New(fieldType.Type.Elem()))
 	}
-	
+
 	// 递归填充指针指向的值
 	pointedValue := field.Elem()
 	switch fieldType.Type.Elem().Kind() {
@@ -732,7 +742,7 @@ func setRandPointerEnhanced(field reflect.Value, fieldType reflect.StructField, 
 		// 处理指向指针的指针
 		return setRandPointerEnhanced(pointedValue, reflect.StructField{Type: fieldType.Type.Elem()}, opts, depth)
 	}
-	
+
 	return nil
 }
 
@@ -741,14 +751,14 @@ func setRandSliceEnhanced(field reflect.Value, fieldType reflect.StructField, op
 	elemType := fieldType.Type.Elem()
 	length := FRandInt(1, opts.MaxSliceLen)
 	slice := reflect.MakeSlice(fieldType.Type, length, length)
-	
+
 	for i := 0; i < length; i++ {
 		elem := slice.Index(i)
 		if err := setRandValueEnhanced(elem, reflect.StructField{Type: elemType}, opts, depth+1); err != nil {
 			return err
 		}
 	}
-	
+
 	field.Set(slice)
 	return nil
 }
@@ -757,14 +767,14 @@ func setRandSliceEnhanced(field reflect.Value, fieldType reflect.StructField, op
 func setRandArrayEnhanced(field reflect.Value, fieldType reflect.StructField, opts *GenerateRandModelOptions, depth int) error {
 	elemType := fieldType.Type.Elem()
 	length := fieldType.Type.Len()
-	
+
 	for i := 0; i < length; i++ {
 		elem := field.Index(i)
 		if err := setRandValueEnhanced(elem, reflect.StructField{Type: elemType}, opts, depth+1); err != nil {
 			return err
 		}
 	}
-	
+
 	return nil
 }
 
@@ -772,32 +782,32 @@ func setRandArrayEnhanced(field reflect.Value, fieldType reflect.StructField, op
 func setRandMapEnhanced(field reflect.Value, fieldType reflect.StructField, opts *GenerateRandModelOptions, depth int) error {
 	keyType := fieldType.Type.Key()
 	valueType := fieldType.Type.Elem()
-	
+
 	m := reflect.MakeMap(fieldType.Type)
 	length := FRandInt(1, opts.MaxMapLen)
-	
+
 	for i := 0; i < length; i++ {
 		// 生成随机键
 		key := reflect.New(keyType).Elem()
 		if err := setRandValueEnhanced(key, reflect.StructField{Type: keyType}, opts, depth+1); err != nil {
 			return err
 		}
-		
+
 		// 生成随机值
 		value := reflect.New(valueType).Elem()
 		if err := setRandValueEnhanced(value, reflect.StructField{Type: valueType}, opts, depth+1); err != nil {
 			return err
 		}
-		
+
 		m.SetMapIndex(key, value)
 	}
-	
+
 	field.Set(m)
 	return nil
 }
 
 // setRandInterfaceEnhanced 处理 interface{} 类型
-func setRandInterfaceEnhanced(field reflect.Value,  opts *GenerateRandModelOptions, depth int) error {
+func setRandInterfaceEnhanced(field reflect.Value, opts *GenerateRandModelOptions, depth int) error {
 	// 随机选择一个具体类型来实现 interface{}
 	types := []reflect.Type{
 		reflect.TypeOf(""),
@@ -807,14 +817,14 @@ func setRandInterfaceEnhanced(field reflect.Value,  opts *GenerateRandModelOptio
 		reflect.TypeOf([]string{}),
 		reflect.TypeOf(map[string]interface{}{}),
 	}
-	
+
 	selectedType := types[FRandInt(0, len(types)-1)]
 	value := reflect.New(selectedType).Elem()
-	
+
 	if err := setRandValueEnhanced(value, reflect.StructField{Type: selectedType}, opts, depth+1); err != nil {
 		return err
 	}
-	
+
 	field.Set(value)
 	return nil
 }
@@ -826,7 +836,7 @@ func setRandChannelEnhanced() error {
 	return nil
 }
 
-// setRandFuncEnhanced 处理函数类型  
+// setRandFuncEnhanced 处理函数类型
 func setRandFuncEnhanced() error {
 	// 对于不支持JSON序列化的类型，我们跳过不设置
 	// 因为 func 无法JSON序列化，保持零值

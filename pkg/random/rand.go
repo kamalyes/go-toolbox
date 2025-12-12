@@ -2,21 +2,11 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-11-08 03:59:11
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-11-09 09:21:43
+ * @LastEditTime: 2025-12-12 23:05:08
  * @FilePath: \go-toolbox\pkg\random\rand.go
  * @Description:
  *
  * Copyright (c) 2025 by kamalyes, All Rights Reserved.
- */
-/*
- * @Author: kamalyes 501893067@qq.com
- * @Date: 2023-07-28 00:50:58
- * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-11-09 09:20:57
- * @FilePath: \go-toolbox\pkg\random\rand.go
- * @Description:
- *
- * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
 package random
 
