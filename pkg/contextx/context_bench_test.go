@@ -2,28 +2,31 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-08 11:11:26
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-08-21 11:57:55
- * @FilePath: \go-toolbox\tests\context_bench_test.go
+ * @LastEditTime: 2025-12-12 22:08:05
+ * @FilePath: \go-toolbox\pkg\contextx\context_bench_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
 
-package tests
+package contextx
 
 import (
 	"context"
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/contextx"
 	"github.com/kamalyes/go-toolbox/pkg/syncx"
+	"github.com/stretchr/testify/assert"
 )
+
+// 定义常量以避免重复的字符串
+const errSetValue = "failed to set value: %v"
 
 func BenchmarkNewContext(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		ctx := context.Background()
 		pool := syncx.NewLimitedPool(32, 1024)
-		_ = contextx.NewContext(ctx, pool)
+		_ = NewContext(ctx, pool)
 	}
 }
 
@@ -31,7 +34,7 @@ func BenchmarkNewContext(b *testing.B) {
 func BenchmarkWithStringValue(b *testing.B) {
 	ctx := context.Background()
 	pool := syncx.NewLimitedPool(32, 1024)
-	c := contextx.NewContext(ctx, pool)
+	c := NewContext(ctx, pool)
 
 	b.ResetTimer() // 重置计时器，以排除设置上下文的开销
 
@@ -39,7 +42,7 @@ func BenchmarkWithStringValue(b *testing.B) {
 		key := i // 使用整数作为键
 		value := "test string value"
 		if err := c.WithValue(key, value); err != nil {
-			b.Fatalf("failed to set value: %v", err)
+			assert.Fail(b, errSetValue, err)
 		}
 	}
 }
@@ -48,7 +51,7 @@ func BenchmarkWithStringValue(b *testing.B) {
 func BenchmarkWithIntValue(b *testing.B) {
 	ctx := context.Background()
 	pool := syncx.NewLimitedPool(32, 1024)
-	c := contextx.NewContext(ctx, pool)
+	c := NewContext(ctx, pool)
 
 	b.ResetTimer() // 重置计时器，以排除设置上下文的开销
 
@@ -56,7 +59,7 @@ func BenchmarkWithIntValue(b *testing.B) {
 		key := i    // 使用整数作为键
 		value := 42 // 整数值
 		if err := c.WithValue(key, value); err != nil {
-			b.Fatalf("failed to set value: %v", err)
+			assert.Fail(b, errSetValue, err)
 		}
 	}
 }
@@ -64,15 +67,18 @@ func BenchmarkWithIntValue(b *testing.B) {
 func BenchmarkWithStructValue(b *testing.B) {
 	ctx := context.Background()
 	pool := syncx.NewLimitedPool(32, 1024)
-	c := contextx.NewContext(ctx, pool)
+	c := NewContext(ctx, pool)
 
 	b.ResetTimer() // 重置计时器，以排除设置上下文的开销
-
+	type TestStruct struct {
+		Name string `validate:"notEmpty"`
+		Age  int    `validate:"ge=0"`
+	}
 	for i := 0; i < b.N; i++ {
 		key := i                                  // 使用整数作为键
 		value := TestStruct{Name: "test", Age: i} // 结构体值
 		if err := c.WithValue(key, value); err != nil {
-			b.Fatalf("failed to set value: %v", err)
+			assert.Fail(b, errSetValue, err)
 		}
 	}
 }
@@ -81,7 +87,7 @@ func BenchmarkWithStructValue(b *testing.B) {
 func BenchmarkWithSliceValue(b *testing.B) {
 	ctx := context.Background()
 	pool := syncx.NewLimitedPool(32, 1024)
-	c := contextx.NewContext(ctx, pool)
+	c := NewContext(ctx, pool)
 
 	b.ResetTimer() // 重置计时器，以排除设置上下文的开销
 
@@ -89,7 +95,7 @@ func BenchmarkWithSliceValue(b *testing.B) {
 		key := i                            // 使用整数作为键
 		value := []byte("test slice value") // 切片值
 		if err := c.WithValue(key, value); err != nil {
-			b.Fatalf("failed to set value: %v", err)
+			assert.Fail(b, errSetValue, err)
 		}
 	}
 }
@@ -98,7 +104,7 @@ func BenchmarkWithSliceValue(b *testing.B) {
 func BenchmarkWithInterfaceValue(b *testing.B) {
 	ctx := context.Background()
 	pool := syncx.NewLimitedPool(32, 1024)
-	c := contextx.NewContext(ctx, pool)
+	c := NewContext(ctx, pool)
 
 	b.ResetTimer() // 重置计时器，以排除设置上下文的开销
 
@@ -106,7 +112,7 @@ func BenchmarkWithInterfaceValue(b *testing.B) {
 		key := i                                     // 使用整数作为键
 		value := interface{}("test interface value") // 空接口值
 		if err := c.WithValue(key, value); err != nil {
-			b.Fatalf("failed to set value: %v", err)
+			assert.Fail(b, errSetValue, err)
 		}
 	}
 }
@@ -116,8 +122,8 @@ func BenchmarkMergeContext(b *testing.B) {
 	ctx1 := context.Background()
 	ctx2 := context.Background()
 	pool := syncx.NewLimitedPool(32, 1024)
-	c1 := contextx.NewContext(ctx1, pool)
-	c2 := contextx.NewContext(ctx2, pool)
+	c1 := NewContext(ctx1, pool)
+	c2 := NewContext(ctx2, pool)
 
 	// 预先设置一些值
 	for i := 0; i < 1000; i++ {
@@ -128,7 +134,7 @@ func BenchmarkMergeContext(b *testing.B) {
 	b.ResetTimer() // 重置计时器，以排除设置上下文的开销
 
 	for i := 0; i < b.N; i++ {
-		_ = contextx.MergeContext(c1, c2)
+		_ = MergeContext(c1, c2)
 	}
 }
 
@@ -136,7 +142,7 @@ func BenchmarkMergeContext(b *testing.B) {
 func BenchmarkValue(b *testing.B) {
 	ctx := context.Background()
 	pool := syncx.NewLimitedPool(32, 1024)
-	c := contextx.NewContext(ctx, pool)
+	c := NewContext(ctx, pool)
 
 	// 预先设置一些值
 	for i := 0; i < 1000; i++ {
@@ -157,7 +163,7 @@ func BenchmarkValue(b *testing.B) {
 func BenchmarkRemove(b *testing.B) {
 	ctx := context.Background()
 	pool := syncx.NewLimitedPool(32, 1024)
-	c := contextx.NewContext(ctx, pool)
+	c := NewContext(ctx, pool)
 
 	// 预先设置一些值
 	for i := 0; i < 1000; i++ {

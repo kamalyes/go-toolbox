@@ -2,13 +2,13 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-10 21:51:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-11 00:55:15
- * @FilePath: \go-toolbox\tests\sign_rsa_test.go
+ * @LastEditTime: 2025-12-12 22:10:59
+ * @FilePath: \go-toolbox\pkg\sign\rsa_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package sign
 
 import (
 	"crypto/sha1"
@@ -21,13 +21,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/sign"
 	"github.com/stretchr/testify/assert"
 )
 
 // 辅助函数：生成 RSA 密钥对并进行有效性断言
-func generateAndAssertRsaKeyPair(size sign.RsaKeySize, t *testing.T) *sign.RsaKeyPair {
-	keyPair, err := sign.GenerateRsaKeyPair(size)
+func generateAndAssertRsaKeyPair(size RsaKeySize, t *testing.T) *RsaKeyPair {
+	keyPair, err := GenerateRsaKeyPair(size)
 	assert.NoError(t, err, "生成 RSA 密钥对时发生错误")
 	assert.NotNil(t, keyPair.PrivateKey, "私钥应不为 nil")
 	assert.NotNil(t, keyPair.PublicKey, "公钥应不为 nil")
@@ -35,20 +34,20 @@ func generateAndAssertRsaKeyPair(size sign.RsaKeySize, t *testing.T) *sign.RsaKe
 }
 
 // 辅助函数：导出 RSA 密钥到 PEM 格式并进行有效性断言
-func exportAndAssertRsaKeysToPEM(keyPair *sign.RsaKeyPair, t *testing.T) {
-	privPEM, err := sign.ExportRsaPrivateKeyToPEM(keyPair.PrivateKey)
+func exportAndAssertRsaKeysToPEM(keyPair *RsaKeyPair, t *testing.T) {
+	privPEM, err := ExportRsaPrivateKeyToPEM(keyPair.PrivateKey)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, privPEM, "导出的私钥 PEM 不应为空")
 
-	pubPEM, err := sign.ExportRsaPublicKeyToPEM(keyPair.PublicKey)
+	pubPEM, err := ExportRsaPublicKeyToPEM(keyPair.PublicKey)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, pubPEM, "导出的公钥 PEM 不应为空")
 }
 
 // 辅助函数：测试 RSA 加密和解密功能，使用不同的哈希函数
-func testRsaCryptoEncryptDecryptWithHashFunc(keyPair *sign.RsaKeyPair, hashFuncs []func() hash.Hash, t *testing.T) {
+func testRsaCryptoEncryptDecryptWithHashFunc(keyPair *RsaKeyPair, hashFuncs []func() hash.Hash, t *testing.T) {
 	for _, hashFunc := range hashFuncs {
-		rsaCrypto := sign.NewRsaCryptoFromKeys(keyPair.PrivateKey, keyPair.PublicKey, hashFunc)
+		rsaCrypto := NewRsaCryptoFromKeys(keyPair.PrivateKey, keyPair.PublicKey, hashFunc)
 
 		originalText := []byte("Hello, RSA!") // 原始文本
 		salt := []byte("salt")                // 盐值
@@ -63,9 +62,9 @@ func testRsaCryptoEncryptDecryptWithHashFunc(keyPair *sign.RsaKeyPair, hashFuncs
 }
 
 // 辅助函数：测试 RSA Base64 解密功能，使用不同的哈希函数
-func testRsaCryptoDecryptBase64WithHashFunc(keyPair *sign.RsaKeyPair, hashFuncs []func() hash.Hash, t *testing.T) {
+func testRsaCryptoDecryptBase64WithHashFunc(keyPair *RsaKeyPair, hashFuncs []func() hash.Hash, t *testing.T) {
 	for _, hashFunc := range hashFuncs {
-		rsaCrypto := sign.NewRsaCryptoFromKeys(keyPair.PrivateKey, keyPair.PublicKey, hashFunc)
+		rsaCrypto := NewRsaCryptoFromKeys(keyPair.PrivateKey, keyPair.PublicKey, hashFunc)
 
 		originalText := []byte("Hello, RSA!") // 原始文本
 		salt := []byte("salt")                // 盐值
@@ -84,7 +83,7 @@ func testRsaCryptoDecryptBase64WithHashFunc(keyPair *sign.RsaKeyPair, hashFuncs 
 
 // 测试 EncryptRandSalt 函数
 func TestEncryptRandSalt(t *testing.T) {
-	keyPair := generateAndAssertRsaKeyPair(sign.RsaKeySize2048, t)
+	keyPair := generateAndAssertRsaKeyPair(RsaKeySize2048, t)
 
 	hashFuncs := []func() hash.Hash{
 		sha256.New,
@@ -93,7 +92,7 @@ func TestEncryptRandSalt(t *testing.T) {
 	}
 	for _, hashFunc := range hashFuncs {
 		// 生成 RSA 密钥对
-		rsaCrypto := sign.NewRsaCryptoFromKeys(keyPair.PrivateKey, keyPair.PublicKey, hashFunc)
+		rsaCrypto := NewRsaCryptoFromKeys(keyPair.PrivateKey, keyPair.PublicKey, hashFunc)
 
 		input := []byte("Hello, World!")
 
@@ -125,7 +124,7 @@ func TestEncryptRandSalt(t *testing.T) {
 
 // 测试生成 RSA 密钥对
 func TestGenerateRsaKeyPair(t *testing.T) {
-	keySizes := []sign.RsaKeySize{sign.RsaKeySize512, sign.RsaKeySize1024, sign.RsaKeySize2048, sign.RsaKeySize4096}
+	keySizes := []RsaKeySize{RsaKeySize512, RsaKeySize1024, RsaKeySize2048, RsaKeySize4096}
 	for _, size := range keySizes {
 		generateAndAssertRsaKeyPair(size, t)
 	}
@@ -133,13 +132,13 @@ func TestGenerateRsaKeyPair(t *testing.T) {
 
 // 测试导出 RSA 私钥和公钥为 PEM 格式
 func TestExportRsaKeysToPEM(t *testing.T) {
-	keyPair := generateAndAssertRsaKeyPair(sign.RsaKeySize2048, t)
+	keyPair := generateAndAssertRsaKeyPair(RsaKeySize2048, t)
 	exportAndAssertRsaKeysToPEM(keyPair, t)
 }
 
 // 测试 RSA 加解密功能，使用不同的哈希函数
 func TestRsaCryptoEncryptDecryptWithHashFunc(t *testing.T) {
-	keyPair := generateAndAssertRsaKeyPair(sign.RsaKeySize2048, t)
+	keyPair := generateAndAssertRsaKeyPair(RsaKeySize2048, t)
 
 	hashFuncs := []func() hash.Hash{
 		sha1.New,
@@ -154,7 +153,7 @@ func TestRsaCryptoEncryptDecryptWithHashFunc(t *testing.T) {
 
 // 测试 RSA Base64 解密功能，使用不同的哈希函数
 func TestRsaCryptoDecryptBase64WithHashFunc(t *testing.T) {
-	keyPair := generateAndAssertRsaKeyPair(sign.RsaKeySize2048, t)
+	keyPair := generateAndAssertRsaKeyPair(RsaKeySize2048, t)
 
 	hashFuncs := []func() hash.Hash{
 		sha256.New,
@@ -167,9 +166,9 @@ func TestRsaCryptoDecryptBase64WithHashFunc(t *testing.T) {
 
 // 测试从私钥文件创建 RSA 加解密器
 func TestNewRsaCryptoFromPrivateFile(t *testing.T) {
-	keyPair := generateAndAssertRsaKeyPair(sign.RsaKeySize2048, t)
+	keyPair := generateAndAssertRsaKeyPair(RsaKeySize2048, t)
 
-	privPEM, err := sign.ExportRsaPrivateKeyToPEM(keyPair.PrivateKey)
+	privPEM, err := ExportRsaPrivateKeyToPEM(keyPair.PrivateKey)
 	assert.NoError(t, err)
 
 	// 将私钥写入临时文件
@@ -182,7 +181,7 @@ func TestNewRsaCryptoFromPrivateFile(t *testing.T) {
 	tempFile.Close()
 
 	// 从文件中创建 RSA 加解密器
-	rsaCrypto, err := sign.NewRsaCryptoFromPrivateFile(tempFile.Name(), sha256.New)
+	rsaCrypto, err := NewRsaCryptoFromPrivateFile(tempFile.Name(), sha256.New)
 	assert.NoError(t, err)
 	assert.NotNil(t, rsaCrypto.GetPrivateKey(), "私钥应不为 nil")
 	assert.NotNil(t, rsaCrypto.GetPublicKey(), "公钥应不为 nil")
@@ -190,9 +189,9 @@ func TestNewRsaCryptoFromPrivateFile(t *testing.T) {
 
 // 测试从 PEM 格式公钥创建 RSA 加解密器
 func TestNewRsaCryptoFromPublicPEM(t *testing.T) {
-	keyPair := generateAndAssertRsaKeyPair(sign.RsaKeySize2048, t)
+	keyPair := generateAndAssertRsaKeyPair(RsaKeySize2048, t)
 
-	pubPEM, err := sign.ExportRsaPublicKeyToPEM(keyPair.PublicKey)
+	pubPEM, err := ExportRsaPublicKeyToPEM(keyPair.PublicKey)
 	assert.NoError(t, err)
 
 	// 输出 PEM 格式公钥，便于调试
@@ -203,7 +202,7 @@ func TestNewRsaCryptoFromPublicPEM(t *testing.T) {
 		t.Fatalf("公钥 PEM 格式不正确: %v", err) // 输出 PEM 内容以便调试
 	}
 
-	rsaCrypto, err := sign.NewRsaCryptoFromPublicPEM([]byte(pubPEM), sha256.New)
+	rsaCrypto, err := NewRsaCryptoFromPublicPEM([]byte(pubPEM), sha256.New)
 	assert.NoError(t, err)
 	assert.NotNil(t, rsaCrypto.GetPublicKey(), "公钥应不为 nil")
 }
@@ -222,15 +221,15 @@ func isValidPEM(pemData string) error {
 
 // 测试解析 PEM 格式公钥
 func TestParsePublicKey(t *testing.T) {
-	keyPair := generateAndAssertRsaKeyPair(sign.RsaKeySize2048, t)
+	keyPair := generateAndAssertRsaKeyPair(RsaKeySize2048, t)
 
-	pubPEM, err := sign.ExportRsaPublicKeyToPEM(keyPair.PublicKey)
+	pubPEM, err := ExportRsaPublicKeyToPEM(keyPair.PublicKey)
 	assert.NoError(t, err)
 
 	// 输出 PEM 格式公钥，便于调试
 	t.Logf("公钥 PEM:\n%s", pubPEM)
 
-	publicKey, err := sign.ParsePublicKey([]byte(pubPEM))
+	publicKey, err := ParsePublicKey([]byte(pubPEM))
 	if err != nil {
 		t.Fatalf("公钥解析错误: %v", err) // 输出详细错误信息
 	}
@@ -238,7 +237,7 @@ func TestParsePublicKey(t *testing.T) {
 
 	// 校验生成的公钥和解析的公钥是否一致
 	// 重新编码解析后的公钥为 PEM 格式
-	reEncodedPEM, err := sign.ExportRsaPublicKeyToPEM(publicKey)
+	reEncodedPEM, err := ExportRsaPublicKeyToPEM(publicKey)
 	assert.NoError(t, err)
 
 	// 比较原始 PEM 和重新编码的 PEM 是否一致
@@ -247,17 +246,17 @@ func TestParsePublicKey(t *testing.T) {
 
 // 测试解析 PEM 格式私钥
 func TestParsePrivateKey(t *testing.T) {
-	keyPair := generateAndAssertRsaKeyPair(sign.RsaKeySize2048, t)
+	keyPair := generateAndAssertRsaKeyPair(RsaKeySize2048, t)
 
-	privPEM, err := sign.ExportRsaPrivateKeyToPEM(keyPair.PrivateKey)
+	privPEM, err := ExportRsaPrivateKeyToPEM(keyPair.PrivateKey)
 	assert.NoError(t, err)
 
-	privateKey, err := sign.ParsePrivateKey([]byte(privPEM))
+	privateKey, err := ParsePrivateKey([]byte(privPEM))
 	assert.NoError(t, err)
 	assert.NotNil(t, privateKey, "解析后的私钥应不为 nil")
 	// 校验生成的私钥和解析的私钥是否一致
 	// 重新编码解析后的私钥为 PEM 格式
-	reEncodedPEM, err := sign.ExportRsaPrivateKeyToPEM(privateKey)
+	reEncodedPEM, err := ExportRsaPrivateKeyToPEM(privateKey)
 	assert.NoError(t, err)
 
 	// 比较原始 PEM 和重新编码的 PEM 是否一致

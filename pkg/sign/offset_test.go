@@ -3,24 +3,23 @@
  * @Date: 2025-09-16 18:55:08
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2025-09-17 09:51:08
- * @FilePath: \go-toolbox\tests\sign_offset_test.go
+ * @FilePath: \go-toolbox\pkg\sign\offset_test.go
  * @Description:
  *
  * Copyright (c) 2025 by kamalyes, All Rights Reserved.
  */
-package tests
+package sign
 
 import (
 	"math/rand"
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/sign"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestProtonOffsetCipher(t *testing.T) {
 	// 创建一个新的 ProtonOffsetCipher 实例
-	psc := sign.NewProtonOffsetCipher()
+	psc := NewProtonOffsetCipher()
 
 	testCases := map[string][]byte{
 		"string":       []byte("Hello, World!"),
@@ -47,7 +46,7 @@ func TestProtonOffsetCipher(t *testing.T) {
 // 随机测试
 func TestProtonOffsetCipherMultipleCases(t *testing.T) {
 	// 创建一个新的 ProtonOffsetCipher 实例
-	psc := sign.NewProtonOffsetCipher()
+	psc := NewProtonOffsetCipher()
 
 	// 生成 10,000 个随机测试用例
 	for i := 0; i < 10000; i++ {

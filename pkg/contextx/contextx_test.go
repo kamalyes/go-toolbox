@@ -2,14 +2,14 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2024-11-08 11:11:26
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-01-17 15:07:01
- * @FilePath: \go-toolbox\tests\contextx_test.go
+ * @LastEditTime: 2025-12-12 22:05:15
+ * @FilePath: \go-toolbox\pkg\contextx\contextx_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
 
-package tests
+package contextx
 
 import (
 	"context"
@@ -17,14 +17,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kamalyes/go-toolbox/pkg/contextx"
 	"github.com/kamalyes/go-toolbox/pkg/syncx"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewContext(t *testing.T) {
 	parentCtx := context.Background()
-	customCtx := contextx.NewContext(parentCtx, nil)
+	customCtx := NewContext(parentCtx, nil)
 
 	assert.Equal(t, parentCtx, customCtx.Context, "Expected parent context to be equal")
 
@@ -33,14 +32,14 @@ func TestNewContext(t *testing.T) {
 	customPool := syncx.NewLimitedPool(32, 1024)
 
 	// 测试 NewContextWithValue
-	customCtx, err := contextx.NewContextWithValue(parentWithCtx, "key1", "value1", customPool)
+	customCtx, err := NewContextWithValue(parentWithCtx, "key1", "value1", customPool)
 	assert.NoError(t, err, "Expected no error when creating Context with NewContextWithValue")
 
 	// 测试 Value
 	assert.Equal(t, "value1", customCtx.Value("key1"), "Expected value1 for key1")
 
 	// 测试 NewLocalContextWithValue
-	customCtx, err = contextx.NewLocalContextWithValue(customCtx, "key2", "value2")
+	customCtx, err = NewLocalContextWithValue(customCtx, "key2", "value2")
 	assert.NoError(t, err, "Expected no error when setting local value with NewLocalContextWithValue")
 
 	// 测试 Value
@@ -54,13 +53,13 @@ func TestNewContext(t *testing.T) {
 	assert.Nil(t, customCtx.Value("key1"), "Expected nil for key1 after deletion")
 
 	// 测试 IsContext
-	assert.True(t, contextx.IsContext(customCtx), "Expected customCtx to be a Context")
-	assert.False(t, contextx.IsContext(parentCtx), "Expected parentCtx not to be a Context")
+	assert.True(t, IsContext(customCtx), "Expected customCtx to be a Context")
+	assert.False(t, IsContext(parentCtx), "Expected parentCtx not to be a Context")
 }
 
 func TestSetAndGetValue(t *testing.T) {
 	parentCtx := context.Background()
-	customCtx := contextx.NewContext(parentCtx, nil)
+	customCtx := NewContext(parentCtx, nil)
 
 	key := "testKey"
 	value := "testValue"
@@ -72,14 +71,14 @@ func TestSetAndGetValue(t *testing.T) {
 
 func TestValueFromParentContext(t *testing.T) {
 	parentCtx := context.WithValue(context.Background(), "parentKey", "parentValue")
-	customCtx := contextx.NewContext(parentCtx, nil)
+	customCtx := NewContext(parentCtx, nil)
 	got := customCtx.Value("parentKey")
 	assert.Equal(t, "parentValue", got, "Expected value from parent context to be 'parentValue'")
 }
 
 func TestDeleteKey(t *testing.T) {
 	parentCtx := context.Background()
-	customCtx := contextx.NewContext(parentCtx, nil)
+	customCtx := NewContext(parentCtx, nil)
 
 	key := "testKey"
 	value := "testValue"
@@ -97,7 +96,7 @@ func TestContext_String(t *testing.T) {
 	ctx := context.Background()
 
 	// 创建一个 Context 实例
-	customCtx := &contextx.Context{Context: ctx}
+	customCtx := &Context{Context: ctx}
 	// Create a map with interface{} as key and value
 	myMap := make(map[interface{}]interface{})
 
@@ -120,19 +119,19 @@ func TestContext_String(t *testing.T) {
 // TestMergeContext 测试合并多个上下文
 func TestMergeContext(t *testing.T) {
 	// 创建上下文并设置一些值
-	ctx1 := contextx.NewContext(context.Background(), nil)
+	ctx1 := NewContext(context.Background(), nil)
 	_ = ctx1.WithValue("key1", "value1")
 	_ = ctx1.WithValue("key2", "value2")
 
-	ctx2 := contextx.NewContext(context.Background(), nil)
+	ctx2 := NewContext(context.Background(), nil)
 	_ = ctx2.WithValue("key2", "newValue2") // 这个值会覆盖 ctx1 中的值
 	_ = ctx2.WithValue("key3", "value3")
 
-	ctx3 := contextx.NewContext(context.Background(), nil)
+	ctx3 := NewContext(context.Background(), nil)
 	_ = ctx3.WithValue("key4", "value4")
 
 	// 合并上下文
-	merged := contextx.MergeContext(ctx1, ctx2, ctx3)
+	merged := MergeContext(ctx1, ctx2, ctx3)
 
 	// 断言合并后的值
 	assert.Equal(t, "value1", merged.Value("key1"), "期望值为 'value1'")
@@ -144,7 +143,7 @@ func TestMergeContext(t *testing.T) {
 
 // TestMergeContextEmpty 测试合并空上下文
 func TestMergeContextEmpty(t *testing.T) {
-	merged := contextx.MergeContext()
+	merged := MergeContext()
 
 	assert.NotNil(t, merged, "期望合并后的上下文不为 nil")
 	assert.Equal(t, context.Background(), merged.Context, "期望合并后的上下文为背景上下文")
@@ -153,7 +152,7 @@ func TestMergeContextEmpty(t *testing.T) {
 func TestNewContextWithTimeout(t *testing.T) {
 	parentCtx := context.Background()
 	timeout := 1 * time.Second
-	customCtx := contextx.NewContextWithTimeout(parentCtx, timeout, nil)
+	customCtx := NewContextWithTimeout(parentCtx, timeout, nil)
 
 	// 等待超时
 	time.Sleep(timeout + 100*time.Millisecond)
@@ -166,7 +165,7 @@ func TestNewContextWithTimeout(t *testing.T) {
 
 func TestNewContextWithCancel(t *testing.T) {
 	parentCtx := context.Background()
-	customCtx := contextx.NewContextWithCancel(parentCtx, nil)
+	customCtx := NewContextWithCancel(parentCtx, nil)
 
 	// 取消上下文
 	customCtx.Cancel()
@@ -179,7 +178,7 @@ func TestNewContextWithCancel(t *testing.T) {
 
 func TestSetNilKey(t *testing.T) {
 	parentCtx := context.Background()
-	customCtx := contextx.NewContext(parentCtx, nil)
+	customCtx := NewContext(parentCtx, nil)
 
 	err := customCtx.WithValue(nil, "value")
 	assert.Error(t, err, "Expected error when setting nil key")
@@ -187,7 +186,7 @@ func TestSetNilKey(t *testing.T) {
 
 func TestRemoveNonExistentKey(t *testing.T) {
 	parentCtx := context.Background()
-	customCtx := contextx.NewContext(parentCtx, nil)
+	customCtx := NewContext(parentCtx, nil)
 
 	customCtx.Remove("nonExistentKey") // should not panic or error
 	assert.Nil(t, customCtx.Value("nonExistentKey"), "Expected nil for non-existent key")
@@ -195,7 +194,7 @@ func TestRemoveNonExistentKey(t *testing.T) {
 
 func TestValues(t *testing.T) {
 	parentCtx := context.Background()
-	customCtx := contextx.NewContext(parentCtx, nil)
+	customCtx := NewContext(parentCtx, nil)
 
 	customCtx.WithValue("key1", "value1")
 	customCtx.WithValue("key2", "value2")
@@ -208,7 +207,7 @@ func TestValues(t *testing.T) {
 
 func TestCancel(t *testing.T) {
 	parentCtx := context.Background()
-	customCtx := contextx.NewContextWithCancel(parentCtx, nil)
+	customCtx := NewContextWithCancel(parentCtx, nil)
 	customCtx.Cancel()
 
 	select {
@@ -222,7 +221,7 @@ func TestCancel(t *testing.T) {
 func TestDeadline(t *testing.T) {
 	parentCtx := context.Background()
 	timeout := 1 * time.Second
-	customCtx := contextx.NewContextWithTimeout(parentCtx, timeout, nil)
+	customCtx := NewContextWithTimeout(parentCtx, timeout, nil)
 
 	deadline, ok := customCtx.Deadline()
 	assert.True(t, ok, "Expected deadline to be set")
@@ -231,7 +230,7 @@ func TestDeadline(t *testing.T) {
 
 func TestSetByteSlice(t *testing.T) {
 	parentCtx := context.Background()
-	customCtx := contextx.NewContext(parentCtx, nil)
+	customCtx := NewContext(parentCtx, nil)
 
 	byteSlice := []byte("test")
 	err := customCtx.WithValue("byteKey", byteSlice)

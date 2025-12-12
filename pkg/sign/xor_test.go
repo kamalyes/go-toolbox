@@ -2,26 +2,25 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-09-17 10:02:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-09-17 10:35:16
- * @FilePath: \go-toolbox\tests\sign_xor_test.go
+ * @LastEditTime: 2025-12-12 22:10:48
+ * @FilePath: \go-toolbox\pkg\sign\xor_test.go
  * @Description:
  *
  * Copyright (c) 2025 by kamalyes, All Rights Reserved.
  */
-package tests
+package sign
 
 import (
 	"math/rand"
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/sign"
 	"github.com/stretchr/testify/assert"
 )
 
 // 测试 XORCipher 的加密和解密
 func TestXORCipher(t *testing.T) {
 	key := byte(0xAA)
-	cipher := sign.NewXORCipher(key)
+	cipher := NewXORCipher(key)
 
 	// 测试数据
 	data := []byte("Hello, World!")
@@ -40,7 +39,7 @@ func TestXORCipher(t *testing.T) {
 // 随机测试
 func TestXORCipherMultipleCases(t *testing.T) {
 	key := byte(0xAA)
-	cipher := sign.NewXORCipher(key)
+	cipher := NewXORCipher(key)
 
 	for i := 0; i < 10000; i++ {
 		// 生成随机数据

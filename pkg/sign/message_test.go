@@ -3,12 +3,12 @@
  * @Date: 2025-06-05 13:35:59
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2025-09-16 18:15:50
- * @FilePath: \go-toolbox\tests\sign_message_test.go
+ * @FilePath: \go-toolbox\pkg\sign\message_test.go
  * @Description: 签名客户端测试，公共参数提取，结合自定义 WaitGroup 并发测试
  *
  * Copyright (c) 2025 by kamalyes, All Rights Reserved.
  */
-package tests
+package sign
 
 import (
 	"fmt"
@@ -16,7 +16,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kamalyes/go-toolbox/pkg/sign"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -28,29 +27,29 @@ type TestPayload struct {
 
 // 公共测试参数辅助函数
 
-func newTestClient(t *testing.T) *sign.SignerClient[TestPayload] {
+func newTestClient(t *testing.T) *SignerClient[TestPayload] {
 	secretKey := []byte("my_secret_key_123")
-	serializer := sign.JSONSerializer{}
+	serializer := JSONSerializer{}
 
-	client := sign.NewSignerClient[TestPayload]().
+	client := NewSignerClient[TestPayload]().
 		WithSecretKey(secretKey).
 		WithSerializer(serializer)
 
-	client, err := client.WithAlgorithm(sign.AlgorithmSHA256)
+	client, err := client.WithAlgorithm(AlgorithmSHA256)
 	assert.NoError(t, err)
 
 	return client
 }
 
-func newBenchmarkClient(b *testing.B) *sign.SignerClient[TestPayload] {
+func newBenchmarkClient(b *testing.B) *SignerClient[TestPayload] {
 	secretKey := []byte("my_secret_key_123")
-	serializer := sign.JSONSerializer{}
+	serializer := JSONSerializer{}
 
-	client := sign.NewSignerClient[TestPayload]().
+	client := NewSignerClient[TestPayload]().
 		WithSecretKey(secretKey).
 		WithSerializer(serializer)
 
-	client, err := client.WithAlgorithm(sign.AlgorithmSHA256)
+	client, err := client.WithAlgorithm(AlgorithmSHA256)
 	assert.NoError(b, err)
 	return client
 }
@@ -65,7 +64,7 @@ func newTestPayload() TestPayload {
 
 // 测试用例
 
-func TestSignerClient_ChainUsage(t *testing.T) {
+func TestSignerClientChainUsage(t *testing.T) {
 	issuer := "issuer string"
 	client := newTestClient(t).WithIssuer(issuer)
 	payload := newTestPayload()
@@ -90,7 +89,7 @@ func TestSignerClient_ChainUsage(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestValidate_ValidSignature(t *testing.T) {
+func TestValidateValidSignature(t *testing.T) {
 	client := newTestClient(t)
 	payload := newTestPayload()
 	signedMessage, err := client.WithExpiration(1 * time.Second).Create(payload)
@@ -106,9 +105,9 @@ func TestValidate_ValidSignature(t *testing.T) {
 	assert.Nil(t, validatedMessage, "过期的签名消息应该返回 nil")
 }
 
-func TestSignerClient_ValidateErrors(t *testing.T) {
+func TestSignerClientValidateErrors(t *testing.T) {
 	secretKey := []byte("my_secret_key_123")
-	client := sign.NewSignerClient[TestPayload]().
+	client := NewSignerClient[TestPayload]().
 		WithSecretKey(secretKey)
 
 	// 不设置算法，调用Create应报错
@@ -116,7 +115,7 @@ func TestSignerClient_ValidateErrors(t *testing.T) {
 	assert.Error(t, err)
 
 	// 设置算法后创建成功
-	client, err = client.WithAlgorithm(sign.AlgorithmSHA256)
+	client, err = client.WithAlgorithm(AlgorithmSHA256)
 	assert.NoError(t, err)
 	signedStr, err := client.Create(TestPayload{UserID: 1})
 	assert.NoError(t, err)
@@ -191,7 +190,7 @@ func TestSignerClient_ConcurrentUsage_WithSync(t *testing.T) {
 	assert.NoError(t, firstErr)
 }
 
-func BenchmarkSignerClient_Create(b *testing.B) {
+func BenchmarkSignerClientCreate(b *testing.B) {
 	client := newBenchmarkClient(b)
 	payload := newTestPayload()
 	b.ResetTimer() // 重置计时器，以确保不测量设置时间
@@ -203,7 +202,7 @@ func BenchmarkSignerClient_Create(b *testing.B) {
 	}
 }
 
-func BenchmarkSignerClient_Validate(b *testing.B) {
+func BenchmarkSignerClientValidate(b *testing.B) {
 	client := newBenchmarkClient(b)
 	payload := newTestPayload()
 	signedStr, err := client.Create(payload)
@@ -220,7 +219,7 @@ func BenchmarkSignerClient_Validate(b *testing.B) {
 	}
 }
 
-func BenchmarkSignerClient_ConcurrentCreate(b *testing.B) {
+func BenchmarkSignerClientConcurrentCreate(b *testing.B) {
 	client := newBenchmarkClient(b)
 	payload := newTestPayload()
 	b.RunParallel(func(pb *testing.PB) {
@@ -233,7 +232,7 @@ func BenchmarkSignerClient_ConcurrentCreate(b *testing.B) {
 	})
 }
 
-func BenchmarkSignerClient_ConcurrentValidate(b *testing.B) {
+func BenchmarkSignerClientConcurrentValidate(b *testing.B) {
 	client := newBenchmarkClient(b)
 	payload := newTestPayload()
 	signedStr, err := client.Create(payload)

@@ -1,52 +1,47 @@
 /*
  * @Author: kamalyes 501893067@qq.com
- * @Date: 2025-09-17 10:06:15
+ * @Date: 2025-09-16 18:55:08
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-09-17 10:06:55
- * @FilePath: \go-toolbox\tests\sign_xor_bench_test.go
+ * @LastEditTime: 2025-09-17 09:58:26
+ * @FilePath: \go-toolbox\pkg\sign\offset_bench_test.go
  * @Description:
  *
  * Copyright (c) 2025 by kamalyes, All Rights Reserved.
  */
-package tests
+package sign
 
 import (
 	"testing"
-
-	"github.com/kamalyes/go-toolbox/pkg/sign"
 )
 
-func BenchmarkXORCipherEncrypt(b *testing.B) {
-	key := byte(0xAA)
-	xor := sign.NewXORCipher(key)
+func BenchmarkProtonOffsetCipherEncrypt(b *testing.B) {
+	psc := NewProtonOffsetCipher()
 	data := []byte("Hello, World!")
 
 	for i := 0; i < b.N; i++ {
-		_, err := xor.Encrypt(data)
+		_, err := psc.Encrypt(data)
 		if err != nil {
 			b.Fatalf("Encryption failed: %v", err)
 		}
 	}
 }
 
-func BenchmarkXORCipherDecrypt(b *testing.B) {
-	key := byte(0xAA)
-	xor := sign.NewXORCipher(key)
+func BenchmarkProtonOffsetCipherDecrypt(b *testing.B) {
+	psc := NewProtonOffsetCipher()
 	data := []byte("Hello, World!")
-	encrypted, _ := xor.Encrypt(data)
+	encrypted, _ := psc.Encrypt(data)
 
 	b.ResetTimer() // 重置计时器
 	for i := 0; i < b.N; i++ {
-		_, err := xor.Decrypt(encrypted)
+		_, err := psc.Decrypt(encrypted)
 		if err != nil {
 			b.Fatalf("Decryption failed: %v", err)
 		}
 	}
 }
 
-func BenchmarkXORCipherEncryptLong(b *testing.B) {
-	key := byte(0xAA)
-	xor := sign.NewXORCipher(key)
+func BenchmarkProtonOffsetCipherEncryptLong(b *testing.B) {
+	psc := NewProtonOffsetCipher()
 	data := make([]byte, 1024*1024) // 1 MB 数据
 	for i := range data {
 		data[i] = 'A' // 填充数据
@@ -54,25 +49,24 @@ func BenchmarkXORCipherEncryptLong(b *testing.B) {
 
 	b.ResetTimer() // 重置计时器
 	for i := 0; i < b.N; i++ {
-		_, err := xor.Encrypt(data)
+		_, err := psc.Encrypt(data)
 		if err != nil {
 			b.Fatalf("Encryption failed: %v", err)
 		}
 	}
 }
 
-func BenchmarkXORCipherDecryptLong(b *testing.B) {
-	key := byte(0xAA)
-	xor := sign.NewXORCipher(key)
+func BenchmarkProtonOffsetCipherDecryptLong(b *testing.B) {
+	psc := NewProtonOffsetCipher()
 	data := make([]byte, 1024*1024) // 1 MB 数据
 	for i := range data {
 		data[i] = 'A' // 填充数据
 	}
-	encrypted, _ := xor.Encrypt(data)
+	encrypted, _ := psc.Encrypt(data)
 
 	b.ResetTimer() // 重置计时器
 	for i := 0; i < b.N; i++ {
-		_, err := xor.Decrypt(encrypted)
+		_, err := psc.Decrypt(encrypted)
 		if err != nil {
 			b.Fatalf("Decryption failed: %v", err)
 		}
