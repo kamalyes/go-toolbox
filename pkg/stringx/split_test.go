@@ -2,39 +2,38 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-22 15:26:51
- * @FilePath: \go-toolbox\tests\stringx_split_test.go
+ * @LastEditTime: 2025-12-12 22:31:01
+ * @FilePath: \go-toolbox\pkg\stringx\split_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package stringx
 
 import (
 	"fmt"
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/stringx"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestSplit(t *testing.T) {
-	result := stringx.Split("one,two,three,four", ",")
+	result := Split("one,two,three,four", ",")
 	assert.Equal(t, []string{"one", "two", "three", "four"}, result)
 }
 
 func TestSplitLimit(t *testing.T) {
-	result := stringx.SplitLimit("one,two,three,four", ",", 2)
+	result := SplitLimit("one,two,three,four", ",", 2)
 	assert.Equal(t, []string{"one", "two,three,four"}, result)
 }
 
 func TestSplitTrim(t *testing.T) {
-	result := stringx.SplitTrim(" one , two , three , four ", ",")
+	result := SplitTrim(" one , two , three , four ", ",")
 	assert.Equal(t, []string{"one", "two", "three", "four"}, result)
 }
 
 func TestSplitTrimLimit(t *testing.T) {
-	result := stringx.SplitTrimLimit(" one , two , three , four ", ",", 2)
+	result := SplitTrimLimit(" one , two , three , four ", ",", 2)
 	assert.Equal(t, []string{"one", "two , three , four"}, result)
 }
 
@@ -48,56 +47,56 @@ func TestSplitByLen_Cut(t *testing.T) {
 	}{
 		{
 			name:     "SplitByLen - normal case",
-			function: stringx.SplitByLen,
+			function: SplitByLen,
 			input:    "HelloWorld",
 			param:    3,
 			expected: []string{"Hel", "loW", "orl", "d"},
 		},
 		{
 			name:     "SplitByLen - length greater than string",
-			function: stringx.SplitByLen,
+			function: SplitByLen,
 			input:    "Hi",
 			param:    5,
 			expected: []string{"Hi"},
 		},
 		{
 			name:     "SplitByLen - empty string",
-			function: stringx.SplitByLen,
+			function: SplitByLen,
 			input:    "",
 			param:    3,
 			expected: []string{},
 		},
 		{
 			name:     "SplitByLen - zero length",
-			function: stringx.SplitByLen,
+			function: SplitByLen,
 			input:    "Test",
 			param:    0,
 			expected: []string{},
 		},
 		{
 			name:     "Cut - normal case",
-			function: stringx.Cut,
+			function: Cut,
 			input:    "HelloWorld",
 			param:    3,
 			expected: []string{"Hell", "oWo", "rld"},
 		},
 		{
 			name:     "Cut - n greater than string length",
-			function: stringx.Cut,
+			function: Cut,
 			input:    "Hi",
 			param:    5,
 			expected: []string{"H", "i", "", "", ""},
 		},
 		{
 			name:     "Cut - empty string",
-			function: stringx.Cut,
+			function: Cut,
 			input:    "",
 			param:    3,
 			expected: []string{},
 		},
 		{
 			name:     "Cut - zero parts",
-			function: stringx.Cut,
+			function: Cut,
 			input:    "Test",
 			param:    0,
 			expected: []string{},
@@ -158,10 +157,10 @@ func TestSplitAfterMapping(t *testing.T) {
 	for _, test := range tests {
 		if test.expectPanic {
 			assert.Panics(t, func() {
-				stringx.SplitAfterMapping(test.input, test.separator, test.mapping)
+				SplitAfterMapping(test.input, test.separator, test.mapping)
 			}, "Expected panic for input %q, but did not panic", test.input)
 		} else {
-			result := stringx.SplitAfterMapping(test.input, test.separator, test.mapping)
+			result := SplitAfterMapping(test.input, test.separator, test.mapping)
 			assert.Equal(t, test.expected, result, "For input %q, expected %v but got %v", test.input, test.expected, result)
 		}
 	}

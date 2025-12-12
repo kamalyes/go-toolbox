@@ -3,17 +3,16 @@
  * @Date: 2025-06-06 17:51:07
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2025-06-06 17:51:22
- * @FilePath: \go-toolbox\tests\stringx_parse_test.go
+ * @FilePath: \go-toolbox\pkg\stringx\parse_test.go
  * @Description:
  *
  * Copyright (c) 2025 by kamalyes, All Rights Reserved.
  */
-package tests
+package stringx
 
 import (
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/stringx"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -40,7 +39,7 @@ func TestParseFieldIntOrWildcard(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			val, err := stringx.ParseFieldIntOrWildcard(tt.field, tt.wildcard, tt.min, tt.max)
+			val, err := ParseFieldIntOrWildcard(tt.field, tt.wildcard, tt.min, tt.max)
 			if tt.wantError {
 				assert.Error(t, err)
 				assert.Equal(t, tt.wantVal, val)
@@ -71,7 +70,7 @@ func TestParseFieldInt(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			val, err := stringx.ParseFieldInt(tt.field, tt.min, tt.max)
+			val, err := ParseFieldInt(tt.field, tt.min, tt.max)
 			if tt.wantError {
 				assert.Error(t, err)
 				assert.Equal(t, tt.wantVal, val)

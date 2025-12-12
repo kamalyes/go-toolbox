@@ -2,29 +2,28 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-11-22 15:17:25
- * @FilePath: \go-toolbox\tests\stringx_replace_test.go
+ * @LastEditTime: 2025-12-12 22:30:55
+ * @FilePath: \go-toolbox\pkg\stringx\replace_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package stringx
 
 import (
 	"fmt"
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/stringx"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestReplace(t *testing.T) {
-	result := stringx.Replace("hello, world", "hello", "hi", 1)
+	result := Replace("hello, world", "hello", "hi", 1)
 	assert.Equal(t, "hi, world", result)
 }
 
 func TestReplaceAll(t *testing.T) {
-	result := stringx.ReplaceAll("hello, hello, world", "hello", "hi")
+	result := ReplaceAll("hello, hello, world", "hello", "hi")
 	assert.Equal(t, "hi, hi, world", result)
 }
 
@@ -50,35 +49,35 @@ func TestReplaceWithIndex(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("input: %s, start: %d, end: %d", test.input, test.startIndex, test.endIndex), func(t *testing.T) {
-			result := stringx.ReplaceWithIndex(test.input, test.startIndex, test.endIndex, test.replacedStr)
+			result := ReplaceWithIndex(test.input, test.startIndex, test.endIndex, test.replacedStr)
 			assert.Equal(t, test.expected, result)
 		})
 	}
 }
 
 func TestPad(t *testing.T) {
-	resultDefault := stringx.Pad("hello", 10)
+	resultDefault := Pad("hello", 10)
 	assert.Equal(t, "hell*****o", resultDefault)
 
-	result := stringx.Pad("hello", 10, &stringx.Paddler{Position: stringx.Middle})
+	result := Pad("hello", 10, &Paddler{Position: Middle})
 	assert.Equal(t, "hell*****o", result)
 
-	result = stringx.Pad("world", 8, &stringx.Paddler{Position: stringx.Left})
+	result = Pad("world", 8, &Paddler{Position: Left})
 	assert.Equal(t, "***world", result)
 
-	result = stringx.Pad("ok", 5, &stringx.Paddler{Position: stringx.Right})
+	result = Pad("ok", 5, &Paddler{Position: Right})
 	assert.Equal(t, "ok***", result)
 }
 
 func TestReplaceWithMatcher(t *testing.T) {
-	result := stringx.ReplaceWithMatcher("hello 123 world 456", `\d+`, func(s string) string {
+	result := ReplaceWithMatcher("hello 123 world 456", `\d+`, func(s string) string {
 		return "xxx"
 	})
 	assert.Equal(t, "hello xxx world xxx", result)
 }
 
 func TestHide(t *testing.T) {
-	result := stringx.Hide("password12345", 8, 10)
+	result := Hide("password12345", 8, 10)
 	assert.Equal(t, "password**345", result)
 }
 
@@ -97,7 +96,7 @@ func TestReplaceSpecialChars(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		output := stringx.ReplaceSpecialChars(test.input, 'X')
+		output := ReplaceSpecialChars(test.input, 'X')
 		if output != test.expected {
 			t.Errorf("ReplaceSpecialChars(%q) = %q; expected %q", test.input, output, test.expected)
 		}

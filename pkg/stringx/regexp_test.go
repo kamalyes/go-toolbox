@@ -3,26 +3,25 @@
  * @Date: 2024-11-09 10:50:50
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2024-11-22 15:55:59
- * @FilePath: \go-toolbox\tests\stringx_regexp_test.go
+ * @FilePath: \go-toolbox\pkg\stringx\regexp_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package stringx
 
 import (
 	"fmt"
 	"testing"
 	"time"
 
-	"github.com/kamalyes/go-toolbox/pkg/stringx"
 	"github.com/stretchr/testify/assert"
 )
 
-var r *stringx.AnyRegs
+var r *AnyRegs
 
 func init() {
-	r = stringx.NewAnyRegs()
+	r = NewAnyRegs()
 }
 
 // TestRegexpData 结构表示测试数据的格式
@@ -744,7 +743,7 @@ func TestAnyRegs_RegChineseCharacter(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			actual, _ := stringx.IsChineseCharacter(test.Input)
+			actual, _ := IsChineseCharacter(test.Input)
 			if test.Expected {
 				assert.True(t, actual, "Expected input '%s' to Chinese characters", test.Input)
 			} else {
@@ -1084,7 +1083,7 @@ func TestParseWeek(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result, err := stringx.ParseWeek(test.input)
+		result, err := ParseWeek(test.input)
 		if test.err {
 			assert.Error(t, err, "ParseWeek Expected an error for input: %q", test.input)
 		} else {
@@ -1145,7 +1144,7 @@ func TestIsValidMonth(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result, err := stringx.ParseMonth(test.input)
+		result, err := ParseMonth(test.input)
 		if test.err {
 			assert.Error(t, err, "ParseMonth Expected an error for input: %q", test.input)
 		} else {

@@ -3,17 +3,16 @@
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2024-11-01 02:29:53
- * @FilePath: \go-toolbox\tests\stringx_trim_test.go
+ * @FilePath: \go-toolbox\pkg\stringx\trim_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package stringx
 
 import (
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/stringx"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,56 +26,56 @@ func TestAllTrimFunctions(t *testing.T) {
 // TestTrim tests the Trim function
 func TestTrim(t *testing.T) {
 	// Test empty string
-	assert.Equal(t, "", stringx.Trim(""))
+	assert.Equal(t, "", Trim(""))
 
 	// Test string with leading and trailing spaces
-	assert.Equal(t, "hello", stringx.Trim("  hello  "))
+	assert.Equal(t, "hello", Trim("  hello  "))
 
 	// Test string with leading spaces
-	assert.Equal(t, "world", stringx.Trim("   world "))
+	assert.Equal(t, "world", Trim("   world "))
 
 	// Test string with trailing spaces
-	assert.Equal(t, "hi", stringx.Trim("hi    "))
+	assert.Equal(t, "hi", Trim("hi    "))
 }
 
 // TestTrimStart tests the TrimStart function
 func TestTrimStart(t *testing.T) {
 	// Test empty string
-	assert.Equal(t, "", stringx.TrimStart(""))
+	assert.Equal(t, "", TrimStart(""))
 
 	// Test string with leading and trailing spaces
-	assert.Equal(t, "hello  ", stringx.TrimStart("  hello  "))
+	assert.Equal(t, "hello  ", TrimStart("  hello  "))
 
 	// Test string with leading spaces
-	assert.Equal(t, "world ", stringx.TrimStart("   world "))
+	assert.Equal(t, "world ", TrimStart("   world "))
 
 	// Test string with trailing spaces
-	assert.Equal(t, "hi    ", stringx.TrimStart("hi    "))
+	assert.Equal(t, "hi    ", TrimStart("hi    "))
 }
 
 // TestTrimEnd tests the TrimEnd function
 func TestTrimEnd(t *testing.T) {
 	// Test empty string
-	assert.Equal(t, "", stringx.TrimEnd(""))
+	assert.Equal(t, "", TrimEnd(""))
 
 	// Test string with leading and trailing spaces
-	assert.Equal(t, "  hello", stringx.TrimEnd("  hello  "))
+	assert.Equal(t, "  hello", TrimEnd("  hello  "))
 
 	// Test string with leading spaces
-	assert.Equal(t, "   world", stringx.TrimEnd("   world "))
+	assert.Equal(t, "   world", TrimEnd("   world "))
 
 	// Test string with trailing spaces
-	assert.Equal(t, "hi", stringx.TrimEnd("hi    "))
+	assert.Equal(t, "hi", TrimEnd("hi    "))
 }
 
 // TestCleanEmpty tests the CleanEmpty function
 func TestCleanEmpty(t *testing.T) {
 	// Test empty string
-	assert.Equal(t, "", stringx.CleanEmpty(""))
+	assert.Equal(t, "", CleanEmpty(""))
 
 	// Test string with spaces
-	assert.Equal(t, "helloworld", stringx.CleanEmpty(" hello world "))
+	assert.Equal(t, "helloworld", CleanEmpty(" hello world "))
 
 	// Test string without spaces
-	assert.Equal(t, "hello", stringx.CleanEmpty("hello"))
+	assert.Equal(t, "hello", CleanEmpty("hello"))
 }

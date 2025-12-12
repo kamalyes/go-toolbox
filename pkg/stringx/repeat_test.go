@@ -8,12 +8,11 @@
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package stringx
 
 import (
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/stringx"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -58,7 +57,7 @@ func TestRepeat(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := stringx.Repeat(tt.input, tt.count)
+			result := Repeat(tt.input, tt.count)
 			assert.Equal(t, tt.output, result)
 		})
 	}
