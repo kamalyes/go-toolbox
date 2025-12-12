@@ -3,12 +3,12 @@
  * @Date: 2024-11-09 10:50:50
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2025-01-15 11:55:15
- * @FilePath: \go-toolbox\tests\syncx_map_test.go
- * @Description:
+ * @FilePath: \go-toolbox\pkg\syncx\map_test.go
+ * @Description: map 映射单元测试
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package syncx
 
 import (
 	"sort"
@@ -16,12 +16,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kamalyes/go-toolbox/pkg/syncx"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestMap(t *testing.T) {
-	m := syncx.NewMap[string, int]()
+	m := NewMap[string, int]()
 
 	// 测试 Store 和 Load
 	m.Store("key1", 1)
@@ -101,8 +100,8 @@ func TestMap(t *testing.T) {
 	assert.Equal(t, 0, size, "Expected size 0 after clear")
 }
 
-func TestMap_Swap(t *testing.T) {
-	m := syncx.NewMap[string, int]()
+func TestMapSwap(t *testing.T) {
+	m := NewMap[string, int]()
 
 	// 测试 Swap 时键不存在
 	pre, ok := m.Swap("key1", 10)
@@ -123,8 +122,8 @@ func TestMap_Swap(t *testing.T) {
 	assert.Equal(t, 10, val, "expected value to be 10 after swap")
 }
 
-func TestMap_Clear(t *testing.T) {
-	m := syncx.NewMap[string, int]()
+func TestMapClear(t *testing.T) {
+	m := NewMap[string, int]()
 	m.Store("key1", 1)
 	m.Store("key2", 2)
 
@@ -142,8 +141,8 @@ func TestMap_Clear(t *testing.T) {
 	assert.False(t, ok, "expected key2 to be deleted after clear")
 }
 
-func TestMap_LoadAndDelete(t *testing.T) {
-	m := syncx.NewMap[string, int]()
+func TestMapLoadAndDelete(t *testing.T) {
+	m := NewMap[string, int]()
 	m.Store("key1", 1)
 
 	// 测试 LoadAndDelete
@@ -156,8 +155,8 @@ func TestMap_LoadAndDelete(t *testing.T) {
 	assert.False(t, ok, "expected key1 to be deleted")
 }
 
-func TestMap_Equals(t *testing.T) {
-	m := syncx.NewMap[string, int]()
+func TestMapEquals(t *testing.T) {
+	m := NewMap[string, int]()
 	m.Store("key1", 1)
 
 	// 测试存在的键
@@ -176,8 +175,8 @@ func TestMap_Equals(t *testing.T) {
 	assert.False(t, m.Equals("key1", 1, isEqualDifferent), "expected key1 to not be equal to 2")
 }
 
-func TestMap_Size_Concurrent(t *testing.T) {
-	m := syncx.NewMap[string, int]()
+func TestMapSize_Concurrent(t *testing.T) {
+	m := NewMap[string, int]()
 
 	// 启动多个 goroutine 来并发存储值
 	for i := 0; i < 100; i++ {
@@ -195,8 +194,8 @@ func TestMap_Size_Concurrent(t *testing.T) {
 	assert.Equal(t, 100, size, "Expected size 100")
 }
 
-func TestMap_KeysAndValues(t *testing.T) {
-	m := syncx.NewMap[string, int]()
+func TestMapKeysAndValues(t *testing.T) {
+	m := NewMap[string, int]()
 	m.Store("key1", 1)
 	m.Store("key2", 2)
 	m.Store("key3", 3)
@@ -218,7 +217,7 @@ func TestCopyMetaWithExistingKeys(t *testing.T) {
 		"key1": "old_value",
 	}
 
-	syncx.CopyMeta(src, dst)
+	CopyMeta(src, dst)
 
 	assert.Equal(t, "value1", dst["key1"], "expected dst['key1'] = 'value1'")
 }
@@ -236,8 +235,8 @@ func TestMetaStringToMap(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := syncx.MetaStringToMap(test.meta)
-		assert.True(t, mapsEqual(result, test.expected), 
+		result := MetaStringToMap(test.meta)
+		assert.True(t, mapsEqual(result, test.expected),
 			"MetaStringToMap(%q) = %v; want %v", test.meta, result, test.expected)
 	}
 }
@@ -255,8 +254,8 @@ func TestMetaMapToString(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := syncx.MetaMapToString(test.meta)
-		assert.Equal(t, test.expected, result, 
+		result := MetaMapToString(test.meta)
+		assert.Equal(t, test.expected, result,
 			"MetaMapToString(%v) should equal expected", test.meta)
 	}
 }
@@ -274,9 +273,9 @@ func mapsEqual(a, b map[string]string) bool {
 	return true
 }
 
-func TestMap_Clone(t *testing.T) {
+func TestMapClone(t *testing.T) {
 	// 创建一个新的 Map 实例并添加一些键值对
-	originalMap := syncx.NewMap[string, int]()
+	originalMap := NewMap[string, int]()
 	originalMap.Store("key1", 1)
 	originalMap.Store("key2", 2)
 	originalMap.Store("key3", 3)

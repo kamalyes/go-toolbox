@@ -3,22 +3,21 @@
  * @Date: 2024-11-09 10:50:50
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2024-11-11 15:05:55
- * @FilePath: \go-toolbox\tests\syncx_set_test.go
- * @Description:
+ * @FilePath: \go-toolbox\pkg\syncx\set_test.go
+ * @Description: set 集合单元测试
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package syncx
 
 import (
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/syncx"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestSet(t *testing.T) {
-	s := syncx.NewSet[string]()
+	s := NewSet[string]()
 
 	// 测试 Add 和 Has
 	s.Add("apple")
@@ -61,7 +60,7 @@ func TestSet(t *testing.T) {
 }
 
 func TestSet_Elements(t *testing.T) {
-	s := syncx.NewSet[int]()
+	s := NewSet[int]()
 	s.AddAll(1, 2, 3)
 
 	elements := s.Elements()
@@ -69,7 +68,7 @@ func TestSet_Elements(t *testing.T) {
 }
 
 func TestSet_IsEmpty(t *testing.T) {
-	s := syncx.NewSet[string]()
+	s := NewSet[string]()
 	assert.True(t, s.IsEmpty(), "expected new set to be empty")
 
 	s.Add("item")

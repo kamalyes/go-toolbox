@@ -3,19 +3,18 @@
  * @Date: 2024-12-13 13:06:30
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2025-08-06 17:37:31
- * @FilePath: \go-toolbox\tests\syncx_lock_test.go
+ * @FilePath: \go-toolbox\pkg\syncx\lock_test.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package syncx
 
 import (
 	"sync"
 	"sync/atomic"
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/syncx"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -38,7 +37,7 @@ func TestWithLock(t *testing.T) {
 	lock := &MockLocker{}
 
 	// 使用 WithLock 执行操作
-	syncx.WithLock(lock, func() {
+	WithLock(lock, func() {
 		counter++
 	})
 
@@ -50,7 +49,7 @@ func TestWithLockReturnValue(t *testing.T) {
 	lock := &MockLocker{}
 
 	// 使用 WithLockReturnValue 执行操作
-	result := syncx.WithLockReturnValue(lock, func() int {
+	result := WithLockReturnValue(lock, func() int {
 		return 42 // 返回一个结果
 	})
 
@@ -69,7 +68,7 @@ func TestWithLockConcurrent(t *testing.T) {
 	for i := 0; i < goroutines; i++ {
 		go func() {
 			defer wg.Done()
-			syncx.WithLock(lock, func() {
+			WithLock(lock, func() {
 				counter++
 			})
 		}()
@@ -106,7 +105,7 @@ func TestWithLockReturn(t *testing.T) {
 	lock := &MockLocker{}
 
 	// 使用 WithLockReturn 执行操作
-	result, err := syncx.WithLockReturn(lock, func() (int, error) {
+	result, err := WithLockReturn(lock, func() (int, error) {
 		return 42, nil // 返回一个结果
 	})
 
@@ -118,7 +117,7 @@ func TestWithLockReturn(t *testing.T) {
 func TestWithLockReturnWithE(t *testing.T) {
 	lock := &MockLocker{}
 
-	result, err := syncx.WithLockReturnWithE(lock, func() (int, error) {
+	result, err := WithLockReturnWithE(lock, func() (int, error) {
 		return 42, nil
 	})
 
@@ -135,7 +134,7 @@ func TestWithUnlockThenLock(t *testing.T) {
 	mockLocker.Lock()
 	counter = 0
 
-	syncx.WithUnlockThenLock(mockLocker, func() {
+	WithUnlockThenLock(mockLocker, func() {
 		counter++
 	})
 
@@ -151,7 +150,7 @@ func TestWithRUnlockThenLock(t *testing.T) {
 	mockRLocker.Lock()
 	counter = 0
 
-	syncx.WithRUnlockThenLock(mockRLocker, func() {
+	WithRUnlockThenLock(mockRLocker, func() {
 		counter++
 	})
 	assert.Equal(t, 1, counter, "计数器应该增加到 1")
@@ -162,7 +161,7 @@ func TestWithLockReturnString(t *testing.T) {
 	lock := &MockLocker{}
 
 	// 使用 WithLockReturn 执行操作
-	result, err := syncx.WithLockReturn(lock, func() (string, error) {
+	result, err := WithLockReturn(lock, func() (string, error) {
 		return "Hello, World!", nil // 返回一个字符串
 	})
 
@@ -175,7 +174,7 @@ func TestWithLockReturnBool(t *testing.T) {
 	lock := &MockLocker{}
 
 	// 使用 WithLockReturn 执行操作
-	result, err := syncx.WithLockReturn(lock, func() (bool, error) {
+	result, err := WithLockReturn(lock, func() (bool, error) {
 		return true, nil // 返回一个布尔值
 	})
 
@@ -193,7 +192,7 @@ func TestWithLockReturnComplex(t *testing.T) {
 	}
 
 	// 使用 WithLockReturn 执行操作
-	result, err := syncx.WithLockReturn(lock, func() (CustomStruct, error) {
+	result, err := WithLockReturn(lock, func() (CustomStruct, error) {
 		return CustomStruct{Name: "Test", Value: 100}, nil // 返回一个自定义结构体
 	})
 
@@ -214,7 +213,7 @@ func TestWithLockReturnConcurrent(t *testing.T) {
 	for i := 0; i < goroutines; i++ {
 		go func(index int) {
 			defer wg.Done()
-			result, err := syncx.WithLockReturn(lock, func() (int, error) {
+			result, err := WithLockReturn(lock, func() (int, error) {
 				return index, nil // 返回当前索引
 			})
 			assert.NoError(t, err, "Expected no error")
@@ -236,7 +235,7 @@ func TestWithRLock(t *testing.T) {
 	lock := &MockRWLocker{}
 
 	// 使用 WithRLock 执行操作
-	syncx.WithRLock(lock, func() {
+	WithRLock(lock, func() {
 		counter++
 	})
 
@@ -248,7 +247,7 @@ func TestWithRLockReturn(t *testing.T) {
 	lock := &MockRWLocker{}
 
 	// 使用 WithRLockReturn 执行操作
-	result, err := syncx.WithRLockReturn(lock, func() (int, error) {
+	result, err := WithRLockReturn(lock, func() (int, error) {
 		return 42, nil // 返回一个结果
 	})
 
@@ -269,7 +268,7 @@ func TestWithRLockReturnConcurrent(t *testing.T) {
 	for i := 0; i < goroutines; i++ {
 		go func(index int) {
 			defer wg.Done()
-			result, err := syncx.WithRLockReturn(lock, func() (int, error) {
+			result, err := WithRLockReturn(lock, func() (int, error) {
 				return index, nil // 返回当前索引
 			})
 			assert.NoError(t, err, "Expected no error")
@@ -290,7 +289,7 @@ func TestWithRLockReturnValue(t *testing.T) {
 	lock := &MockRWLocker{}
 
 	// 使用 WithRLockReturnValue 执行操作
-	result := syncx.WithRLockReturnValue(lock, func() int {
+	result := WithRLockReturnValue(lock, func() int {
 		return 42 // 返回一个结果
 	})
 
@@ -301,7 +300,7 @@ func TestWithRLockReturnValue(t *testing.T) {
 func TestWithRLockReturnWithE(t *testing.T) {
 	lock := &MockRWLocker{}
 
-	result, err := syncx.WithRLockReturnWithE(lock, func() (string, error) {
+	result, err := WithRLockReturnWithE(lock, func() (string, error) {
 		return "Hello, World!", nil
 	})
 
@@ -406,7 +405,7 @@ func TestWithTryLock(t *testing.T) {
 	lock := &SimpleTryMutex{}
 
 	// 成功获取锁并执行操作
-	err := syncx.WithTryLock(lock, func() error {
+	err := WithTryLock(lock, func() error {
 		return nil
 	})
 	assert.NoError(t, err)
@@ -415,18 +414,18 @@ func TestWithTryLock(t *testing.T) {
 	ok := lock.TryLock()
 	assert.True(t, ok)
 
-	err = syncx.WithTryLock(lock, func() error {
+	err = WithTryLock(lock, func() error {
 		assert.Fail(t, "不应该执行")
 		return nil
 	})
-	assert.Equal(t, syncx.ErrLockNotAcquired, err)
+	assert.Equal(t, ErrLockNotAcquired, err)
 	lock.Unlock()
 }
 
 func TestWithTryLockReturn(t *testing.T) {
 	lock := &SimpleTryMutex{}
 
-	val, err := syncx.WithTryLockReturn(lock, func() (int, error) {
+	val, err := WithTryLockReturn(lock, func() (int, error) {
 		return 42, nil
 	})
 	assert.NoError(t, err)
@@ -435,11 +434,11 @@ func TestWithTryLockReturn(t *testing.T) {
 	ok := lock.TryLock()
 	assert.True(t, ok)
 
-	val, err = syncx.WithTryLockReturn(lock, func() (int, error) {
+	val, err = WithTryLockReturn(lock, func() (int, error) {
 		assert.Fail(t, "不应该执行")
 		return 0, nil
 	})
-	assert.Equal(t, syncx.ErrLockNotAcquired, err)
+	assert.Equal(t, ErrLockNotAcquired, err)
 	assert.Equal(t, 0, val)
 	lock.Unlock()
 }
@@ -447,7 +446,7 @@ func TestWithTryLockReturn(t *testing.T) {
 func TestWithTryLockReturnValue(t *testing.T) {
 	lock := &SimpleTryMutex{}
 
-	val, err := syncx.WithTryLockReturnValue(lock, func() string {
+	val, err := WithTryLockReturnValue(lock, func() string {
 		return "hello"
 	})
 	assert.NoError(t, err)
@@ -456,11 +455,11 @@ func TestWithTryLockReturnValue(t *testing.T) {
 	ok := lock.TryLock()
 	assert.True(t, ok)
 
-	val, err = syncx.WithTryLockReturnValue(lock, func() string {
+	val, err = WithTryLockReturnValue(lock, func() string {
 		assert.Fail(t, "不应该执行")
 		return "fail"
 	})
-	assert.Equal(t, syncx.ErrLockNotAcquired, err)
+	assert.Equal(t, ErrLockNotAcquired, err)
 	assert.Equal(t, "", val)
 	lock.Unlock()
 }
@@ -468,7 +467,7 @@ func TestWithTryLockReturnValue(t *testing.T) {
 func TestWithTryRLock(t *testing.T) {
 	lock := &SimpleTryRWMutex{}
 
-	err := syncx.WithTryRLock(lock, func() error {
+	err := WithTryRLock(lock, func() error {
 		return nil
 	})
 	assert.NoError(t, err)
@@ -476,18 +475,18 @@ func TestWithTryRLock(t *testing.T) {
 	ok := lock.TryLock()
 	assert.True(t, ok)
 
-	err = syncx.WithTryRLock(lock, func() error {
+	err = WithTryRLock(lock, func() error {
 		assert.Fail(t, "不应该执行")
 		return nil
 	})
-	assert.Equal(t, syncx.ErrLockNotAcquired, err)
+	assert.Equal(t, ErrLockNotAcquired, err)
 	lock.Unlock()
 }
 
 func TestWithTryRLockReturn(t *testing.T) {
 	lock := &SimpleTryRWMutex{}
 
-	val, err := syncx.WithTryRLockReturn(lock, func() (string, error) {
+	val, err := WithTryRLockReturn(lock, func() (string, error) {
 		return "read", nil
 	})
 	assert.NoError(t, err)
@@ -496,11 +495,11 @@ func TestWithTryRLockReturn(t *testing.T) {
 	ok := lock.TryLock()
 	assert.True(t, ok)
 
-	val, err = syncx.WithTryRLockReturn(lock, func() (string, error) {
+	val, err = WithTryRLockReturn(lock, func() (string, error) {
 		assert.Fail(t, "不应该执行")
 		return "", nil
 	})
-	assert.Equal(t, syncx.ErrLockNotAcquired, err)
+	assert.Equal(t, ErrLockNotAcquired, err)
 	assert.Equal(t, "", val)
 	lock.Unlock()
 }
@@ -508,7 +507,7 @@ func TestWithTryRLockReturn(t *testing.T) {
 func TestWithTryRLockReturnValue(t *testing.T) {
 	lock := &SimpleTryRWMutex{}
 
-	val, err := syncx.WithTryRLockReturnValue(lock, func() int {
+	val, err := WithTryRLockReturnValue(lock, func() int {
 		return 123
 	})
 	assert.NoError(t, err)
@@ -517,11 +516,11 @@ func TestWithTryRLockReturnValue(t *testing.T) {
 	ok := lock.TryLock()
 	assert.True(t, ok)
 
-	val, err = syncx.WithTryRLockReturnValue(lock, func() int {
+	val, err = WithTryRLockReturnValue(lock, func() int {
 		assert.Fail(t, "不应该执行")
 		return 456
 	})
-	assert.Equal(t, syncx.ErrLockNotAcquired, err)
+	assert.Equal(t, ErrLockNotAcquired, err)
 	assert.Equal(t, 0, val)
 	lock.Unlock()
 }
@@ -530,7 +529,7 @@ func TestWithTryRLockReturnValue(t *testing.T) {
 func TestWithTryLockReturnWithE(t *testing.T) {
 	lock := &SimpleTryMutex{}
 
-	result, err := syncx.WithTryLockReturnWithE(lock, func() (int, error) {
+	result, err := WithTryLockReturnWithE(lock, func() (int, error) {
 		return 42, nil
 	})
 
@@ -542,7 +541,7 @@ func TestWithTryLockReturnWithE(t *testing.T) {
 func TestWithTryRLockReturnWithE(t *testing.T) {
 	lock := &SimpleTryRWMutex{}
 
-	result, err := syncx.WithTryRLockReturnWithE(lock, func() (int, error) {
+	result, err := WithTryRLockReturnWithE(lock, func() (int, error) {
 		return 42, nil
 	})
 

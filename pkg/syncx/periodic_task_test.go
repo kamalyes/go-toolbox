@@ -14,15 +14,16 @@ package syncx
 import (
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
-// TestPeriodicTaskManager_NewPeriodicTaskManager 测试创建新的任务管理器
-func TestPeriodicTaskManager_NewPeriodicTaskManager(t *testing.T) {
+// TestPeriodicTaskManagerNewPeriodicTaskManager 测试创建新的任务管理器
+func TestPeriodicTaskManagerNewPeriodicTaskManager(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 
 	assert.NotNil(t, manager, "manager should not be nil")
@@ -31,8 +32,8 @@ func TestPeriodicTaskManager_NewPeriodicTaskManager(t *testing.T) {
 	assert.False(t, manager.isRunning, "manager should not be running initially")
 }
 
-// TestPeriodicTaskManager_AddTask 测试添加任务
-func TestPeriodicTaskManager_AddTask(t *testing.T) {
+// TestPeriodicTaskManagerAddTask 测试添加任务
+func TestPeriodicTaskManagerAddTask(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 
 	task := NewPeriodicTask("test_task", time.Second, func(ctx context.Context) error { return nil })
@@ -44,8 +45,8 @@ func TestPeriodicTaskManager_AddTask(t *testing.T) {
 	assert.Equal(t, "test_task", manager.tasks[0].GetName(), "task name should match")
 }
 
-// TestPeriodicTaskManager_AddSimpleTask 测试添加简单任务
-func TestPeriodicTaskManager_AddSimpleTask(t *testing.T) {
+// TestPeriodicTaskManagerAddSimpleTask 测试添加简单任务
+func TestPeriodicTaskManagerAddSimpleTask(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var executed int32
 
@@ -61,8 +62,8 @@ func TestPeriodicTaskManager_AddSimpleTask(t *testing.T) {
 	assert.False(t, manager.tasks[0].GetImmediateStart(), "immediate start should be false by default")
 }
 
-// TestPeriodicTaskManager_AddTaskWithImmediateStart 测试添加立即执行任务
-func TestPeriodicTaskManager_AddTaskWithImmediateStart(t *testing.T) {
+// TestPeriodicTaskManagerAddTaskWithImmediateStart 测试添加立即执行任务
+func TestPeriodicTaskManagerAddTaskWithImmediateStart(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var executed int32
 
@@ -77,8 +78,8 @@ func TestPeriodicTaskManager_AddTaskWithImmediateStart(t *testing.T) {
 	assert.True(t, manager.tasks[0].GetImmediateStart(), "immediate start should be true")
 }
 
-// TestPeriodicTaskManager_SetDefaultErrorHandler 测试设置默认错误处理器
-func TestPeriodicTaskManager_SetDefaultErrorHandler(t *testing.T) {
+// TestPeriodicTaskManagerSetDefaultErrorHandler 测试设置默认错误处理器
+func TestPeriodicTaskManagerSetDefaultErrorHandler(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 
 	// 添加一个没有错误处理器的任务
@@ -99,8 +100,8 @@ func TestPeriodicTaskManager_SetDefaultErrorHandler(t *testing.T) {
 	assert.NotNil(t, manager.tasks[1].GetOnError(), "task2 should still have its original error handler")
 }
 
-// TestPeriodicTaskManager_SetDefaultCallbacks 测试设置默认回调函数
-func TestPeriodicTaskManager_SetDefaultCallbacks(t *testing.T) {
+// TestPeriodicTaskManagerSetDefaultCallbacks 测试设置默认回调函数
+func TestPeriodicTaskManagerSetDefaultCallbacks(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 
 	// 添加一个没有回调的任务
@@ -125,8 +126,8 @@ func TestPeriodicTaskManager_SetDefaultCallbacks(t *testing.T) {
 	assert.NotNil(t, manager.tasks[1].GetOnStop(), "task2 should still have its original stop callback")
 }
 
-// TestPeriodicTaskManager_Start_AlreadyRunning 测试重复启动
-func TestPeriodicTaskManager_Start_AlreadyRunning(t *testing.T) {
+// TestPeriodicTaskManagerStartAlreadyRunning 测试重复启动
+func TestPeriodicTaskManagerStartAlreadyRunning(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	manager.AddSimpleTask("test_task", time.Second, func(ctx context.Context) error { return nil })
 
@@ -142,8 +143,8 @@ func TestPeriodicTaskManager_Start_AlreadyRunning(t *testing.T) {
 	manager.Stop()
 }
 
-// TestPeriodicTaskManager_StartWithContext_AlreadyRunning 测试使用上下文重复启动
-func TestPeriodicTaskManager_StartWithContext_AlreadyRunning(t *testing.T) {
+// TestPeriodicTaskManagerStartWithContextAlreadyRunning 测试使用上下文重复启动
+func TestPeriodicTaskManagerStartWithContextAlreadyRunning(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	manager.AddSimpleTask("test_task", time.Second, func(ctx context.Context) error { return nil })
 
@@ -161,8 +162,8 @@ func TestPeriodicTaskManager_StartWithContext_AlreadyRunning(t *testing.T) {
 	manager.Stop()
 }
 
-// TestPeriodicTaskManager_Stop_NotRunning 测试停止未运行的管理器
-func TestPeriodicTaskManager_Stop_NotRunning(t *testing.T) {
+// TestPeriodicTaskManagerStopNotRunning 测试停止未运行的管理器
+func TestPeriodicTaskManagerStopNotRunning(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 
 	err := manager.Stop()
@@ -170,8 +171,8 @@ func TestPeriodicTaskManager_Stop_NotRunning(t *testing.T) {
 	assert.False(t, manager.IsRunning(), "manager should not be running")
 }
 
-// TestPeriodicTaskManager_StartStop 测试启动和停止
-func TestPeriodicTaskManager_StartStop(t *testing.T) {
+// TestPeriodicTaskManagerStartStop 测试启动和停止
+func TestPeriodicTaskManagerStartStop(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var executed int32
 
@@ -195,8 +196,8 @@ func TestPeriodicTaskManager_StartStop(t *testing.T) {
 	assert.Greater(t, executedCount, int32(0), "task should have executed at least once")
 }
 
-// TestPeriodicTaskManager_ImmediateStart 测试立即执行任务
-func TestPeriodicTaskManager_ImmediateStart(t *testing.T) {
+// TestPeriodicTaskManagerImmediateStart 测试立即执行任务
+func TestPeriodicTaskManagerImmediateStart(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var executed int32
 
@@ -217,8 +218,8 @@ func TestPeriodicTaskManager_ImmediateStart(t *testing.T) {
 	manager.Stop()
 }
 
-// TestPeriodicTaskManager_ErrorHandling 测试错误处理
-func TestPeriodicTaskManager_ErrorHandling(t *testing.T) {
+// TestPeriodicTaskManagerErrorHandling 测试错误处理
+func TestPeriodicTaskManagerErrorHandling(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var errorCount int32
 	var errorName string
@@ -243,8 +244,8 @@ func TestPeriodicTaskManager_ErrorHandling(t *testing.T) {
 	assert.Equal(t, "test error", errorMessage, "error message should match")
 }
 
-// TestPeriodicTaskManager_StartStopCallbacks 测试启动停止回调
-func TestPeriodicTaskManager_StartStopCallbacks(t *testing.T) {
+// TestPeriodicTaskManagerStartStopCallbacks 测试启动停止回调
+func TestPeriodicTaskManagerStartStopCallbacks(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var startCalled, stopCalled bool
 	var startTaskName, stopTaskName string
@@ -272,8 +273,8 @@ func TestPeriodicTaskManager_StartStopCallbacks(t *testing.T) {
 	assert.Equal(t, "callback_task", stopTaskName, "stop callback should receive correct task name")
 }
 
-// TestPeriodicTaskManager_MultipleTasksExecution 测试多个任务执行
-func TestPeriodicTaskManager_MultipleTasksExecution(t *testing.T) {
+// TestPeriodicTaskManagerMultipleTasksExecution 测试多个任务执行
+func TestPeriodicTaskManagerMultipleTasksExecution(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var task1Count, task2Count, task3Count int32
 
@@ -303,8 +304,8 @@ func TestPeriodicTaskManager_MultipleTasksExecution(t *testing.T) {
 	assert.Greater(t, atomic.LoadInt32(&task3Count), int32(0), "task3 should have executed")
 }
 
-// TestPeriodicTaskManager_GetTaskNames 测试获取任务名称
-func TestPeriodicTaskManager_GetTaskNames(t *testing.T) {
+// TestPeriodicTaskManagerGetTaskNames 测试获取任务名称
+func TestPeriodicTaskManagerGetTaskNames(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 
 	manager.AddSimpleTask("task_a", time.Second, func(ctx context.Context) error { return nil })
@@ -319,8 +320,8 @@ func TestPeriodicTaskManager_GetTaskNames(t *testing.T) {
 	assert.Contains(t, names, "task_c", "should contain task_c")
 }
 
-// TestPeriodicTaskManager_ContextCancellation 测试上下文取消
-func TestPeriodicTaskManager_ContextCancellation(t *testing.T) {
+// TestPeriodicTaskManagerContextCancellation 测试上下文取消
+func TestPeriodicTaskManagerContextCancellation(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var executed int32
 
@@ -346,8 +347,8 @@ func TestPeriodicTaskManager_ContextCancellation(t *testing.T) {
 	assert.Equal(t, executedBefore, executedAfter, "task should not execute after context cancellation")
 }
 
-// TestPeriodicTaskManager_StopWithTimeout_Success 测试超时停止成功
-func TestPeriodicTaskManager_StopWithTimeout_Success(t *testing.T) {
+// TestPeriodicTaskManagerStopWithTimeout_Success 测试超时停止成功
+func TestPeriodicTaskManagerStopWithTimeout_Success(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 
 	manager.AddSimpleTask("quick_task", time.Millisecond*50, func(ctx context.Context) error {
@@ -362,8 +363,8 @@ func TestPeriodicTaskManager_StopWithTimeout_Success(t *testing.T) {
 	assert.False(t, manager.IsRunning(), "manager should not be running")
 }
 
-// TestPeriodicTaskManager_StopWithTimeout_Timeout 测试超时停止超时
-func TestPeriodicTaskManager_StopWithTimeout_Timeout(t *testing.T) {
+// TestPeriodicTaskManagerStopWithTimeout_Timeout 测试超时停止超时
+func TestPeriodicTaskManagerStopWithTimeout_Timeout(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 
 	// 创建一个会阻塞的任务
@@ -380,8 +381,8 @@ func TestPeriodicTaskManager_StopWithTimeout_Timeout(t *testing.T) {
 	assert.Contains(t, err.Error(), "timeout", "error should mention timeout")
 }
 
-// TestPeriodicTaskManager_Wait 测试等待功能
-func TestPeriodicTaskManager_Wait(t *testing.T) {
+// TestPeriodicTaskManagerWait 测试等待功能
+func TestPeriodicTaskManagerWait(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var completed bool
 
@@ -401,8 +402,8 @@ func TestPeriodicTaskManager_Wait(t *testing.T) {
 	assert.True(t, completed, "Wait should block until tasks complete")
 }
 
-// TestPeriodicTaskManager_ConcurrentAccess 测试并发访问
-func TestPeriodicTaskManager_ConcurrentAccess(t *testing.T) {
+// TestPeriodicTaskManagerConcurrentAccess 测试并发访问
+func TestPeriodicTaskManagerConcurrentAccess(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var wg sync.WaitGroup
 	var errorCount int32
@@ -438,8 +439,8 @@ func TestPeriodicTaskManager_ConcurrentAccess(t *testing.T) {
 	assert.Equal(t, 10, manager.GetTaskCount(), "should have 10 tasks")
 }
 
-// TestPeriodicTaskManager_TaskWithCustomCallbacks 测试带自定义回调的任务
-func TestPeriodicTaskManager_TaskWithCustomCallbacks(t *testing.T) {
+// TestPeriodicTaskManagerTaskWithCustomCallbacks 测试带自定义回调的任务
+func TestPeriodicTaskManagerTaskWithCustomCallbacks(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var customStartCalled, customStopCalled, customErrorCalled bool
 
@@ -477,8 +478,8 @@ func TestPeriodicTaskManager_TaskWithCustomCallbacks(t *testing.T) {
 	assert.True(t, customErrorCalled, "custom error callback should have been called")
 }
 
-// TestPeriodicTaskManager_EmptyManager 测试空管理器
-func TestPeriodicTaskManager_EmptyManager(t *testing.T) {
+// TestPeriodicTaskManagerEmptyManager 测试空管理器
+func TestPeriodicTaskManagerEmptyManager(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 
 	err := manager.Start()
@@ -493,8 +494,8 @@ func TestPeriodicTaskManager_EmptyManager(t *testing.T) {
 	assert.Equal(t, 0, len(manager.GetTaskNames()), "task names should be empty")
 }
 
-// TestPeriodicTaskManager_TaskExecutionOrder 测试任务执行顺序
-func TestPeriodicTaskManager_TaskExecutionOrder(t *testing.T) {
+// TestPeriodicTaskManagerTaskExecutionOrder 测试任务执行顺序
+func TestPeriodicTaskManagerTaskExecutionOrder(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var executionOrder []string
 	var mutex sync.Mutex
@@ -520,8 +521,8 @@ func TestPeriodicTaskManager_TaskExecutionOrder(t *testing.T) {
 	// 注意：由于并发执行，执行顺序可能不固定，但都应该执行
 }
 
-// TestPeriodicTaskManager_LongRunningTask 测试长时间运行的任务
-func TestPeriodicTaskManager_LongRunningTask(t *testing.T) {
+// TestPeriodicTaskManagerLongRunningTask 测试长时间运行的任务
+func TestPeriodicTaskManagerLongRunningTask(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var startCount, completeCount int32
 
@@ -544,8 +545,8 @@ func TestPeriodicTaskManager_LongRunningTask(t *testing.T) {
 	// 由于任务执行时间长，可能出现starts > completes的情况
 }
 
-// TestPeriodicTaskManager_PanicRecovery 测试panic恢复
-func TestPeriodicTaskManager_PanicRecovery(t *testing.T) {
+// TestPeriodicTaskManagerPanicRecovery 测试panic恢复
+func TestPeriodicTaskManagerPanicRecovery(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var panicHandled bool
 
@@ -572,8 +573,8 @@ func TestPeriodicTaskManager_PanicRecovery(t *testing.T) {
 	manager.Stop()
 
 	assert.True(t, panicHandled, "panic should have been handled by error handler")
-} // TestPeriodicTaskManager_HighFrequencyTasks 测试高频任务
-func TestPeriodicTaskManager_HighFrequencyTasks(t *testing.T) {
+} // TestPeriodicTaskManagerHighFrequencyTasks 测试高频任务
+func TestPeriodicTaskManagerHighFrequencyTasks(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var executionCount int32
 
@@ -590,8 +591,8 @@ func TestPeriodicTaskManager_HighFrequencyTasks(t *testing.T) {
 	assert.Greater(t, executions, int32(10), "high frequency task should execute many times")
 }
 
-// TestPeriodicTaskManager_TaskNameUniqueness 测试任务名称唯一性
-func TestPeriodicTaskManager_TaskNameUniqueness(t *testing.T) {
+// TestPeriodicTaskManagerTaskNameUniqueness 测试任务名称唯一性
+func TestPeriodicTaskManagerTaskNameUniqueness(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 
 	manager.AddSimpleTask("duplicate_name", time.Second, func(ctx context.Context) error { return nil })
@@ -611,8 +612,8 @@ func TestPeriodicTaskManager_TaskNameUniqueness(t *testing.T) {
 	assert.Equal(t, 1, nameCount["unique_name"], "should have 1 task with unique_name")
 }
 
-// TestPeriodicTaskManager_MemoryUsage 测试内存使用
-func TestPeriodicTaskManager_MemoryUsage(t *testing.T) {
+// TestPeriodicTaskManagerMemoryUsage 测试内存使用
+func TestPeriodicTaskManagerMemoryUsage(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 
 	// 添加大量任务
@@ -631,8 +632,8 @@ func TestPeriodicTaskManager_MemoryUsage(t *testing.T) {
 	assert.False(t, manager.IsRunning(), "manager should not be running after stop")
 }
 
-// TestPeriodicTaskManager_ZeroInterval 测试零间隔任务
-func TestPeriodicTaskManager_ZeroInterval(t *testing.T) {
+// TestPeriodicTaskManagerZeroInterval 测试零间隔任务
+func TestPeriodicTaskManagerZeroInterval(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var executionCount int32
 
@@ -651,8 +652,8 @@ func TestPeriodicTaskManager_ZeroInterval(t *testing.T) {
 	assert.Greater(t, executions, int32(0), "zero interval task should execute")
 }
 
-// TestPeriodicTaskManager_NegativeInterval 测试负间隔任务
-func TestPeriodicTaskManager_NegativeInterval(t *testing.T) {
+// TestPeriodicTaskManagerNegativeInterval 测试负间隔任务
+func TestPeriodicTaskManagerNegativeInterval(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var executionCount int32
 
@@ -670,8 +671,8 @@ func TestPeriodicTaskManager_NegativeInterval(t *testing.T) {
 	assert.True(t, true, "negative interval should not cause crash")
 }
 
-// TestPeriodicTaskManager_VeryLargeInterval 测试非常大的间隔
-func TestPeriodicTaskManager_VeryLargeInterval(t *testing.T) {
+// TestPeriodicTaskManagerVeryLargeInterval 测试非常大的间隔
+func TestPeriodicTaskManagerVeryLargeInterval(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var executed bool
 
@@ -688,8 +689,8 @@ func TestPeriodicTaskManager_VeryLargeInterval(t *testing.T) {
 	assert.False(t, executed, "large interval task should not execute quickly")
 }
 
-// TestPeriodicTaskManager_ComplexScenario 测试复杂场景
-func TestPeriodicTaskManager_ComplexScenario(t *testing.T) {
+// TestPeriodicTaskManagerComplexScenario 测试复杂场景
+func TestPeriodicTaskManagerComplexScenario(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var results sync.Map
 	var errorCount int32
@@ -757,8 +758,8 @@ func TestPeriodicTaskManager_ComplexScenario(t *testing.T) {
 
 // ===================== 重叠保护功能测试 =====================
 
-// TestPeriodicTaskManager_AddTaskWithOverlapPrevention 测试添加防重叠任务
-func TestPeriodicTaskManager_AddTaskWithOverlapPrevention(t *testing.T) {
+// TestPeriodicTaskManagerAddTaskWithOverlapPrevention 测试添加防重叠任务
+func TestPeriodicTaskManagerAddTaskWithOverlapPrevention(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 
 	result := manager.AddTaskWithOverlapPrevention("overlap_task", time.Millisecond*100, func(ctx context.Context) error {
@@ -771,8 +772,8 @@ func TestPeriodicTaskManager_AddTaskWithOverlapPrevention(t *testing.T) {
 	assert.True(t, manager.tasks[0].GetPreventOverlap(), "PreventOverlap should be true")
 }
 
-// TestPeriodicTaskManager_AddTaskWithOverlapPreventionAndCallback 测试添加带回调的防重叠任务
-func TestPeriodicTaskManager_AddTaskWithOverlapPreventionAndCallback(t *testing.T) {
+// TestPeriodicTaskManagerAddTaskWithOverlapPreventionAndCallback 测试添加带回调的防重叠任务
+func TestPeriodicTaskManagerAddTaskWithOverlapPreventionAndCallback(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var callbackCalled bool
 
@@ -795,8 +796,8 @@ func TestPeriodicTaskManager_AddTaskWithOverlapPreventionAndCallback(t *testing.
 	_ = callbackCalled // 使用变量避免编译警告
 }
 
-// TestPeriodicTaskManager_OverlapPrevention 测试重叠保护功能
-func TestPeriodicTaskManager_OverlapPrevention(t *testing.T) {
+// TestPeriodicTaskManagerOverlapPrevention 测试重叠保护功能
+func TestPeriodicTaskManagerOverlapPrevention(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var executionCount, overlapCount int32
 
@@ -851,8 +852,8 @@ func TestPeriodicTaskManager_OverlapPrevention(t *testing.T) {
 	}
 }
 
-// TestPeriodicTaskManager_OverlapPreventionWithoutCallback 测试无回调的重叠保护
-func TestPeriodicTaskManager_OverlapPreventionWithoutCallback(t *testing.T) {
+// TestPeriodicTaskManagerOverlapPreventionWithoutCallback 测试无回调的重叠保护
+func TestPeriodicTaskManagerOverlapPreventionWithoutCallback(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var executionCount int32
 
@@ -884,8 +885,8 @@ func TestPeriodicTaskManager_OverlapPreventionWithoutCallback(t *testing.T) {
 	assert.Less(t, executions, int32(10), "execution count should be limited by overlap prevention")
 }
 
-// TestPeriodicTaskManager_NoOverlapPrevention 测试无重叠保护的对比
-func TestPeriodicTaskManager_NoOverlapPrevention(t *testing.T) {
+// TestPeriodicTaskManagerNoOverlapPrevention 测试无重叠保护的对比
+func TestPeriodicTaskManagerNoOverlapPrevention(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var startCount, endCount int32
 
@@ -914,8 +915,8 @@ func TestPeriodicTaskManager_NoOverlapPrevention(t *testing.T) {
 	assert.GreaterOrEqual(t, starts, ends, "starts should be >= ends due to possible overlap")
 }
 
-// TestPeriodicTaskManager_MixedTasks 测试混合任务（有/无重叠保护）
-func TestPeriodicTaskManager_MixedTasks(t *testing.T) {
+// TestPeriodicTaskManagerMixedTasks 测试混合任务（有/无重叠保护）
+func TestPeriodicTaskManagerMixedTasks(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var normalCount, protectedCount, overlapSkipCount int32
 
@@ -959,8 +960,8 @@ func TestPeriodicTaskManager_MixedTasks(t *testing.T) {
 	t.Logf("🧪 混合任务测试结果: 普通任务=%d, 保护任务=%d, 跳过次数=%d", normal, protected, skips)
 }
 
-// TestPeriodicTaskManager_OverlapPreventionWithError 测试重叠保护中的错误处理
-func TestPeriodicTaskManager_OverlapPreventionWithError(t *testing.T) {
+// TestPeriodicTaskManagerOverlapPreventionWithError 测试重叠保护中的错误处理
+func TestPeriodicTaskManagerOverlapPreventionWithError(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var executionCount, errorCount, overlapCount int32
 
@@ -995,8 +996,8 @@ func TestPeriodicTaskManager_OverlapPreventionWithError(t *testing.T) {
 	assert.Equal(t, executions, errors, "each execution should produce an error")
 }
 
-// TestPeriodicTaskManager_OverlapPreventionWithPanic 测试重叠保护中的panic处理
-func TestPeriodicTaskManager_OverlapPreventionWithPanic(t *testing.T) {
+// TestPeriodicTaskManagerOverlapPreventionWithPanic 测试重叠保护中的panic处理
+func TestPeriodicTaskManagerOverlapPreventionWithPanic(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var executionCount, panicCount, overlapCount int32
 
@@ -1033,8 +1034,8 @@ func TestPeriodicTaskManager_OverlapPreventionWithPanic(t *testing.T) {
 	assert.Equal(t, executions, panics, "each execution should produce a panic")
 }
 
-// TestPeriodicTaskManager_FastTaskWithOverlapPrevention 测试快速任务的重叠保护
-func TestPeriodicTaskManager_FastTaskWithOverlapPrevention(t *testing.T) {
+// TestPeriodicTaskManagerFastTaskWithOverlapPrevention 测试快速任务的重叠保护
+func TestPeriodicTaskManagerFastTaskWithOverlapPrevention(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var executionCount, overlapCount int32
 
@@ -1063,8 +1064,8 @@ func TestPeriodicTaskManager_FastTaskWithOverlapPrevention(t *testing.T) {
 	assert.Equal(t, int32(0), overlaps, "fast task should not have overlaps")
 }
 
-// TestPeriodicTaskManager_OverlapPreventionThreadSafety 测试重叠保护的线程安全性
-func TestPeriodicTaskManager_OverlapPreventionThreadSafety(t *testing.T) {
+// TestPeriodicTaskManagerOverlapPreventionThreadSafety 测试重叠保护的线程安全性
+func TestPeriodicTaskManagerOverlapPreventionThreadSafety(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var executionCount, overlapCount int32
 	var activeExecutions int32
@@ -1103,8 +1104,8 @@ func TestPeriodicTaskManager_OverlapPreventionThreadSafety(t *testing.T) {
 
 // ===================== 任务移除和取消功能测试 =====================
 
-// TestPeriodicTaskManager_RemoveTask_Basic 测试基本的任务移除功能
-func TestPeriodicTaskManager_RemoveTask_Basic(t *testing.T) {
+// TestPeriodicTaskManagerRemoveTask_Basic 测试基本的任务移除功能
+func TestPeriodicTaskManagerRemoveTask_Basic(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 
 	// 添加任务
@@ -1131,8 +1132,8 @@ func TestPeriodicTaskManager_RemoveTask_Basic(t *testing.T) {
 	assert.False(t, removed, "should not be able to remove non-existent task")
 }
 
-// TestPeriodicTaskManager_RemoveRunningTask 测试移除正在运行的任务
-func TestPeriodicTaskManager_RemoveRunningTask(t *testing.T) {
+// TestPeriodicTaskManagerRemoveRunningTask 测试移除正在运行的任务
+func TestPeriodicTaskManagerRemoveRunningTask(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var executionCount int32
 	var taskCancelled bool
@@ -1191,8 +1192,8 @@ func TestPeriodicTaskManager_RemoveRunningTask(t *testing.T) {
 	}
 }
 
-// TestPeriodicTaskManager_RemoveTaskWithTimeout 测试带超时的任务移除
-func TestPeriodicTaskManager_RemoveTaskWithTimeout(t *testing.T) {
+// TestPeriodicTaskManagerRemoveTaskWithTimeout 测试带超时的任务移除
+func TestPeriodicTaskManagerRemoveTaskWithTimeout(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var executionCount int32
 	var taskCancelled bool
@@ -1237,8 +1238,8 @@ func TestPeriodicTaskManager_RemoveTaskWithTimeout(t *testing.T) {
 	t.Logf("任务是否被取消: %v", taskCancelled)
 }
 
-// TestPeriodicTaskManager_RemoveTaskTimeout 测试移除任务超时情况
-func TestPeriodicTaskManager_RemoveTaskTimeout(t *testing.T) {
+// TestPeriodicTaskManagerRemoveTaskTimeout 测试移除任务超时情况
+func TestPeriodicTaskManagerRemoveTaskTimeout(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 
 	// 添加一个会阻塞很久的任务
@@ -1275,8 +1276,8 @@ func TestPeriodicTaskManager_RemoveTaskTimeout(t *testing.T) {
 	t.Logf("超时移除操作耗时: %v", duration)
 }
 
-// TestPeriodicTaskManager_RemoveMultipleTasks 测试移除多个任务
-func TestPeriodicTaskManager_RemoveMultipleTasks(t *testing.T) {
+// TestPeriodicTaskManagerRemoveMultipleTasks 测试移除多个任务
+func TestPeriodicTaskManagerRemoveMultipleTasks(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var task1Count, task2Count, task3Count int32
 
@@ -1339,8 +1340,8 @@ func TestPeriodicTaskManager_RemoveMultipleTasks(t *testing.T) {
 	t.Logf("Task3 执行次数: %d", atomic.LoadInt32(&task3Count))
 }
 
-// TestPeriodicTaskManager_ClearAllTasks 测试清除所有任务
-func TestPeriodicTaskManager_ClearAllTasks(t *testing.T) {
+// TestPeriodicTaskManagerClearAllTasks 测试清除所有任务
+func TestPeriodicTaskManagerClearAllTasks(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 
 	// 添加多个任务
@@ -1373,8 +1374,8 @@ func TestPeriodicTaskManager_ClearAllTasks(t *testing.T) {
 	assert.NoError(t, err, "should stop successfully")
 }
 
-// TestPeriodicTaskManager_RemoveTaskConcurrency 测试并发移除任务
-func TestPeriodicTaskManager_RemoveTaskConcurrency(t *testing.T) {
+// TestPeriodicTaskManagerRemoveTaskConcurrency 测试并发移除任务
+func TestPeriodicTaskManagerRemoveTaskConcurrency(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 
 	// 添加多个任务
@@ -1421,8 +1422,8 @@ func TestPeriodicTaskManager_RemoveTaskConcurrency(t *testing.T) {
 	assert.NoError(t, err, "should stop successfully")
 }
 
-// TestPeriodicTaskManager_GetTaskDetailsAfterRemoval 测试移除后获取任务详情
-func TestPeriodicTaskManager_GetTaskDetailsAfterRemoval(t *testing.T) {
+// TestPeriodicTaskManagerGetTaskDetailsAfterRemoval 测试移除后获取任务详情
+func TestPeriodicTaskManagerGetTaskDetailsAfterRemoval(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 
 	// 添加任务
@@ -1451,8 +1452,8 @@ func TestPeriodicTaskManager_GetTaskDetailsAfterRemoval(t *testing.T) {
 	assert.Equal(t, 0, len(allDetails), "should have no task details")
 }
 
-// TestPeriodicTaskManager_TaskCancellationContext 测试任务取消上下文
-func TestPeriodicTaskManager_TaskCancellationContext(t *testing.T) {
+// TestPeriodicTaskManagerTaskCancellationContext 测试任务取消上下文
+func TestPeriodicTaskManagerTaskCancellationContext(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var cancelledCount int32
 	var executionCount int32

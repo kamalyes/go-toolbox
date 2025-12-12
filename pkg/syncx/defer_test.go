@@ -3,17 +3,16 @@
  * @Date: 2025-01-23 09:09:56
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2025-01-24 09:22:56
- * @FilePath: \go-toolbox\tests\syncx_defer_test.go
- * @Description:
+ * @FilePath: \go-toolbox\pkg\syncx\defer_test.go
+ * @Description: syncx 延迟执行单元测试
  *
  * Copyright (c) 2025 by kamalyes, All Rights Reserved.
  */
-package tests
+package syncx
 
 import (
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/syncx"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -31,7 +30,7 @@ func TestWithDefer(t *testing.T) {
 	}
 
 	// 调用 WithDefer 函数
-	syncx.WithDefer(operation, cleanup)
+	WithDefer(operation, cleanup)
 
 	// 使用 assert 来验证操作和清理函数是否被调用
 	assert.True(t, executedOperation, "Operation should be executed")
@@ -48,7 +47,7 @@ func TestWithDeferReturnValue(t *testing.T) {
 		executedCleanup = true
 	}
 
-	result := syncx.WithDeferReturnValue(operation, cleanup)
+	result := WithDeferReturnValue(operation, cleanup)
 
 	// 使用 assert 来验证结果和清理函数是否被调用
 	assert.Equal(t, 42, result, "Expected result should be 42")
@@ -65,7 +64,7 @@ func TestWithDeferReturn(t *testing.T) {
 		executedCleanup = true
 	}
 
-	result, err := syncx.WithDeferReturn(operation, cleanup)
+	result, err := WithDeferReturn(operation, cleanup)
 
 	// 使用 assert 来验证结果和清理函数是否被调用
 	assert.NoError(t, err, "Expected no error")
@@ -83,7 +82,7 @@ func TestWithDeferReturnWithError(t *testing.T) {
 		executedCleanup = true
 	}
 
-	result, err := syncx.WithDeferReturn(operation, cleanup)
+	result, err := WithDeferReturn(operation, cleanup)
 
 	// 使用 assert 来验证结果和清理函数是否被调用
 	assert.Error(t, err, "Expected an error")

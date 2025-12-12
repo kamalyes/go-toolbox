@@ -2,24 +2,23 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-01-05 15:08:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-01-09 15:19:28
- * @FilePath: \go-toolbox\tests\syncx_atomic_test.go
- * @Description:
+ * @LastEditTime: 2025-12-12 22:56:39
+ * @FilePath: \go-toolbox\pkg\syncx\atomic_test.go
+ * @Description: atomic 原子操作单元测试
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package syncx
 
 import (
 	"sync"
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/syncx"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestAtomicBool(t *testing.T) {
-	b := syncx.NewBool(false)
+	b := NewBool(false)
 
 	// 测试初始值
 	assert.Equal(t, false, b.Load(), "expected false")
@@ -35,7 +34,7 @@ func TestAtomicBool(t *testing.T) {
 }
 
 func TestAtomicInt32(t *testing.T) {
-	i32 := syncx.NewInt32(10)
+	i32 := NewInt32(10)
 
 	// 测试初始值
 	assert.Equal(t, int32(10), i32.Load(), "expected 10")
@@ -59,7 +58,7 @@ func TestAtomicInt32(t *testing.T) {
 }
 
 func TestAtomicUint32(t *testing.T) {
-	u32 := syncx.NewUint32(10)
+	u32 := NewUint32(10)
 
 	// 测试初始值
 	assert.Equal(t, uint32(10), u32.Load(), "expected 10")
@@ -83,7 +82,7 @@ func TestAtomicUint32(t *testing.T) {
 }
 
 func TestAtomicInt64(t *testing.T) {
-	i64 := syncx.NewInt64(10)
+	i64 := NewInt64(10)
 
 	// 测试初始值
 	assert.Equal(t, int64(10), i64.Load(), "expected 10")
@@ -107,7 +106,7 @@ func TestAtomicInt64(t *testing.T) {
 }
 
 func TestAtomicUint64(t *testing.T) {
-	u64 := syncx.NewUint64(10)
+	u64 := NewUint64(10)
 
 	// 测试初始值
 	assert.Equal(t, uint64(10), u64.Load(), "expected 10")
@@ -131,7 +130,7 @@ func TestAtomicUint64(t *testing.T) {
 }
 
 func TestAtomicUintptr(t *testing.T) {
-	ptr := syncx.NewUintptr(10)
+	ptr := NewUintptr(10)
 
 	// 测试初始值
 	assert.Equal(t, uintptr(10), ptr.Load(), "expected 10")
@@ -147,7 +146,7 @@ func TestAtomicUintptr(t *testing.T) {
 }
 
 func TestConcurrentAtomicBool(t *testing.T) {
-	b := syncx.NewBool(false)
+	b := NewBool(false)
 	var wg sync.WaitGroup
 
 	// 启动多个 goroutine 进行并发写入和读取
@@ -170,7 +169,7 @@ func TestConcurrentAtomicBool(t *testing.T) {
 }
 
 func TestConcurrentAtomicInt32(t *testing.T) {
-	i32 := syncx.NewInt32(0)
+	i32 := NewInt32(0)
 	var wg sync.WaitGroup
 
 	for i := 0; i < 100; i++ {
@@ -190,7 +189,7 @@ func TestConcurrentAtomicInt32(t *testing.T) {
 }
 
 func TestConcurrentAtomicUint32(t *testing.T) {
-	u32 := syncx.NewUint32(0)
+	u32 := NewUint32(0)
 	var wg sync.WaitGroup
 
 	for i := 0; i < 100; i++ {
@@ -210,7 +209,7 @@ func TestConcurrentAtomicUint32(t *testing.T) {
 }
 
 func TestConcurrentAtomicInt64(t *testing.T) {
-	i64 := syncx.NewInt64(0)
+	i64 := NewInt64(0)
 	var wg sync.WaitGroup
 
 	for i := 0; i < 100; i++ {
@@ -230,7 +229,7 @@ func TestConcurrentAtomicInt64(t *testing.T) {
 }
 
 func TestConcurrentAtomicUint64(t *testing.T) {
-	u64 := syncx.NewUint64(0)
+	u64 := NewUint64(0)
 	var wg sync.WaitGroup
 
 	for i := 0; i < 100; i++ {

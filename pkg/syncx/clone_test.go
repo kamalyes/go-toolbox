@@ -3,17 +3,16 @@
  * @Date: 2025-01-05 15:27:15
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2025-01-05 15:27:15
- * @FilePath: \go-toolbox\tests\syncx_clone_test.go
- * @Description:
+ * @FilePath: \go-toolbox\pkg\syncx\clone_test.go
+ * @Description: syncx 克隆单元测试
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package syncx
 
 import (
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/syncx"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -35,7 +34,7 @@ func TestDeepCopyBasicType(t *testing.T) {
 	var intSrc = new(int)
 	*intSrc = 42
 	var intDst int
-	syncx.DeepCopy(&intDst, intSrc)
+	DeepCopy(&intDst, intSrc)
 	assert.Equal(t, *intSrc, intDst)
 }
 
@@ -51,7 +50,7 @@ func TestDeepCopyStruct(t *testing.T) {
 		},
 	}
 	var dst TestCloneStruct
-	syncx.DeepCopy(&dst, src)
+	DeepCopy(&dst, src)
 
 	// 断言源和目标相等
 	assert.Equal(t, src.Name, dst.Name)
@@ -73,7 +72,7 @@ func TestDeepCopyStruct(t *testing.T) {
 func TestDeepCopyNilPointer(t *testing.T) {
 	var nilSrc *TestCloneStruct
 	var nilDst TestCloneStruct
-	err := syncx.DeepCopy(&nilDst, nilSrc)
+	err := DeepCopy(&nilDst, nilSrc)
 	assert.Error(t, err)
 	assert.Equal(t, nilDst, TestCloneStruct{})
 }
@@ -82,7 +81,7 @@ func TestDeepCopyNilPointer(t *testing.T) {
 func TestDeepCopyEmptySlice(t *testing.T) {
 	srcSlice := &[]string{}
 	var dstSlice []string
-	err := syncx.DeepCopy(&dstSlice, srcSlice)
+	err := DeepCopy(&dstSlice, srcSlice)
 	assert.NoError(t, err)                // 确保没有错误
 	assert.Equal(t, dstSlice, []string{}) // 检查目标为空切片
 }
@@ -92,7 +91,7 @@ func TestDeepCopyNestedPointer(t *testing.T) {
 	nestedSrc := &NestedStruct{"Inner", 100}
 	testStructWithPointer := &TestCloneStruct{Nested: *nestedSrc}
 	var testStructWithPointerDst TestCloneStruct
-	err := syncx.DeepCopy(&testStructWithPointerDst, testStructWithPointer)
+	err := DeepCopy(&testStructWithPointerDst, testStructWithPointer)
 	assert.NoError(t, err) // 确保没有错误
 	assert.Equal(t, testStructWithPointer.Nested, testStructWithPointerDst.Nested)
 }

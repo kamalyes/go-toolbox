@@ -2,25 +2,24 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-06-11 13:15:55
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-06-17 11:15:26
- * @FilePath: \go-toolbox\tests\syncx_orderset_test.go
- * @Description:
+ * @LastEditTime: 2025-12-12 22:59:04
+ * @FilePath: \go-toolbox\pkg\syncx\orderset_test.go
+ * @Description: ordered set 有序集合单元测试
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
-package tests
+package syncx
 
 import (
 	"strconv"
 	"sync"
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/syncx"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestOrderedSetBasic(t *testing.T) {
-	set := syncx.NewOrderedSet[int]()
+	set := NewOrderedSet[int]()
 
 	// Add & Contains 测试
 	set.Add(1)
@@ -46,7 +45,7 @@ func TestOrderedSetBasic(t *testing.T) {
 }
 
 func TestOrderedSetConcurrent(t *testing.T) {
-	set := syncx.NewOrderedSet[int]()
+	set := NewOrderedSet[int]()
 	var wg sync.WaitGroup
 	concurrency := 100
 	operations := 1000
@@ -83,7 +82,7 @@ func TestOrderedSetConcurrent(t *testing.T) {
 }
 
 func TestOrderedSetConcurrentMixed(t *testing.T) {
-	set := syncx.NewOrderedSet[string]()
+	set := NewOrderedSet[string]()
 	var wg sync.WaitGroup
 	concurrency := 50
 	operations := 500
@@ -129,7 +128,7 @@ func TestOrderedSetConcurrentMixed(t *testing.T) {
 }
 
 func TestOrderedSetString(t *testing.T) {
-	set := syncx.NewOrderedSet[int]()
+	set := NewOrderedSet[int]()
 	set.Add(10)
 	set.Add(20)
 	set.Add(30)
@@ -140,7 +139,7 @@ func TestOrderedSetString(t *testing.T) {
 
 func TestNewOrderedSetFromSlice(t *testing.T) {
 	items := []int{3, 1, 2, 3, 2, 4}
-	set := syncx.NewOrderedSetFromSlice(items)
+	set := NewOrderedSetFromSlice(items)
 
 	// 元素顺序应为首次出现顺序，且无重复
 	expected := []int{3, 1, 2, 4}
@@ -149,7 +148,7 @@ func TestNewOrderedSetFromSlice(t *testing.T) {
 }
 
 func TestElementsReturnsCopy(t *testing.T) {
-	set := syncx.NewOrderedSet[int]()
+	set := NewOrderedSet[int]()
 	set.Add(1)
 	set.Add(2)
 	set.Add(3)
@@ -163,7 +162,7 @@ func TestElementsReturnsCopy(t *testing.T) {
 }
 
 func TestRemoveAndContainsOnEmptySet(t *testing.T) {
-	set := syncx.NewOrderedSet[string]()
+	set := NewOrderedSet[string]()
 
 	// 删除不存在元素不报错
 	set.Remove("nonexistent")
@@ -173,7 +172,7 @@ func TestRemoveAndContainsOnEmptySet(t *testing.T) {
 }
 
 func TestAddDuplicateElements(t *testing.T) {
-	set := syncx.NewOrderedSet[int]()
+	set := NewOrderedSet[int]()
 	set.Add(5)
 	set.Add(5)
 	set.Add(5)
