@@ -12,6 +12,8 @@ package mathx
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMarshalJSONOrDefault(t *testing.T) {
@@ -137,9 +139,7 @@ func TestMarshalJSONOrDefault(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := MarshalJSONOrDefault(tt.value, tt.defaultVal)
-			if got != tt.want {
-				t.Errorf("MarshalJSONOrDefault() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -197,50 +197,44 @@ func BenchmarkMarshalJSONOrDefault(b *testing.B) {
 }
 
 // TestMarshalJSONOrDefault_EdgeCases 边界情况测试
-func TestMarshalJSONOrDefault_EdgeCases(t *testing.T) {
+func TestMarshalJSONOrDefaultEdgeCases(t *testing.T) {
+	assert := assert.New(t)
+
 	t.Run("空字符串序列化", func(t *testing.T) {
 		got := MarshalJSONOrDefault("", `""`)
 		want := `""`
-		if got != want {
-			t.Errorf("got %v, want %v", got, want)
-		}
+		assert.Equal(want, got)
 	})
 
 	t.Run("零值数字序列化", func(t *testing.T) {
 		got := MarshalJSONOrDefault(0, "999")
 		want := "0"
-		if got != want {
-			t.Errorf("got %v, want %v", got, want)
-		}
+		assert.Equal(want, got)
 	})
 
 	t.Run("false布尔值序列化", func(t *testing.T) {
 		got := MarshalJSONOrDefault(false, "true")
 		want := "false"
-		if got != want {
-			t.Errorf("got %v, want %v", got, want)
-		}
+		assert.Equal(want, got)
 	})
 
 	t.Run("包含特殊字符的字符串", func(t *testing.T) {
 		got := MarshalJSONOrDefault(`{"key":"value"}`, "{}")
 		want := `"{\"key\":\"value\"}"`
-		if got != want {
-			t.Errorf("got %v, want %v", got, want)
-		}
+		assert.Equal(want, got)
 	})
 
 	t.Run("Unicode字符串", func(t *testing.T) {
 		got := MarshalJSONOrDefault("你好世界", `""`)
 		want := `"你好世界"`
-		if got != want {
-			t.Errorf("got %v, want %v", got, want)
-		}
+		assert.Equal(want, got)
 	})
 }
 
 // TestMarshalJSONOrDefault_RealWorldUsage 真实使用场景测试
-func TestMarshalJSONOrDefault_RealWorldUsage(t *testing.T) {
+func TestMarshalJSONOrDefaultRealWorldUsage(t *testing.T) {
+	assert := assert.New(t)
+
 	t.Run("数据库JSON字段-ContentExtra", func(t *testing.T) {
 		// 模拟protobuf请求
 		type Request struct {
@@ -272,9 +266,7 @@ func TestMarshalJSONOrDefault_RealWorldUsage(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				got := MarshalJSONOrDefault(tt.req.ContentExtra, "{}")
-				if got != tt.want {
-					t.Errorf("got %v, want %v", got, tt.want)
-				}
+				assert.Equal(tt.want, got)
 			})
 		}
 	})
@@ -287,9 +279,7 @@ func TestMarshalJSONOrDefault_RealWorldUsage(t *testing.T) {
 		}
 		got := MarshalJSONOrDefault(metadata, "{}")
 		// 注意：map的key顺序是不确定的，所以只检查是否包含预期内容
-		if len(got) < 30 { // 基本的长度检查
-			t.Errorf("序列化结果太短: %v", got)
-		}
+		assert.GreaterOrEqual(len(got), 30, "序列化结果太短")
 	})
 
 	t.Run("数据库JSON字段-MediaInfo", func(t *testing.T) {
@@ -323,9 +313,7 @@ func TestMarshalJSONOrDefault_RealWorldUsage(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				got := MarshalJSONOrDefault(tt.mediaInfo, "{}")
-				if got != tt.want {
-					t.Errorf("got %v, want %v", got, tt.want)
-				}
+				assert.Equal(tt.want, got)
 			})
 		}
 	})

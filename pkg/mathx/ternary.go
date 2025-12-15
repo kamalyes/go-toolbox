@@ -58,15 +58,33 @@ func IfDoWithError[T any](condition bool, do DoFuncWithError[T], defaultVal T) (
 }
 
 // IfDoAsync 支持异步执行延迟函数 do，返回结果的通道
-// 根据条件 condition 决定是否执行 do()，否则返回默认值 defaultVal
+// 根据条件 condition 决定是否执行 do()，否则返回默认值 defaultVal（可选）
 // 结果通过带缓冲的通道返回，避免阻塞
-func IfDoAsync[T any](condition bool, do DoFunc[T], defaultVal T) <-chan T {
+//
+// 示例：
+//
+//	提供默认值
+//	ch := mathx.IfDoAsync(needFetch,
+//	    func() Data { return fetchData() },
+//	    defaultData,
+//	)
+//
+//	不提供默认值（返回零值）
+//	ch := mathx.IfDoAsync(needFetch,
+//	    func() Data { return fetchData() },
+//	)
+func IfDoAsync[T any](condition bool, do DoFunc[T], defaultVal ...T) <-chan T {
 	ch := make(chan T, 1)
 	go func() {
 		if condition {
 			ch <- do()
 		} else {
-			ch <- defaultVal
+			if len(defaultVal) > 0 {
+				ch <- defaultVal[0]
+			} else {
+				var zero T
+				ch <- zero
+			}
 		}
 		close(ch)
 	}()
@@ -74,16 +92,21 @@ func IfDoAsync[T any](condition bool, do DoFunc[T], defaultVal T) <-chan T {
 }
 
 // IfDoAsyncWithTimeout 异步执行延迟函数 do，支持超时控制
-// condition 为 true 时执行 do()，否则返回默认值 defaultVal
+// condition 为 true 时执行 do()，否则返回默认值 defaultVal（可选）
 // timeoutMs 指定超时时间（毫秒），超时则返回类型 T 的零值
 // 返回一个通道，异步获取结果
-func IfDoAsyncWithTimeout[T any](condition bool, do DoFunc[T], defaultVal T, timeoutMs int) <-chan T {
+func IfDoAsyncWithTimeout[T any](condition bool, do DoFunc[T], timeoutMs int, defaultVal ...T) <-chan T {
 	ch := make(chan T, 1)
 	go func() {
 		if condition {
 			ch <- do()
 		} else {
-			ch <- defaultVal
+			if len(defaultVal) > 0 {
+				ch <- defaultVal[0]
+			} else {
+				var zero T
+				ch <- zero
+			}
 		}
 		close(ch)
 	}()
@@ -103,14 +126,14 @@ func IfDoAsyncWithTimeout[T any](condition bool, do DoFunc[T], defaultVal T, tim
 }
 
 // IfElse 实现多条件链式判断，安全泛型版本IfE
-// conds 和 values 长度必须相等，依次判断 conds 中的条件
+// conditions 和 values 长度必须相等，依次判断 conditions 中的条件
 // 返回第一个为 true 的对应 values 元素；如果没有满足条件，返回 defaultVal
 // 适合实现类似 if ... else if ... else 的多分支逻辑
-func IfElse[T any](conds []bool, values []T, defaultVal T) T {
-	if len(conds) != len(values) {
+func IfElse[T any](conditions []bool, values []T, defaultVal T) T {
+	if len(conditions) != len(values) {
 		panic("IfElse: 条件和值长度必须相等")
 	}
-	for i, cond := range conds {
+	for i, cond := range conditions {
 		if cond {
 			return values[i]
 		}
@@ -198,22 +221,42 @@ func IfDoWithErrorDefault[T any](condition bool, do DoFuncWithError[T], defaultV
 //   - condition: 判断条件，true 时调用 onTrue，false 时调用 onFalse
 //   - result: 泛型参数，传递给回调函数的结果值
 //   - err: 错误信息，传递给回调函数
-//   - onTrue: 条件为 true 时调用的回调函数，接收 (result, err)
-//   - onFalse: 条件为 false 时调用的回调函数，接收 (result, err)
+//   - callbacks: 可变参数，可以传 0-2 个回调函数
+//   - callbacks[0]: onTrue - 条件为 true 时调用
+//   - callbacks[1]: onFalse - 条件为 false 时调用
 //
 // 函数逻辑：
-//  1. 根据 condition 选择要调用的回调函数 cb（onTrue 或 onFalse）
-//  2. 如果 cb 不为 nil，则调用 cb(result, err)
-//  3. 如果 cb 为 nil，则跳过调用，避免空指针异常
+//  1. 根据 condition 选择要调用的回调函数
+//  2. 如果回调不为 nil，则调用它
+//  3. 支持省略任意回调函数
 //
-// 作用：简化根据条件调用不同回调的代码，避免重复写 if-else 和 nil 判断，提高代码简洁性和安全性
-func IfCall[T any](condition bool, result T, err error, onTrue func(T, error), onFalse func(T, error)) {
-	if condition && onTrue != nil {
-		onTrue(result, err)
-		return
-	}
-	if !condition && onFalse != nil {
-		onFalse(result, err)
+// 示例：
+//
+//	完整版本（两个回调）
+//	mathx.IfCall(err != nil, result, err,
+//	    func(r T, e error) { onSuccess(r) },
+//	    func(r T, e error) { onError(e) },
+//	)
+//
+//	只需要 true 分支
+//	mathx.IfCall(success, data, nil,
+//	    func(r T, e error) { log.Info("成功: %v", r) },
+//	)
+//
+//	只需要 false 分支
+//	mathx.IfCall(err != nil, nil, err,
+//	    nil,
+//	    func(r T, e error) { log.Error("错误: %v", e) },
+//	)
+func IfCall[T any](condition bool, result T, err error, callbacks ...func(T, error)) {
+	if condition {
+		if len(callbacks) > 0 && callbacks[0] != nil {
+			callbacks[0](result, err)
+		}
+	} else {
+		if len(callbacks) > 1 && callbacks[1] != nil {
+			callbacks[1](result, err)
+		}
 	}
 }
 
@@ -241,22 +284,30 @@ func IfExec(condition bool, action func()) {
 // Params
 //   - condition: 判断条件
 //   - onTrue: 条件为 true 时执行的函数
-//   - onFalse: 条件为 false 时执行的函数
+//   - onFalse: 条件为 false 时执行的函数（可选，可以省略或传 nil）
 //
 // 示例：
+//
+// 两个分支都需要
 //
 //	mathx.IfExecElse(err == nil,
 //	    func() { log.Info("Success") },
 //	    func() { log.Error("Failed: " + err.Error()) },
 //	)
-func IfExecElse(condition bool, onTrue func(), onFalse func()) {
+//
+//	只需要 false 分支（true 分支传 nil）
+//	mathx.IfExecElse(err == nil, nil, func() { log.Error("Failed") })
+//
+//	或者使用可变参数版本，省略第二个参数
+//	mathx.IfExecElse(err == nil, func() { log.Info("Success") })
+func IfExecElse(condition bool, onTrue func(), onFalse ...func()) {
 	if condition {
 		if onTrue != nil {
 			onTrue()
 		}
 	} else {
-		if onFalse != nil {
-			onFalse()
+		if len(onFalse) > 0 && onFalse[0] != nil {
+			onFalse[0]()
 		}
 	}
 }
@@ -451,14 +502,6 @@ func IfNotZero[T comparable](val T, defaultVal T) T {
 	return IF(val != zero, val, defaultVal)
 }
 
-// IfInRange 范围检查三元运算
-// 检查 val 是否在 [min, max] 范围内
-// 如果在范围内，返回 val；否则返回 defaultVal
-func IfInRange[T comparable](val, min, max, defaultVal T) T {
-	// 这里需要具体的类型约束来比较大小，简化为相等性检查
-	return IF(val == min || val == max, val, defaultVal)
-}
-
 // IfContains 包含检查三元运算
 // 检查 slice 是否包含 target
 // 如果包含，返回 trueVal；否则返回 falseVal
@@ -518,12 +561,30 @@ func IfMap[T, R any](condition bool, val T, mapper func(T) R, defaultVal R) R {
 
 // IfMapElse 双向映射三元运算
 // 根据条件选择不同的映射函数
-// 如果 condition 为 true，执行 trueMapper；否则执行 falseMapper
-func IfMapElse[T, R any](condition bool, val T, trueMapper, falseMapper func(T) R) R {
+// 如果 condition 为 true，执行 trueMapper；否则执行 falseMapper（可选）
+// 如果不提供 falseMapper，则 condition=false 时返回 R 类型的零值
+//
+// 示例：
+//
+//	完整版本
+//	output := mathx.IfMapElse(isJSON, data,
+//	    func(d Data) string { return d.ToJSON() },
+//	    func(d Data) string { return d.ToXML() },
+//	)
+//
+//	简化版本（false 时返回零值）
+//	output := mathx.IfMapElse(needFormat, data,
+//	    func(d Data) string { return d.Format() },
+//	)
+func IfMapElse[T, R any](condition bool, val T, trueMapper func(T) R, falseMapper ...func(T) R) R {
 	if condition {
 		return trueMapper(val)
 	}
-	return falseMapper(val)
+	if len(falseMapper) > 0 && falseMapper[0] != nil {
+		return falseMapper[0](val)
+	}
+	var zero R
+	return zero
 }
 
 // IfFilter 过滤三元运算
@@ -632,45 +693,6 @@ func IfPipeline[T any](condition bool, input T, funcs []func(T) T, defaultVal T)
 		result = fn(result)
 	}
 	return result
-}
-
-// IfDefault 默认值设置三元运算
-// 提供多个默认值选项，返回第一个满足条件的值
-// conditions 和 values 一一对应，返回第一个条件为 true 的值
-// 如果都不满足，返回 finalDefault
-func IfDefault[T any](conditions []bool, values []T, finalDefault T) T {
-	return IfElse(conditions, values, finalDefault)
-}
-
-// IfLazy 惰性求值三元运算
-// 只有在需要时才执行对应的函数
-// 避免不必要的计算开销
-func IfLazy[T any](condition bool, trueFn, falseFn func() T) T {
-	if condition {
-		return trueFn()
-	}
-	return falseFn()
-}
-
-// IfV void 版三元运算 - 执行副作用操作
-// 根据条件执行 trueFunc 或 falseFunc，无返回值
-// 适用于只需要执行操作而不需要返回值的场景
-func IfV(condition bool, trueFunc, falseFunc func()) {
-	if condition {
-		if trueFunc != nil {
-			trueFunc()
-		}
-	} else {
-		if falseFunc != nil {
-			falseFunc()
-		}
-	}
-}
-
-// IfElseFn 函数式三元运算 - 简化版
-// 根据条件返回并执行对应的函数，支持泛型返回值
-func IfElseFn[T any](condition bool, trueVal, falseVal T) T {
-	return IF(condition, trueVal, falseVal)
 }
 
 // IfMemoized 带缓存的三元运算
@@ -833,4 +855,58 @@ func IFErrorChain() *IFChainBuilder[error] {
 // 便利函数：用于返回 nil 的链式构建器
 func IFNilChain() *IFChainBuilder[any] {
 	return NewIFChain[any]()
+}
+
+// IfStrFmt 条件格式化字符串选择
+// 根据条件选择不同的格式化字符串和参数
+//
+// 示例：
+//
+//	format, args := mathx.IfStrFmt(err != nil,
+//	    "  - %s: 获取负载失败 (%v)", []any{agentID, err},
+//	    "  - %s: %d 个工单", []any{agentID, workload},
+//	)
+//	logger.InfoContext(ctx, format, args...)
+func IfStrFmt(condition bool, trueFormat string, trueArgs []any, falseFormat string, falseArgs []any) (string, []any) {
+	if condition {
+		return trueFormat, trueArgs
+	}
+	return falseFormat, falseArgs
+}
+
+// IfEmptySlice 空切片检查三元运算
+// 如果切片为空，返回 trueVal；否则返回 falseVal
+func IfEmptySlice[T any, R any](slice []T, trueVal, falseVal R) R {
+	return IF(len(slice) == 0, trueVal, falseVal)
+}
+
+// IfLenGt 长度检查三元运算
+// 检查切片长度是否大于指定值
+//
+// 示例：
+//
+//	message := mathx.IfLenGt(availableAgents, 0,
+//	    "ABC",
+//	    "DEF",
+//	)
+func IfLenGt[T any, R any](slice []T, threshold int, trueVal, falseVal R) R {
+	return IF(len(slice) > threshold, trueVal, falseVal)
+}
+
+// IfLenEq 长度等于检查
+func IfLenEq[T any, R any](slice []T, length int, trueVal, falseVal R) R {
+	return IF(len(slice) == length, trueVal, falseVal)
+}
+
+// IfErrOrNil 错误或空值检查
+// 如果 err != nil 或 val 为零值，返回 trueVal；否则返回 falseVal
+func IfErrOrNil[T comparable, R any](val T, err error, trueVal, falseVal R) R {
+	var zero T
+	return IF(err != nil || val == zero, trueVal, falseVal)
+}
+
+// IfCountGt 计数大于检查
+// 检查计数是否大于阈值
+func IfCountGt[R any](count, threshold int64, trueVal, falseVal R) R {
+	return IF(count > threshold, trueVal, falseVal)
 }

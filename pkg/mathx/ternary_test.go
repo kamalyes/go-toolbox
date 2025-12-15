@@ -169,17 +169,17 @@ func TestIfDoAsyncWithTimeout(t *testing.T) {
 	}
 
 	// 执行时间小于超时，返回正常结果
-	ch1 := IfDoAsyncWithTimeout(true, slowFunc, 0, 100)
+	ch1 := IfDoAsyncWithTimeout(true, slowFunc, 100)
 	res1 := <-ch1
 	assert.Equal(42, res1, "未超时应返回正常结果")
 
 	// 执行时间大于超时，返回零值
-	ch2 := IfDoAsyncWithTimeout(true, slowFunc, 0, 10)
+	ch2 := IfDoAsyncWithTimeout(true, slowFunc, 10)
 	res2 := <-ch2
 	assert.Equal(0, res2, "超时应返回类型零值")
 
 	// 条件为 false，直接返回默认值
-	ch3 := IfDoAsyncWithTimeout(false, slowFunc, 99, 100)
+	ch3 := IfDoAsyncWithTimeout(false, slowFunc, 100, 99)
 	res3 := <-ch3
 	assert.Equal(99, res3, "条件为 false 应返回默认值")
 }
