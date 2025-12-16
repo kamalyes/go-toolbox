@@ -14,7 +14,10 @@ package validator
 import (
 	"reflect"
 	"strings"
+	"time"
 	"unicode"
+
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // isEmptyValue checks if a reflect.Value is empty.
@@ -22,6 +25,7 @@ func IsEmptyValue(v reflect.Value) bool {
 	if !v.IsValid() {
 		return true
 	}
+
 	switch v.Kind() {
 	case reflect.Array, reflect.Map, reflect.Slice:
 		return v.Len() == 0
@@ -36,30 +40,109 @@ func IsEmptyValue(v reflect.Value) bool {
 	case reflect.Bool:
 		return !v.Bool()
 	case reflect.Ptr, reflect.Interface:
-		return v.IsNil() || IsEmptyValue(v.Elem())
+		return IsEmptyPointer(v)
 	case reflect.Struct:
-		isEmpty := true // 默认假设结构体是空的
-		for i := 0; i < v.NumField(); i++ {
-			if v.Field(i).Kind() == reflect.Interface && v.Field(i).IsNil() {
-				continue // 如果字段是interface{}且为nil，继续检查其他字段
-			}
-			if !IsEmptyValue(v.Field(i)) {
-				isEmpty = false // 只要有一个字段不为空，整体就不为空
-				break
-			}
-		}
-		return isEmpty
+		return IsEmptyStruct(v)
 	default:
 		return false
 	}
 }
 
-// IsCEmpty 判断元素是否为类型零值。
+// IsEmptyPointer 检查指针或接口类型是否为空
+func IsEmptyPointer(v reflect.Value) bool {
+	if v.IsNil() {
+		return true
+	}
+
+	// 检查特殊类型
+	if isEmpty, ok := CheckEmptyTimePointer(v); ok {
+		return isEmpty
+	}
+
+	// 递归检查指针指向的值
+	return IsEmptyValue(v.Elem())
+}
+
+// IsEmptyStruct 检查结构体是否为空
+func IsEmptyStruct(v reflect.Value) bool {
+	// 检查特殊的时间类型
+	if isEmpty, ok := CheckEmptyTimeStruct(v); ok {
+		return isEmpty
+	}
+
+	// 通用结构体检查 - 所有字段都为空
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+		// 跳过 nil 接口字段
+		if field.Kind() == reflect.Interface && field.IsNil() {
+			continue
+		}
+		// 只要有一个字段不为空，整体就不为空
+		if !IsEmptyValue(field) {
+			return false
+		}
+	}
+	return true
+}
+
+// CheckEmptyTimePointer 检查指针类型的时间是否为空
+func CheckEmptyTimePointer(v reflect.Value) (isEmpty bool, handled bool) {
+	// 检查 *time.Time
+	if t, ok := v.Interface().(*time.Time); ok {
+		return t == nil || IsTimeEmpty(t), true
+	}
+
+	// 检查 *timestamppb.Timestamp
+	if ts, ok := v.Interface().(*timestamppb.Timestamp); ok {
+		return ts == nil || ts.GetSeconds() <= 0, true
+	}
+
+	return false, false
+}
+
+// CheckEmptyTimeStruct 检查结构体类型的时间是否为空
+func CheckEmptyTimeStruct(v reflect.Value) (isEmpty bool, handled bool) {
+	// 检查 time.Time
+	if t, ok := v.Interface().(time.Time); ok {
+		return IsTimeEmpty(&t), true
+	}
+
+	// 检查 protobuf Timestamp（避免复制锁）
+	typeName := v.Type().String()
+	if typeName == "timestamppb.Timestamp" {
+		return IsProtobufTimestampEmpty(v), true
+	}
+
+	return false, false
+}
+
+// IsTimeEmpty 检查 time.Time 是否为空
+// 空的定义：零值、Unix 零点或之前的时间
+func IsTimeEmpty(t *time.Time) bool {
+	if t == nil {
+		return true
+	}
+	return t.IsZero() || t.Unix() <= 0
+}
+
+// IsProtobufTimestampEmpty 检查 protobuf Timestamp 是否为空（使用反射避免复制锁）
+func IsProtobufTimestampEmpty(v reflect.Value) bool {
+	// 直接通过反射获取 Seconds 字段的值（避免调用方法可能的指针接收者问题）
+	secondsField := v.FieldByName("Seconds")
+	if !secondsField.IsValid() {
+		return true
+	}
+
+	// 检查 Seconds 是否 <= 0
+	return secondsField.Int() <= 0
+}
+
+// IsCEmpty 判断元素是否为类型零值
 // Params：
-//   - v: 需要判断的元素，类型为 T。
+//   - v: 需要判断的元素，类型为 T
 //
 // Returns:
-//   - 返回布尔值，true 表示 v 是类型的零值，false 表示非零值。
+//   - 返回布尔值，true 表示 v 是类型的零值，false 表示非零值
 func IsCEmpty[T comparable](v T) bool {
 	var zero T
 	return v == zero
