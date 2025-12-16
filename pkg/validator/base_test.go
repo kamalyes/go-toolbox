@@ -453,3 +453,76 @@ func TestIsCEmpty(t *testing.T) {
 		})
 	}
 }
+
+// 定义常量
+const (
+	invalidField = "invalid-field"
+	invalidSpace = "invalid field"
+)
+
+// TestIsSafeFieldName 测试字段名安全检查函数
+func TestIsSafeFieldName(t *testing.T) {
+	testCases := []struct {
+		name     string
+		field    string
+		expected bool
+	}{
+		{"空字符串", "", false},
+		{"简单字段名", "id", true},
+		{"下划线字段名", "user_id", true},
+		{"数字结尾", "field123", true},
+		{"大写字母", "UserId", true},
+		{"点号表示法", "users.id", true},
+		{"包含空格", "user id", false},
+		{"包含单引号", "user'id", false},
+		{"包含分号", "id;DROP", false},
+		{"包含星号", "id*", false},
+		{"包含减号", "user-id", false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := IsSafeFieldName(tc.field)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+// TestIsAllowedField 测试 IsAllowedField 函数
+func TestIsAllowedField(t *testing.T) {
+	allowedFields := []string{"name", "age", "email"}
+
+	tests := []struct {
+		field   string
+		allowed bool
+	}{
+		{"name", true},           // 在白名单中
+		{"age", true},            // 在白名单中
+		{"email", true},          // 在白名单中
+		{"invalid_field", false}, // 不在白名单中
+		{"", false},              // 空字符串
+		{invalidSpace, false},    // 包含空格
+		{invalidField, false},    // 包含连字符
+	}
+
+	for _, test := range tests {
+		result := IsAllowedField(test.field, allowedFields)
+		assert.Equal(t, test.allowed, result, "Expected IsAllowedField(%q) to be %v", test.field, test.allowed)
+	}
+
+	// 测试没有白名单的情况
+	testsNoWhitelist := []struct {
+		field  string
+		isSafe bool
+	}{
+		{"valid_field", true},
+		{invalidSpace, false}, // 包含空格
+		{invalidField, false}, // 包含连字符
+		{"", false},           // 空字符串
+	}
+
+	for _, test := range testsNoWhitelist {
+		result := IsAllowedField(test.field) // 不传白名单
+		assert.Equal(t, test.isSafe, result, "Expected IsAllowedField(%q) to be %v", test.field, test.isSafe)
+	}
+}

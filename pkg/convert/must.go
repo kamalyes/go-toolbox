@@ -21,9 +21,15 @@ import (
 
 	"github.com/kamalyes/go-toolbox/pkg/stringx"
 	"github.com/kamalyes/go-toolbox/pkg/types"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // MustString 强制转为字符串
+// 参数:
+//   - v: 要转换的值，支持 string、[]byte、error、bool、数字、time.Time 等
+//   - timeLayout: 可选的时间格式化布局，默认使用 time.RFC3339
+//
+// 返回值: 转换后的字符串
 func MustString[T any](v T, timeLayout ...string) string {
 	switch v := any(v).(type) {
 	case string:
@@ -52,22 +58,50 @@ func convertToString[T any](v T, timeLayout ...string) string {
 	case reflect.Float32, reflect.Float64:
 		return strconv.FormatFloat(val.Float(), 'f', -1, 64)
 	case reflect.Struct:
-		if val.Type() == reflect.TypeOf(time.Time{}) {
-			t := val.Interface().(time.Time) // 这里可以安全地断言为 time.Time
-			if len(timeLayout) > 0 {
-				return t.Format(timeLayout[0])
-			}
-			return t.Format(time.RFC3339)
-		}
-	default:
-		// 对于未知类型，使用 %v 格式化为默认字符串表示
-		return fmt.Sprintf("%v", val)
+		return convertStructToString(val, timeLayout...)
+	case reflect.Ptr:
+		return convertPtrToString(val, timeLayout...)
 	}
-	b, err := json.Marshal(v)
-	if err != nil {
-		return "" // 返回空字符串以避免 panic
+	return convertFallback(v)
+}
+
+// convertStructToString 将结构体转换为字符串
+func convertStructToString(val reflect.Value, timeLayout ...string) string {
+	if val.Type() == reflect.TypeOf(time.Time{}) {
+		return formatTime(val.Interface().(time.Time), timeLayout...)
 	}
-	return string(b)
+	return convertFallback(val.Interface())
+}
+
+// convertPtrToString 将指针类型转换为字符串
+func convertPtrToString(val reflect.Value, timeLayout ...string) string {
+	if val.IsNil() {
+		return ""
+	}
+
+	// 处理 *timestamppb.Timestamp
+	if ts, ok := val.Interface().(*timestamppb.Timestamp); ok {
+		return formatTime(ts.AsTime(), timeLayout...)
+	}
+
+	// 递归处理其他指针类型，使用 MustString 而不是 convertToString
+	return MustString(val.Elem().Interface(), timeLayout...)
+}
+
+// formatTime 格式化时间
+func formatTime(t time.Time, timeLayout ...string) string {
+	if len(timeLayout) > 0 {
+		return t.Format(timeLayout[0])
+	}
+	return t.Format(time.RFC3339)
+}
+
+// convertFallback 默认转换方式
+func convertFallback(v interface{}) string {
+	if b, err := json.Marshal(v); err == nil {
+		return string(b)
+	}
+	return fmt.Sprintf("%v", v)
 }
 
 // RoundMode 是一个枚举类型，用于指定取整的方式
@@ -80,158 +114,131 @@ const (
 	RoundUp                       // 向上取整
 )
 
-// MustFloatT 将字符串转换为指定类型的浮点数
-func MustFloatT[T types.Float](value any, mode RoundMode) (T, error) {
-	var f float64
+var defaultRoundMode = RoundNone
 
-	// 根据输入的类型进行处理
-	switch v := value.(type) {
-	case string:
-		var err error
-		f, err = strconv.ParseFloat(v, 64) // 解析为 float64
-		if err != nil {
-			return 0, fmt.Errorf("无法将字符串转换为浮点数: %v", err)
-		}
-	case float64:
-		f = v // 直接使用 float64 值
-	case float32:
-		f = float64(v) // 将 float32 转换为 float64
-	case int:
-		f = float64(v)
-	case int8:
-		f = float64(v)
-	case int16:
-		f = float64(v)
-	case int32:
-		f = float64(v)
-	case int64:
-		f = float64(v)
-	case uint:
-		f = float64(v)
-	case uint8:
-		f = float64(v)
-	case uint16:
-		f = float64(v)
-	case uint32:
-		f = float64(v)
-	case uint64:
-		f = float64(v)
-	default:
-		return 0, fmt.Errorf("不支持的输入类型: %T", v)
+// MustIntT 将任意类型转换为数字类型 T
+// 参数:
+//   - value: 要转换的值，支持 int/uint 系列、float 系列、string
+//   - mode: 取整模式，nil 时默认为 RoundDown
+//
+// 返回值: 转换后的数字和可能的错误
+func MustIntT[T types.Numerical](value any, mode *RoundMode) (T, error) {
+	if mode == nil {
+		mode = &defaultRoundMode
 	}
 
-	var result float64
+	var zero T
+	v := reflect.ValueOf(value)
 
-	// 根据取整模式进行处理
+	switch v.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return T(v.Int()), nil
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return T(v.Uint()), nil
+	case reflect.Float32, reflect.Float64:
+		return applyRoundMode[T](v.Float(), *mode), nil
+	case reflect.String:
+		return parseStringToInt[T](v.String(), *mode)
+	default:
+		return zero, fmt.Errorf("unsupported conversion: %v (type %T)", value, value)
+	}
+}
+
+// applyRoundMode 应用取整模式（内部辅助函数）
+func applyRoundMode[T types.Numerical](value float64, mode RoundMode) T {
+	switch mode {
+	case RoundUp:
+		return T(math.Ceil(value))
+	case RoundDown:
+		return T(math.Floor(value))
+	case RoundNearest:
+		return T(math.Round(value))
+	default:
+		return T(value)
+	}
+}
+
+// parseStringToInt 将字符串解析为整数（处理跨平台一致性问题）
+func parseStringToInt[T types.Numerical](v string, mode RoundMode) (T, error) {
+	var zero T
+	var floatValue float64
+	if err := ParseFloat(v, &floatValue); err != nil {
+		return zero, fmt.Errorf("failed to parse %q: %v", v, err)
+	}
+	return Float64ToInt[T](floatValue, mode)
+}
+
+// MustFloatT 将值转换为浮点数类型 T
+// 参数:
+//   - value: 要转换的值，支持 string、float 系列、int 系列
+//   - mode: 取整模式
+//
+// 返回值: 转换后的浮点数和可能的错误
+func MustFloatT[T types.Float](value any, mode RoundMode) (T, error) {
+	f, err := toFloat64(value)
+	if err != nil {
+		return 0, err
+	}
+
 	switch mode {
 	case RoundNone:
-		result = f // 保持原值不变
+		return T(f), nil
 	case RoundNearest:
-		result = math.Round(f) // 使用 math.Round 处理四舍五入
+		return T(math.Round(f)), nil
 	case RoundUp:
-		result = math.Ceil(f) // 向上取整
+		return T(math.Ceil(f)), nil
 	case RoundDown:
-		result = math.Floor(f) // 向下取整
+		return T(math.Floor(f)), nil
 	default:
 		return 0, fmt.Errorf("未知的四舍五入模式")
 	}
-
-	return T(result), nil // 将结果转换为 T 类型并返回
 }
 
-// MustIntT 将 any 转换为 T 类型
-func MustIntT[T types.Numerical](value any, mode *RoundMode) (T, error) {
-	const unsupportedConversion = "unsupported conversion"
-	// 默认取整模式为向下取整
-	if mode == nil {
-		defaultMode := RoundDown
-		mode = &defaultMode
-	}
-	var zero T
-	switch v := value.(type) {
-	case int:
-		return T(v), nil
-	case int8:
-		return T(v), nil
-	case int16:
-		return T(v), nil
-	case int32:
-		return T(v), nil
-	case int64:
-		return T(v), nil
-	case uint:
-		return T(v), nil
-	case uint8:
-		return T(v), nil
-	case uint16:
-		return T(v), nil
-	case uint32:
-		return T(v), nil
-	case uint64:
-		return T(v), nil
-	case float32:
-		if *mode == RoundUp {
-			return T(math.Ceil(float64(v))), nil
-		}
-		return T(math.Floor(float64(v))), nil
-	case float64:
-		if *mode == RoundUp {
-			return T(math.Ceil(v)), nil
-		}
-		return T(math.Floor(v)), nil
-	case string:
-		// 需要特殊处理下, 坑注意go版本不一致 越界返回的结果不一样
-		// GO WIN 1.21.13 input := []string{"9223372036854775807", "9223372036854775806"} actual  : []int64{-9223372036854775808, -9223372036854775808}
-		// GO LINUX 1.21.13 input := []string{"9223372036854775807", "9223372036854775806"} actual  : []int64{9223372036854775807, 9223372036854775807}
-		var floatValue float64
-		err := ParseFloat(v, &floatValue) // 尝试将字符串解析为浮点数
-		if err != nil {
-			return zero, fmt.Errorf("failed to parse %q: %v", v, err)
-		}
-		return Float64ToInt[T](floatValue, *mode)
+// toFloat64 将各种类型转换为 float64
+func toFloat64(value any) (float64, error) {
+	v := reflect.ValueOf(value)
+
+	switch v.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return float64(v.Int()), nil
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return float64(v.Uint()), nil
+	case reflect.Float32, reflect.Float64:
+		return v.Float(), nil
+	case reflect.String:
+		return strconv.ParseFloat(v.String(), 64)
 	default:
-		return zero, fmt.Errorf("%s: %v (type %T)", unsupportedConversion, value, value)
+		return 0, fmt.Errorf("不支持的输入类型: %T", value)
 	}
 }
 
-// Float64ToInt 将浮点数转换为整数类型，并进行取整
+// Float64ToInt 将浮点数转换为整数类型，进行范围检查
 func Float64ToInt[T types.Numerical](value float64, mode RoundMode) (T, error) {
-	var resultFloatValue T
+	var zero T
+	convertedValue := applyRoundMode[float64](value, mode)
 
-	var convertedValue float64
-	if mode == RoundUp {
-		convertedValue = math.Ceil(value)
-	} else {
-		convertedValue = math.Floor(value)
+	// 检查范围（仅对 int64 类型检查，其他类型由 Go 自动处理）
+	if convertedValue < float64(math.MinInt64) || convertedValue > float64(math.MaxInt64) {
+		return zero, fmt.Errorf("value %f out of range for type %T", convertedValue, zero)
 	}
 
-	// 检查转换后的值是否超出 T 的范围
-	switch any(convertedValue).(type) {
-	case int64:
-		if convertedValue < float64(math.MinInt64) || convertedValue > float64(math.MaxInt64) {
-			return resultFloatValue, fmt.Errorf("value %f out of range for type %T", convertedValue, resultFloatValue)
-		}
-	}
-
-	resultFloatValue = T(convertedValue)
-	return resultFloatValue, nil
+	return T(convertedValue), nil
 }
 
-// ParseFloat 尝试将字符串解析为指定类型的浮点数
+// ParseFloat 将字符串解析为浮点数，进行 NaN 和 Inf 检查
 func ParseFloat[T types.Float](v string, value *T) error {
-	f, err := strconv.ParseFloat(v, 64) // 先解析为 float64
+	f, err := strconv.ParseFloat(v, 64)
 	if err != nil {
 		return fmt.Errorf("failed to parse %q: %v", v, err)
 	}
-	// 检查是否是 NaN 或无穷大
 	if math.IsNaN(f) || math.IsInf(f, 0) {
 		return fmt.Errorf("invalid float value: %q", v)
 	}
-	*value = T(f) // 转换为目标类型
+	*value = T(f)
 	return nil
 }
 
-// MustBool 强制转为 bool
+// MustBool 强制转为 bool，支持布尔值、字符串、数字
 func MustBool[T any](v T) bool {
 	val := reflect.ValueOf(v)
 	switch val.Kind() {
@@ -257,95 +264,118 @@ func MustJSON(v interface{}) ([]byte, error) {
 
 // NumberSliceToStringSlice Number切片转String
 func NumberSliceToStringSlice[T types.Numerical](numbers []T) []string {
-	if numbers == nil {
-		return nil // 处理 nil 切片
-	}
-	var result []string
-	for _, number := range numbers {
-		result = append(result, fmt.Sprintf("%v", number)) // 使用 %v 格式化输出
-	}
-	return result
+	return sliceMap(numbers, func(n T) string { return fmt.Sprintf("%v", n) })
 }
 
 // StringSliceToNumberSlice 将字符串切片转换为数字切片
 func StringSliceToNumberSlice[T types.Numerical](input []string, mode *RoundMode) ([]T, error) {
-	if input == nil {
-		return []T{}, nil // 返回一个空切片而不是 nil
-	}
-	result := make([]T, 0, len(input))
-	for _, str := range input {
-		num, err := MustIntT[T](str, mode) // 使用 MustIntT 进行转换
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, num)
-	}
-
-	return result, nil
+	return sliceMapErr(input, func(s string) (T, error) {
+		return MustIntT[T](s, mode)
+	})
 }
 
 // StringSliceToFloatSlice 将字符串切片转换为浮点数切片
 func StringSliceToFloatSlice[T types.Float](input []string, mode RoundMode) ([]T, error) {
-	if input == nil {
-		return []T{}, nil // 返回一个空切片而不是 nil
+	return sliceMapErr(input, func(s string) (T, error) {
+		return MustFloatT[T](s, mode)
+	})
+}
+
+// sliceMap 切片映射转换（无错误版本）
+func sliceMap[T any, R any](slice []T, fn func(T) R) []R {
+	if len(slice) == 0 {
+		return []R{}
 	}
-	result := make([]T, 0, len(input))
-	for _, str := range input {
-		num, err := MustFloatT[T](str, mode) // 使用 MustFloatT 进行转换
+	result := make([]R, len(slice))
+	for i, v := range slice {
+		result[i] = fn(v)
+	}
+	return result
+}
+
+// sliceMapErr 切片映射转换（带错误处理）
+func sliceMapErr[T any, R any](slice []T, fn func(T) (R, error)) ([]R, error) {
+	if len(slice) == 0 {
+		return []R{}, nil
+	}
+	result := make([]R, 0, len(slice))
+	for _, v := range slice {
+		r, err := fn(v)
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, num)
+		result = append(result, r)
+	}
+	return result, nil
+}
+
+// AnySliceToInterfaceSlice 将任意类型的切片或数组转换为 []interface{}
+// 支持所有类型切片: []string, []int, []int32, []int64, []uint, []bool, 自定义类型切片等
+// 支持数组类型: [3]int, [5]string 等
+// 如果传入的不是切片/数组类型或为空，返回空切片
+func AnySliceToInterfaceSlice(slice interface{}) []interface{} {
+	if slice == nil {
+		return []interface{}{}
 	}
 
-	return result, nil
+	v := reflect.ValueOf(slice)
+	// 支持切片和数组
+	if v.Kind() != reflect.Slice && v.Kind() != reflect.Array {
+		return []interface{}{}
+	}
+
+	length := v.Len()
+	result := make([]interface{}, length)
+	for i := 0; i < length; i++ {
+		result[i] = v.Index(i).Interface()
+	}
+	return result
 }
 
 // StringSliceToInterfaceSlice 将 []string 转换为 []interface{}
+// 为了向后兼容保留，内部调用 AnySliceToInterfaceSlice
 func StringSliceToInterfaceSlice(slice []string) []interface{} {
-	interfaceSlice := make([]interface{}, len(slice))
-	for i, v := range slice {
-		interfaceSlice[i] = v
-	}
-	return interfaceSlice
+	return AnySliceToInterfaceSlice(slice)
 }
 
-var defaultRoundMode = RoundNone
-
-// ToNumberSlice 支持输入是 string 或 []string
-func ToNumberSlice[T types.Numerical](input any, decollator string) ([]T, error) {
-	var strSlice []string
-
-	switch v := input.(type) {
-	case string:
-		if v == "" {
-			return []T{}, nil // 空字符串直接返回空切片，不继续拆分
-		}
-		// 自动拆分字符串
-		strSlice = strings.Split(v, decollator)
-	case []string:
-		strSlice = v
-	default:
-		return nil, fmt.Errorf("unsupported input type %T, want string or []string", input)
+// ToNumberSlice 支持输入 string 或 []string，自动拆分和转换
+// 参数:
+//   - input: 字符串或字符串切片
+//   - desolator: 分隔符（仅当 input 为 string 时有效）
+//
+// 返回值: 数字切片和可能的错误
+func ToNumberSlice[T types.Numerical](input any, desolator string) ([]T, error) {
+	strSlice, err := normalizeToStringSlice(input, desolator)
+	if err != nil {
+		return nil, err
 	}
 
-	result := make([]T, 0, len(strSlice))
-	for _, s := range strSlice {
-		s = strings.TrimSpace(s) // 去掉前后空格
-		num, err := MustIntT[T](s, &defaultRoundMode)
-		if err != nil {
-			return nil, fmt.Errorf("转换失败，input=%q, err=%w", s, err)
-		}
-		result = append(result, num)
-	}
-	return result, nil
+	return sliceMapErr(strSlice, func(s string) (T, error) {
+		trimmed := strings.TrimSpace(s)
+		return MustIntT[T](trimmed, &defaultRoundMode)
+	})
 }
 
-// MustToNumberSlice 是不返回错误版本，遇错 panic
-func MustToNumberSlice[T types.Numerical](input any, decollator string) []T {
-	nums, err := ToNumberSlice[T](input, decollator)
+// MustToNumberSlice 不返回错误的版本，转换失败时 panic
+func MustToNumberSlice[T types.Numerical](input any, desolator string) []T {
+	nums, err := ToNumberSlice[T](input, desolator)
 	if err != nil {
 		panic(err)
 	}
 	return nums
+}
+
+// normalizeToStringSlice 将输入标准化为字符串切片
+func normalizeToStringSlice(input any, separator string) ([]string, error) {
+	switch v := input.(type) {
+	case string:
+		if v == "" {
+			return []string{}, nil
+		}
+		return strings.Split(v, separator), nil
+	case []string:
+		return v, nil
+	default:
+		return nil, fmt.Errorf("unsupported input type %T, want string or []string", input)
+	}
 }

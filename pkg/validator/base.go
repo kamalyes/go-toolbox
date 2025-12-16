@@ -221,3 +221,41 @@ func IsFuncType[T any]() bool {
 	}
 	return tp.Kind() == reflect.Func
 }
+
+// IsSafeFieldName 检查字段名是否安全(仅包含字母、数字、下划线、点号)
+// 用于防止 SQL 注入等安全问题
+func IsSafeFieldName(field string) bool {
+	if field == "" {
+		return false
+	}
+	for _, ch := range field {
+		if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+			(ch >= '0' && ch <= '9') || ch == '_' || ch == '.') {
+			return false
+		}
+	}
+	return true
+}
+
+// IsAllowedField 检查字段是否在白名单中
+// 如果提供了白名单，检查字段是否在白名单中；否则验证字段名是否安全
+// 参数:
+//   - field: 要检查的字段名
+//   - allowedFields: 可选的白名单切片（可变参数，传入一个[]string切片）
+//
+// 返回:
+//   - true: 字段允许使用
+//   - false: 字段不允许使用
+func IsAllowedField(field string, allowedFields ...[]string) bool {
+	// 如果提供了白名单，检查字段是否在白名单中
+	if len(allowedFields) > 0 && len(allowedFields[0]) > 0 {
+		for _, allowedField := range allowedFields[0] {
+			if field == allowedField {
+				return true
+			}
+		}
+		return false
+	}
+	// 没有白名单，验证字段名是否安全
+	return IsSafeFieldName(field)
+}

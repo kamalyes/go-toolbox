@@ -11,8 +11,11 @@
 package convert
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
+
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -561,6 +564,240 @@ func TestMustToNumberSliceTableDriven(t *testing.T) {
 					got := MustToNumberSlice[int](tc.input, ",")
 					assert.Equal(t, tc.expected, got)
 				})
+			}
+		})
+	}
+}
+
+// TestMustStringWithProtobufTimestamp 测试 protobuf Timestamp 转换
+func TestMustStringWithProtobufTimestamp(t *testing.T) {
+	// 创建一个 protobuf Timestamp (2024-01-01 12:00:00 UTC)
+	pbTime := timestamppb.New(time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC))
+
+	// 默认格式 (RFC3339)
+	result := MustString(pbTime)
+	assert.Equal(t, "2024-01-01T12:00:00Z", result)
+
+	// 自定义格式
+	customLayout := "2006-01-02 15:04:05"
+	result2 := MustString(pbTime, customLayout)
+	assert.Equal(t, "2024-01-01 12:00:00", result2)
+
+	// 测试 nil protobuf Timestamp
+	var nilPbTime *timestamppb.Timestamp
+	result3 := MustString(nilPbTime)
+	assert.Equal(t, "", result3) // nil 转换为 ""，而不是 "null"
+}
+
+// TestMustStringWithCustomTimeLayout 测试自定义时间格式
+func TestMustStringWithCustomTimeLayout(t *testing.T) {
+	testTime := time.Date(2024, 3, 15, 14, 30, 45, 0, time.UTC)
+	customLayout := "2006/01/02 15:04"
+
+	result := MustString(testTime, customLayout)
+	assert.Equal(t, "2024/03/15 14:30", result)
+}
+
+// TestConvertStructToString 测试结构体转换为字符串
+func TestConvertStructToString(t *testing.T) {
+	type CustomStruct struct {
+		Name  string `json:"name"`
+		Value int    `json:"value"`
+	}
+
+	cs := CustomStruct{Name: "test", Value: 42}
+	result := MustString(cs)
+
+	var decoded CustomStruct
+	err := json.Unmarshal([]byte(result), &decoded)
+	assert.NoError(t, err)
+	assert.Equal(t, cs, decoded)
+}
+
+// TestConvertPtrToString 测试指针转换为字符串
+func TestConvertPtrToString(t *testing.T) {
+	// 测试 *int
+	intVal := 42
+	result := MustString(&intVal)
+	assert.Equal(t, "42", result)
+
+	// 测试 *string
+	strVal := "hello"
+	result2 := MustString(&strVal)
+	assert.Equal(t, "hello", result2)
+
+	// 测试 *time.Time
+	testTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	result3 := MustString(&testTime)
+	assert.Equal(t, "2024-01-01T00:00:00Z", result3)
+}
+
+// TestMustJSONIndent 测试 JSON 格式化
+func TestMustJSONIndent(t *testing.T) {
+	type TestStruct struct {
+		Name   string `json:"name"`
+		Age    int    `json:"age"`
+		Active bool   `json:"active"`
+	}
+
+	data := TestStruct{
+		Name:   "John",
+		Age:    30,
+		Active: true,
+	}
+
+	result, err := MustJSONIndent(data)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, result)
+
+	// 验证是否包含换行符和空格
+	assert.Contains(t, string(result), "\n")
+	assert.Contains(t, string(result), "  ")
+
+	// 验证 JSON 是否有效
+	var decoded TestStruct
+	err = json.Unmarshal(result, &decoded)
+	assert.NoError(t, err)
+	assert.Equal(t, data, decoded)
+}
+
+// TestMustJSON 测试 JSON 生成
+func TestMustJSON(t *testing.T) {
+	type TestStruct struct {
+		Name string `json:"name"`
+		Age  int    `json:"age"`
+	}
+
+	tests := []struct {
+		name  string
+		input interface{}
+	}{
+		{"simple struct", TestStruct{Name: "Alice", Age: 25}},
+		{"map", map[string]interface{}{"key": "value", "number": 123}},
+		{"slice", []int{1, 2, 3, 4, 5}},
+		{"string", "test string"},
+		{"number", 42},
+		{"bool", true},
+		{"nil", nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := MustJSON(tt.input)
+			assert.NoError(t, err)
+			assert.NotEmpty(t, result)
+
+			// 验证 JSON 是否有效
+			var decoded interface{}
+			err = json.Unmarshal(result, &decoded)
+			assert.NoError(t, err)
+		})
+	}
+}
+
+// TestAnySliceToInterfaceSlice 测试任意切片转换为接口切片
+func TestAnySliceToInterfaceSlice(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    interface{}
+		expected []interface{}
+	}{
+		{"int slice", []int{1, 2, 3}, []interface{}{1, 2, 3}},
+		{"string slice", []string{"a", "b", "c"}, []interface{}{"a", "b", "c"}},
+		{"int array", [3]int{1, 2, 3}, []interface{}{1, 2, 3}},
+		{"empty slice", []int{}, []interface{}{}},
+		{"nil input", nil, []interface{}{}},
+		{"non-slice type", 42, []interface{}{}},
+		{"bool slice", []bool{true, false, true}, []interface{}{true, false, true}},
+		{"float64 slice", []float64{1.1, 2.2, 3.3}, []interface{}{1.1, 2.2, 3.3}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := AnySliceToInterfaceSlice(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestFloat64ToInt 测试浮点数转换为整数
+func TestFloat64ToInt(t *testing.T) {
+	tests := []struct {
+		name      string
+		value     float64
+		mode      RoundMode
+		expected  int
+		expectErr bool
+	}{
+		{"round none", 3.7, RoundNone, 3, false},
+		{"round up", 3.2, RoundUp, 4, false},
+		{"round down", 3.9, RoundDown, 3, false},
+		{"round nearest low", 3.4, RoundNearest, 3, false},
+		{"round nearest high", 3.6, RoundNearest, 4, false},
+		{"negative round down", -3.9, RoundDown, -4, false},
+		{"negative round up", -3.2, RoundUp, -3, false},
+		{"zero", 0.0, RoundNone, 0, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := Float64ToInt[int](tt.value, tt.mode)
+			if tt.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			}
+		})
+	}
+}
+
+// TestMustIntTWithRoundNearest 测试 MustIntT 函数的四舍五入
+func TestMustIntTWithRoundNearest(t *testing.T) {
+	tests := []struct {
+		input    float64
+		expected int
+	}{
+		{2.4, 2},
+		{2.5, 3},
+		{2.6, 3},
+		{-2.4, -2},
+		{-2.5, -3},
+		{-2.6, -3},
+	}
+
+	mode := RoundNearest
+	for _, test := range tests {
+		result, err := MustIntT[int](test.input, &mode)
+		assert.NoError(t, err)
+		assert.Equal(t, test.expected, result, "Input: %v", test.input)
+	}
+}
+
+// TestNormalizeToStringSlice 测试规范化为字符串切片
+func TestNormalizeToStringSlice(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     interface{}
+		separator string
+		expected  []string
+		expectErr bool
+	}{
+		{"string split", "a,b,c", ",", []string{"a", "b", "c"}, false},
+		{"empty string", "", ",", []string{}, false},
+		{"string slice", []string{"x", "y", "z"}, ",", []string{"x", "y", "z"}, false},
+		{"unsupported type", 123, ",", nil, true},
+		{"string with different separator", "a;b;c", ";", []string{"a", "b", "c"}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := normalizeToStringSlice(tt.input, tt.separator)
+			if tt.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
 			}
 		})
 	}

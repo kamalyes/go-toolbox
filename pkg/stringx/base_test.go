@@ -239,3 +239,31 @@ func TestUniqueStringSlice(t *testing.T) {
 		assert.ElementsMatch(t, test.expected, result, "Input: %v", test.input)
 	}
 }
+
+// TestNormalizeDirectionEdgeCases 测试 normalizeDirection 的边界情况
+func TestNormalizeDirectionEdgeCases(t *testing.T) {
+	t.Run("空字符串", func(t *testing.T) {
+		result := NormalizeSQLDirection("", "ASC")
+		assert.Equal(t, "ASC", result)
+	})
+
+	t.Run("ASC小写", func(t *testing.T) {
+		result := NormalizeSQLDirection("asc", "DESC")
+		assert.Equal(t, "ASC", result)
+	})
+
+	t.Run("DESC小写", func(t *testing.T) {
+		result := NormalizeSQLDirection("desc", "ASC")
+		assert.Equal(t, "DESC", result)
+	})
+
+	t.Run("无效方向返回默认值", func(t *testing.T) {
+		result := NormalizeSQLDirection("invalid", "DESC")
+		assert.Equal(t, "DESC", result)
+	})
+
+	t.Run("空字符串使用DESC默认值", func(t *testing.T) {
+		result := NormalizeSQLDirection("", "DESC")
+		assert.Equal(t, "DESC", result)
+	})
+}

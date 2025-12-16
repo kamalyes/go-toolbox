@@ -13,12 +13,13 @@ package stringx
 import (
 	"crypto/md5"
 	"encoding/hex"
-	"github.com/kamalyes/go-toolbox/pkg/validator"
 	"reflect"
 	"strconv"
 	"strings"
 	"unicode"
 	"unsafe"
+
+	"github.com/kamalyes/go-toolbox/pkg/validator"
 )
 
 // StringX 是一个结构体，用于封装字符串值并提供操作方法。
@@ -489,4 +490,21 @@ func TruncateMessage(content string, maxLen int) string {
 	builder.WriteString("...")
 
 	return builder.String()
+}
+
+// NormalizeSQLDirection 规范化排序方向，仅允许 "ASC" 或 "DESC"（不区分大小写）
+// direction: 输入的排序方向
+// defaultDirection: 默认方向（当输入无效时）
+// 返回规范化后的排序方向（大写）
+func NormalizeSQLDirection(direction, defaultDirection string) string {
+	// 转换为大写进行比较
+	upperDirection := ToUpper(direction)
+
+	// 检查是否为有效的排序方向
+	if upperDirection == "ASC" || upperDirection == "DESC" {
+		return upperDirection
+	}
+
+	// 如果无效，返回默认方向
+	return ToUpper(defaultDirection)
 }
