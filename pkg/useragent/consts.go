@@ -61,6 +61,7 @@ const (
 	Android        = "Android"          // Android 操作系统
 	MacOS          = "macOS"            // macOS 操作系统
 	IPhone         = "IPhone"           // IPhone 操作系统
+	IOS            = "iOS"              // iOS 操作系统
 	Linux          = "Linux"            // Linux 操作系统
 	FreeBSD        = "FreeBSD"          // FreeBSD 操作系统
 	ChromeOS       = "ChromeOS"         // ChromeOS 操作系统
@@ -68,6 +69,36 @@ const (
 	CrOS           = "CrOS"             // CrOS 操作系统
 	OpenHarmony    = "OpenHarmony"      // OpenHarmony 设备
 	IPad           = "iPad"             // iPad 设备
+)
+
+// 设备厂商常量
+const (
+	VendorApple     = "Apple"     // 苹果
+	VendorSamsung   = "Samsung"   // 三星
+	VendorHuawei    = "Huawei"    // 华为
+	VendorHonor     = "Honor"     // 荣耀
+	VendorXiaomi    = "Xiaomi"    // 小米
+	VendorOPPO      = "OPPO"      // OPPO
+	VendorVivo      = "Vivo"      // Vivo
+	VendorMicrosoft = "Microsoft" // 微软
+)
+
+// 设备类型常量
+const (
+	DeviceBot     = "bot"     // 机器人
+	DeviceTablet  = "tablet"  // 平板
+	DeviceMobile  = "mobile"  // 移动设备
+	DeviceDesktop = "desktop" // 桌面设备
+	DeviceUnknown = "unknown" // 未知设备
+)
+
+// 爬虫名称常量
+const (
+	BotBaidu   = "Baidu"   // 百度爬虫
+	BotYahoo   = "Yahoo"   // Yahoo爬虫
+	BotGeneric = "Bot"     // 通用爬虫
+	BotCrawler = "Crawler" // 爬虫
+	BotSpider  = "Spider"  // 蜘蛛
 )
 
 // 所有浏览器常量
