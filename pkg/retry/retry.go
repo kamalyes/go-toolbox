@@ -50,12 +50,13 @@ package retry
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/kamalyes/go-toolbox/pkg/mathx"
 	"github.com/kamalyes/go-toolbox/pkg/osx"
 	"github.com/kamalyes/go-toolbox/pkg/random"
 	"github.com/kamalyes/go-toolbox/pkg/syncx"
-	"sync"
-	"time"
 )
 
 // Retry 结构体用于实现重试机制
@@ -68,6 +69,7 @@ type Retry struct {
 	maxInterval       time.Duration       // 最大重试间隔时间
 	backoffMultiplier float64             // 退避倍数
 	jitter            bool                // 是否添加随机抖动
+	jitterPercent     float64             // 抖动百分比（0-1），例如 0.2 表示 ±20%
 	errCallFun        ErrCallbackFunc     // 错误回调函数
 	successCallFun    SuccessCallbackFunc // 成功回调函数
 	conditionFunc     func(error) bool    // 重试条件函数
@@ -145,6 +147,20 @@ func (r *Retry) SetJitter(jitter bool) *Retry {
 	})
 }
 
+// SetJitterPercent 设置抖动百分比（0-1），返回 Retry 实例以支持链式调用
+// 例如: 0.2 表示 ±20% 的抖动范围，0.005 表示 ±0.5% 的抖动范围
+func (r *Retry) SetJitterPercent(percent float64) *Retry {
+	return syncx.WithLockReturnValue(&r.mu, func() *Retry {
+		if percent < 0 {
+			percent = 0
+		} else if percent > 1 {
+			percent = 1
+		}
+		r.jitterPercent = percent
+		return r
+	})
+}
+
 // SetErrCallback 设置错误回调函数，返回 Retry 实例以支持链式调用
 func (r *Retry) SetErrCallback(fn ErrCallbackFunc) *Retry {
 	return syncx.WithLockReturnValue(&r.mu, func() *Retry {
@@ -211,6 +227,13 @@ func (r *Retry) GetJitter() bool {
 	})
 }
 
+// GetJitterPercent 获取抖动百分比
+func (r *Retry) GetJitterPercent() float64 {
+	return syncx.WithRLockReturnValue(&r.mu, func() float64 {
+		return r.jitterPercent
+	})
+}
+
 // GetErrCallback 获取错误回调函数
 func (r *Retry) GetErrCallback() ErrCallbackFunc {
 	return syncx.WithRLockReturnValue(&r.mu, func() ErrCallbackFunc {
@@ -249,12 +272,14 @@ func (r *Retry) Do(fn DoFun) (err error) {
 		}, r.caller)
 		// 确保尝试次数为正数
 		r.attemptCount = mathx.IF(r.attemptCount < 1, 1, r.attemptCount)
-		return doRetryWithCondition(r.ctx, r.attemptCount, r.interval, r.maxInterval, r.backoffMultiplier, r.jitter, fn, r.errCallFun, r.successCallFun, r.conditionFunc, r.caller)
+		// 默认抖动百分比 20%
+		jitterPercent := mathx.IF(r.jitterPercent == 0 && r.jitter, 0.2, r.jitterPercent)
+		return doRetryWithCondition(r.ctx, r.attemptCount, r.interval, r.maxInterval, r.backoffMultiplier, r.jitter, jitterPercent, fn, r.errCallFun, r.successCallFun, r.conditionFunc, r.caller)
 	})
 }
 
 // doRetryWithCondition 内部函数，定义了重试操作，执行指定次数的尝试
-func doRetryWithCondition(ctx context.Context, attemptCount int, interval, maxInterval time.Duration, backoffMultiplier float64, jitter bool, fn DoFun, errCallFun ErrCallbackFunc, successCallFun SuccessCallbackFunc, conditionFunc func(error) bool, funcName ...string) (err error) {
+func doRetryWithCondition(ctx context.Context, attemptCount int, interval, maxInterval time.Duration, backoffMultiplier float64, jitter bool, jitterPercent float64, fn DoFun, errCallFun ErrCallbackFunc, successCallFun SuccessCallbackFunc, conditionFunc func(error) bool, funcName ...string) (err error) {
 	var (
 		fName           = mathx.IF(len(funcName) > 0, funcName[0], "") // 获取函数名称
 		nowAttemptCount int
@@ -296,11 +321,10 @@ func doRetryWithCondition(ctx context.Context, attemptCount int, interval, maxIn
 				waitTime := currentInterval
 
 				// 添加随机抖动
-				if jitter {
-					jitterRange := float64(currentInterval) * 0.2 // 20% 的抖动范围
+				if jitter && jitterPercent > 0 {
+					jitterRange := float64(currentInterval) * jitterPercent
 					waitTime = currentInterval + time.Duration(random.RandFloat(0, jitterRange))
 				}
-
 				time.Sleep(waitTime)
 
 				// 应用退避倍数

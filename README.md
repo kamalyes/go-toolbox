@@ -43,6 +43,7 @@ graph TB
     A --> C[网络工具]
     A --> D[系统工具]
     A --> E[算法工具]
+    A --> F[高可用]
     
     B --> B1[类型转换 convert]
     B --> B2[JSON 处理 json]
@@ -60,6 +61,8 @@ graph TB
     E --> E1[数学扩展 mathx]
     E --> E2[加密签名 sign]
     E --> E3[校验算法 crc]
+    
+    F --> F1[熔断器 breaker]
 ```
 
 ## 🧰 核心模块
@@ -104,6 +107,7 @@ graph TB
 
 | 模块 | 功能描述 | 使用场景 |
 |------|----------|----------|
+| [🛡 breaker](pkg/breaker) | 熔断器，服务高可用保护 | 微服务治理、故障隔离 |
 | [🔁 retry](pkg/retry) | 智能重试机制 | 网络请求、服务调用 |
 | [🎲 random](pkg/random) | 随机数生成 | 测试数据、算法实现 |
 | [🆔 uuid](pkg/uuid) | UUID 生成器 | 唯一标识、分布式 ID |
@@ -170,6 +174,28 @@ email := desensitize.Email("test@example.com")  // t***@example.com
 
 // 身份证脱敏
 idcard := desensitize.IDCard("110101199001011234")  // 110101****1234
+```
+
+#### 🛡 熔断器（Breaker）
+
+```go
+import "github.com/kamalyes/go-toolbox/pkg/breaker"
+
+// 创建熔断器
+cb := breaker.NewCircuitBreaker(breaker.Config{
+    FailureThreshold: 3,
+    SuccessThreshold: 2,
+    Timeout: time.Second * 5,
+})
+
+// 使用熔断器保护业务调用
+err := cb.Do(func() error {
+    // 你的业务逻辑
+    return nil
+})
+if err != nil {
+    // 熔断或业务错误
+}
 ```
 
 #### 🔁 智能重试

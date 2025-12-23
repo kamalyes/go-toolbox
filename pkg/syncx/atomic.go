@@ -99,6 +99,48 @@ func NewInt32(i int32) *Int32 {
 	return &Int32{v: i}
 }
 
+// AtomicValue 泛型原子值包装器
+type AtomicValue[T any] struct {
+	v atomic.Value
+}
+
+// NewAtomicValue 创建一个新的 AtomicValue 实例
+func NewAtomicValue[T any](val T) *AtomicValue[T] {
+	av := &AtomicValue[T]{}
+	av.v.Store(val)
+	return av
+}
+
+// Load 原子地加载值
+func (av *AtomicValue[T]) Load() T {
+	val := av.v.Load()
+	if val == nil {
+		var zero T
+		return zero
+	}
+	return val.(T)
+}
+
+// Store 原子地存储值
+func (av *AtomicValue[T]) Store(val T) {
+	av.v.Store(val)
+}
+
+// Swap 原子地交换值并返回旧值
+func (av *AtomicValue[T]) Swap(new T) T {
+	old := av.v.Swap(new)
+	if old == nil {
+		var zero T
+		return zero
+	}
+	return old.(T)
+}
+
+// CompareAndSwap 原子地比较并交换值
+func (av *AtomicValue[T]) CompareAndSwap(old, new T) bool {
+	return av.v.CompareAndSwap(old, new)
+}
+
 // Load 原子地加载值
 func (i32 *Int32) Load() int32 {
 	return atomic.LoadInt32(&i32.v)

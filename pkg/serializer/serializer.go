@@ -458,3 +458,25 @@ func NewUltraCompact[T any]() *Serializer[T] {
 		WithCompression(CompressionGzip).
 		WithBase64(true)
 }
+
+// ToJSON 将任意类型转换为 JSON 字符串（兼容 nil 和零值）
+func ToJSON[T any](v T) string {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+// FromJSON 将 JSON 字符串转换为指定类型（兼容空字符串）
+func FromJSON[T any](jsonStr string) T {
+	var zero T
+	if jsonStr == "" {
+		return zero
+	}
+	var result T
+	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
+		return zero
+	}
+	return result
+}

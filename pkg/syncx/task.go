@@ -356,6 +356,11 @@ func (tk *Task[T, R, U]) GetCallbackError() error {
 	return tk.callbackError
 }
 
+// GetTimestamp 获取任务开始时间戳（纳秒）
+func (tk *Task[T, R, U]) GetTimestamp() int64 {
+	return tk.timestamp
+}
+
 // GetDepends 获取当前任务的所有依赖任务
 func (tk *Task[T, R, U]) GetDepends() []*Task[T, R, U] {
 	return tk.depends

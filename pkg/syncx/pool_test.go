@@ -82,3 +82,30 @@ func TestLimitedPool(t *testing.T) {
 		pool.Put(buf2)
 	})
 }
+
+// Test for generic Pool[T]
+func TestGenericPool(t *testing.T) {
+	// 创建一个 int 类型的泛型池
+	pool := NewPool(func() int { return 42 })
+
+	// Get 应该返回 new() 的值
+	v := pool.Get()
+	assert.Equal(t, 42, v)
+
+	// Put 一个新值，再次 Get 应该能拿到刚放进去的值
+	pool.Put(100)
+	v2 := pool.Get()
+	assert.Equal(t, 100, v2)
+
+	// Put nil 值（对于 int 类型无意义，但测试泛型池的健壮性）
+	// 对于非指针类型，nil 不适用，这里仅做类型安全性验证
+	// pool.Put(nil) // 编译期会报错，说明泛型池类型安全
+
+	// 测试 string 类型
+	strPool := NewPool(func() string { return "hello" })
+	s := strPool.Get()
+	assert.Equal(t, "hello", s)
+	strPool.Put("world")
+	s2 := strPool.Get()
+	assert.Equal(t, "world", s2)
+}

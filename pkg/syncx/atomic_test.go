@@ -247,3 +247,36 @@ func TestConcurrentAtomicUint64(t *testing.T) {
 	wg.Wait()
 	assert.Equal(t, uint64(0), u64.Load(), "expected final value to be 0")
 }
+
+func TestAtomicValue_Int(t *testing.T) {
+	av := NewAtomicValue(123)
+	assert.Equal(t, 123, av.Load())
+
+	av.Store(456)
+	assert.Equal(t, 456, av.Load())
+
+	old := av.Swap(789)
+	assert.Equal(t, 456, old)
+	assert.Equal(t, 789, av.Load())
+
+	ok := av.CompareAndSwap(789, 1000)
+	assert.True(t, ok)
+	assert.Equal(t, 1000, av.Load())
+
+	ok2 := av.CompareAndSwap(789, 2000)
+	assert.False(t, ok2)
+	assert.Equal(t, 1000, av.Load())
+}
+
+func TestAtomicValue_String(t *testing.T) {
+	av := NewAtomicValue("foo")
+	assert.Equal(t, "foo", av.Load())
+	av.Store("bar")
+	assert.Equal(t, "bar", av.Load())
+	old := av.Swap("baz")
+	assert.Equal(t, "bar", old)
+	assert.Equal(t, "baz", av.Load())
+	ok := av.CompareAndSwap("baz", "qux")
+	assert.True(t, ok)
+	assert.Equal(t, "qux", av.Load())
+}

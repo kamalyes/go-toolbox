@@ -109,6 +109,34 @@ func (p *LimitedPool) Get(size int) *[]byte {
 	return byteSlice
 }
 
+// Pool 泛型对象池
+type Pool[T any] struct {
+	pool sync.Pool
+	new  func() T
+}
+
+// NewPool 创建一个新的泛型对象池
+func NewPool[T any](new func() T) *Pool[T] {
+	return &Pool[T]{
+		new: new,
+		pool: sync.Pool{
+			New: func() interface{} {
+				return new()
+			},
+		},
+	}
+}
+
+// Get 从池中获取一个对象
+func (p *Pool[T]) Get() T {
+	return p.pool.Get().(T)
+}
+
+// Put 将对象放回池中
+func (p *Pool[T]) Put(x T) {
+	p.pool.Put(x)
+}
+
 // Put 将字节切片放回池中以供重用
 func (p *LimitedPool) Put(b *[]byte) {
 	if b == nil {
