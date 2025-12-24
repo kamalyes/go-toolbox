@@ -407,7 +407,6 @@ func (tm *TaskManager[T, R, U]) SetTrunDown(fn func() (R, error)) *TaskManager[T
 // TrunUp 启动任务管理器并返回结果和错误
 func (tm *TaskManager[T, R, U]) TrunUp() (result R, err error) {
 	return WithLockReturn(&tm.mu, func() (R, error) {
-		fmt.Println("Task Manager is starting up...")
 		if tm.trunUpFunc != nil {
 			return tm.trunUpFunc() // 调用设置的启动函数
 		}
@@ -418,7 +417,6 @@ func (tm *TaskManager[T, R, U]) TrunUp() (result R, err error) {
 // TrunDown 关闭任务管理器并返回结果和错误
 func (tm *TaskManager[T, R, U]) TrunDown() (result R, err error) {
 	return WithLockReturn(&tm.mu, func() (R, error) {
-		fmt.Println("Task Manager is shutting down...")
 		if tm.trunDownFunc != nil {
 			return tm.trunDownFunc() // 调用设置的关闭函数并返回结果和错误
 		}

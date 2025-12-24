@@ -43,15 +43,30 @@ func deepCopy(dst, src reflect.Value) {
 		deepCopy(newPtr.Elem(), src.Elem())      // 递归复制指针指向的值
 
 	case reflect.Map: // 处理映射类型
+		if src.IsNil() {
+			dst.Set(reflect.Zero(dst.Type())) // 如果映射为nil，设置目标为该类型的零值
+			return
+		}
 		dst.Set(reflect.MakeMap(src.Type())) // 创建新的映射
 		for _, key := range src.MapKeys() {  // 遍历源映射的键
-			value := src.MapIndex(key)                   // 获取键对应的值
-			newValue := reflect.New(value.Type()).Elem() // 创建新值
-			deepCopy(newValue, value)                    // 递归复制
-			dst.SetMapIndex(key, newValue)               // 设置目标映射的值
+			value := src.MapIndex(key) // 获取键对应的值
+
+			// 深拷贝 key（对于复杂类型的key很重要）
+			newKey := reflect.New(key.Type()).Elem()
+			deepCopy(newKey, key)
+
+			// 深拷贝 value
+			newValue := reflect.New(value.Type()).Elem()
+			deepCopy(newValue, value)
+
+			dst.SetMapIndex(newKey, newValue) // 设置目标映射的值
 		}
 
 	case reflect.Slice: // 处理切片类型
+		if src.IsNil() {
+			dst.Set(reflect.Zero(dst.Type())) // 如果切片为nil，设置目标为该类型的零值
+			return
+		}
 		dst.Set(reflect.MakeSlice(src.Type(), src.Len(), src.Cap())) // 创建新的切片
 		for i := 0; i < src.Len(); i++ {                             // 遍历源切片
 			deepCopy(dst.Index(i), src.Index(i)) // 递归复制每个元素
@@ -59,18 +74,24 @@ func deepCopy(dst, src reflect.Value) {
 
 	case reflect.Struct: // 处理结构体类型
 		for i := 0; i < src.NumField(); i++ { // 遍历源结构体的字段
-			value := src.Field(i) // 获取字段值
-			if value.CanSet() {   // 检查字段是否可设置
-				tag := src.Type().Field(i).Tag.Get("deepcopy") // 获取字段的deepcopy标签
-				if tag != "-" {                                // 如果标签不是"-"，则进行复制
-					deepCopy(dst.Field(i), value) // 递归复制字段
-				}
+			srcField := src.Field(i)             // 获取源字段值
+			dstField := dst.Field(i)             // 获取目标字段
+			fieldType := src.Type().Field(i)     // 获取字段类型信息
+			tag := fieldType.Tag.Get("deepcopy") // 获取字段的deepcopy标签
+
+			// 跳过标记为不复制的字段
+			if tag == "-" {
+				continue
+			}
+
+			// 只复制可设置且导出的字段
+			if dstField.CanSet() && fieldType.IsExported() {
+				deepCopy(dstField, srcField) // 递归复制字段
 			}
 		}
 
 	case reflect.Array: // 处理数组类型
-		dst.Set(reflect.New(reflect.ArrayOf(src.Len(), src.Type().Elem())).Elem()) // 创建新的数组
-		for i := 0; i < src.Len(); i++ {                                           // 遍历源数组
+		for i := 0; i < src.Len(); i++ { // 遍历源数组
 			deepCopy(dst.Index(i), src.Index(i)) // 递归复制每个元素
 		}
 
