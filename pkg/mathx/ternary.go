@@ -13,6 +13,8 @@ package mathx
 import (
 	"encoding/json"
 	"time"
+
+	"github.com/kamalyes/go-toolbox/pkg/types"
 )
 
 // IF 实现三元运算，使用泛型 T
@@ -623,8 +625,31 @@ func IfCast[R any](val any, defaultVal R) R {
 
 // IfBetween 区间检查三元运算（支持数值类型）
 // 检查 val 是否在 [min, max] 区间内
-func IfBetween[T int | int64 | float32 | float64](val, min, max T, trueVal, falseVal T) T {
+func IfBetween[T types.Numerical](val, min, max T, trueVal, falseVal T) T {
 	return IF(val >= min && val <= max, trueVal, falseVal)
+}
+
+// IfClamp 将值限制在 [min, max] 范围内
+// 如果 val < min，返回 min；如果 val > max，返回 max；否则返回 val
+//
+// 示例：
+//
+//	result := mathx.IfClamp(150, 0, 100)  // 返回 100
+//	result := mathx.IfClamp(-10, 0, 100)  // 返回 0
+//	result := mathx.IfClamp(50, 0, 100)   // 返回 50
+func IfClamp[T types.Numerical](val, min, max T) T {
+	return IF(val < min, min, IF(val > max, max, val))
+}
+
+// IfDefaultAndClamp 先应用默认值，再做范围限制
+// 适用于分页等场景，先判断 <=0 用默认值，再限制在[min,max]区间
+//
+// 示例：
+//
+//	pageSize = mathx.IfDefaultAndClamp(pageSize, 10, 1, 100)
+func IfDefaultAndClamp[T types.Numerical](val, defaultVal, min, max T) T {
+	v := IF(val <= 0, defaultVal, val)
+	return IfClamp(v, min, max)
 }
 
 // IfSwitch 开关式三元运算

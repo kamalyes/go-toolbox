@@ -473,3 +473,275 @@ func TestAdjustScore(t *testing.T) {
 		)
 	}
 }
+
+// TestIfClampAllNumericalTypes 测试 IfClamp 函数对所有数值类型的支持
+func TestIfClampAllNumericalTypes(t *testing.T) {
+	type testCase[T comparable] struct {
+		name                string
+		val, min, max, want T
+	}
+
+	casesInt := []testCase[int]{
+		{"int: in range", 50, 0, 100, 50},
+		{"int: below min", -10, 0, 100, 0},
+		{"int: above max", 150, 0, 100, 100},
+	}
+	casesInt8 := []testCase[int8]{
+		{"int8: in range", 50, 0, 100, 50},
+		{"int8: below min", -10, 0, 100, 0},
+		{"int8: above max", 120, 0, 100, 100},
+	}
+	casesInt16 := []testCase[int16]{
+		{"int16: in range", 50, 0, 100, 50},
+		{"int16: below min", -10, 0, 100, 0},
+		{"int16: above max", 150, 0, 100, 100},
+	}
+	casesInt32 := []testCase[int32]{
+		{"int32: in range", 50, 0, 100, 50},
+		{"int32: below min", -10, 0, 100, 0},
+		{"int32: above max", 150, 0, 100, 100},
+	}
+	casesInt64 := []testCase[int64]{
+		{"int64: in range", 50, 0, 100, 50},
+		{"int64: below min", -10, 0, 100, 0},
+		{"int64: above max", 150, 0, 100, 100},
+	}
+	casesUint := []testCase[uint]{
+		{"uint: in range", 50, 0, 100, 50},
+		{"uint: below min", 0, 10, 100, 10},
+		{"uint: above max", 150, 0, 100, 100},
+	}
+	casesUint8 := []testCase[uint8]{
+		{"uint8: in range", 50, 0, 100, 50},
+		{"uint8: below min", 0, 10, 100, 10},
+		{"uint8: above max", 150, 0, 100, 100},
+	}
+	casesUint16 := []testCase[uint16]{
+		{"uint16: in range", 50, 0, 100, 50},
+		{"uint16: below min", 0, 10, 100, 10},
+		{"uint16: above max", 150, 0, 100, 100},
+	}
+	casesUint32 := []testCase[uint32]{
+		{"uint32: in range", 50, 0, 100, 50},
+		{"uint32: below min", 0, 10, 100, 10},
+		{"uint32: above max", 150, 0, 100, 100},
+	}
+	casesUint64 := []testCase[uint64]{
+		{"uint64: in range", 50, 0, 100, 50},
+		{"uint64: below min", 0, 10, 100, 10},
+		{"uint64: above max", 150, 0, 100, 100},
+	}
+	casesFloat32 := []testCase[float32]{
+		{"float32: in range", 50, 0, 100, 50},
+		{"float32: below min", -10, 0, 100, 0},
+		{"float32: above max", 150, 0, 100, 100},
+	}
+	casesFloat64 := []testCase[float64]{
+		{"float64: in range", 50, 0, 100, 50},
+		{"float64: below min", -10, 0, 100, 0},
+		{"float64: above max", 150, 0, 100, 100},
+	}
+
+	for _, tc := range casesInt {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IfClamp(tc.val, tc.min, tc.max))
+		})
+	}
+	for _, tc := range casesInt8 {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IfClamp(tc.val, tc.min, tc.max))
+		})
+	}
+	for _, tc := range casesInt16 {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IfClamp(tc.val, tc.min, tc.max))
+		})
+	}
+	for _, tc := range casesInt32 {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IfClamp(tc.val, tc.min, tc.max))
+		})
+	}
+	for _, tc := range casesInt64 {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IfClamp(tc.val, tc.min, tc.max))
+		})
+	}
+	for _, tc := range casesUint {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IfClamp(tc.val, tc.min, tc.max))
+		})
+	}
+	for _, tc := range casesUint8 {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IfClamp(tc.val, tc.min, tc.max))
+		})
+	}
+	for _, tc := range casesUint16 {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IfClamp(tc.val, tc.min, tc.max))
+		})
+	}
+	for _, tc := range casesUint32 {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IfClamp(tc.val, tc.min, tc.max))
+		})
+	}
+	for _, tc := range casesUint64 {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IfClamp(tc.val, tc.min, tc.max))
+		})
+	}
+	for _, tc := range casesFloat32 {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IfClamp(tc.val, tc.min, tc.max))
+		})
+	}
+	for _, tc := range casesFloat64 {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IfClamp(tc.val, tc.min, tc.max))
+		})
+	}
+}
+
+// TestIfDefaultAndClampAllNumericalTypes 测试 IfDefaultAndClamp 对所有数值类型的支持
+func TestIfDefaultAndClampAllNumericalTypes(t *testing.T) {
+	type testCase[T comparable] struct {
+		name                     string
+		val, def, min, max, want T
+	}
+
+	casesInt := []testCase[int]{
+		{"int: in range", 50, 10, 0, 100, 50},
+		{"int: below min", -10, 10, 0, 100, 10}, // 先用默认值10，再clamp到10
+		{"int: above max", 150, 10, 0, 100, 100},
+		{"int: zero", 0, 10, 0, 100, 10},
+	}
+	casesInt8 := []testCase[int8]{
+		{"int8: in range", 50, 10, 0, 100, 50},
+		{"int8: below min", -10, 10, 0, 100, 10},
+		{"int8: above max", 120, 10, 0, 100, 100},
+		{"int8: zero", 0, 10, 0, 100, 10},
+	}
+	casesInt16 := []testCase[int16]{
+		{"int16: in range", 50, 10, 0, 100, 50},
+		{"int16: below min", -10, 10, 0, 100, 10},
+		{"int16: above max", 150, 10, 0, 100, 100},
+		{"int16: zero", 0, 10, 0, 100, 10},
+	}
+	casesInt32 := []testCase[int32]{
+		{"int32: in range", 50, 10, 0, 100, 50},
+		{"int32: below min", -10, 10, 0, 100, 10},
+		{"int32: above max", 150, 10, 0, 100, 100},
+		{"int32: zero", 0, 10, 0, 100, 10},
+	}
+	casesInt64 := []testCase[int64]{
+		{"int64: in range", 50, 10, 0, 100, 50},
+		{"int64: below min", -10, 10, 0, 100, 10},
+		{"int64: above max", 150, 10, 0, 100, 100},
+		{"int64: zero", 0, 10, 0, 100, 10},
+	}
+	casesUint := []testCase[uint]{
+		{"uint: in range", 50, 10, 0, 100, 50},
+		{"uint: below min", 0, 10, 10, 100, 10},
+		{"uint: above max", 150, 10, 0, 100, 100},
+		{"uint: zero", 0, 10, 0, 100, 10},
+	}
+	casesUint8 := []testCase[uint8]{
+		{"uint8: in range", 50, 10, 0, 100, 50},
+		{"uint8: below min", 0, 10, 10, 100, 10},
+		{"uint8: above max", 150, 10, 0, 100, 100},
+		{"uint8: zero", 0, 10, 0, 100, 10},
+	}
+	casesUint16 := []testCase[uint16]{
+		{"uint16: in range", 50, 10, 0, 100, 50},
+		{"uint16: below min", 0, 10, 10, 100, 10},
+		{"uint16: above max", 150, 10, 0, 100, 100},
+		{"uint16: zero", 0, 10, 0, 100, 10},
+	}
+	casesUint32 := []testCase[uint32]{
+		{"uint32: in range", 50, 10, 0, 100, 50},
+		{"uint32: below min", 0, 10, 10, 100, 10},
+		{"uint32: above max", 150, 10, 0, 100, 100},
+		{"uint32: zero", 0, 10, 0, 100, 10},
+	}
+	casesUint64 := []testCase[uint64]{
+		{"uint64: in range", 50, 10, 0, 100, 50},
+		{"uint64: below min", 0, 10, 10, 100, 10},
+		{"uint64: above max", 150, 10, 0, 100, 100},
+		{"uint64: zero", 0, 10, 0, 100, 10},
+	}
+	casesFloat32 := []testCase[float32]{
+		{"float32: in range", 50, 10, 0, 100, 50},
+		{"float32: below min", -10, 10, 0, 100, 10},
+		{"float32: above max", 150, 10, 0, 100, 100},
+		{"float32: zero", 0, 10, 0, 100, 10},
+	}
+	casesFloat64 := []testCase[float64]{
+		{"float64: in range", 50, 10, 0, 100, 50},
+		{"float64: below min", -10, 10, 0, 100, 10},
+		{"float64: above max", 150, 10, 0, 100, 100},
+		{"float64: zero", 0, 10, 0, 100, 10},
+	}
+
+	for _, tc := range casesInt {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IfDefaultAndClamp(tc.val, tc.def, tc.min, tc.max))
+		})
+	}
+	for _, tc := range casesInt8 {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IfDefaultAndClamp(tc.val, tc.def, tc.min, tc.max))
+		})
+	}
+	for _, tc := range casesInt16 {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IfDefaultAndClamp(tc.val, tc.def, tc.min, tc.max))
+		})
+	}
+	for _, tc := range casesInt32 {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IfDefaultAndClamp(tc.val, tc.def, tc.min, tc.max))
+		})
+	}
+	for _, tc := range casesInt64 {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IfDefaultAndClamp(tc.val, tc.def, tc.min, tc.max))
+		})
+	}
+	for _, tc := range casesUint {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IfDefaultAndClamp(tc.val, tc.def, tc.min, tc.max))
+		})
+	}
+	for _, tc := range casesUint8 {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IfDefaultAndClamp(tc.val, tc.def, tc.min, tc.max))
+		})
+	}
+	for _, tc := range casesUint16 {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IfDefaultAndClamp(tc.val, tc.def, tc.min, tc.max))
+		})
+	}
+	for _, tc := range casesUint32 {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IfDefaultAndClamp(tc.val, tc.def, tc.min, tc.max))
+		})
+	}
+	for _, tc := range casesUint64 {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IfDefaultAndClamp(tc.val, tc.def, tc.min, tc.max))
+		})
+	}
+	for _, tc := range casesFloat32 {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IfDefaultAndClamp(tc.val, tc.def, tc.min, tc.max))
+		})
+	}
+	for _, tc := range casesFloat64 {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IfDefaultAndClamp(tc.val, tc.def, tc.min, tc.max))
+		})
+	}
+}
