@@ -3,7 +3,7 @@
  * @Date: 2025-01-23 09:11:20
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2025-12-24 18:59:29
- * @FilePath: \go-scheduler\go-toolbox\pkg\types\bound.go
+ * @FilePath: \go-toolbox\pkg\types\bound.go
  * @Description: 边界和范围相关的类型定义
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.

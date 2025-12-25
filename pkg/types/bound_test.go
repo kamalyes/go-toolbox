@@ -3,7 +3,7 @@
  * @Date: 2025-12-24 19:20:00
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2025-12-24 19:01:15
- * @FilePath: \go-scheduler\go-toolbox\pkg\types\bound_test.go
+ * @FilePath: \go-toolbox\pkg\types\bound_test.go
  * @Description: 边界和范围相关类型的单元测试
  *
  * Copyright (c) 2025 by kamalyes, All Rights Reserved.

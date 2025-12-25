@@ -109,6 +109,7 @@ graph TB
 |------|----------|----------|
 | [🛡 breaker](pkg/breaker) | 熔断器，服务高可用保护 | 微服务治理、故障隔离 |
 | [🔁 retry](pkg/retry) | 智能重试机制 | 网络请求、服务调用 |
+| [⏱️ cron](pkg/cron) | Cron 表达式解析器，支持 Quartz | 任务调度、定时任务、作业管理 |
 | [🎲 random](pkg/random) | 随机数生成 | 测试数据、算法实现 |
 | [🆔 uuid](pkg/uuid) | UUID 生成器 | 唯一标识、分布式 ID |
 | [⚡ idgen](pkg/idgen) | 高性能 ID 生成器 | TraceID、分布式 ID、链路追踪 |
@@ -261,6 +262,34 @@ ulidGen := idgen.NewULIDGenerator()        // ULID (时间排序)
 defaultGen := idgen.NewDefaultIDGenerator() // Default Hex
 
 // 特点：零分配优化、并发安全、多种算法
+```
+
+#### ⏱️ Cron 表达式解析器
+
+```go
+import "github.com/kamalyes/go-toolbox/pkg/cron"
+
+// 解析标准 Cron 表达式（5 字段）
+schedule, _ := cron.ParseCronStandard("0 9 * * MON-FRI")
+
+// 解析 Quartz Cron 表达式（6 字段，包含秒）
+schedule, _ := cron.ParseCronWithSeconds("*/5 * * * * ?")
+
+// 获取下次执行时间
+next := schedule.Next(time.Now())
+
+// 支持 Quartz 特殊字符
+cron.ParseCronWithSeconds("0 15 10 ? * 6L")      // 每月最后一个星期五
+cron.ParseCronWithSeconds("0 15 10 ? * 6#3")     // 每月第三个星期五
+cron.ParseCronWithSeconds("0 0 12 15W * ?")      // 每月 15 号最近的工作日
+cron.ParseCronWithSeconds("0 0 12 LW * ?")       // 每月最后一个工作日
+
+// 使用预定义描述符
+cron.ParseCronStandard("@daily")          // 每天午夜
+cron.ParseCronStandard("@workdays_9am")   // 工作日早 9 点
+cron.ParseCronStandard("@every 5m")       // 每 5 分钟
+
+// 特点：支持标准 Cron 和 Quartz、高性能位运算、时区支持
 ```
 
 ## 📈 性能基准
