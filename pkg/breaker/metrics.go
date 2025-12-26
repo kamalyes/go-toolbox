@@ -185,6 +185,10 @@ func (mc *MetricsCollector) RecordSuccess(name string, duration time.Duration) {
 		var t int64 = 0
 		mc.lastExecutionTime[name] = &t
 	}
+	if mc.runningCount[name] == nil {
+		var count int64 = 0
+		mc.runningCount[name] = &count
+	}
 
 	atomic.AddInt64(mc.successCount[name], 1)
 	atomic.AddInt64(mc.runningCount[name], -1)
@@ -205,6 +209,10 @@ func (mc *MetricsCollector) RecordFailure(name string, duration time.Duration) {
 	if mc.failureCount[name] == nil {
 		var count int64 = 0
 		mc.failureCount[name] = &count
+	}
+	if mc.runningCount[name] == nil {
+		var count int64 = 0
+		mc.runningCount[name] = &count
 	}
 
 	atomic.AddInt64(mc.failureCount[name], 1)
