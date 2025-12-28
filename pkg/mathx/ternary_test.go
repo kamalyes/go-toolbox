@@ -745,3 +745,321 @@ func TestIfDefaultAndClampAllNumericalTypes(t *testing.T) {
 		})
 	}
 }
+
+func TestIfEmpty(t *testing.T) {
+	// Test string
+	assert.Equal(t, "default", IfEmpty("", "default"))
+	assert.Equal(t, "hello", IfEmpty("hello", "default"))
+
+	// Test int
+	assert.Equal(t, 100, IfEmpty(0, 100))
+	assert.Equal(t, 42, IfEmpty(42, 100))
+
+	// Test slice
+	assert.Equal(t, []int{1, 2}, IfEmpty([]int{}, []int{1, 2}))
+	assert.Equal(t, []int{1}, IfEmpty([]int{1}, []int{2}))
+
+	// Test pointer
+	var ptr *int
+	defaultPtr := 999
+	result := IfEmpty(ptr, &defaultPtr)
+	assert.NotNil(t, result)
+	assert.Equal(t, 999, *result)
+
+	value := 123
+	assert.Equal(t, &value, IfEmpty(&value, &defaultPtr))
+}
+
+func TestIfNotEmptyValue(t *testing.T) {
+	tests := []struct {
+		name       string
+		val        string
+		defaultVal string
+		expected   string
+	}{
+		{"non-empty string", "hello", "default", "hello"},
+		{"empty string", "", "default", "default"},
+		{"whitespace", "  ", "default", "  "},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IfNotEmptyValue(tt.val, tt.defaultVal)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestIfEmptyDo(t *testing.T) {
+	called := false
+	generator := func() string {
+		called = true
+		return "generated"
+	}
+
+	// Test with empty value
+	result := IfEmptyDo("", generator)
+	assert.True(t, called)
+	assert.Equal(t, "generated", result)
+
+	// Test with non-empty value
+	called = false
+	result = IfEmptyDo("exists", generator)
+	assert.False(t, called)
+	assert.Equal(t, "exists", result)
+}
+
+func TestIfAllEmpty(t *testing.T) {
+	tests := []struct {
+		name     string
+		values   []interface{}
+		expected string
+	}{
+		{"all empty", []interface{}{"", 0, []int{}}, "all empty"},
+		{"has non-empty", []interface{}{"", 0, "x"}, "has value"},
+		{"empty list", []interface{}{}, "all empty"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IfAllEmpty(tt.values, "all empty", "has value")
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestIfHasEmpty(t *testing.T) {
+	tests := []struct {
+		name     string
+		values   []interface{}
+		expected string
+	}{
+		{"has empty", []interface{}{"hello", "", "world"}, "has empty"},
+		{"all filled", []interface{}{"a", "b", "c"}, "all filled"},
+		{"has zero", []interface{}{1, 0, 3}, "has empty"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IfHasEmpty(tt.values, "has empty", "all filled")
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestIfNil(t *testing.T) {
+	var ptr *string
+	value := "test"
+
+	tests := []struct {
+		name     string
+		val      interface{}
+		expected string
+	}{
+		{"nil pointer", ptr, "is nil"},
+		{"non-nil pointer", &value, "not nil"},
+		{"nil slice", []int(nil), "is nil"},
+		{"empty slice", []int{}, "not nil"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IfNil(tt.val, "is nil", "not nil")
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestIfNotNilValue(t *testing.T) {
+	var ptr *string
+	value := "test"
+
+	assert.Equal(t, "no value", IfNotNilValue(ptr, "has value", "no value"))
+	assert.Equal(t, "has value", IfNotNilValue(&value, "has value", "no value"))
+}
+
+func TestIfCEmpty(t *testing.T) {
+	tests := []struct {
+		name     string
+		val      interface{}
+		expected string
+	}{
+		{"zero int", 0, "is zero"},
+		{"non-zero int", 42, "not zero"},
+		{"empty string", "", "is zero"},
+		{"non-empty string", "hello", "not zero"},
+		{"false bool", false, "is zero"},
+		{"true bool", true, "not zero"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			switch v := tt.val.(type) {
+			case int:
+				result := IfCEmpty(v, "is zero", "not zero")
+				assert.Equal(t, tt.expected, result)
+			case string:
+				result := IfCEmpty(v, "is zero", "not zero")
+				assert.Equal(t, tt.expected, result)
+			case bool:
+				result := IfCEmpty(v, "is zero", "not zero")
+				assert.Equal(t, tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestIfNotCEmpty(t *testing.T) {
+	assert.Equal(t, "has text", IfNotCEmpty("hello", "has text", "empty"))
+	assert.Equal(t, "empty", IfNotCEmpty("", "has text", "empty"))
+	assert.Equal(t, "has value", IfNotCEmpty(100, "has value", "zero"))
+	assert.Equal(t, "zero", IfNotCEmpty(0, "has value", "zero"))
+}
+
+func TestIfIPAllowed(t *testing.T) {
+	allowList := []string{"192.168.1.0/24", "10.0.0.1"}
+
+	tests := []struct {
+		name     string
+		ip       string
+		expected string
+	}{
+		{"allowed CIDR", "192.168.1.100", "allowed"},
+		{"allowed exact", "10.0.0.1", "allowed"},
+		{"denied", "8.8.8.8", "denied"},
+		{"denied private", "172.16.0.1", "denied"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IfIPAllowed(tt.ip, allowList, "allowed", "denied")
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestIfIPAllowedWildcard(t *testing.T) {
+	allowAll := []string{"*"}
+	result := IfIPAllowed("any.ip.here", allowAll, "allowed", "denied")
+	assert.Equal(t, "allowed", result)
+
+	emptyList := []string{}
+	result = IfIPAllowed("any.ip", emptyList, "allowed", "denied")
+	assert.Equal(t, "allowed", result)
+}
+
+func TestIfSafeFieldName(t *testing.T) {
+	tests := []struct {
+		name     string
+		field    string
+		expected string
+	}{
+		{"safe field", "user_name", "safe"},
+		{"safe with dot", "user.name", "safe"},
+		{"unsafe SQL injection", "user'; DROP TABLE", "unsafe"},
+		{"unsafe special char", "user@name", "unsafe"},
+		{"empty field", "", "unsafe"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IfSafeFieldName(tt.field, "safe", "unsafe")
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestIfAllowedField(t *testing.T) {
+	allowed := []string{"id", "name", "email"}
+
+	tests := []struct {
+		name     string
+		field    string
+		expected string
+	}{
+		{"allowed field", "name", "ok"},
+		{"not in whitelist", "password", "forbidden"},
+		{"allowed id", "id", "ok"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IfAllowedField(tt.field, allowed, "ok", "forbidden")
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestIfContainsChinese(t *testing.T) {
+	tests := []struct {
+		name     string
+		str      string
+		expected string
+	}{
+		{"has chinese", "你好world", "has chinese"},
+		{"no chinese", "hello", "no chinese"},
+		{"only chinese", "中文测试", "has chinese"},
+		{"mixed", "test测试", "has chinese"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IfContainsChinese(tt.str, "has chinese", "no chinese")
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestIfUndefined(t *testing.T) {
+	tests := []struct {
+		name     string
+		str      string
+		expected string
+	}{
+		{"is undefined", "undefined", "is undef"},
+		{"case insensitive", "UNDEFINED", "is undef"},
+		{"with spaces", "  undefined  ", "is undef"},
+		{"is null", "null", "defined"},
+		{"is empty", "", "defined"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IfUndefined(tt.str, "is undef", "defined")
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// Benchmark tests
+func BenchmarkIfEmpty(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		IfEmpty("", "default")
+	}
+}
+
+func BenchmarkIfNotEmptyValue(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		IfNotEmptyValue("hello", "default")
+	}
+}
+
+func BenchmarkIfNil(b *testing.B) {
+	var ptr *string
+	for i := 0; i < b.N; i++ {
+		IfNil(ptr, "nil", "not nil")
+	}
+}
+
+func BenchmarkIfCEmpty(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		IfCEmpty(0, "zero", "not zero")
+	}
+}
+
+func BenchmarkIfIPAllowed(b *testing.B) {
+	allowList := []string{"192.168.1.0/24"}
+	for i := 0; i < b.N; i++ {
+		IfIPAllowed("192.168.1.100", allowList, "allowed", "denied")
+	}
+}

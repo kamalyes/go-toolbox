@@ -100,6 +100,27 @@ func WithRLockReturnWithE[T any, E any](lock RLocker, operation func() (T, E)) (
 	return operation()   // 执行操作并返回结果
 }
 
+// WithRLockReturnFunc 是一个通用函数，支持任意返回值的函数
+// 使用示例:
+//
+//	result := syncx.WithRLockReturnFunc(&mu, func() interface{} {
+//	    return []interface{}{val1, val2, val3}
+//	})
+//	values := result.([]interface{})
+//	val1, val2, val3 := values[0], values[1], values[2]
+func WithRLockReturnFunc[R any](lock RLocker, operation func() R) R {
+	lock.RLock()         // 获取读锁
+	defer lock.RUnlock() // 确保在操作完成后释放读锁
+	return operation()   // 执行操作并返回结果
+}
+
+// WithLockReturnFunc 是一个通用函数，支持任意返回值的函数（写锁版本）
+func WithLockReturnFunc[R any](lock Locker, operation func() R) R {
+	lock.Lock()         // 获取锁
+	defer lock.Unlock() // 确保在操作完成后释放锁
+	return operation()  // 执行操作并返回结果
+}
+
 var ErrLockNotAcquired = errors.New("lock not acquired")
 
 // TryLocker 支持 TryLock 的锁接口

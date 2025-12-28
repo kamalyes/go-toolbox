@@ -1034,3 +1034,204 @@ func BenchmarkBubbleSort100(b *testing.B) {
 		BubbleSort(slice)
 	}
 }
+
+// TestTransformAndFilterSlice 测试 TransformAndFilterSlice 函数
+func TestTransformAndFilterSlice(t *testing.T) {
+	t.Run("Empty slice", func(t *testing.T) {
+		result := TransformAndFilterSlice([]int{},
+			func(x int) string { return string(rune(x)) },
+			func(s string) bool { return s != "" })
+		assert.Empty(t, result)
+	})
+
+	t.Run("Transform int to string and filter empty", func(t *testing.T) {
+		input := []int{1, 2, 3, 4, 5}
+		result := TransformAndFilterSlice(input,
+			func(x int) string {
+				if x%2 == 0 {
+					return ""
+				}
+				return string(rune('0' + x))
+			},
+			func(s string) bool { return s != "" })
+		assert.Equal(t, 3, len(result))
+	})
+
+	t.Run("Transform and filter struct", func(t *testing.T) {
+		type User struct {
+			Name string
+			Age  int
+		}
+		users := []User{
+			{Name: "Alice", Age: 25},
+			{Name: "", Age: 30},
+			{Name: "Bob", Age: 0},
+			{Name: "Charlie", Age: 35},
+		}
+		result := TransformAndFilterSlice(users,
+			func(u User) string { return u.Name },
+			func(name string) bool { return name != "" })
+		assert.Equal(t, 3, len(result))
+		assert.Contains(t, result, "Alice")
+		assert.Contains(t, result, "Bob")
+		assert.Contains(t, result, "Charlie")
+	})
+
+	t.Run("Transform pointers and filter nil values", func(t *testing.T) {
+		type Client struct {
+			ID string
+			IP string
+		}
+		clients := []*Client{
+			{ID: "1", IP: "192.168.1.1"},
+			{ID: "2", IP: ""},
+			{ID: "3", IP: "192.168.1.3"},
+			{ID: "4", IP: ""},
+		}
+		result := TransformAndFilterSlice(clients,
+			func(c *Client) string { return c.IP },
+			func(ip string) bool { return ip != "" })
+		assert.Equal(t, 2, len(result))
+		assert.Equal(t, "192.168.1.1", result[0])
+		assert.Equal(t, "192.168.1.3", result[1])
+	})
+}
+
+// TestTransformAndCompactSlice 测试 TransformAndCompactSlice 函数
+func TestTransformAndCompactSlice(t *testing.T) {
+	t.Run("Empty slice", func(t *testing.T) {
+		result := TransformAndCompactSlice([]int{}, func(x int) string {
+			return string(rune(x))
+		})
+		assert.Empty(t, result)
+	})
+
+	t.Run("Transform int to string and remove empty", func(t *testing.T) {
+		input := []int{1, 2, 3, 4, 5}
+		result := TransformAndCompactSlice(input, func(x int) string {
+			if x%2 == 0 {
+				return ""
+			}
+			return string(rune('0' + x))
+		})
+		assert.Equal(t, 3, len(result))
+	})
+
+	t.Run("Transform and remove zero integers", func(t *testing.T) {
+		type Item struct {
+			Value int
+		}
+		items := []Item{{Value: 1}, {Value: 0}, {Value: 3}, {Value: 0}, {Value: 5}}
+		result := TransformAndCompactSlice(items, func(item Item) int {
+			return item.Value
+		})
+		assert.Equal(t, 3, len(result))
+		assert.Equal(t, []int{1, 3, 5}, result)
+	})
+
+	t.Run("Extract IPs from clients and remove empty", func(t *testing.T) {
+		type Client struct {
+			ID   string
+			IP   string
+			Name string
+		}
+		clients := []*Client{
+			{ID: "1", IP: "192.168.1.1", Name: "Alice"},
+			{ID: "2", IP: "", Name: "Bob"},
+			{ID: "3", IP: "192.168.1.3", Name: "Charlie"},
+			{ID: "4", IP: "", Name: "David"},
+			{ID: "5", IP: "192.168.1.5", Name: "Eve"},
+		}
+		result := TransformAndCompactSlice(clients, func(c *Client) string {
+			return c.IP
+		})
+		assert.Equal(t, 3, len(result))
+		assert.Equal(t, []string{"192.168.1.1", "192.168.1.3", "192.168.1.5"}, result)
+	})
+
+	t.Run("Transform to pointers and remove nil", func(t *testing.T) {
+		input := []int{1, 0, 3, 0, 5}
+		result := TransformAndCompactSlice(input, func(x int) *int {
+			if x == 0 {
+				return nil
+			}
+			return &x
+		})
+		assert.Equal(t, 3, len(result))
+		for _, ptr := range result {
+			assert.NotNil(t, ptr)
+		}
+	})
+}
+
+// BenchmarkTransformAndFilterSlice 性能测试
+func BenchmarkTransformAndFilterSlice(b *testing.B) {
+	type Client struct {
+		ID string
+		IP string
+	}
+	clients := make([]*Client, 10000)
+	for i := 0; i < len(clients); i++ {
+		ip := ""
+		if i%2 == 0 {
+			ip = "192.168.1.1"
+		}
+		clients[i] = &Client{ID: string(rune(i)), IP: ip}
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = TransformAndFilterSlice(clients,
+			func(c *Client) string { return c.IP },
+			func(ip string) bool { return ip != "" })
+	}
+}
+
+// BenchmarkTransformAndCompactSlice 性能测试
+func BenchmarkTransformAndCompactSlice(b *testing.B) {
+	type Client struct {
+		ID string
+		IP string
+	}
+	clients := make([]*Client, 10000)
+	for i := 0; i < len(clients); i++ {
+		ip := ""
+		if i%2 == 0 {
+			ip = "192.168.1.1"
+		}
+		clients[i] = &Client{ID: string(rune(i)), IP: ip}
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = TransformAndCompactSlice(clients, func(c *Client) string {
+			return c.IP
+		})
+	}
+}
+
+// BenchmarkSeparateTransformAndFilter 对比基准测试：分开调用 TransformSlice 和 FilterSlice
+func BenchmarkSeparateTransformAndFilter(b *testing.B) {
+	type Client struct {
+		ID string
+		IP string
+	}
+	clients := make([]*Client, 10000)
+	for i := 0; i < len(clients); i++ {
+		ip := ""
+		if i%2 == 0 {
+			ip = "192.168.1.1"
+		}
+		clients[i] = &Client{ID: string(rune(i)), IP: ip}
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		ips := TransformSlice(clients, func(c *Client) string {
+			return c.IP
+		})
+		_ = FilterSlice(ips, func(ip string) bool {
+			return ip != ""
+		})
+	}
+}

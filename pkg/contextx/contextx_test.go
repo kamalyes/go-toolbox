@@ -13,6 +13,7 @@ package contextx
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -238,4 +239,196 @@ func TestSetByteSlice(t *testing.T) {
 
 	got := customCtx.Value("byteKey")
 	assert.Equal(t, byteSlice, got, "Expected byte slice to be equal")
+}
+
+// TestWithTimeout_Success 测试成功执行
+func TestWithTimeout_Success(t *testing.T) {
+	executed := false
+	err := WithTimeout(1*time.Second, func(ctx context.Context) error {
+		executed = true
+		return nil
+	})
+	assert.NoError(t, err)
+	assert.True(t, executed)
+}
+
+// TestWithTimeout_WithError 测试函数返回错误
+func TestWithTimeout_WithError(t *testing.T) {
+	testErr := errors.New("test error")
+	err := WithTimeout(1*time.Second, func(ctx context.Context) error {
+		return testErr
+	})
+	assert.Equal(t, testErr, err)
+}
+
+// TestWithTimeout_TimeoutByDelay 测试通过延迟触发超时(函数不检查context)
+func TestWithTimeout_TimeoutByDelay(t *testing.T) {
+	start := time.Now()
+	err := WithTimeout(100*time.Millisecond, func(ctx context.Context) error {
+		time.Sleep(200 * time.Millisecond)
+		return nil
+	})
+	elapsed := time.Since(start)
+
+	assert.Error(t, err)
+	assert.Equal(t, context.DeadlineExceeded, err)
+	// 应该在100ms左右超时,而不是等待200ms
+	assert.Less(t, elapsed, 150*time.Millisecond)
+}
+
+// TestWithTimeout_TimeoutByContextCheck 测试函数主动检查context.Done()
+func TestWithTimeout_TimeoutByContextCheck(t *testing.T) {
+	err := WithTimeout(100*time.Millisecond, func(ctx context.Context) error {
+		select {
+		case <-time.After(200 * time.Millisecond):
+			return errors.New("should not reach here")
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	})
+	assert.Error(t, err)
+	assert.Equal(t, context.DeadlineExceeded, err)
+}
+
+// TestWithTimeout_ContextAvailable 测试context是否正常传递
+func TestWithTimeout_ContextAvailable(t *testing.T) {
+	var receivedCtx context.Context
+	err := WithTimeout(1*time.Second, func(ctx context.Context) error {
+		receivedCtx = ctx
+		return nil
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, receivedCtx)
+
+	// 验证context有deadline
+	_, ok := receivedCtx.Deadline()
+	assert.True(t, ok)
+}
+
+// TestWithTimeout_CancelPropagation 测试cancel传播
+func TestWithTimeout_CancelPropagation(t *testing.T) {
+	err := WithTimeout(100*time.Millisecond, func(ctx context.Context) error {
+		<-ctx.Done()
+		return ctx.Err()
+	})
+	assert.Equal(t, context.DeadlineExceeded, err)
+}
+
+// TestWithTimeoutValue_Success 测试成功返回值
+func TestWithTimeoutValue_Success(t *testing.T) {
+	result, err := WithTimeoutValue(1*time.Second, func(ctx context.Context) (int, error) {
+		return 42, nil
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, 42, result)
+}
+
+// TestWithTimeoutValue_WithError 测试返回错误
+func TestWithTimeoutValue_WithError(t *testing.T) {
+	testErr := errors.New("test error")
+	result, err := WithTimeoutValue(1*time.Second, func(ctx context.Context) (string, error) {
+		return "", testErr
+	})
+	assert.Equal(t, testErr, err)
+	assert.Equal(t, "", result)
+}
+
+// TestWithTimeoutValue_TimeoutByDelay 测试通过延迟触发超时
+func TestWithTimeoutValue_TimeoutByDelay(t *testing.T) {
+	start := time.Now()
+	result, err := WithTimeoutValue(100*time.Millisecond, func(ctx context.Context) (int, error) {
+		time.Sleep(200 * time.Millisecond)
+		return 42, nil
+	})
+	elapsed := time.Since(start)
+
+	assert.Error(t, err)
+	assert.Equal(t, context.DeadlineExceeded, err)
+	assert.Equal(t, 0, result)
+	assert.Less(t, elapsed, 150*time.Millisecond)
+}
+
+// TestWithTimeoutValue_TimeoutByContextCheck 测试函数主动检查context.Done()
+func TestWithTimeoutValue_TimeoutByContextCheck(t *testing.T) {
+	result, err := WithTimeoutValue(100*time.Millisecond, func(ctx context.Context) (string, error) {
+		select {
+		case <-time.After(200 * time.Millisecond):
+			return "should not reach here", nil
+		case <-ctx.Done():
+			return "", ctx.Err()
+		}
+	})
+	assert.Error(t, err)
+	assert.Equal(t, context.DeadlineExceeded, err)
+	assert.Equal(t, "", result)
+}
+
+// TestWithTimeoutValue_ZeroValue 测试超时时返回零值
+func TestWithTimeoutValue_ZeroValue(t *testing.T) {
+	type CustomStruct struct {
+		Value int
+	}
+
+	result, err := WithTimeoutValue(100*time.Millisecond, func(ctx context.Context) (CustomStruct, error) {
+		time.Sleep(200 * time.Millisecond)
+		return CustomStruct{Value: 42}, nil
+	})
+
+	assert.Error(t, err)
+	assert.Equal(t, context.DeadlineExceeded, err)
+	assert.Equal(t, CustomStruct{}, result) // 应该返回零值
+}
+
+// TestWithTimeoutValue_ContextAvailable 测试context是否正常传递
+func TestWithTimeoutValue_ContextAvailable(t *testing.T) {
+	var receivedCtx context.Context
+	result, err := WithTimeoutValue(1*time.Second, func(ctx context.Context) (bool, error) {
+		receivedCtx = ctx
+		return true, nil
+	})
+
+	assert.NoError(t, err)
+	assert.True(t, result)
+	assert.NotNil(t, receivedCtx)
+
+	// 验证context有deadline
+	_, ok := receivedCtx.Deadline()
+	assert.True(t, ok)
+}
+
+// TestWithTimeoutValue_MultipleTypes 测试不同类型的返回值
+func TestWithTimeoutValue_MultipleTypes(t *testing.T) {
+	// string类型
+	strResult, err := WithTimeoutValue(1*time.Second, func(ctx context.Context) (string, error) {
+		return "hello", nil
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "hello", strResult)
+
+	// slice类型
+	sliceResult, err := WithTimeoutValue(1*time.Second, func(ctx context.Context) ([]int, error) {
+		return []int{1, 2, 3}, nil
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, []int{1, 2, 3}, sliceResult)
+
+	// pointer类型
+	type TestStruct struct{ Value int }
+	ptrResult, err := WithTimeoutValue(1*time.Second, func(ctx context.Context) (*TestStruct, error) {
+		return &TestStruct{Value: 99}, nil
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, ptrResult)
+	assert.Equal(t, 99, ptrResult.Value)
+}
+
+// TestWithTimeoutValue_CancelPropagation 测试cancel传播
+func TestWithTimeoutValue_CancelPropagation(t *testing.T) {
+	result, err := WithTimeoutValue(100*time.Millisecond, func(ctx context.Context) (int, error) {
+		<-ctx.Done()
+		return 0, ctx.Err()
+	})
+	assert.Error(t, err)
+	assert.Equal(t, context.DeadlineExceeded, err)
+	assert.Equal(t, 0, result)
 }

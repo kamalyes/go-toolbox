@@ -12,9 +12,11 @@ package mathx
 
 import (
 	"encoding/json"
+	"reflect"
 	"time"
 
 	"github.com/kamalyes/go-toolbox/pkg/types"
+	"github.com/kamalyes/go-toolbox/pkg/validator"
 )
 
 // IF 实现三元运算，使用泛型 T
@@ -934,4 +936,184 @@ func IfErrOrNil[T comparable, R any](val T, err error, trueVal, falseVal R) R {
 // 检查计数是否大于阈值
 func IfCountGt[R any](count, threshold int64, trueVal, falseVal R) R {
 	return IF(count > threshold, trueVal, falseVal)
+}
+
+// ============================================================================
+// Validator-based Conditional Functions (基于 validator 的条件判断函数)
+// ============================================================================
+
+// IfEmpty 空值检查三元运算
+// 使用 validator.IsEmptyValue 检查值是否为空
+// 如果为空，返回 defaultVal；否则返回 val
+//
+// 示例：
+//
+//	result := mathx.IfEmpty("", "default")        // "default"
+//	result := mathx.IfEmpty("hello", "default")   // "hello"
+//	result := mathx.IfEmpty([]int{}, []int{1,2})  // []int{1,2}
+//	result := mathx.IfEmpty(0, 100)               // 100
+func IfEmpty[T any](val T, defaultVal T) T {
+	return IF(validator.IsEmptyValue(reflect.ValueOf(val)), defaultVal, val)
+}
+
+// IfNotEmptyValue 非空值检查三元运算
+// 使用 validator.IsEmptyValue 检查值是否非空
+// 如果非空，返回 val；否则返回 defaultVal
+//
+// 示例：
+//
+//	result := mathx.IfNotEmptyValue("hello", "default")  // "hello"
+//	result := mathx.IfNotEmptyValue("", "default")       // "default"
+//	result := mathx.IfNotEmptyValue([]int{1}, []int{})   // []int{1}
+func IfNotEmptyValue[T any](val T, defaultVal T) T {
+	return IF(!validator.IsEmptyValue(reflect.ValueOf(val)), val, defaultVal)
+}
+
+// IfEmptyDo 空值检查执行函数
+// 如果值为空，执行 do 函数；否则返回 val
+//
+// 示例：
+//
+//	result := mathx.IfEmptyDo("", func() string { return generateDefaultName() })
+//	result := mathx.IfEmptyDo([]int{}, func() []int { return loadDefaultData() })
+func IfEmptyDo[T any](val T, do DoFunc[T]) T {
+	return IfDo(validator.IsEmptyValue(reflect.ValueOf(val)), do, val)
+}
+
+// IfAllEmpty 所有值为空检查三元运算
+// 检查提供的所有值是否都为空
+// 如果全部为空，返回 trueVal；否则返回 falseVal
+//
+// 示例：
+//
+//	result := mathx.IfAllEmpty([]interface{}{"", 0, []int{}}, "all empty", "has value")  // "all empty"
+//	result := mathx.IfAllEmpty([]interface{}{"", 0, "x"}, "all empty", "has value")      // "has value"
+func IfAllEmpty[T any](values []interface{}, trueVal, falseVal T) T {
+	return IF(validator.IsAllEmpty(values), trueVal, falseVal)
+}
+
+// IfHasEmpty 包含空值检查三元运算
+// 检查提供的值中是否有空值
+// 如果有空值，返回 trueVal；否则返回 falseVal
+//
+// 示例：
+//
+//	result := mathx.IfHasEmpty([]interface{}{"hello", "", "world"}, "has empty", "all filled")  // "has empty"
+//	result := mathx.IfHasEmpty([]interface{}{"a", "b", "c"}, "has empty", "all filled")         // "all filled"
+func IfHasEmpty[T any](values []interface{}, trueVal, falseVal T) T {
+	hasEmpty, _ := validator.HasEmpty(values)
+	return IF(hasEmpty, trueVal, falseVal)
+}
+
+// IfNil Nil检查三元运算
+// 使用 validator.IsNil 检查值是否为 nil
+// 如果为 nil，返回 trueVal；否则返回 falseVal
+//
+// 示例：
+//
+//	var ptr *string
+//	result := mathx.IfNil(ptr, "is nil", "not nil")              // "is nil"
+//	result := mathx.IfNil(&value, "is nil", "not nil")           // "not nil"
+//	result := mathx.IfNil([]int(nil), "is nil", "not nil")       // "is nil"
+func IfNil[T any](val interface{}, trueVal, falseVal T) T {
+	return IF(validator.IsNil(val), trueVal, falseVal)
+}
+
+// IfNotNilValue 非Nil检查三元运算
+// 使用 validator.IsNil 检查值是否非 nil
+// 如果非 nil，返回 trueVal；否则返回 falseVal
+//
+// 示例：
+//
+//	result := mathx.IfNotNilValue(&value, "has value", "no value")  // "has value"
+//	result := mathx.IfNotNilValue(nil, "has value", "no value")     // "no value"
+func IfNotNilValue[T any](val interface{}, trueVal, falseVal T) T {
+	return IF(!validator.IsNil(val), trueVal, falseVal)
+}
+
+// IfCEmpty 可比较类型零值检查三元运算
+// 使用 validator.IsCEmpty 检查可比较类型是否为零值
+// 如果为零值，返回 trueVal；否则返回 falseVal
+//
+// 示例：
+//
+//	result := mathx.IfCEmpty(0, "is zero", "not zero")           // "is zero"
+//	result := mathx.IfCEmpty("", "is empty", "not empty")        // "is empty"
+//	result := mathx.IfCEmpty(false, "is false", "is true")       // "is false"
+func IfCEmpty[T comparable, R any](val T, trueVal, falseVal R) R {
+	return IF(validator.IsCEmpty(val), trueVal, falseVal)
+}
+
+// IfNotCEmpty 可比较类型非零值检查三元运算
+// 使用 validator.IsCEmpty 检查可比较类型是否非零值
+// 如果非零值，返回 trueVal；否则返回 falseVal
+//
+// 示例：
+//
+//	result := mathx.IfNotCEmpty("hello", "has text", "empty")    // "has text"
+//	result := mathx.IfNotCEmpty(0, "has value", "zero")          // "zero"
+func IfNotCEmpty[T comparable, R any](val T, trueVal, falseVal R) R {
+	return IF(!validator.IsCEmpty(val), trueVal, falseVal)
+}
+
+// IfIPAllowed IP白名单检查三元运算
+// 使用 validator.IsIPAllowed 检查 IP 是否在白名单中
+// 如果允许，返回 trueVal；否则返回 falseVal
+//
+// 示例：
+//
+//	allowList := []string{"192.168.1.0/24", "10.0.0.1"}
+//	result := mathx.IfIPAllowed("192.168.1.100", allowList, "allowed", "denied")  // "allowed"
+//	result := mathx.IfIPAllowed("8.8.8.8", allowList, "allowed", "denied")        // "denied"
+func IfIPAllowed[T any](ip string, cidrList []string, trueVal, falseVal T) T {
+	return IF(validator.IsIPAllowed(ip, cidrList), trueVal, falseVal)
+}
+
+// IfSafeFieldName 字段名安全检查三元运算
+// 使用 validator.IsSafeFieldName 检查字段名是否安全
+// 如果安全，返回 trueVal；否则返回 falseVal
+//
+// 示例：
+//
+//	result := mathx.IfSafeFieldName("user_name", "safe", "unsafe")       // "safe"
+//	result := mathx.IfSafeFieldName("user'; DROP TABLE", "safe", "unsafe") // "unsafe"
+func IfSafeFieldName[T any](field string, trueVal, falseVal T) T {
+	return IF(validator.IsSafeFieldName(field), trueVal, falseVal)
+}
+
+// IfAllowedField 字段白名单检查三元运算
+// 使用 validator.IsAllowedField 检查字段是否在白名单中
+// 如果允许，返回 trueVal；否则返回 falseVal
+//
+// 示例：
+//
+//	allowed := []string{"id", "name", "email"}
+//	result := mathx.IfAllowedField("name", allowed, "ok", "forbidden")     // "ok"
+//	result := mathx.IfAllowedField("password", allowed, "ok", "forbidden") // "forbidden"
+func IfAllowedField[T any](field string, allowedFields []string, trueVal, falseVal T) T {
+	return IF(validator.IsAllowedField(field, allowedFields), trueVal, falseVal)
+}
+
+// IfContainsChinese 中文字符检查三元运算
+// 使用 validator.ContainsChinese 检查字符串是否包含中文
+// 如果包含，返回 trueVal；否则返回 falseVal
+//
+// 示例：
+//
+//	result := mathx.IfContainsChinese("你好world", "has chinese", "no chinese")  // "has chinese"
+//	result := mathx.IfContainsChinese("hello", "has chinese", "no chinese")      // "no chinese"
+func IfContainsChinese[T any](str string, trueVal, falseVal T) T {
+	return IF(validator.ContainsChinese(str), trueVal, falseVal)
+}
+
+// IfUndefined "undefined"字符串检查三元运算
+// 使用 validator.IsUndefined 检查字符串是否为 "undefined"
+// 如果是，返回 trueVal；否则返回 falseVal
+//
+// 示例：
+//
+//	result := mathx.IfUndefined("undefined", "is undef", "defined")  // "is undef"
+//	result := mathx.IfUndefined("null", "is undef", "defined")       // "defined"
+func IfUndefined[T any](str string, trueVal, falseVal T) T {
+	return IF(validator.IsUndefined(str), trueVal, falseVal)
 }

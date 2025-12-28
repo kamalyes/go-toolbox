@@ -624,6 +624,59 @@ func FilterSlice[T any](slice []T, predicate func(T) bool) []T {
 	return result
 }
 
+// TransformAndFilterSlice 组合转换和过滤操作
+// 先将切片元素转换为新类型，然后过滤掉不满足条件的元素
+// 这是 TransformSlice + FilterSlice 的组合优化版本，避免中间切片分配
+//
+// 参数:
+//   - slice: 输入切片
+//   - transform: 转换函数，将 T 类型转换为 R 类型
+//   - predicate: 过滤函数，返回 true 保留元素，false 过滤掉
+//
+// 返回:
+//   - 转换并过滤后的切片
+//
+// 示例:
+//
+//	clients := []*Client{...}
+//	ips := TransformAndFilterSlice(clients,
+//	    func(c *Client) string { return getIP(c) },
+//	    func(ip string) bool { return ip != "" })
+func TransformAndFilterSlice[T any, R any](slice []T, transform func(T) R, predicate func(R) bool) []R {
+	if len(slice) == 0 {
+		return []R{}
+	}
+	result := make([]R, 0, len(slice))
+	for _, v := range slice {
+		transformed := transform(v)
+		if predicate(transformed) {
+			result = append(result, transformed)
+		}
+	}
+	return result
+}
+
+// TransformAndCompactSlice 转换切片并移除零值
+// 这是常见的模式：转换后过滤掉零值元素
+//
+// 参数:
+//   - slice: 输入切片
+//   - transform: 转换函数
+//
+// 返回:
+//   - 转换后移除零值的切片
+//
+// 示例:
+//
+//	clients := []*Client{...}
+//	ips := TransformAndCompactSlice(clients, func(c *Client) string { return getIP(c) })
+func TransformAndCompactSlice[T any, R comparable](slice []T, transform func(T) R) []R {
+	var zero R
+	return TransformAndFilterSlice(slice, transform, func(r R) bool {
+		return r != zero
+	})
+}
+
 // ReduceSlice 将切片归约为单个值
 func ReduceSlice[T any, R any](slice []T, initial R, accumulator func(R, T) R) R {
 	result := initial

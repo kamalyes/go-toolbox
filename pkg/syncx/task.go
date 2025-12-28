@@ -75,36 +75,45 @@ const (
 	DependencyTask                     // 依赖任务
 )
 
+// TaskExecuteFunc 任务执行函数类型
+type TaskExecuteFunc[T any, R any] func(ctx context.Context, input T) (R, error)
+
+// TaskCallbackFunc 任务回调函数类型
+type TaskCallbackFunc[R any, U any] func(result R, err error) (U, error)
+
+// TaskTrunFunc 任务启动/关闭函数类型
+type TaskTrunFunc[R any] func() (R, error)
+
 // Task 表示一个异步任务
 type Task[T any, R any, U any] struct {
-	name                string                                        // 任务名称
-	funcPointer         uintptr                                       // 任务函数的指针，用于循环依赖检查
-	fn                  func(ctx context.Context, input T) (R, error) // 任务执行的函数
-	depends             []*Task[T, R, U]                              // 依赖的任务列表
-	priority            int                                           // 任务优先级
-	state               TaskState                                     // 任务状态
-	result              R                                             // 任务执行结果
-	err                 error                                         // 任务执行错误
-	cancel              context.CancelFunc                            // 取消函数
-	timeout             time.Duration                                 // 超时时间
-	successCallback     func(result R, err error) (U, error)          // 任务成功后的回调函数
-	failureCallback     func(result R, err error) (U, error)          // 任务失败后的回调函数
-	input               T                                             // 任务输入
-	retryCount          int32                                         // 当前重试次数
-	retryInterval       time.Duration                                 // 重试间隔时间
-	maxRetries          int32                                         // 最大重试次数
-	ctx                 context.Context                               // 传入的上下文
-	timestamp           int64                                         // 任务开始时间(纳秒)
-	totalDuration       time.Duration                                 // 任务的总耗时(纳秒)
-	fnDuration          time.Duration                                 // 主任务运行时间
-	callbackDuration    time.Duration                                 // 回调运行时间
-	callbackResult      U                                             // 存储回调结果
-	callbackError       error                                         // 存储回调错误
-	callbackState       TaskState                                     // 任务状态
-	taskType            TaskType                                      // 任务类型（主任务或依赖任务）
-	dependExecutionMode ExecutionMode                                 // 依赖任务的执行模式
-	history             map[string][]TaskHistory                      // 任务执行历史
-	maxHistorySize      int                                           // 最大历史行数
+	name                string                   // 任务名称
+	funcPointer         uintptr                  // 任务函数的指针，用于循环依赖检查
+	fn                  TaskExecuteFunc[T, R]    // 任务执行的函数
+	depends             []*Task[T, R, U]         // 依赖的任务列表
+	priority            int                      // 任务优先级
+	state               TaskState                // 任务状态
+	result              R                        // 任务执行结果
+	err                 error                    // 任务执行错误
+	cancel              context.CancelFunc       // 取消函数
+	timeout             time.Duration            // 超时时间
+	successCallback     TaskCallbackFunc[R, U]   // 任务成功后的回调函数
+	failureCallback     TaskCallbackFunc[R, U]   // 任务失败后的回调函数
+	input               T                        // 任务输入
+	retryCount          int32                    // 当前重试次数
+	retryInterval       time.Duration            // 重试间隔时间
+	maxRetries          int32                    // 最大重试次数
+	ctx                 context.Context          // 传入的上下文
+	timestamp           int64                    // 任务开始时间(纳秒)
+	totalDuration       time.Duration            // 任务的总耗时(纳秒)
+	fnDuration          time.Duration            // 主任务运行时间
+	callbackDuration    time.Duration            // 回调运行时间
+	callbackResult      U                        // 存储回调结果
+	callbackError       error                    // 存储回调错误
+	callbackState       TaskState                // 任务状态
+	taskType            TaskType                 // 任务类型（主任务或依赖任务）
+	dependExecutionMode ExecutionMode            // 依赖任务的执行模式
+	history             map[string][]TaskHistory // 任务执行历史
+	maxHistorySize      int                      // 最大历史行数
 }
 
 // TaskManager 管理所有的任务
@@ -112,8 +121,8 @@ type TaskManager[T any, R any, U any] struct {
 	tasks        map[string]*Task[T, R, U] // 存储所有任务的映射
 	mu           sync.Mutex                // 互斥锁，确保并发安全
 	concurrency  int                       // 并发数
-	trunUpFunc   func() (R, error)         // 启动时执行的函数
-	trunDownFunc func() (R, error)         // 关闭时执行的函数
+	trunUpFunc   TaskTrunFunc[R]           // 启动时执行的函数
+	trunDownFunc TaskTrunFunc[R]           // 关闭时执行的函数
 }
 
 // TaskHistory 记录任务执行的历史信息
@@ -173,7 +182,7 @@ func NewTaskManager[T any, R any, U any](concurrency int) *TaskManager[T, R, U] 
 }
 
 // NewTaskWithOptions 创建一个新的任务
-func NewTaskWithOptions[T any, R any, U any](name string, fn func(ctx context.Context, input T) (R, error), input T, ctx context.Context, maxRetries int32, retryInterval time.Duration) *Task[T, R, U] {
+func NewTaskWithOptions[T any, R any, U any](name string, fn TaskExecuteFunc[T, R], input T, ctx context.Context, maxRetries int32, retryInterval time.Duration) *Task[T, R, U] {
 	return &Task[T, R, U]{
 		name:           name,                           // 任务名称
 		fn:             fn,                             // 任务执行的函数
@@ -191,7 +200,7 @@ func NewTaskWithOptions[T any, R any, U any](name string, fn func(ctx context.Co
 }
 
 // NewTask 创建一个新的任务，使用背景上下文
-func NewTask[T any, R any, U any](name string, fn func(ctx context.Context, input T) (R, error), input T) *Task[T, R, U] {
+func NewTask[T any, R any, U any](name string, fn TaskExecuteFunc[T, R], input T) *Task[T, R, U] {
 	// 调用 NewTaskWithOptions，并传入背景上下文和默认的重试参数
 	return NewTaskWithOptions[T, R, U](name, fn, input, context.Background(), 3, 1*time.Second)
 }
@@ -251,13 +260,13 @@ func (tk *Task[T, R, U]) SetTimeout(timeout time.Duration) *Task[T, R, U] {
 }
 
 // SetSuccessCallback 设置任务成功后的回调函数，并返回当前任务以支持链式调用
-func (tk *Task[T, R, U]) SetSuccessCallback(callback func(R, error) (U, error)) *Task[T, R, U] {
+func (tk *Task[T, R, U]) SetSuccessCallback(callback TaskCallbackFunc[R, U]) *Task[T, R, U] {
 	tk.successCallback = callback
 	return tk
 }
 
 // SetFailureCallback 设置任务失败后的回调函数，并返回当前任务以支持链式调用
-func (tk *Task[T, R, U]) SetFailureCallback(callback func(R, error) (U, error)) *Task[T, R, U] {
+func (tk *Task[T, R, U]) SetFailureCallback(callback TaskCallbackFunc[R, U]) *Task[T, R, U] {
 	tk.failureCallback = callback
 	return tk
 }
@@ -389,7 +398,7 @@ func (tm *TaskManager[T, R, U]) AddTask(task *Task[T, R, U]) *TaskManager[T, R, 
 }
 
 // SetTrunUp 设置启动时执行的函数
-func (tm *TaskManager[T, R, U]) SetTrunUp(fn func() (R, error)) *TaskManager[T, R, U] {
+func (tm *TaskManager[T, R, U]) SetTrunUp(fn TaskTrunFunc[R]) *TaskManager[T, R, U] {
 	return WithLockReturnValue(&tm.mu, func() *TaskManager[T, R, U] {
 		tm.trunUpFunc = fn
 		return tm
@@ -397,7 +406,7 @@ func (tm *TaskManager[T, R, U]) SetTrunUp(fn func() (R, error)) *TaskManager[T, 
 }
 
 // SetTrunDown 设置关闭时执行的函数
-func (tm *TaskManager[T, R, U]) SetTrunDown(fn func() (R, error)) *TaskManager[T, R, U] {
+func (tm *TaskManager[T, R, U]) SetTrunDown(fn TaskTrunFunc[R]) *TaskManager[T, R, U] {
 	return WithLockReturnValue(&tm.mu, func() *TaskManager[T, R, U] {
 		tm.trunDownFunc = fn
 		return tm
@@ -605,7 +614,7 @@ func (tk *Task[T, R, U]) runWithRetries() (result R, err error) {
 func (tk *Task[T, R, U]) invokeCallback() {
 	// 定义一个映射，将错误状态映射到相应的回调函数
 	// 如果没有错误，使用成功回调；如果有错误，使用失败回调
-	callbackMap := map[bool]func(R, error) (U, error){
+	callbackMap := map[bool]TaskCallbackFunc[R, U]{
 		false: tk.successCallback, // err == nil
 		true:  tk.failureCallback, // err != nil
 	}

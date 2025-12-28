@@ -20,25 +20,23 @@ import (
 
 func TestWrapError(t *testing.T) {
 	tests := []struct {
+		name     string
 		message  string
-		err      error
+		err      []error
 		expected string
 	}{
-		{"an error occurred", errors.New("original error"), "an error occurred: original error"},
-		{"another error", nil, ""},
-		{"wrapped error", errors.New("something went wrong"), "wrapped error: something went wrong"},
+		{"with error", "an error occurred", []error{errors.New("original error")}, "an error occurred: original error"},
+		{"without error", "another error", []error{}, "another error"},
+		{"with nil error", "nil error", []error{nil}, "nil error"},
+		{"with wrapped error", "wrapped error", []error{errors.New("something went wrong")}, "wrapped error: something went wrong"},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.message, func(t *testing.T) {
-			got := WrapError(tt.message, tt.err)
+		t.Run(tt.name, func(t *testing.T) {
+			got := WrapError(tt.message, tt.err...)
 
-			if tt.expected == "" {
-				assert.Nil(t, got)
-			} else {
-				assert.NotNil(t, got)
-				assert.EqualError(t, got, tt.expected)
-			}
+			assert.NotNil(t, got)
+			assert.EqualError(t, got, tt.expected)
 		})
 	}
 }

@@ -25,3 +25,5 @@ go.work.sum
 .env
 
 /tests/*.png
+/tests/*.jpg
+/tests/*.jpeg

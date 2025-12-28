@@ -11,6 +11,7 @@
 package errorx
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -18,11 +19,11 @@ import (
 )
 
 // WrapError 是一个通用的错误包装函数
-func WrapError(message string, err error) error {
-	if err == nil {
-		return nil
+func WrapError(message string, err ...error) error {
+	if len(err) == 0 || err[0] == nil {
+		return errors.New(message)
 	}
-	return fmt.Errorf("%s: %w", message, err)
+	return fmt.Errorf("%s: %w", message, err[0])
 }
 
 // 定义 BaseError 结构体
