@@ -171,6 +171,15 @@ func RandString(n int, mode RandType) string {
 	return build.String() // 返回最终生成的随机字符串
 }
 
+// UUID 生成 UUID 字符串
+func UUID() string {
+	return RandString(8, LOWERCASE|NUMBER) + "-" +
+		RandString(4, LOWERCASE|NUMBER) + "-" +
+		RandString(4, LOWERCASE|NUMBER) + "-" +
+		RandString(4, LOWERCASE|NUMBER) + "-" +
+		RandString(12, LOWERCASE|NUMBER)
+}
+
 // RandStringSlice 指定长度的随机字符串
 func RandStringSlice(count, len int, mode RandType) (result []string) {
 	for i := 0; i < count; i++ {

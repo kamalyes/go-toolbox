@@ -10,7 +10,22 @@
  */
 package validator
 
-import "net"
+import (
+	"fmt"
+	"net"
+)
+
+// IPBase IP验证器基类
+type IPBase struct{}
+
+// ValidateIP 验证IP地址是否有效
+func (b *IPBase) ValidateIP(ip string) error {
+	parsedIP := net.ParseIP(ip)
+	if parsedIP == nil {
+		return fmt.Errorf("无效的IP地址: %s", ip)
+	}
+	return nil
+}
 
 // IsIPAllowed 检查 IP 是否在允许列表中
 // 支持：

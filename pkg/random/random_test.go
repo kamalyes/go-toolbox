@@ -876,3 +876,32 @@ func TestRandNumericalWithRandomStepFloat64(t *testing.T) {
 		}
 	}
 }
+
+// TestUUID 测试 UUID 函数
+func TestUUID(t *testing.T) {
+	// 生成一个 UUID
+	uuid := UUID()
+
+	// 检查 UUID 的格式
+	parts := strings.Split(uuid, "-")
+	assert.Len(t, parts, 5, "UUID should consist of 5 parts separated by '-'")
+
+	// 检查每个部分的长度
+	assert.Len(t, parts[0], 8, "First part of UUID should be 8 characters long")
+	assert.Len(t, parts[1], 4, "Second part of UUID should be 4 characters long")
+	assert.Len(t, parts[2], 4, "Third part of UUID should be 4 characters long")
+	assert.Len(t, parts[3], 4, "Fourth part of UUID should be 4 characters long")
+	assert.Len(t, parts[4], 12, "Fifth part of UUID should be 12 characters long")
+
+	// 检查每个部分是否只包含小写字母和数字
+	for _, part := range parts {
+		for _, char := range part {
+			assert.True(t, isLowercaseOrNumber(char), "UUID parts should only contain lowercase letters and numbers")
+		}
+	}
+}
+
+// isLowercaseOrNumber 检查字符是否是小写字母或数字
+func isLowercaseOrNumber(char rune) bool {
+	return (char >= 'a' && char <= 'z') || (char >= '0' && char <= '9')
+}

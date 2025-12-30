@@ -137,3 +137,23 @@ func SubBetweenAll(str string, prefix string, suffix string) []string {
 	}
 	return result
 }
+
+// SubString 截取字符串，从 start 位置开始，截取 length 长度
+// 如果 start 超出范围或为负数，返回空字符串
+// 如果 length 超出剩余长度，截取到字符串末尾
+func SubString(s string, start, length int) string {
+	if start < 0 || start >= len(s) {
+		return ""
+	}
+	end := start + length
+	if end > len(s) {
+		end = len(s)
+	}
+	return s[start:end]
+}
+
+// SubStringChain 截取字符串（链式调用）
+func (s *StringX) SubStringChain(start, length int) *StringX {
+	s.value = SubString(s.value, start, length)
+	return s
+}
