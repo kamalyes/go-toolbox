@@ -14,7 +14,11 @@ import "io"
 
 // HTTP 请求和响应相关的常量定义
 const (
-	HeaderContentType = "Content-Type" // HTTP 请求和响应头中的 Content-Type
+	// HTTP Headers
+	HeaderContentType   = "Content-Type"  // HTTP 请求和响应头中的 Content-Type
+	HeaderAccept        = "Accept"        // HTTP 请求头中的 Accept
+	HeaderAuthorization = "Authorization" // HTTP 请求头中的 Authorization
+	HeaderUserAgent     = "User-Agent"    // HTTP 请求头中的 User-Agent
 
 	// 常见的 Content-Type
 	ContentTypeTextPlain                    = "text/plain"                        // 纯文本格式

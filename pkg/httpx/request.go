@@ -101,6 +101,18 @@ func (r *Request) GetError() error {
 	return r.err
 }
 
+// GetFullURL 返回包含查询参数的完整 URL
+func (r *Request) GetFullURL() string {
+	if len(r.queryValues) == 0 {
+		return r.endpoint
+	}
+	separator := "?"
+	if strings.Contains(r.endpoint, "?") {
+		separator = "&"
+	}
+	return r.endpoint + separator + r.queryValues.Encode()
+}
+
 // Setter 方法
 
 // AddQuery 添加查询参数
@@ -112,6 +124,83 @@ func (r *Request) AddQuery(key, value string) *Request {
 // SetQuery 设置查询参数
 func (r *Request) SetQuery(key, value string) *Request {
 	r.queryValues.Set(key, value) // 设置查询参数的值，如果已存在则覆盖
+	return r
+}
+
+// SetQueries 批量设置查询参数
+func (r *Request) SetQueries(queries map[string]string) *Request {
+	for key, value := range queries {
+		r.queryValues.Set(key, value)
+	}
+	return r
+}
+
+// AddQueries 批量添加查询参数
+func (r *Request) AddQueries(queries map[string]string) *Request {
+	for key, value := range queries {
+		r.queryValues.Add(key, value)
+	}
+	return r
+}
+
+// SetHeaders 批量设置请求头
+func (r *Request) SetHeaders(headers map[string]string) *Request {
+	for key, value := range headers {
+		r.headers.Set(key, value)
+	}
+	return r
+}
+
+// AddHeaders 批量添加请求头
+func (r *Request) AddHeaders(headers map[string]string) *Request {
+	for key, value := range headers {
+		r.headers.Add(key, value)
+	}
+	return r
+}
+
+// SetUserAgent 设置 User-Agent
+func (r *Request) SetUserAgent(userAgent string) *Request {
+	return r.SetHeader(HeaderUserAgent, userAgent)
+}
+
+// SetAuthorization 设置 Authorization
+func (r *Request) SetAuthorization(token string) *Request {
+	return r.SetHeader(HeaderAuthorization, token)
+}
+
+// SetBearerToken 设置 Bearer Token
+func (r *Request) SetBearerToken(token string) *Request {
+	return r.SetHeader(HeaderAuthorization, token)
+}
+
+// SetContentType 设置 Content-Type
+func (r *Request) SetContentType(contentType string) *Request {
+	return r.SetHeader(HeaderContentType, contentType)
+}
+
+// SetAccept 设置 Accept
+func (r *Request) SetAccept(accept string) *Request {
+	return r.SetHeader(HeaderAccept, accept)
+}
+
+// SetBodyJSON 设置 JSON 请求体（自动设置 Content-Type）
+func (r *Request) SetBodyJSON(body any) *Request {
+	r.body = body
+	r.bodyEncodeFunc = encodeJSON
+	r.SetHeader(HeaderContentType, ContentTypeApplicationJSON)
+	return r
+}
+
+// SetBodyString 设置字符串请求体
+func (r *Request) SetBodyString(body string) *Request {
+	r.bodyBytes = strings.NewReader(body)
+	return r
+}
+
+// SetBodyyValues 直接设置 url.Values
+func (r *Request) SetQueryValues(values url.Values) *Request {
+	r.queryValues = values
 	return r
 }
 
@@ -150,13 +239,19 @@ func (r *Request) SetBody(body any) *Request {
 	return r
 }
 
+// SetBodyRaw 设置原始请求体，不进行任何编码
+func (r *Request) SetBodyRaw(body []byte) *Request {
+	r.bodyBytes = bytes.NewReader(body)
+	return r
+}
+
 // SetBodyForm 设置请求体为表单数据
 func (r *Request) SetBodyForm(data url.Values) *Request {
 	r.body = data
 	r.bodyEncodeFunc = func(body any) (io.Reader, error) {
 		return strings.NewReader(body.(url.Values).Encode()), nil
 	}
-	r.SetHeader(HeaderContentType, ContentTypeWWWFormURLEncoded) // 设置 Content-Type 为表单
+	r.SetHeader(HeaderContentType, ContentTypeWWWFormURLEncoded)
 	return r
 }
 
@@ -168,26 +263,109 @@ func (r *Request) SetBodyMultipart(fieldName, fileName string, fileContent []byt
 	// 添加文件字段
 	part, err := writer.CreateFormFile(fieldName, fileName)
 	if err != nil {
-		return r // 处理错误
+		r.err = err
+		return r
 	}
 	_, err = part.Write(fileContent)
 	if err != nil {
-		return r // 处理错误
+		r.err = err
+		return r
 	}
 
 	// 关闭 writer，完成 multipart 数据
 	err = writer.Close()
 	if err != nil {
-		return r // 处理错误
+		r.err = err
+		return r
 	}
 
 	r.bodyBytes = &buf
-	r.SetHeader(HeaderContentType, ContentTypeMultipartFormData)
+	r.SetHeader(HeaderContentType, writer.FormDataContentType())
 	return r
+}
+
+// SetBodyMultipartWithFields 设置请求体为 multipart/form-data（支持多个字段）
+func (r *Request) SetBodyMultipartWithFields(fields map[string]string, files map[string]FileField) *Request {
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+
+	// 添加普通字段
+	for key, value := range fields {
+		if err := writer.WriteField(key, value); err != nil {
+			r.err = err
+			return r
+		}
+	}
+
+	// 添加文件字段
+	for fieldName, file := range files {
+		part, err := writer.CreateFormFile(fieldName, file.FileName)
+		if err != nil {
+			r.err = err
+			return r
+		}
+		if _, err := part.Write(file.Content); err != nil {
+			r.err = err
+			return r
+		}
+	}
+
+	if err := writer.Close(); err != nil {
+		r.err = err
+		return r
+	}
+
+	r.bodyBytes = &buf
+	r.SetHeader(HeaderContentType, writer.FormDataContentType())
+	return r
+}
+
+// FileField 文件字段结构
+type FileField struct {
+	FileName string
+	Content  []byte
+}
+
+// Clone 克隆请求（用于重试等场景）
+func (r *Request) Clone() *Request {
+	clone := &Request{
+		ctx:            r.ctx,
+		client:         r.client,
+		endpoint:       r.endpoint,
+		method:         r.method,
+		headers:        make(http.Header),
+		queryValues:    make(url.Values),
+		body:           r.body,
+		bodyEncodeFunc: r.bodyEncodeFunc,
+		err:            r.err,
+	}
+
+	// 深拷贝 headers
+	for k, v := range r.headers {
+		clone.headers[k] = v
+	}
+
+	// 深拷贝 queryValues
+	for k, v := range r.queryValues {
+		clone.queryValues[k] = v
+	}
+
+	// 如果有 bodyBytes，需要重新编码
+	if r.bodyBytes != nil && r.body != nil {
+		// 保留原始 body，在发送时重新编码
+		clone.body = r.body
+	}
+
+	return clone
 }
 
 // Send 执行 HTTP 请求
 func (r *Request) Send() (Response, error) {
+	// 检查是否有之前的错误
+	if r.err != nil {
+		return Response{}, r.err
+	}
+
 	if !IsValidMethod(r.method) {
 		return Response{}, errorx.NewError(ErrInvalidMethod, r.method)
 	}
@@ -214,6 +392,15 @@ func (r *Request) Send() (Response, error) {
 	} // 将原始 HTTP 响应赋值给 Response 结构体
 
 	return Response{Response: resp}, nil
+}
+
+// MustSend 执行 HTTP 请求，如果失败则 panic
+func (r *Request) MustSend() Response {
+	resp, err := r.Send()
+	if err != nil {
+		panic(err)
+	}
+	return resp
 }
 
 // encodeBody 编码请求体
