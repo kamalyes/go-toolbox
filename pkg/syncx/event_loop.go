@@ -158,6 +158,48 @@ func (el *EventLoop) OnTicker(interval time.Duration, handler func()) *EventLoop
 	return el
 }
 
+// IfTicker 条件注册定时器事件处理器
+// 只有当条件为 true 时才注册定时器
+//
+// 参数:
+//   - condition: 条件判断，为 true 时才注册
+//   - interval: 定时间隔（如 5*time.Second, 1*time.Minute）
+//   - handler: 定时触发时执行的函数，无参数无返回值
+//
+// 示例:
+//
+//	// 只有当启用清理时才注册定时器
+//	loop.IfTicker(config.EnableCleanup, 30*time.Minute, func() {
+//	    cleanupExpiredData()
+//	})
+func (el *EventLoop) IfTicker(condition bool, interval time.Duration, handler func()) *EventLoop {
+	if condition {
+		return el.OnTicker(interval, handler)
+	}
+	return el
+}
+
+// IfChannel 条件注册通道事件处理器
+// 只有当条件为 true 时才注册通道监听
+//
+// 参数:
+//   - condition: 条件判断，为 true 时才注册
+//   - ch: 必须是一个通道类型
+//   - handler: 必须是一个函数，接受通道元素类型的参数
+//
+// 示例:
+//
+//	// 只有当启用某功能时才监听该通道
+//	loop.IfChannel(config.EnableFeature, featureChan, func(msg Message) {
+//	    handleFeature(msg)
+//	})
+func (el *EventLoop) IfChannel(condition bool, ch interface{}, handler interface{}) *EventLoop {
+	if condition {
+		return el.OnChannel(ch, handler)
+	}
+	return el
+}
+
 // OnShutdown 设置关闭时的回调
 // 当事件循环退出时（context 取消或发生 panic），会调用此函数进行清理
 //

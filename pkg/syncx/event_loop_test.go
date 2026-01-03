@@ -322,3 +322,111 @@ func ExampleEventLoop() {
 
 	// Output:
 }
+
+// TestEventLoop_IfTicker 测试条件定时器
+func TestEventLoop_IfTicker(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+
+	enabledCount := int32(0)
+	disabledCount := int32(0)
+
+	loop := NewEventLoop(ctx).
+		// 条件为 true，应该执行
+		IfTicker(true, 50*time.Millisecond, func() {
+			atomic.AddInt32(&enabledCount, 1)
+		}).
+		// 条件为 false，不应该执行
+		IfTicker(false, 50*time.Millisecond, func() {
+			atomic.AddInt32(&disabledCount, 1)
+		})
+
+	loop.Run()
+
+	// 300ms / 50ms = 6次触发（大约5-6次）
+	enabled := atomic.LoadInt32(&enabledCount)
+	disabled := atomic.LoadInt32(&disabledCount)
+
+	assert.GreaterOrEqual(t, enabled, int32(4), "启用的定时器应该触发至少4次")
+	assert.Equal(t, int32(0), disabled, "禁用的定时器不应该触发")
+}
+
+// TestEventLoop_IfChannel 测试条件通道
+func TestEventLoop_IfChannel(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	enabledCh := make(chan int, 10)
+	disabledCh := make(chan int, 10)
+
+	enabledReceived := int32(0)
+	disabledReceived := int32(0)
+
+	loop := NewEventLoop(ctx).
+		// 条件为 true，应该监听
+		IfChannel(true, enabledCh, func(val int) {
+			atomic.AddInt32(&enabledReceived, int32(val))
+		}).
+		// 条件为 false，不应该监听
+		IfChannel(false, disabledCh, func(val int) {
+			atomic.AddInt32(&disabledReceived, int32(val))
+		})
+
+	go loop.Run()
+
+	// 发送数据
+	enabledCh <- 10
+	enabledCh <- 20
+	disabledCh <- 100
+
+	time.Sleep(50 * time.Millisecond)
+
+	assert.Equal(t, int32(30), atomic.LoadInt32(&enabledReceived), "启用的通道应该接收到数据")
+	assert.Equal(t, int32(0), atomic.LoadInt32(&disabledReceived), "禁用的通道不应该接收到数据")
+
+	cancel()
+	time.Sleep(50 * time.Millisecond)
+}
+
+// TestEventLoop_MixedConditions 测试混合条件
+func TestEventLoop_MixedConditions(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+
+	ch1 := make(chan int, 10)
+	ch2 := make(chan int, 10)
+
+	ch1Received := int32(0)
+	ch2Received := int32(0)
+	ticker1Count := int32(0)
+	ticker2Count := int32(0)
+
+	enableFeature1 := true
+	enableFeature2 := false
+
+	loop := NewEventLoop(ctx).
+		IfChannel(enableFeature1, ch1, func(val int) {
+			atomic.AddInt32(&ch1Received, int32(val))
+		}).
+		IfChannel(enableFeature2, ch2, func(val int) {
+			atomic.AddInt32(&ch2Received, int32(val))
+		}).
+		IfTicker(enableFeature1, 50*time.Millisecond, func() {
+			atomic.AddInt32(&ticker1Count, 1)
+		}).
+		IfTicker(enableFeature2, 50*time.Millisecond, func() {
+			atomic.AddInt32(&ticker2Count, 1)
+		})
+
+	go loop.Run()
+
+	ch1 <- 5
+	ch2 <- 10
+
+	time.Sleep(250 * time.Millisecond)
+
+	assert.Equal(t, int32(5), atomic.LoadInt32(&ch1Received), "feature1的通道应该工作")
+	assert.Equal(t, int32(0), atomic.LoadInt32(&ch2Received), "feature2的通道不应该工作")
+	assert.GreaterOrEqual(t, atomic.LoadInt32(&ticker1Count), int32(3), "feature1的定时器应该工作")
+	assert.Equal(t, int32(0), atomic.LoadInt32(&ticker2Count), "feature2的定时器不应该工作")
+}
