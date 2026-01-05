@@ -32,7 +32,7 @@ func New(value string) *StringX {
 	return &StringX{value: value}
 }
 
-// Get 返回当前字符串的值
+// Value 返回当前字符串的值
 func (s *StringX) Value() string {
 	return s.value
 }
@@ -370,7 +370,8 @@ func ToSnakeCase(s string) string {
 	var result strings.Builder
 
 	for i, r := range s {
-		if r == '-' {
+		// 将连字符和空格都转换为下划线
+		if r == '-' || r == ' ' {
 			result.WriteRune('_')
 			continue
 		}

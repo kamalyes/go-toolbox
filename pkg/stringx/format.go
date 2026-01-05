@@ -13,6 +13,7 @@ package stringx
 import (
 	"fmt"
 	"strings"
+	"unicode"
 )
 
 // FillBefore 将已有字符串填充为规定长度，如果已有字符串超过这个长度则返回这个字符串
@@ -145,5 +146,60 @@ func AddSuffixIfNot(str string, suffix string) string {
 // AddSuffixIfNotChain 如果给定字符串不是以suffix结尾的，在尾部补充 suffix（链式调用）
 func (s *StringX) AddSuffixIfNotChain(prefix string) *StringX {
 	s.value = AddSuffixIfNot(s.value, prefix)
+	return s
+}
+
+// SanitizeSlug 格式化字符串为 URL 友好的 slug 格式
+// 规则：小写、去除空格、只保留字母数字和连字符、去除连续连字符、去除首尾连字符
+// 适用场景：项目名称、域名、URL slug 等
+//
+// 示例：
+//
+//	SanitizeSlug("Hello World!")      // "hello-world"
+//	SanitizeSlug("My--Project__123")  // "my-project-123"
+//	SanitizeSlug("  -test-  ")        // "test"
+func SanitizeSlug(name string) string {
+	if name == "" {
+		return ""
+	}
+
+	// 预分配 Builder，避免多次内存分配
+	var builder strings.Builder
+	builder.Grow(len(name))
+
+	lastWasHyphen := true // 用于跟踪上一个字符是否为连字符，初始为 true 以去除开头连字符
+
+	for _, r := range name {
+		// 将字符转为小写
+		r = unicode.ToLower(r)
+
+		// 判断字符类型并处理
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			// 字母或数字，直接添加
+			builder.WriteRune(r)
+			lastWasHyphen = false
+		} else if r == '-' || r == '_' || r == ' ' || r == '\t' || r == '\n' || r == '\r' {
+			// 分隔符转换为连字符，但避免连续连字符
+			if !lastWasHyphen && builder.Len() > 0 {
+				builder.WriteRune('-')
+				lastWasHyphen = true
+			}
+		}
+		// 其他特殊字符直接忽略
+	}
+
+	result := builder.String()
+
+	// 去除尾部连字符（开头连字符已在循环中处理）
+	if len(result) > 0 && result[len(result)-1] == '-' {
+		result = result[:len(result)-1]
+	}
+
+	return result
+}
+
+// SanitizeSlugChain 格式化字符串为 URL 友好的 slug 格式（链式调用）
+func (s *StringX) SanitizeSlugChain() *StringX {
+	s.value = SanitizeSlug(s.value)
 	return s
 }
