@@ -12,6 +12,7 @@ package syncx
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -22,13 +23,15 @@ type NestedStruct struct {
 }
 
 type TestCloneStruct struct {
-	Name     string
-	Age      int
-	Nested   NestedStruct
-	Friends  []string
-	Settings map[string]interface{}
-	Pointer  *NestedStruct
-	private  string // 未导出字段，不应该被复制
+	Name      string
+	Age       int
+	Nested    NestedStruct
+	Friends   []string
+	Settings  map[string]interface{}
+	Pointer   *NestedStruct
+	CreatedAt time.Time  // time.Time 字段
+	UpdatedAt *time.Time // time.Time 指针字段
+	private   string     // 未导出字段，不应该被复制
 }
 
 type ComplexMapStruct struct {
@@ -70,6 +73,8 @@ func TestDeepCopyString(t *testing.T) {
 
 // 测试结构体的深拷贝
 func TestDeepCopyStruct(t *testing.T) {
+	now := time.Now()
+	updatedAt := time.Now().Add(1 * time.Hour)
 	src := &TestCloneStruct{
 		Name:    "Alice",
 		Age:     30,
@@ -79,8 +84,10 @@ func TestDeepCopyStruct(t *testing.T) {
 			"theme": "dark",
 			"count": 42,
 		},
-		Pointer: &NestedStruct{"Pointer", 200},
-		private: "private_value",
+		Pointer:   &NestedStruct{"Pointer", 200},
+		CreatedAt: now,
+		UpdatedAt: &updatedAt,
+		private:   "private_value",
 	}
 	var dst TestCloneStruct
 	err := DeepCopy(&dst, src)
@@ -93,6 +100,8 @@ func TestDeepCopyStruct(t *testing.T) {
 	assert.Equal(t, src.Friends, dst.Friends)
 	assert.Equal(t, src.Settings, dst.Settings)
 	assert.Equal(t, *src.Pointer, *dst.Pointer)
+	assert.True(t, src.CreatedAt.Equal(dst.CreatedAt), "CreatedAt should be equal")
+	assert.True(t, src.UpdatedAt.Equal(*dst.UpdatedAt), "UpdatedAt should be equal")
 
 	// 修改源数据，确保目标数据不受影响
 	src.Name = "Bob"
@@ -100,12 +109,17 @@ func TestDeepCopyStruct(t *testing.T) {
 	src.Friends[0] = "Dave"
 	src.Settings["theme"] = "light"
 	src.Pointer.Field1 = "Modified"
+	src.CreatedAt = time.Now().Add(24 * time.Hour)
+	newUpdatedAt := time.Now().Add(48 * time.Hour)
+	src.UpdatedAt = &newUpdatedAt
 
 	assert.NotEqual(t, src.Name, dst.Name)
 	assert.NotEqual(t, src.Age, dst.Age)
 	assert.NotEqual(t, src.Friends[0], dst.Friends[0])
 	assert.NotEqual(t, src.Settings["theme"], dst.Settings["theme"])
 	assert.NotEqual(t, src.Pointer.Field1, dst.Pointer.Field1)
+	assert.False(t, src.CreatedAt.Equal(dst.CreatedAt), "CreatedAt should not be equal after modification")
+	assert.False(t, src.UpdatedAt.Equal(*dst.UpdatedAt), "UpdatedAt should not be equal after modification")
 }
 
 // 测试 Map 的深拷贝
@@ -431,4 +445,136 @@ func TestDeepCopyComplexNested(t *testing.T) {
 	assert.Equal(t, "item1", dst.Nested.Items[0].Value)
 	assert.Equal(t, "x_value", dst.MapData["key1"].Data["x"].Value)
 	assert.Equal(t, "ptr1", dst.SlicePtr[0].Value)
+}
+
+// 测试 time.Time 类型的深拷贝
+func TestDeepCopyTimeTime(t *testing.T) {
+	now := time.Now()
+	src := &now
+	var dst time.Time
+	err := DeepCopy(&dst, src)
+	assert.NoError(t, err)
+	assert.True(t, src.Equal(dst), "time.Time should be copied correctly")
+	assert.False(t, dst.IsZero(), "copied time.Time should not be zero")
+
+	// 修改源时间
+	newTime := time.Now().Add(24 * time.Hour)
+	src = &newTime
+
+	// 验证目标未受影响
+	assert.False(t, src.Equal(dst), "dst should not change when src changes")
+}
+
+// 测试零值 time.Time 的深拷贝
+func TestDeepCopyZeroTimeTime(t *testing.T) {
+	src := time.Time{}
+	var dst time.Time
+	err := DeepCopy(&dst, &src)
+	assert.NoError(t, err)
+	assert.True(t, dst.IsZero(), "zero time.Time should remain zero after copy")
+	assert.True(t, src.Equal(dst), "zero time.Time should be equal")
+}
+
+// 测试包含 time.Time 的结构体深拷贝
+func TestDeepCopyStructWithTimeTime(t *testing.T) {
+	type Message struct {
+		ID        string
+		Content   string
+		CreatedAt time.Time
+		UpdatedAt *time.Time
+		DeletedAt *time.Time
+	}
+
+	now := time.Now()
+	updatedAt := now.Add(1 * time.Hour)
+	src := &Message{
+		ID:        "msg-123",
+		Content:   "Hello World",
+		CreatedAt: now,
+		UpdatedAt: &updatedAt,
+		DeletedAt: nil,
+	}
+
+	var dst Message
+	err := DeepCopy(&dst, src)
+	assert.NoError(t, err)
+
+	// 验证所有字段
+	assert.Equal(t, src.ID, dst.ID)
+	assert.Equal(t, src.Content, dst.Content)
+	assert.True(t, src.CreatedAt.Equal(dst.CreatedAt), "CreatedAt should be equal")
+	assert.False(t, dst.CreatedAt.IsZero(), "CreatedAt should not be zero")
+	assert.NotNil(t, dst.UpdatedAt)
+	assert.True(t, src.UpdatedAt.Equal(*dst.UpdatedAt), "UpdatedAt should be equal")
+	assert.Nil(t, dst.DeletedAt)
+
+	// 修改源
+	src.ID = "msg-456"
+	src.Content = "Modified"
+	src.CreatedAt = time.Now().Add(24 * time.Hour)
+	newUpdatedAt := time.Now().Add(48 * time.Hour)
+	src.UpdatedAt = &newUpdatedAt
+	deletedAt := time.Now()
+	src.DeletedAt = &deletedAt
+
+	// 验证目标未受影响
+	assert.Equal(t, "msg-123", dst.ID)
+	assert.Equal(t, "Hello World", dst.Content)
+	assert.False(t, src.CreatedAt.Equal(dst.CreatedAt))
+	assert.False(t, src.UpdatedAt.Equal(*dst.UpdatedAt))
+	assert.Nil(t, dst.DeletedAt)
+}
+
+// 测试包含 time.Time 的 Map 深拷贝
+func TestDeepCopyMapWithTimeTime(t *testing.T) {
+	now := time.Now()
+	src := map[string]time.Time{
+		"created": now,
+		"updated": now.Add(1 * time.Hour),
+	}
+	var dst map[string]time.Time
+	err := DeepCopy(&dst, &src)
+	assert.NoError(t, err)
+
+	// 验证相等
+	assert.True(t, src["created"].Equal(dst["created"]))
+	assert.True(t, src["updated"].Equal(dst["updated"]))
+	assert.False(t, dst["created"].IsZero())
+	assert.False(t, dst["updated"].IsZero())
+
+	// 修改源
+	src["created"] = time.Now().Add(24 * time.Hour)
+	src["deleted"] = time.Now().Add(48 * time.Hour)
+
+	// 验证目标未受影响
+	assert.False(t, src["created"].Equal(dst["created"]))
+	assert.NotContains(t, dst, "deleted")
+}
+
+// 测试包含 time.Time 的 Slice 深拷贝
+func TestDeepCopySliceWithTimeTime(t *testing.T) {
+	now := time.Now()
+	src := []time.Time{
+		now,
+		now.Add(1 * time.Hour),
+		now.Add(2 * time.Hour),
+	}
+	var dst []time.Time
+	err := DeepCopy(&dst, &src)
+	assert.NoError(t, err)
+
+	// 验证相等
+	assert.Equal(t, len(src), len(dst))
+	for i := range src {
+		assert.True(t, src[i].Equal(dst[i]), "time.Time at index %d should be equal", i)
+		assert.False(t, dst[i].IsZero(), "time.Time at index %d should not be zero", i)
+	}
+
+	// 修改源
+	src[0] = time.Now().Add(24 * time.Hour)
+	src = append(src, time.Now().Add(48*time.Hour))
+
+	// 验证目标未受影响
+	assert.False(t, src[0].Equal(dst[0]))
+	assert.Equal(t, 3, len(dst))
 }

@@ -73,6 +73,20 @@ func deepCopy(dst, src reflect.Value) {
 		}
 
 	case reflect.Struct: // 处理结构体类型
+		// 特殊处理：如果结构体没有任何导出字段，直接赋值
+		// 这包括 time.Time, time.Duration 等标准库类型
+		hasExportedField := false
+		for i := 0; i < src.NumField(); i++ {
+			if src.Type().Field(i).IsExported() {
+				hasExportedField = true
+				break
+			}
+		}
+		if !hasExportedField {
+			dst.Set(src)
+			return
+		}
+
 		for i := 0; i < src.NumField(); i++ { // 遍历源结构体的字段
 			srcField := src.Field(i)             // 获取源字段值
 			dstField := dst.Field(i)             // 获取目标字段
