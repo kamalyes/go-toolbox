@@ -379,3 +379,34 @@ func normalizeToStringSlice(input any, separator string) ([]string, error) {
 		return nil, fmt.Errorf("unsupported input type %T, want string or []string", input)
 	}
 }
+
+// InterfaceSliceToStringSlice 将 []interface{} 转换为 []string
+func InterfaceSliceToStringSlice(slice []interface{}) []string {
+	result := make([]string, len(slice))
+	for i, v := range slice {
+		result[i] = MustString(v)
+	}
+	return result
+}
+
+// InterfaceSliceToIntSlice 将 []interface{} 转换为 []int
+func InterfaceSliceToIntSlice(slice []interface{}, mode *RoundMode) []int {
+	result := make([]int, 0, len(slice))
+	for _, v := range slice {
+		if num, err := MustIntT[int](v, mode); err == nil {
+			result = append(result, num)
+		}
+	}
+	return result
+}
+
+// InterfaceMapToStringMap 将 map[interface{}]interface{} 转换为 map[string]interface{}
+func InterfaceMapToStringMap(m map[interface{}]interface{}) map[string]interface{} {
+	result := make(map[string]interface{}, len(m))
+	for k, v := range m {
+		if key, ok := k.(string); ok {
+			result[key] = v
+		}
+	}
+	return result
+}

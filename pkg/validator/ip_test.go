@@ -137,3 +137,123 @@ func TestIsIPAllowed(t *testing.T) {
 		})
 	}
 }
+
+func TestIsIPBlocked(t *testing.T) {
+	tests := []struct {
+		name      string
+		ip        string
+		blacklist []string
+		want      bool
+	}{
+		// ========== 空列表测试 ==========
+		{"Empty list does not block", testIPv4_1, []string{}, false},
+		{"Nil list does not block", testIPv4_4, nil, false},
+
+		// ========== 精确匹配测试 ==========
+		{"Exact IP in blacklist", testIPv4_1, []string{testIPv4_1}, true},
+		{"Exact IP not in blacklist", testIPv4_1, []string{"192.168.1.101"}, false},
+		{"Multiple exact IPs one blocked", testIPv4_5, []string{testIPv4_3, testIPv4_5, testIPv4_6}, true},
+		{"Multiple exact IPs none blocked", "10.0.0.6", []string{testIPv4_3, testIPv4_5, testIPv4_6}, false},
+
+		// ========== CIDR 格式测试 ==========
+		{"IP in CIDR blacklist", testIPv4_2, []string{testCIDR_192}, true},
+		{"IP not in CIDR blacklist", "192.168.2.1", []string{testCIDR_192}, false},
+		{"Multiple CIDRs one block", testIPv4_5, []string{testCIDR_192, testCIDR_10}, true},
+		{"Multiple CIDRs none block", testIPv4_6, []string{testCIDR_192, testCIDR_10}, false},
+
+		// ========== IPv6 测试 ==========
+		{"IPv6 exact block", testIPv6_1, []string{testIPv6_1}, true},
+		{"IPv6 exact no block", testIPv6_1, []string{"2001:db8::2"}, false},
+		{"IPv6 CIDR block", testIPv6_2, []string{testCIDR_IPv6}, true},
+		{"IPv6 CIDR no block", "2001:db9::1", []string{testCIDR_IPv6}, false},
+
+		// ========== 异常和边界情况 ==========
+		{"Empty IP", "", []string{testCIDR_192}, false},
+		{"Invalid IP format", "invalid-ip", []string{testCIDR_192}, false},
+		{"Invalid IP with numbers", "256.256.256.256", []string{testCIDR_192}, false},
+		{"CIDR list contains empty string", testIPv4_2, []string{""}, false},
+		{"CIDR list contains invalid CIDR", testIPv4_2, []string{"invalid-cidr"}, false},
+		{"IP equals CIDR but CIDR invalid", testIPv4_2, []string{testIPv4_2 + "/33"}, false},
+		{"IP equals CIDR string but IP invalid", "999.999.999.999", []string{"999.999.999.999"}, false},
+		{"Malformed CIDR", testIPv4_3, []string{"192.168.1.0/99"}, false},
+		{"Incomplete IP", "192.168.1", []string{testCIDR_192}, false},
+		{"IP with port", testIPv4_3 + ":8080", []string{testCIDR_192}, false},
+
+		// ========== 特殊 IP 地址 ==========
+		{"Localhost IPv4 in blacklist", testIPv4_Localhost, []string{testIPv4_Localhost}, true},
+		{"Localhost in CIDR blacklist", testIPv4_Localhost, []string{testCIDR_127}, true},
+		{"Broadcast IP in blacklist", "255.255.255.255", []string{"255.255.255.255"}, true},
+		{"Zero IP in blacklist", testIPv4_Zero, []string{testIPv4_Zero}, true},
+		{"Private IP Class A in blacklist", "10.1.2.3", []string{testCIDR_10}, true},
+		{"Private IP Class B in blacklist", "172.16.5.6", []string{testCIDR_172}, true},
+		{"Private IP Class C in blacklist", "192.168.100.1", []string{testCIDR_192Block}, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsIPBlocked(tt.ip, tt.blacklist)
+			assert.Equal(t, tt.want, got, "IP: %s, Rules: %v", tt.ip, tt.blacklist)
+		})
+	}
+}
+
+func TestMatchIPPattern(t *testing.T) {
+	tests := []struct {
+		name    string
+		ip      string
+		pattern string
+		want    bool
+	}{
+		// ========== 通配符测试 ==========
+		{"Wildcard match", testIPv4_1, testWildcard, true},
+		{"Exact match", testIPv4_1, testIPv4_1, true},
+		{"No match", testIPv4_1, "192.168.1.101", false},
+
+		// ========== CIDR 格式测试 ==========
+		{"IP in CIDR", testIPv4_2, testCIDR_192, true},
+		{"IP not in CIDR", "192.168.2.1", testCIDR_192, false},
+
+		// ========== 异常和边界情况 ==========
+		{"Empty IP", "", testCIDR_192, false},
+		{"Invalid IP format", "invalid-ip", testCIDR_192, false},
+		{"Invalid IP with numbers", "256.256.256.256", testCIDR_192, false},
+		{"Malformed CIDR", testIPv4_3, "192.168.1.0/99", false},
+		{"Incomplete IP", "192.168.1", testCIDR_192, false},
+		{"IP with port", testIPv4_3 + ":8080", testCIDR_192, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := MatchIPPattern(tt.ip, tt.pattern)
+			assert.Equal(t, tt.want, got, "IP: %s, Pattern: %s", tt.ip, tt.pattern)
+		})
+	}
+}
+
+func TestIsPrivateIP(t *testing.T) {
+	tests := []struct {
+		name string
+		ip   string
+		want bool
+	}{
+		{"Private Class A", "10.1.2.3", true},
+		{"Private Class B", "172.16.5.6", true},
+		{"Private Class C", "192.168.100.1", true},
+		{"Localhost", "127.0.0.1", true},
+		{"Link-local", "169.254.0.1", true},
+		{"IPv6 loopback", "::1", true},
+		{"IPv6 unique local", "fc00::1", true},
+		{"Not a private IP", "8.8.8.8", false},
+		{"Invalid IP format", "invalid-ip", false},
+		{"Invalid IP with numbers", "256.256.256.256", false},
+		{"Empty IP", "", false},
+		{"IP with port", "10.1.2.3:8080", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsPrivateIP(tt.ip)
+			assert.Equal(t, tt.want, got, "IP: %s", tt.ip)
+		})
+	}
+}

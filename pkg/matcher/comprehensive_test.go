@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kamalyes/go-toolbox/pkg/contextx"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -39,11 +40,11 @@ type SimpleRule struct {
 	id        string
 	priority  int
 	enabled   bool
-	condition func(*Context) bool
+	condition func(*contextx.Context) bool
 	result    TestResult
 }
 
-func (r *SimpleRule) Match(ctx *Context) bool {
+func (r *SimpleRule) Match(ctx *contextx.Context) bool {
 	if r.condition == nil {
 		return false
 	}
@@ -58,19 +59,19 @@ func (r *SimpleRule) Enabled() bool      { return r.enabled }
 // ===== 1-10: 类型兼容性测试 =====
 
 func TestTypeCompatibility_Int_Types(t *testing.T) {
-	ctx := NewContext()
+	ctx := contextx.NewContext()
 
 	// 测试所有整数类型
-	ctx.Set("int", 42)
-	ctx.Set("int8", int8(8))
-	ctx.Set("int16", int16(16))
-	ctx.Set("int32", int32(32))
-	ctx.Set("int64", int64(64))
-	ctx.Set("uint", uint(100))
-	ctx.Set("uint8", uint8(200))
-	ctx.Set("uint16", uint16(300))
-	ctx.Set("uint32", uint32(400))
-	ctx.Set("uint64", uint64(500))
+	ctx = ctx.WithValue("int", 42)
+	ctx = ctx.WithValue("int8", int8(8))
+	ctx = ctx.WithValue("int16", int16(16))
+	ctx = ctx.WithValue("int32", int32(32))
+	ctx = ctx.WithValue("int64", int64(64))
+	ctx = ctx.WithValue("uint", uint(100))
+	ctx = ctx.WithValue("uint8", uint8(200))
+	ctx = ctx.WithValue("uint16", uint16(300))
+	ctx = ctx.WithValue("uint32", uint32(400))
+	ctx = ctx.WithValue("uint64", uint64(500))
 
 	assert.Equal(t, 42, ctx.GetInt("int"))
 	assert.Equal(t, int8(8), ctx.GetInt8("int8"))
@@ -89,11 +90,11 @@ func TestTypeCompatibility_Int_Types(t *testing.T) {
 }
 
 func TestTypeCompatibility_Float_Types(t *testing.T) {
-	ctx := NewContext()
+	ctx := contextx.NewContext()
 
-	ctx.Set("float32", float32(3.14))
-	ctx.Set("float64", 3.14159)
-	ctx.Set("intToFloat", 42)
+	ctx = ctx.WithValue("float32", float32(3.14))
+	ctx = ctx.WithValue("float64", 3.14159)
+	ctx = ctx.WithValue("intToFloat", 42)
 
 	assert.InDelta(t, float32(3.14), ctx.GetFloat32("float32"), 0.001)
 	assert.InDelta(t, 3.14159, ctx.GetFloat64("float64"), 0.00001)
@@ -102,29 +103,29 @@ func TestTypeCompatibility_Float_Types(t *testing.T) {
 }
 
 func TestTypeCompatibility_String_And_Bool(t *testing.T) {
-	ctx := NewContext()
+	ctx := contextx.NewContext()
 
-	ctx.Set("string", "hello world")
-	ctx.Set("bool_true", true)
-	ctx.Set("bool_false", false)
-	ctx.Set("rune", 'A')
+	ctx = ctx.WithValue("string", "hello world")
+	ctx = ctx.WithValue("bool_true", true)
+	ctx = ctx.WithValue("bool_false", false)
+	ctx = ctx.WithValue("rune", 'A')
 
 	assert.Equal(t, "hello world", ctx.GetString("string"))
-	assert.True(t, ctx.SafeGetBool("bool_true"))
-	assert.False(t, ctx.SafeGetBool("bool_false"))
+	assert.True(t, ctx.GetBool("bool_true"))
+	assert.False(t, ctx.GetBool("bool_false"))
 	assert.Equal(t, int32('A'), ctx.GetRune("rune"))
 }
 
 func TestTypeCompatibility_Time_Duration(t *testing.T) {
-	ctx := NewContext()
+	ctx := contextx.NewContext()
 	now := time.Now()
 	duration := 5 * time.Minute
 
-	ctx.Set("time", now)
-	ctx.Set("duration", duration)
-	ctx.Set("time_string", now.Format(time.RFC3339))
-	ctx.Set("duration_string", "1h30m")
-	ctx.Set("timestamp", now.Unix())
+	ctx = ctx.WithValue("time", now)
+	ctx = ctx.WithValue("duration", duration)
+	ctx = ctx.WithValue("time_string", now.Format(time.RFC3339))
+	ctx = ctx.WithValue("duration_string", "1h30m")
+	ctx = ctx.WithValue("timestamp", now.Unix())
 
 	assert.Equal(t, now, ctx.GetTime("time"))
 	assert.Equal(t, duration, ctx.GetDuration("duration"))
@@ -143,7 +144,7 @@ func TestTypeCompatibility_Time_Duration(t *testing.T) {
 }
 
 func TestTypeCompatibility_Collections(t *testing.T) {
-	ctx := NewContext()
+	ctx := contextx.NewContext()
 
 	intSlice := []int{1, 2, 3, 4, 5}
 	interfaceSlice := []interface{}{10, 20, 30}
@@ -153,10 +154,10 @@ func TestTypeCompatibility_Collections(t *testing.T) {
 		"key2": 42,
 	}
 
-	ctx.Set("intSlice", intSlice)
-	ctx.Set("interfaceSlice", interfaceSlice)
-	ctx.Set("stringSlice", stringSlice)
-	ctx.Set("map", testMap)
+	ctx = ctx.WithValue("intSlice", intSlice)
+	ctx = ctx.WithValue("interfaceSlice", interfaceSlice)
+	ctx = ctx.WithValue("stringSlice", stringSlice)
+	ctx = ctx.WithValue("map", testMap)
 
 	assert.Equal(t, intSlice, ctx.GetIntSlice("intSlice"))
 	assert.Equal(t, []int{10, 20, 30}, ctx.GetIntSlice("interfaceSlice"))
@@ -183,17 +184,17 @@ func TestBasicMatching_Simple_Rules(t *testing.T) {
 
 	matcher.AddRules(rule1, rule2)
 
-	ctx1 := NewContext().Set("action", "create")
+	ctx1 := contextx.NewContext().WithValue("action", "create")
 	result1, matched1 := matcher.Match(ctx1)
 	assert.True(t, matched1)
 	assert.Equal(t, 1, result1.ID)
 
-	ctx2 := NewContext().Set("action", "update")
+	ctx2 := contextx.NewContext().WithValue("action", "update")
 	result2, matched2 := matcher.Match(ctx2)
 	assert.True(t, matched2)
 	assert.Equal(t, 2, result2.ID)
 
-	ctx3 := NewContext().Set("action", "delete")
+	ctx3 := contextx.NewContext().WithValue("action", "delete")
 	_, matched3 := matcher.Match(ctx3)
 	assert.False(t, matched3)
 }
@@ -216,7 +217,7 @@ func TestBasicMatching_Priority_Order(t *testing.T) {
 
 	matcher.AddRules(lowPriority, highPriority)
 
-	ctx := NewContext().Set("type", "test")
+	ctx := contextx.NewContext().WithValue("type", "test")
 	result, matched := matcher.Match(ctx)
 
 	assert.True(t, matched)
@@ -241,7 +242,7 @@ func TestBasicMatching_Disabled_Rules(t *testing.T) {
 
 	matcher.AddRules(enabledRule, disabledRule)
 
-	ctx := NewContext().Set("status", "active")
+	ctx := contextx.NewContext().WithValue("status", "active")
 	result, matched := matcher.Match(ctx)
 
 	assert.True(t, matched)
@@ -265,7 +266,7 @@ func TestBasicMatching_MatchAll_Function(t *testing.T) {
 
 	matcher.AddRules(rule1, rule2)
 
-	ctx := NewContext().Set("name", "test_case")
+	ctx := contextx.NewContext().WithValue("name", "test_case")
 	results := matcher.MatchAll(ctx)
 
 	assert.Len(t, results, 2)
@@ -282,10 +283,9 @@ func TestBasicMatching_Chain_Rules(t *testing.T) {
 		WithPriority(10).
 		WithID("api_rule")
 
-	ctx := NewContext().
-		Set("service", "api").
-		Set("method", "POST").
-		Set("path", "/api/users/create")
+	ctx := contextx.NewContext().WithValue("service", "api")
+	ctx = ctx.WithValue("method", "POST")
+	ctx = ctx.WithValue("path", "/api/users/create")
 
 	assert.True(t, rule.Match(ctx))
 	assert.Equal(t, 10, rule.Priority())
@@ -299,7 +299,7 @@ func TestAdvancedMatching_Pattern_Wildcards(t *testing.T) {
 
 	rule := &SimpleRule{
 		id: "wildcard", priority: 10, enabled: true,
-		condition: func(ctx *Context) bool {
+		condition: func(ctx *contextx.Context) bool {
 			path := ctx.GetString("path")
 			// 简单的通配符匹配：*.log
 			return strings.HasSuffix(path, ".log")
@@ -321,7 +321,7 @@ func TestAdvancedMatching_Pattern_Wildcards(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		ctx := NewContext().Set("path", tc.path)
+		ctx := contextx.NewContext().WithValue("path", tc.path)
 		_, matched := matcher.Match(ctx)
 		assert.Equal(t, tc.expected, matched, "path: %s", tc.path)
 	}
@@ -333,7 +333,7 @@ func TestAdvancedMatching_Conditional_Logic(t *testing.T) {
 	// OR 条件测试 - 使用函数字面量
 	orRule := &SimpleRule{
 		id: "or_rule", priority: 30, enabled: true,
-		condition: func(ctx *Context) bool {
+		condition: func(ctx *contextx.Context) bool {
 			role := ctx.GetString("role")
 			return role == "admin" || role == "moderator"
 		},
@@ -343,7 +343,7 @@ func TestAdvancedMatching_Conditional_Logic(t *testing.T) {
 	// AND 条件测试
 	andRule := &SimpleRule{
 		id: "and_rule", priority: 20, enabled: true,
-		condition: func(ctx *Context) bool {
+		condition: func(ctx *contextx.Context) bool {
 			return ctx.GetString("env") == "production" && ctx.GetString("secure") == "true"
 		},
 		result: TestResult{ID: 2, Value: "secure_production"},
@@ -352,7 +352,7 @@ func TestAdvancedMatching_Conditional_Logic(t *testing.T) {
 	// NOT 条件测试
 	notRule := &SimpleRule{
 		id: "not_rule", priority: 10, enabled: true,
-		condition: func(ctx *Context) bool {
+		condition: func(ctx *contextx.Context) bool {
 			return ctx.GetString("status") != "disabled"
 		},
 		result: TestResult{ID: 3, Value: "active_service"},
@@ -361,19 +361,19 @@ func TestAdvancedMatching_Conditional_Logic(t *testing.T) {
 	matcher.AddRules(orRule, andRule, notRule)
 
 	// 测试 OR 条件
-	ctx1 := NewContext().Set("role", "admin")
+	ctx1 := contextx.NewContext().WithValue("role", "admin")
 	result1, matched1 := matcher.Match(ctx1)
 	assert.True(t, matched1)
 	assert.Equal(t, 1, result1.ID)
 
 	// 测试 AND 条件
-	ctx2 := NewContext().Set("env", "production").Set("secure", "true")
+	ctx2 := contextx.NewContext().WithValue("env", "production").WithValue("secure", "true")
 	result2, matched2 := matcher.Match(ctx2)
 	assert.True(t, matched2)
 	assert.Equal(t, 2, result2.ID)
 
 	// 测试 NOT 条件
-	ctx3 := NewContext().Set("status", "active")
+	ctx3 := contextx.NewContext().WithValue("status", "active")
 	result3, matched3 := matcher.Match(ctx3)
 	assert.True(t, matched3)
 	assert.Equal(t, 3, result3.ID)
@@ -400,19 +400,19 @@ func TestAdvancedMatching_Multiple_Conditions(t *testing.T) {
 	matcher.AddRule(rule)
 
 	// 正匹配测试
-	ctx1 := NewContext().
-		Set("method", "POST").
-		Set("path", "/api/users").
-		Set("version", "v1")
+	ctx1 := contextx.NewContext().
+		WithValue("method", "POST").
+		WithValue("path", "/api/users").
+		WithValue("version", "v1")
 	result1, matched1 := matcher.Match(ctx1)
 	assert.True(t, matched1)
 	assert.Equal(t, 1, result1.ID)
 
 	// 负匹配测试（包含test）
-	ctx2 := NewContext().
-		Set("method", "GET").
-		Set("path", "/api/test/users").
-		Set("version", "v2")
+	ctx2 := contextx.NewContext().
+		WithValue("method", "GET").
+		WithValue("path", "/api/test/users").
+		WithValue("version", "v2")
 	_, matched2 := matcher.Match(ctx2)
 	assert.False(t, matched2)
 }
@@ -420,7 +420,7 @@ func TestAdvancedMatching_Multiple_Conditions(t *testing.T) {
 func TestAdvancedMatching_String_Operations(t *testing.T) {
 	testCases := []struct {
 		name      string
-		condition func(*Context) bool
+		condition func(*contextx.Context) bool
 		key       string
 		value     string
 		expected  bool
@@ -439,7 +439,7 @@ func TestAdvancedMatching_String_Operations(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := NewContext().Set(tc.key, tc.value)
+			ctx := contextx.NewContext().WithValue(tc.key, tc.value)
 			result := tc.condition(ctx)
 			assert.Equal(t, tc.expected, result)
 		})
@@ -462,7 +462,7 @@ func TestAdvancedMatching_HTTP_Methods(t *testing.T) {
 	expected := []bool{true, true, true, true, true, false}
 
 	for i, method := range testMethods {
-		ctx := NewContext().Set("method", method)
+		ctx := contextx.NewContext().WithValue("method", method)
 		_, matched := matcher.Match(ctx)
 		assert.Equal(t, expected[i], matched, "method: %s", method)
 	}
@@ -497,7 +497,7 @@ func TestConcurrency_Parallel_Matching(t *testing.T) {
 			defer wg.Done()
 			for i := 0; i < iterations; i++ {
 				targetID := (gid*iterations + i) % 100
-				ctx := NewContext().Set("id", strconv.Itoa(targetID))
+				ctx := contextx.NewContext().WithValue("id", strconv.Itoa(targetID))
 				result, matched := matcher.Match(ctx)
 				if matched && result.ID == targetID {
 					successCount.Add(1)
@@ -540,7 +540,7 @@ func TestConcurrency_Rule_Modification(t *testing.T) {
 		go func(id int) {
 			defer wg.Done()
 			for j := 0; j < 100; j++ {
-				ctx := NewContext().Set("worker", strconv.Itoa(id%10))
+				ctx := contextx.NewContext().WithValue("worker", strconv.Itoa(id%10))
 				matcher.Match(ctx) // 不检查结果，只确保不会panic
 			}
 		}(i)
@@ -576,7 +576,7 @@ func TestPerformance_Large_Ruleset(t *testing.T) {
 
 	for i := 0; i < iterations; i++ {
 		target := fmt.Sprintf("target_%d", rand.Intn(ruleCount))
-		ctx := NewContext().Set("target", target)
+		ctx := contextx.NewContext().WithValue("target", target)
 		matcher.Match(ctx)
 	}
 
@@ -617,7 +617,7 @@ func TestPerformance_Memory_Usage(t *testing.T) {
 
 		// 执行一些匹配操作
 		for j := 0; j < 10; j++ {
-			ctx := NewContext().Set("id", strconv.Itoa(rand.Intn(i+1)))
+			ctx := contextx.NewContext().WithValue("id", strconv.Itoa(rand.Intn(i+1)))
 			matcher.Match(ctx)
 		}
 	}
@@ -644,7 +644,7 @@ func TestPerformance_Cache_Effectiveness(t *testing.T) {
 	}
 	matcher.AddRule(rule)
 
-	ctx := NewContext().Set("key", "value")
+	ctx := contextx.NewContext().WithValue("key", "value")
 
 	// 第一次匹配
 	start := time.Now()
@@ -673,7 +673,7 @@ func TestPerformance_Cache_Effectiveness(t *testing.T) {
 
 func TestEdgeCases_Empty_Matcher(t *testing.T) {
 	matcher := NewMatcher[TestResult]()
-	ctx := NewContext().Set("any", "value")
+	ctx := contextx.NewContext().WithValue("any", "value")
 
 	result, matched := matcher.Match(ctx)
 	assert.False(t, matched)
@@ -684,26 +684,26 @@ func TestEdgeCases_Empty_Matcher(t *testing.T) {
 }
 
 func TestEdgeCases_Nil_Values(t *testing.T) {
-	ctx := NewContext()
-	ctx.Set("nil_value", nil)
-	ctx.Set("empty_string", "")
+	ctx := contextx.NewContext()
+	ctx.WithValue("nil_value", nil)
+	ctx.WithValue("empty_string", "")
 
 	assert.Equal(t, "", ctx.GetString("nil_value"))
 	assert.Equal(t, 0, ctx.GetInt("nil_value"))
-	assert.False(t, ctx.SafeGetBool("nil_value"))
+	assert.False(t, ctx.GetBool("nil_value"))
 
 	assert.Equal(t, "", ctx.GetString("empty_string"))
 	assert.Equal(t, "", ctx.GetString("nonexistent"))
 }
 
 func TestEdgeCases_Extreme_Values(t *testing.T) {
-	ctx := NewContext()
+	ctx := contextx.NewContext()
 
-	ctx.Set("max_int64", math.MaxInt64)
-	ctx.Set("min_int64", math.MinInt64)
-	ctx.Set("max_float64", math.MaxFloat64)
-	ctx.Set("inf", math.Inf(1))
-	ctx.Set("nan", math.NaN())
+	ctx.WithValue("max_int64", math.MaxInt64)
+	ctx.WithValue("min_int64", math.MinInt64)
+	ctx.WithValue("max_float64", math.MaxFloat64)
+	ctx.WithValue("inf", math.Inf(1))
+	ctx.WithValue("nan", math.NaN())
 
 	assert.Equal(t, int64(math.MaxInt64), ctx.GetInt64("max_int64"))
 	assert.Equal(t, int64(math.MinInt64), ctx.GetInt64("min_int64"))
@@ -713,7 +713,7 @@ func TestEdgeCases_Extreme_Values(t *testing.T) {
 }
 
 func TestEdgeCases_Unicode_Strings(t *testing.T) {
-	ctx := NewContext()
+	ctx := contextx.NewContext()
 
 	unicodeStrings := []string{
 		"Hello, 世界",
@@ -735,7 +735,7 @@ func TestEdgeCases_Unicode_Strings(t *testing.T) {
 		}
 		matcher.AddRule(rule)
 
-		ctx.Set("text", str)
+		ctx.WithValue("text", str)
 		result, matched := matcher.Match(ctx)
 		assert.True(t, matched)
 		assert.Equal(t, str, result.Value)
@@ -743,11 +743,11 @@ func TestEdgeCases_Unicode_Strings(t *testing.T) {
 }
 
 func TestEdgeCases_Large_Context_Data(t *testing.T) {
-	ctx := NewContext()
+	ctx := contextx.NewContext()
 
 	// 添加大量数据
 	for i := 0; i < 10000; i++ {
-		ctx.Set(fmt.Sprintf("key_%d", i), fmt.Sprintf("value_%d", i))
+		ctx.WithValue(fmt.Sprintf("key_%d", i), fmt.Sprintf("value_%d", i))
 	}
 
 	// 测试获取数据
@@ -760,7 +760,7 @@ func TestEdgeCases_Large_Context_Data(t *testing.T) {
 }
 
 func TestEdgeCases_Context_Timeout(t *testing.T) {
-	ctx := NewContext().WithTimeout(10 * time.Millisecond)
+	ctx := contextx.NewContext().WithTimeout(10 * time.Millisecond)
 
 	// 立即检查，应该没有超时
 	assert.False(t, ctx.IsExpired())
@@ -778,7 +778,7 @@ func TestEdgeCases_Context_Timeout(t *testing.T) {
 	}
 	matcher.AddRule(rule)
 
-	ctx.Set("test", "value")
+	ctx.WithValue("test", "value")
 	_, matched := matcher.Match(ctx)
 	assert.False(t, matched, "超时的上下文不应该匹配")
 }
@@ -793,7 +793,7 @@ func TestEdgeCases_Rule_Removal(t *testing.T) {
 	matcher.AddRules(rule1, rule2, rule3)
 
 	// 验证所有规则都存在
-	ctx1 := NewContext().Set("test", "1")
+	ctx1 := contextx.NewContext().WithValue("test", "1")
 	result1, matched1 := matcher.Match(ctx1)
 	assert.True(t, matched1)
 	assert.Equal(t, 1, result1.ID)
@@ -802,12 +802,12 @@ func TestEdgeCases_Rule_Removal(t *testing.T) {
 	matcher.RemoveRule("rule2")
 
 	// 验证规则2被移除
-	ctx2 := NewContext().Set("test", "2")
+	ctx2 := contextx.NewContext().WithValue("test", "2")
 	_, matched2 := matcher.Match(ctx2)
 	assert.False(t, matched2)
 
 	// 验证其他规则仍然存在
-	ctx3 := NewContext().Set("test", "3")
+	ctx3 := contextx.NewContext().WithValue("test", "3")
 	result3, matched3 := matcher.Match(ctx3)
 	assert.True(t, matched3)
 	assert.Equal(t, 3, result3.ID)
@@ -829,7 +829,7 @@ func TestEdgeCases_Clear_All_Rules(t *testing.T) {
 	}
 
 	// 验证规则存在
-	ctx := NewContext().Set("id", "50")
+	ctx := contextx.NewContext().WithValue("id", "50")
 	_, matched := matcher.Match(ctx)
 	assert.True(t, matched)
 
@@ -854,7 +854,7 @@ func TestEdgeCases_Cache_Expiration(t *testing.T) {
 	}
 	matcher.AddRule(rule)
 
-	ctx := NewContext().Set("key", "value")
+	ctx := contextx.NewContext().WithValue("key", "value")
 
 	// 第一次匹配
 	result1, matched1 := matcher.Match(ctx)
@@ -910,7 +910,7 @@ func TestRealWorld_API_Gateway_Routing(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		ctx := NewContext().Set("method", tc.method).Set("path", tc.path)
+		ctx := contextx.NewContext().WithValue("method", tc.method).WithValue("path", tc.path)
 		result, matched := matcher.Match(ctx)
 		assert.True(t, matched, "路径 %s %s 应该匹配", tc.method, tc.path)
 		assert.Equal(t, tc.expected, result.Value)
@@ -931,7 +931,7 @@ func TestRealWorld_Feature_Flags(t *testing.T) {
 			result:    TestResult{ID: 2, Value: "admin_features_enabled"}},
 
 		{id: "percentage_rollout", priority: 50, enabled: true,
-			condition: func(ctx *Context) bool {
+			condition: func(ctx *contextx.Context) bool {
 				userID := ctx.GetInt("user_id")
 				return userID%100 < 10 // 10%的用户
 			},
@@ -941,13 +941,13 @@ func TestRealWorld_Feature_Flags(t *testing.T) {
 	matcher.AddRules(rules[0], rules[1], rules[2])
 
 	// 测试Beta用户
-	ctx1 := NewContext().Set("beta_user", true).Set("env", "production")
+	ctx1 := contextx.NewContext().WithValue("beta_user", true).WithValue("env", "production")
 	result1, matched1 := matcher.Match(ctx1)
 	assert.True(t, matched1)
 	assert.Equal(t, "new_feature_enabled", result1.Value)
 
 	// 测试管理员
-	ctx2 := NewContext().Set("role", "admin")
+	ctx2 := contextx.NewContext().WithValue("role", "admin")
 	result2, matched2 := matcher.Match(ctx2)
 	assert.True(t, matched2)
 	assert.Equal(t, "admin_features_enabled", result2.Value)
@@ -955,7 +955,7 @@ func TestRealWorld_Feature_Flags(t *testing.T) {
 	// 测试渐进式发布
 	enabledCount := 0
 	for i := 0; i < 1000; i++ {
-		ctx := NewContext().Set("user_id", i)
+		ctx := contextx.NewContext().WithValue("user_id", i)
 		_, matched := matcher.Match(ctx)
 		if matched {
 			enabledCount++
@@ -984,7 +984,7 @@ func TestRealWorld_Content_Filtering(t *testing.T) {
 			result:    TestResult{ID: 2, Value: "blocked_offensive"}},
 
 		{id: "max_length", priority: 80, enabled: true,
-			condition: func(ctx *Context) bool {
+			condition: func(ctx *contextx.Context) bool {
 				content := ctx.GetString("content")
 				return len(content) > 1000
 			},
@@ -1006,7 +1006,7 @@ func TestRealWorld_Content_Filtering(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		ctx := NewContext().Set("content", tc.content)
+		ctx := contextx.NewContext().WithValue("content", tc.content)
 		result, matched := matcher.Match(ctx)
 		assert.Equal(t, tc.blocked, matched, "内容: %s", tc.content[:min(50, len(tc.content))])
 		if matched {
@@ -1023,19 +1023,19 @@ func TestRealWorld_Load_Balancing(t *testing.T) {
 		{id: "high_cpu_server", priority: 100, enabled: true,
 			condition: MatchAll(
 				MatchString("server_type", "high_cpu"),
-				func(ctx *Context) bool { return ctx.GetFloat64("cpu_usage") < 80.0 },
+				func(ctx *contextx.Context) bool { return ctx.GetFloat64("cpu_usage") < 80.0 },
 			),
 			result: TestResult{ID: 1, Value: "high-cpu-server-pool"}},
 
 		{id: "memory_intensive", priority: 90, enabled: true,
 			condition: MatchAll(
 				MatchString("request_type", "memory_intensive"),
-				func(ctx *Context) bool { return ctx.GetFloat64("memory_usage") < 70.0 },
+				func(ctx *contextx.Context) bool { return ctx.GetFloat64("memory_usage") < 70.0 },
 			),
 			result: TestResult{ID: 2, Value: "memory-optimized-pool"}},
 
 		{id: "default_pool", priority: 10, enabled: true,
-			condition: func(ctx *Context) bool { return true }, // 默认匹配
+			condition: func(ctx *contextx.Context) bool { return true }, // 默认匹配
 			result:    TestResult{ID: 3, Value: "default-server-pool"}},
 	}
 
@@ -1054,11 +1054,11 @@ func TestRealWorld_Load_Balancing(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		ctx := NewContext().
-			Set("server_type", tc.serverType).
-			Set("request_type", tc.requestType).
-			Set("cpu_usage", tc.cpuUsage).
-			Set("memory_usage", tc.memoryUsage)
+		ctx := contextx.NewContext().
+			WithValue("server_type", tc.serverType).
+			WithValue("request_type", tc.requestType).
+			WithValue("cpu_usage", tc.cpuUsage).
+			WithValue("memory_usage", tc.memoryUsage)
 
 		result, matched := matcher.Match(ctx)
 		assert.True(t, matched)
@@ -1083,7 +1083,7 @@ func TestRealWorld_Stress_Testing(t *testing.T) {
 			condition: MatchAll(
 				MatchString("service", fmt.Sprintf("service_%d", i%50)),
 				MatchString("method", []string{"GET", "POST", "PUT"}[i%3]),
-				func(ctx *Context) bool {
+				func(ctx *contextx.Context) bool {
 					return ctx.GetInt("user_id")%100 == i%100
 				},
 			),
@@ -1108,10 +1108,10 @@ func TestRealWorld_Stress_Testing(t *testing.T) {
 			for i := 0; i < iterations; i++ {
 				startTime := time.Now()
 
-				ctx := NewContext().
-					Set("service", fmt.Sprintf("service_%d", rand.Intn(50))).
-					Set("method", []string{"GET", "POST", "PUT"}[rand.Intn(3)]).
-					Set("user_id", rand.Intn(10000))
+				ctx := contextx.NewContext().
+					WithValue("service", fmt.Sprintf("service_%d", rand.Intn(50))).
+					WithValue("method", []string{"GET", "POST", "PUT"}[rand.Intn(3)]).
+					WithValue("user_id", rand.Intn(10000))
 
 				_, matched := matcher.Match(ctx)
 

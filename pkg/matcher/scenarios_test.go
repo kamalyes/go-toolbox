@@ -19,6 +19,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/kamalyes/go-toolbox/pkg/contextx"
 )
 
 // ========== 场景 1: HTTP 路由匹配 ==========
@@ -40,15 +42,15 @@ func TestScenario_HTTPRouting(t *testing.T) {
 		method    string
 		action    *RouteAction
 		priority  int
-		matchFunc func(*Context) bool
+		matchFunc func(*contextx.Context) bool
 	}{
 		{
 			path:     "/api/users/:id",
 			method:   "GET",
 			action:   &RouteAction{Handler: "GetUser", RateLimit: 100},
 			priority: 10,
-			matchFunc: func(ctx *Context) bool {
-				path := ctx.GetString("path")
+			matchFunc: func(ctx *contextx.Context) bool {
+				path := contextx.Get[string](ctx, "path")
 				// 匹配 /api/users/:id 格式
 				return strings.HasPrefix(path, "/api/users/") && len(path) > len("/api/users/")
 			},
@@ -58,8 +60,8 @@ func TestScenario_HTTPRouting(t *testing.T) {
 			method:   "POST",
 			action:   &RouteAction{Handler: "CreateUser", RateLimit: 50},
 			priority: 10,
-			matchFunc: func(ctx *Context) bool {
-				return ctx.GetString("path") == "/api/users"
+			matchFunc: func(ctx *contextx.Context) bool {
+				return contextx.Get[string](ctx, "path") == "/api/users"
 			},
 		},
 		{
@@ -67,8 +69,8 @@ func TestScenario_HTTPRouting(t *testing.T) {
 			method:   "GET",
 			action:   &RouteAction{Handler: "ListUsers", RateLimit: 200},
 			priority: 9, // 稍低优先级，避免与 /api/users/:id 冲突
-			matchFunc: func(ctx *Context) bool {
-				return ctx.GetString("path") == "/api/users"
+			matchFunc: func(ctx *contextx.Context) bool {
+				return contextx.Get[string](ctx, "path") == "/api/users"
 			},
 		},
 		{
@@ -76,8 +78,8 @@ func TestScenario_HTTPRouting(t *testing.T) {
 			method:   "GET",
 			action:   &RouteAction{Handler: "GetOrder", RateLimit: 150},
 			priority: 5,
-			matchFunc: func(ctx *Context) bool {
-				return strings.HasPrefix(ctx.GetString("path"), "/api/orders/")
+			matchFunc: func(ctx *contextx.Context) bool {
+				return strings.HasPrefix(contextx.Get[string](ctx, "path"), "/api/orders/")
 			},
 		},
 		{
@@ -85,8 +87,8 @@ func TestScenario_HTTPRouting(t *testing.T) {
 			method:   "GET",
 			action:   &RouteAction{Handler: "GetProduct", RateLimit: 300, CacheEnable: true},
 			priority: 10,
-			matchFunc: func(ctx *Context) bool {
-				path := ctx.GetString("path")
+			matchFunc: func(ctx *contextx.Context) bool {
+				path := contextx.Get[string](ctx, "path")
 				return strings.HasPrefix(path, "/api/products/") && len(path) > len("/api/products/")
 			},
 		},
@@ -95,8 +97,8 @@ func TestScenario_HTTPRouting(t *testing.T) {
 			method:   "ANY",
 			action:   &RouteAction{Handler: "AdminPanel", Middleware: []string{"auth", "admin"}},
 			priority: 100,
-			matchFunc: func(ctx *Context) bool {
-				return strings.HasPrefix(ctx.GetString("path"), "/admin/")
+			matchFunc: func(ctx *contextx.Context) bool {
+				return strings.HasPrefix(contextx.Get[string](ctx, "path"), "/admin/")
 			},
 		},
 		{
@@ -104,8 +106,8 @@ func TestScenario_HTTPRouting(t *testing.T) {
 			method:   "ANY",
 			action:   &RouteAction{Handler: "PublicResource"},
 			priority: 1,
-			matchFunc: func(ctx *Context) bool {
-				return strings.HasPrefix(ctx.GetString("path"), "/public/")
+			matchFunc: func(ctx *contextx.Context) bool {
+				return strings.HasPrefix(contextx.Get[string](ctx, "path"), "/public/")
 			},
 		},
 	}
@@ -115,9 +117,9 @@ func TestScenario_HTTPRouting(t *testing.T) {
 		matchFunc := route.matchFunc
 		m.AddRule(
 			NewChainRule(route.action).
-				When(func(ctx *Context) bool {
+				When(func(ctx *contextx.Context) bool {
 					// 先检查 method
-					if method != "ANY" && ctx.GetString("method") != method {
+					if method != "ANY" && contextx.Get[string](ctx, "method") != method {
 						return false
 					}
 					// 再检查路径
@@ -146,9 +148,8 @@ func TestScenario_HTTPRouting(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		ctx := NewContext().
-			Set("path", tc.path).
-			Set("method", tc.method)
+		ctx := contextx.NewContext().WithValue("path", tc.path)
+		ctx = ctx.WithValue("method", tc.method)
 
 		result, matched := m.Match(ctx)
 
@@ -164,9 +165,9 @@ func TestScenario_HTTPRouting(t *testing.T) {
 
 	// 重复请求以测试缓存
 	for i := 0; i < 5; i++ {
-		ctx := NewContext().
-			Set("path", "/api/users/123").
-			Set("method", "GET")
+		ctx := contextx.NewContext().
+			WithValue("path", "/api/users/123")
+		ctx = ctx.WithValue("method", "GET")
 		m.Match(ctx)
 	}
 
@@ -194,7 +195,7 @@ func TestScenario_RateLimiting(t *testing.T) {
 	rules := []struct {
 		name     string
 		rule     *RateLimitRule
-		matcher  func(*Context) bool
+		matcher  func(*contextx.Context) bool
 		priority int
 	}{
 		{
@@ -230,7 +231,7 @@ func TestScenario_RateLimiting(t *testing.T) {
 		{
 			name:     "Global Default",
 			rule:     &RateLimitRule{Strategy: "leaky-bucket", Rate: 50, Burst: 100, Scope: "global"},
-			matcher:  func(ctx *Context) bool { return true },
+			matcher:  func(ctx *contextx.Context) bool { return true },
 			priority: 1,
 		},
 	}
@@ -301,9 +302,9 @@ func TestScenario_RateLimiting(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := NewContext()
+			ctx := contextx.NewContext()
 			for k, v := range tc.ctx {
-				ctx.Set(k, v)
+				ctx.WithValue(k, v)
 			}
 
 			result, matched := m.Match(ctx)
@@ -367,8 +368,8 @@ func TestScenario_IPBlacklist(t *testing.T) {
 		ipPrefix := ipRange
 		m.AddRule(
 			NewChainRule(&IPAction{Action: "deny", Reason: "blacklist", LogLevel: "warn"}).
-				When(func(ctx *Context) bool {
-					ip := ctx.GetString("ip")
+				When(func(ctx *contextx.Context) bool {
+					ip := contextx.Get[string](ctx, "ip")
 					// 简化判断：检查 IP 前缀
 					if strings.Contains(ipPrefix, "/") {
 						// CIDR 格式，取前缀
@@ -401,7 +402,7 @@ func TestScenario_IPBlacklist(t *testing.T) {
 	// 默认允许
 	m.AddRule(
 		NewChainRule(&IPAction{Action: "allow", Reason: "default"}).
-			When(func(ctx *Context) bool { return true }).
+			When(func(ctx *contextx.Context) bool { return true }).
 			WithPriority(1),
 	)
 
@@ -421,7 +422,7 @@ func TestScenario_IPBlacklist(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.ip, func(t *testing.T) {
-			ctx := NewContext().Set("ip", tc.ip)
+			ctx := contextx.NewContext().WithValue("ip", tc.ip)
 			result, matched := m.Match(ctx)
 
 			if !matched {
@@ -498,7 +499,7 @@ func TestScenario_PermissionControl(t *testing.T) {
 			CanRead: true, CanWrite: false, CanDelete: false, CanAdmin: false,
 			Resources: []string{"public"},
 		}).
-			When(func(ctx *Context) bool { return true }).
+			When(func(ctx *contextx.Context) bool { return true }).
 			WithPriority(1),
 	)
 
@@ -517,9 +518,8 @@ func TestScenario_PermissionControl(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.role, func(t *testing.T) {
-			ctx := NewContext().Set("role", tc.role)
+			ctx := contextx.NewContext().WithValue("role", tc.role)
 			result, matched := m.Match(ctx)
-
 			if !matched {
 				t.Fatal("Expected to match")
 			}
@@ -557,9 +557,9 @@ func TestScenario_DynamicRouting(t *testing.T) {
 			Upstream: "service-v2",
 			Timeout:  3 * time.Second,
 		}).
-			When(func(ctx *Context) bool {
+			When(func(ctx *contextx.Context) bool {
 				// 10% 流量到 v2
-				userId := ctx.GetString("user_id")
+				userId := contextx.Get[string](ctx, "user_id")
 				if userId == "" {
 					return false
 				}
@@ -591,7 +591,7 @@ func TestScenario_DynamicRouting(t *testing.T) {
 			RetryCount:     2,
 			CircuitBreaker: true,
 		}).
-			When(func(ctx *Context) bool { return true }).
+			When(func(ctx *contextx.Context) bool { return true }).
 			WithPriority(1),
 	)
 
@@ -599,14 +599,13 @@ func TestScenario_DynamicRouting(t *testing.T) {
 	userDistribution := make(map[string]int)
 
 	for i := 0; i < 1000; i++ {
-		ctx := NewContext().
-			Set("user_id", fmt.Sprintf("user_%d", i)).
-			Set("user_level", func() string {
-				if i%20 == 0 {
-					return "vip"
-				}
-				return "regular"
-			}())
+		ctx := contextx.NewContext().WithValue("user_id", fmt.Sprintf("user_%d", i))
+		ctx = ctx.WithValue("user_level", func() string {
+			if i%20 == 0 {
+				return "vip"
+			}
+			return "regular"
+		}())
 
 		result, matched := m.Match(ctx)
 		if !matched {
@@ -650,8 +649,8 @@ func TestScenario_OrderSharding(t *testing.T) {
 				Database: fmt.Sprintf("order_db_%d", shardID),
 				CacheKey: fmt.Sprintf("order_cache_%d", shardID),
 			}).
-				When(func(ctx *Context) bool {
-					orderID := ctx.GetString("order_id")
+				When(func(ctx *contextx.Context) bool {
+					orderID := contextx.Get[string](ctx, "order_id")
 					if orderID == "" {
 						return false
 					}
@@ -680,7 +679,7 @@ func TestScenario_OrderSharding(t *testing.T) {
 
 			for j := 0; j < ordersPerGoroutine; j++ {
 				orderID := fmt.Sprintf("ORD_%d_%d_%d", goroutineID, j, time.Now().UnixNano())
-				ctx := NewContext().Set("order_id", orderID)
+				ctx := contextx.NewContext().WithValue("order_id", orderID)
 
 				result, matched := m.Match(ctx)
 				if matched {
@@ -763,8 +762,8 @@ func TestScenario_PromoEngine(t *testing.T) {
 			PromoCode:       "FULL_100_10",
 			Description:     "满100减10元",
 		}).
-			When(func(ctx *Context) bool {
-				amount := ctx.GetString("order_amount")
+			When(func(ctx *contextx.Context) bool {
+				amount := contextx.Get[string](ctx, "order_amount")
 				if amount == "" {
 					return false
 				}
@@ -782,8 +781,8 @@ func TestScenario_PromoEngine(t *testing.T) {
 			PromoCode:       "HOLIDAY_5",
 			Description:     "节日特惠95折",
 		}).
-			When(func(ctx *Context) bool {
-				date := ctx.GetString("date")
+			When(func(ctx *contextx.Context) bool {
+				date := contextx.Get[string](ctx, "date")
 				// 简化判断：检查是否包含 "holiday"
 				return strings.Contains(date, "holiday")
 			}).
@@ -798,7 +797,7 @@ func TestScenario_PromoEngine(t *testing.T) {
 			PromoCode:       "NONE",
 			Description:     "无优惠",
 		}).
-			When(func(ctx *Context) bool { return true }).
+			When(func(ctx *contextx.Context) bool { return true }).
 			WithPriority(1),
 	)
 
@@ -856,9 +855,9 @@ func TestScenario_PromoEngine(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := NewContext()
+			ctx := contextx.NewContext()
 			for k, v := range tc.ctx {
-				ctx.Set(k, v)
+				ctx.WithValue(k, v)
 			}
 
 			result, matched := m.Match(ctx)
@@ -891,7 +890,7 @@ func TestScenario_MiddlewareChain(t *testing.T) {
 
 	// 日志中间件
 	var logEntries []string
-	m.Use(func(ctx *Context, next func() (*Result, bool)) (*Result, bool) {
+	m.Use(func(ctx *contextx.Context, next func() (*Result, bool)) (*Result, bool) {
 		start := time.Now()
 		result, matched := next()
 		duration := time.Since(start)
@@ -901,8 +900,8 @@ func TestScenario_MiddlewareChain(t *testing.T) {
 
 	// 鉴权中间件
 	var authChecks atomic.Int64
-	m.Use(func(ctx *Context, next func() (*Result, bool)) (*Result, bool) {
-		if !ctx.SafeGetBool("authenticated") {
+	m.Use(func(ctx *contextx.Context, next func() (*Result, bool)) (*Result, bool) {
+		if !ctx.GetBool("authenticated") {
 			authChecks.Add(1)
 			return nil, false
 		}
@@ -911,8 +910,8 @@ func TestScenario_MiddlewareChain(t *testing.T) {
 
 	// 限流中间件
 	var rateLimitHits atomic.Int64
-	m.Use(func(ctx *Context, next func() (*Result, bool)) (*Result, bool) {
-		if ctx.SafeGetBool("rate_limited") {
+	m.Use(func(ctx *contextx.Context, next func() (*Result, bool)) (*Result, bool) {
+		if ctx.GetBool("rate_limited") {
 			rateLimitHits.Add(1)
 			return nil, false
 		}
@@ -921,12 +920,12 @@ func TestScenario_MiddlewareChain(t *testing.T) {
 
 	m.AddRule(
 		NewChainRule(&Result{Value: "success"}).
-			When(func(ctx *Context) bool { return true }).
+			When(func(ctx *contextx.Context) bool { return true }).
 			WithPriority(10),
 	)
 
 	// 测试未认证
-	ctx1 := NewContext().Set("authenticated", false)
+	ctx1 := contextx.NewContext().WithValue("authenticated", false)
 	_, matched := m.Match(ctx1)
 	if matched {
 		t.Error("Should not match when not authenticated")
@@ -936,9 +935,8 @@ func TestScenario_MiddlewareChain(t *testing.T) {
 	}
 
 	// 测试限流
-	ctx2 := NewContext().
-		Set("authenticated", true).
-		Set("rate_limited", true)
+	ctx2 := contextx.NewContext().WithValue("authenticated", true)
+	ctx2 = ctx2.WithValue("rate_limited", true)
 	_, matched = m.Match(ctx2)
 	if matched {
 		t.Error("Should not match when rate limited")
@@ -948,7 +946,7 @@ func TestScenario_MiddlewareChain(t *testing.T) {
 	}
 
 	// 测试成功
-	ctx3 := NewContext().Set("authenticated", true)
+	ctx3 := contextx.NewContext().WithValue("authenticated", true)
 	result, matched := m.Match(ctx3)
 	if !matched {
 		t.Error("Should match when authenticated")
@@ -980,7 +978,7 @@ func TestScenario_CacheInvalidation(t *testing.T) {
 			WithPriority(10),
 	)
 
-	ctx := NewContext().Set("key", "config")
+	ctx := contextx.NewContext().WithValue("key", "config")
 
 	// 第一次匹配 - 缓存未命中
 	result1, _ := m.Match(ctx)
@@ -1063,7 +1061,7 @@ func TestScenario_ExtremePressure(t *testing.T) {
 			for j := 0; j < iterationsPerGoroutine; j++ {
 				// 随机选择一个 ID
 				targetID := (goroutineID*iterationsPerGoroutine + j) % ruleCount
-				ctx := NewContext().Set("id", fmt.Sprintf("id_%d", targetID))
+				ctx := contextx.NewContext().WithValue("id", fmt.Sprintf("id_%d", targetID))
 
 				result, matched := m.Match(ctx)
 				totalOps.Add(1)

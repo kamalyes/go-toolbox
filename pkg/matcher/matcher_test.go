@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kamalyes/go-toolbox/pkg/contextx"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -44,7 +45,7 @@ func TestBasicMatch(t *testing.T) {
 	)
 
 	// 测试匹配
-	ctx := NewContext().Set("role", "admin")
+	ctx := contextx.NewContext().WithValue("role", "admin")
 	result, ok := m.Match(ctx)
 
 	assert.True(t, ok, "Expected match but got none")
@@ -86,7 +87,7 @@ func TestConcurrentMatch(t *testing.T) {
 			defer wg.Done()
 
 			for i := 0; i < iterations; i++ {
-				ctx := NewContext().Set("key", fmt.Sprintf("value-%d", i%100))
+				ctx := contextx.NewContext().WithValue("key", fmt.Sprintf("value-%d", i%100))
 				result, ok := m.Match(ctx)
 
 				if ok {
@@ -148,7 +149,7 @@ func TestConcurrentAddAndMatch(t *testing.T) {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-			ctx := NewContext().Set("id", fmt.Sprintf("id-%d", id%addGoroutines))
+			ctx := contextx.NewContext().WithValue("id", fmt.Sprintf("id-%d", id%addGoroutines))
 			if _, ok := m.Match(ctx); ok {
 				matchSuccess.Add(1)
 			}
@@ -179,7 +180,7 @@ func TestMatchWithCache(t *testing.T) {
 			WithPriority(100),
 	)
 
-	ctx := NewContext().Set("key", "value")
+	ctx := contextx.NewContext().WithValue("key", "value")
 
 	// 第一次匹配（缓存未命中）
 	result1, ok1 := m.Match(ctx)
@@ -213,16 +214,16 @@ func TestConcurrentCacheAccess(t *testing.T) {
 	// 添加规则，计数调用次数
 	m.AddRule(
 		NewChainRule(&Result{Count: int(callCount.Add(1))}).
-			When(func(ctx *Context) bool {
+			When(func(ctx *contextx.Context) bool {
 				callCount.Add(1)
-				return ctx.GetString("key") == "test"
+				return contextx.Get[string](ctx, "key") == "test"
 			}).
 			WithPriority(100),
 	)
 
 	const goroutines = 1000
 	var wg sync.WaitGroup
-	ctx := NewContext().Set("key", "test")
+	ctx := contextx.NewContext().WithValue("key", "test")
 
 	start := time.Now()
 
@@ -260,9 +261,9 @@ func TestMiddleware(t *testing.T) {
 	var middlewareCalls atomic.Int64
 
 	// 添加中间件
-	m.Use(func(ctx *Context, next func() (*Result, bool)) (*Result, bool) {
+	m.Use(func(ctx *contextx.Context, next func() (*Result, bool)) (*Result, bool) {
 		middlewareCalls.Add(1)
-		ctx.SetMetadata("middleware", "called")
+		ctx.WithMetadata("middleware", "called")
 		return next()
 	})
 
@@ -272,7 +273,7 @@ func TestMiddleware(t *testing.T) {
 			WithPriority(100),
 	)
 
-	ctx := NewContext().Set("key", "value")
+	ctx := contextx.NewContext().WithValue("key", "value")
 	result, ok := m.Match(ctx)
 
 	assert.True(t, ok, "Match failed")
@@ -291,7 +292,7 @@ func TestContextTimeout(t *testing.T) {
 
 	m.AddRule(
 		NewChainRule(&Result{Value: "test"}).
-			When(func(ctx *Context) bool {
+			When(func(ctx *contextx.Context) bool {
 				// 模拟慢速匹配
 				time.Sleep(100 * time.Millisecond)
 				return true
@@ -299,8 +300,8 @@ func TestContextTimeout(t *testing.T) {
 			WithPriority(100),
 	)
 
-	ctx := NewContext().
-		Set("key", "value").
+	ctx := contextx.NewContext().
+		WithValue("key", "value").
 		WithTimeout(10 * time.Millisecond)
 
 	time.Sleep(20 * time.Millisecond)
@@ -320,23 +321,23 @@ func TestPriority(t *testing.T) {
 	// 添加不同优先级的规则
 	m.AddRule(
 		NewChainRule(&Result{Priority: 10}).
-			When(func(*Context) bool { return true }).
+			When(func(*contextx.Context) bool { return true }).
 			WithPriority(10),
 	)
 
 	m.AddRule(
 		NewChainRule(&Result{Priority: 100}).
-			When(func(*Context) bool { return true }).
+			When(func(*contextx.Context) bool { return true }).
 			WithPriority(100),
 	)
 
 	m.AddRule(
 		NewChainRule(&Result{Priority: 50}).
-			When(func(*Context) bool { return true }).
+			When(func(*contextx.Context) bool { return true }).
 			WithPriority(50),
 	)
 
-	ctx := NewContext()
+	ctx := contextx.NewContext()
 	result, ok := m.Match(ctx)
 
 	assert.True(t, ok, "Match failed")
@@ -362,7 +363,7 @@ func BenchmarkMatch(b *testing.B) {
 		)
 	}
 
-	ctx := NewContext().Set("key", "value-50")
+	ctx := contextx.NewContext().WithValue("key", "value-50")
 
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
@@ -389,7 +390,7 @@ func BenchmarkMatchWithCache(b *testing.B) {
 		)
 	}
 
-	ctx := NewContext().Set("key", "value-50")
+	ctx := contextx.NewContext().WithValue("key", "value-50")
 
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
@@ -428,7 +429,7 @@ func BenchmarkConcurrentAddAndMatch(b *testing.B) {
 						WithPriority(i),
 				)
 			} else {
-				ctx := NewContext().Set("id", fmt.Sprintf("id-%d", i%50))
+				ctx := contextx.NewContext().WithValue("id", fmt.Sprintf("id-%d", i%50))
 				m.Match(ctx)
 			}
 			i++
@@ -474,7 +475,7 @@ func TestStressTest(t *testing.T) {
 			defer wg.Done()
 
 			for i := 0; i < numIterations; i++ {
-				ctx := NewContext().Set("key", fmt.Sprintf("value-%d", i%numRules))
+				ctx := contextx.NewContext().WithValue("key", fmt.Sprintf("value-%d", i%numRules))
 				if _, ok := m.Match(ctx); ok {
 					successOps.Add(1)
 				}
