@@ -963,3 +963,117 @@ func TestIfDoAsyncWithTimeoutVariadicParams(t *testing.T) {
 		assert.Equal(t, 42, result)
 	})
 }
+
+// ============================================================================
+// Numerical Comparison Functions Tests (数值比较函数测试)
+// ============================================================================
+
+func TestIfGt(t *testing.T) {
+	// 测试大于条件为真
+	result := IfGt(10, 5, "greater", "not greater")
+	assert.Equal(t, "greater", result)
+
+	// 测试大于条件为假
+	result = IfGt(3, 5, "greater", "not greater")
+	assert.Equal(t, "not greater", result)
+
+	// 测试相等情况（不大于）
+	result = IfGt(5, 5, "greater", "not greater")
+	assert.Equal(t, "not greater", result)
+
+	// 测试浮点数
+	floatResult := IfGt(3.14, 2.5, 100, 0)
+	assert.Equal(t, 100, floatResult)
+}
+
+func TestIfGe(t *testing.T) {
+	// 测试大于等于条件为真（大于）
+	result := IfGe(10, 5, "yes", "no")
+	assert.Equal(t, "yes", result)
+
+	// 测试大于等于条件为真（等于）
+	result = IfGe(10, 10, "yes", "no")
+	assert.Equal(t, "yes", result)
+
+	// 测试大于等于条件为假
+	result = IfGe(9, 10, "yes", "no")
+	assert.Equal(t, "no", result)
+}
+
+func TestIfLt(t *testing.T) {
+	// 测试小于条件为真
+	result := IfLt(3, 5, "less", "not less")
+	assert.Equal(t, "less", result)
+
+	// 测试小于条件为假
+	result = IfLt(7, 5, "less", "not less")
+	assert.Equal(t, "not less", result)
+
+	// 测试相等情况（不小于）
+	result = IfLt(5, 5, "less", "not less")
+	assert.Equal(t, "not less", result)
+
+	// 测试负数
+	intResult := IfLt(-10, 0, true, false)
+	assert.True(t, intResult)
+}
+
+func TestIfLe(t *testing.T) {
+	// 测试小于等于条件为真（小于）
+	result := IfLe(3, 5, "yes", "no")
+	assert.Equal(t, "yes", result)
+
+	// 测试小于等于条件为真（等于）
+	result = IfLe(5, 5, "yes", "no")
+	assert.Equal(t, "yes", result)
+
+	// 测试小于等于条件为假
+	result = IfLe(6, 5, "yes", "no")
+	assert.Equal(t, "no", result)
+}
+
+func TestIfEq(t *testing.T) {
+	// 测试相等条件为真（数值）
+	result := IfEq(5, 5, "equal", "not equal")
+	assert.Equal(t, "equal", result)
+
+	// 测试相等条件为假（数值）
+	result = IfEq(5, 3, "equal", "not equal")
+	assert.Equal(t, "not equal", result)
+
+	// 测试字符串相等
+	strResult := IfEq("hello", "hello", true, false)
+	assert.True(t, strResult)
+
+	// 测试字符串不相等
+	strResult = IfEq("hello", "world", true, false)
+	assert.False(t, strResult)
+}
+
+func TestIfNe(t *testing.T) {
+	// 测试不等于条件为真
+	result := IfNe(5, 3, "different", "same")
+	assert.Equal(t, "different", result)
+
+	// 测试不等于条件为假
+	result = IfNe(5, 5, "different", "same")
+	assert.Equal(t, "same", result)
+
+	// 测试布尔值
+	boolResult := IfNe(true, false, "yes", "no")
+	assert.Equal(t, "yes", boolResult)
+}
+
+func TestNumericalComparisonCombination(t *testing.T) {
+	// 测试组合使用
+	age := 25
+	category := IfLt(age, 18, "child", IfLt(age, 60, "adult", "senior"))
+	assert.Equal(t, "adult", category)
+
+	// 测试范围检查
+	score := 85
+	grade := IfGe(score, 90, "A",
+		IfGe(score, 80, "B",
+			IfGe(score, 70, "C", "F")))
+	assert.Equal(t, "B", grade)
+}

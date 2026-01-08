@@ -657,7 +657,7 @@ func (d *Delayer[T]) executeTask(index int) error {
 	defer d.putExecutionContext(ctx)
 
 	ctx.Index = index
-	ctx.Attempt = 0
+	ctx.Attempt = index
 	ctx.StartTime = time.Now()
 	ctx.Strategy = d.strategy
 	ctx.Concurrent = d.concurrent

@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-12-28 00:00:00
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-12-28 00:00:00 10:00:00
+ * @LastEditTime: 2026-01-08 15:27:17
  * @FilePath: \go-toolbox\pkg\syncx\recover.go
  * @Description: 统一的 panic 恢复处理
  *
@@ -73,7 +73,7 @@ func MustRecover(handler RecoverFunc) {
 //
 //	func example() (err error) {
 //	    defer RecoverToError(&err, nil)
-//	    // 可能会 panic 的代码
+//	    可能会 panic 的代码
 //	    return nil
 //	}
 func RecoverToError(err *error, handler RecoverFunc) {
@@ -88,6 +88,41 @@ func RecoverToError(err *error, handler RecoverFunc) {
 				*err = &panicError{value: r}
 			}
 		}
+	}
+}
+
+// RecoverAndHandle 恢复 panic 并在 defer 中处理错误
+// 用于需要在同一个 defer 中完成 panic 恢复和错误处理的场景
+//
+// 示例:
+//
+//	func example() error {
+//	    var err error
+//	    defer RecoverAndHandle(&err,
+//	        func(r interface{}) { log.Error("panic", r) },  // panic handler
+//	        func(e error) { log.Error("error", e) })        // error handler
+//
+//	    err = doSomething()
+//	    return err
+//	}
+func RecoverAndHandle(err *error, panicHandler RecoverFunc, errorHandler func(error)) {
+	// 先恢复 panic
+	if r := recover(); r != nil {
+		if panicHandler != nil {
+			panicHandler(r)
+		}
+		if err != nil {
+			if e, ok := r.(error); ok {
+				*err = e
+			} else {
+				*err = &panicError{value: r}
+			}
+		}
+	}
+
+	// 再处理错误（无论是 panic 转换的还是正常返回的）
+	if err != nil && *err != nil && errorHandler != nil {
+		errorHandler(*err)
 	}
 }
 

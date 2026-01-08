@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-12-28 00:00:00
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-12-28 00:00:00 09:09:21
+ * @LastEditTime: 2026-01-07 18:15:02
  * @FilePath: \go-toolbox\pkg\syncx\state_machine_test.go
  * @Description: 状态机测试
  *
@@ -222,6 +222,111 @@ func TestStateMachine_WithAllowAnyTransition(t *testing.T) {
 	err := sm.TransitionTo(StateConnected)
 	assert.NoError(t, err)
 	assert.Equal(t, StateConnected, sm.CurrentState())
+}
+
+func TestStateMachine_WithTrackHistory(t *testing.T) {
+	sm := NewStateMachine(StateDisconnected,
+		WithTrackHistory[ConnectionState](10),
+		WithTimeFormat[ConnectionState]("2006-01-02 15:04:05"),
+	)
+	sm.AllowTransition(StateDisconnected, StateConnecting)
+	sm.AllowTransition(StateConnecting, StateConnected)
+
+	assert.True(t, sm.IsTrackingHistory())
+	assert.Equal(t, 0, sm.GetHistoryCount())
+
+	_ = sm.TransitionTo(StateConnecting)
+	_ = sm.TransitionTo(StateConnected)
+
+	assert.Equal(t, 2, sm.GetHistoryCount())
+
+	history := sm.GetHistory()
+	assert.Equal(t, 2, len(history))
+	assert.Equal(t, StateDisconnected, history[0].From)
+	assert.Equal(t, StateConnecting, history[0].To)
+	assert.Equal(t, StateConnecting, history[1].From)
+	assert.Equal(t, StateConnected, history[1].To)
+}
+
+func TestStateMachine_GetRecentHistory(t *testing.T) {
+	sm := NewStateMachine(StateDisconnected, WithTrackHistory[ConnectionState](10))
+	sm.AllowTransition(StateDisconnected, StateConnecting)
+	sm.AllowTransition(StateConnecting, StateConnected)
+	sm.AllowTransition(StateConnected, StateDisconnected)
+
+	_ = sm.TransitionTo(StateConnecting)
+	_ = sm.TransitionTo(StateConnected)
+	_ = sm.TransitionTo(StateDisconnected)
+
+	recent := sm.GetRecentHistory(2)
+	assert.Equal(t, 2, len(recent))
+	assert.Equal(t, StateConnecting, recent[0].From)
+	assert.Equal(t, StateConnected, recent[0].To)
+}
+
+func TestStateMachine_GetHistoryString(t *testing.T) {
+	sm := NewStateMachine(StateDisconnected,
+		WithTrackHistory[ConnectionState](10),
+		WithTimeFormat[ConnectionState]("2006-01-02 15:04:05"),
+	)
+	sm.AllowTransition(StateDisconnected, StateConnecting)
+	sm.AllowTransition(StateConnecting, StateConnected)
+
+	_ = sm.TransitionTo(StateConnecting)
+	_ = sm.TransitionTo(StateConnected)
+
+	historyStr := sm.GetHistoryString()
+	assert.NotEmpty(t, historyStr)
+	assert.Contains(t, historyStr, "disconnected -> connecting")
+	assert.Contains(t, historyStr, "connecting -> connected")
+
+	// 打印历史记录查看效果
+	t.Logf("状态转换历史:\n%s", historyStr)
+}
+
+func TestStateMachine_GetRecentHistoryString(t *testing.T) {
+	sm := NewStateMachine(StateDisconnected, WithTrackHistory[ConnectionState](10))
+	sm.AllowTransition(StateDisconnected, StateConnecting)
+	sm.AllowTransition(StateConnecting, StateConnected)
+	sm.AllowTransition(StateConnected, StateDisconnected)
+
+	_ = sm.TransitionTo(StateConnecting)
+	_ = sm.TransitionTo(StateConnected)
+	_ = sm.TransitionTo(StateDisconnected)
+
+	recentStr := sm.GetRecentHistoryString(1)
+	assert.NotEmpty(t, recentStr)
+	assert.Contains(t, recentStr, "connected -> disconnected")
+	assert.NotContains(t, recentStr, "disconnected -> connecting")
+}
+
+func TestStateMachine_ClearHistory(t *testing.T) {
+	sm := NewStateMachine(StateDisconnected, WithTrackHistory[ConnectionState](10))
+	sm.AllowTransition(StateDisconnected, StateConnecting)
+
+	_ = sm.TransitionTo(StateConnecting)
+	assert.Equal(t, 1, sm.GetHistoryCount())
+
+	sm.ClearHistory()
+	assert.Equal(t, 0, sm.GetHistoryCount())
+	assert.Empty(t, sm.GetHistoryString())
+}
+
+func TestStateMachine_MaxHistory(t *testing.T) {
+	sm := NewStateMachine(StateDisconnected, WithTrackHistory[ConnectionState](2))
+	sm.AllowTransition(StateDisconnected, StateConnecting)
+	sm.AllowTransition(StateConnecting, StateConnected)
+	sm.AllowTransition(StateConnected, StateDisconnected)
+
+	_ = sm.TransitionTo(StateConnecting)
+	_ = sm.TransitionTo(StateConnected)
+	_ = sm.TransitionTo(StateDisconnected)
+
+	// 最多保留2条记录
+	assert.Equal(t, 2, sm.GetHistoryCount())
+	history := sm.GetHistory()
+	assert.Equal(t, StateConnecting, history[0].From) // 最旧的记录被移除
+	assert.Equal(t, StateConnected, history[0].To)
 }
 
 func TestStateMachine_ConcurrentAccess(t *testing.T) {

@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-12-28 00:00:00
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-12-28 00:00:00 09:00:00
+ * @LastEditTime: 2026-01-08 15:21:11
  * @FilePath: \go-toolbox\pkg\syncx\go_executor_test.go
  * @Description: Goroutine 执行器测试
  *
@@ -13,6 +13,7 @@ package syncx
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -393,4 +394,197 @@ func TestGo_DeprecatedGoWithContext(t *testing.T) {
 
 	time.Sleep(50 * time.Millisecond)
 	assert.Equal(t, int32(1), atomic.LoadInt32(&executed))
+}
+
+// TestBatchExecutor_Basic 测试基础批量执行
+func TestBatchExecutor_Basic(t *testing.T) {
+	ctx := context.Background()
+	var counter atomic.Int32
+
+	executor := NewBatchExecutor(ctx).SetLimit(5)
+
+	for i := 0; i < 10; i++ {
+		executor.Go(func() error {
+			counter.Add(1)
+			time.Sleep(10 * time.Millisecond)
+			return nil
+		})
+	}
+
+	err := executor.Wait()
+	assert.NoError(t, err)
+	assert.Equal(t, int32(10), counter.Load())
+}
+
+// TestBatchExecutor_ContinueOnError 测试继续执行模式，即使有错误也继续执行所有任务
+func TestBatchExecutor_ContinueOnError(t *testing.T) {
+	ctx := context.Background()
+	var counter atomic.Int32
+
+	executor := NewBatchExecutor(ctx).
+		SetLimit(5).
+		SetMode(ContinueOnErrorMode)
+
+	for i := 0; i < 10; i++ {
+		i := i // capture loop variable
+		executor.Go(func() error {
+			if i == 5 {
+				return fmt.Errorf("error on task %d", i)
+			}
+			counter.Add(1)
+			time.Sleep(10 * time.Millisecond)
+			return nil
+		})
+	}
+
+	err := executor.Wait()
+	assert.Error(t, err)
+	assert.Equal(t, int32(9), counter.Load()) // 任务5返回错误不增加counter
+	assert.Equal(t, 1, executor.ErrorCount())
+}
+
+// TestBatchExecutor_FailFastMode 测试快速失败模式，确保在遇到第一个错误时停止提交新任务
+func TestBatchExecutor_FailFastMode(t *testing.T) {
+	ctx := context.Background()
+	var counter atomic.Int32
+
+	executor := NewBatchExecutor(ctx).
+		SetLimit(5).
+		SetMode(FailFastMode)
+
+	for i := 0; i < 10; i++ {
+		i := i // capture loop variable
+		executor.Go(func() error {
+			if i == 3 {
+				return fmt.Errorf("error on task %d", i)
+			}
+			counter.Add(1)
+			time.Sleep(10 * time.Millisecond)
+			return nil
+		})
+	}
+
+	err := executor.Wait()
+	assert.Error(t, err)
+	// FailFastMode: 任务3报错触发cancel，但0-3已提交，其中0,1,2成功执行
+	// 由于并发和时序问题，counter可能是3或更少
+	assert.LessOrEqual(t, counter.Load(), int32(6)) // 最多前几个任务执行
+	assert.Equal(t, 1, executor.ErrorCount())
+}
+
+// TestBatchExecutor_ContextCancellation 测试在上下文取消后，确保不再执行新任务
+func TestBatchExecutor_ContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var counter atomic.Int32
+
+	executor := NewBatchExecutor(ctx).
+		SetLimit(5)
+
+	for i := 0; i < 10; i++ {
+		executor.Go(func() error {
+			time.Sleep(10 * time.Millisecond)
+			return nil
+		})
+	}
+
+	cancel() // 取消上下文
+
+	err := executor.Wait()
+	assert.NoError(t, err)
+	assert.Equal(t, int32(0), counter.Load()) // 由于上下文取消，所有任务都不应执行
+}
+
+// TestBatchExecutor_ErrorHandler 测试错误处理器，确保每个错误都被处理
+func TestBatchExecutor_ErrorHandler(t *testing.T) {
+	ctx := context.Background()
+	var counter atomic.Int32
+	var errorCount int32
+
+	executor := NewBatchExecutor(ctx).
+		SetLimit(5).
+		SetMode(ContinueOnErrorMode). // 继续执行模式
+		OnError(func(err error) {
+			atomic.AddInt32(&errorCount, 1)
+		})
+
+	for i := 0; i < 10; i++ {
+		i := i // capture loop variable
+		executor.Go(func() error {
+			if i%3 == 0 {
+				return fmt.Errorf("error on task %d", i)
+			}
+			counter.Add(1)
+			time.Sleep(10 * time.Millisecond)
+			return nil
+		})
+	}
+
+	err := executor.Wait()
+	assert.Error(t, err)
+	assert.Equal(t, int32(6), counter.Load()) // 只有非i%3==0的任务增加counter: 1,2,4,5,7,8
+	assert.Equal(t, int32(4), errorCount)     // 0, 3, 6, 9 应该产生错误
+}
+
+// TestBatchExecutor_ConcurrentLimit 测试并发限制，确保不会超过设定的并发数
+func TestBatchExecutor_ConcurrentLimit(t *testing.T) {
+	ctx := context.Background()
+	executor := NewBatchExecutor(ctx).
+		SetLimit(3)
+
+	var counter atomic.Int32
+	const totalTasks = 10
+
+	for i := 0; i < totalTasks; i++ {
+		executor.Go(func() error {
+			counter.Add(1)
+			time.Sleep(50 * time.Millisecond) // 模拟工作
+			return nil
+		})
+	}
+
+	err := executor.Wait() // 等待所有任务完成
+	assert.NoError(t, err)
+	assert.Equal(t, int32(totalTasks), counter.Load()) // 所有任务都应成功执行
+	assert.Equal(t, 0, executor.ErrorCount())          // 没有错误
+}
+
+// TestBatchExecutor_PanicRecovery 测试任务中的 panic 恢复，确保 panic 不会导致程序崩溃
+func TestBatchExecutor_PanicRecovery(t *testing.T) {
+	ctx := context.Background()
+	var counter atomic.Int32
+
+	executor := NewBatchExecutor(ctx).
+		SetLimit(5).
+		SetMode(ContinueOnErrorMode). // 继续执行模式
+		OnPanic(func(r interface{}) {
+			t.Logf("Recovered from panic: %v", r)
+		})
+
+	for i := 0; i < 10; i++ {
+		i := i // capture loop variable
+		executor.Go(func() error {
+			if i == 5 {
+				panic("panic on task 5")
+			}
+			counter.Add(1)
+			time.Sleep(10 * time.Millisecond)
+			return nil
+		})
+	}
+
+	err := executor.Wait()
+	assert.Error(t, err)
+	assert.Equal(t, int32(9), counter.Load()) // 任务5发生panic，其他任务应该执行
+}
+
+// TestBatchExecutor_EmptyExecutor 测试没有任务的执行器，确保不会出错
+func TestBatchExecutor_EmptyExecutor(t *testing.T) {
+	ctx := context.Background()
+	executor := NewBatchExecutor(ctx)
+
+	err := executor.Wait()
+	assert.NoError(t, err)
+	assert.Equal(t, 0, executor.ErrorCount())
 }

@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-12-28 00:00:00
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-12-28 00:00:00 00:00:00
+ * @LastEditTime: 2025-12-28 00:00:00
  * @FilePath: \go-toolbox\pkg\types\enum.go
  * @Description: 枚举类型验证器
  *

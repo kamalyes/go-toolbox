@@ -59,9 +59,8 @@ func (s *StringX) TrimEndChain() *StringX {
 
 // CleanEmpty 清除空白串
 func CleanEmpty(str string) string {
-	strRune := []rune(str)
 	var newRune []rune
-	for _, r := range strRune {
+	for _, r := range str {
 		if r != ' ' {
 			newRune = append(newRune, r)
 		}
@@ -72,5 +71,19 @@ func CleanEmpty(str string) string {
 // CleanEmptyChain 清除空白串（链式调用）
 func (s *StringX) CleanEmptyChain() *StringX {
 	s.value = CleanEmpty(s.value)
+	return s
+}
+
+// TrimProtocol 移除URL的协议前缀 (支持 http://, https://, ftp://, ws://, wss://, file:// 等所有协议)，并移除尾部空格
+func TrimProtocol(url string) string {
+	if idx := strings.Index(url, "://"); idx != -1 {
+		return strings.TrimSpace(url[idx+3:])
+	}
+	return strings.TrimSpace(url)
+}
+
+// TrimProtocolChain 移除URL的协议前缀（链式调用）
+func (s *StringX) TrimProtocolChain() *StringX {
+	s.value = TrimProtocol(s.value)
 	return s
 }

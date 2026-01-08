@@ -49,7 +49,6 @@ package retry
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -293,12 +292,8 @@ func doRetryWithCondition(ctx context.Context, attemptCount int, interval, maxIn
 		case <-ctx.Done():
 			return ctx.Err() // 如果上下文被取消，返回错误
 		default:
-			// 捕获 panic
-			defer func() {
-				if r := recover(); r != nil {
-					err = fmt.Errorf("panic occurred: %v", r)
-				}
-			}()
+			// 捕获 panic（使用 syncx 封装）
+			defer syncx.RecoverToError(&err, nil)
 
 			if err = fn(); err == nil { // 执行传入的函数
 				if successCallFun != nil {

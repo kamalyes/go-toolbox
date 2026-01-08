@@ -21,6 +21,7 @@ func TestAllTrimFunctions(t *testing.T) {
 	t.Run("TestTrimStart", TestTrimStart)
 	t.Run("TestTrimEnd", TestTrimEnd)
 	t.Run("TestCleanEmpty", TestCleanEmpty)
+	t.Run("TestTrimProtocol", TestTrimProtocol)
 }
 
 // TestTrim tests the Trim function
@@ -78,4 +79,33 @@ func TestCleanEmpty(t *testing.T) {
 
 	// Test string without spaces
 	assert.Equal(t, "hello", CleanEmpty("hello"))
+}
+
+// TestTrimProtocol tests the TrimProtocol function
+func TestTrimProtocol(t *testing.T) {
+	tests := map[string]struct {
+		input    string
+		expected string
+	}{
+		"empty string":              {input: "", expected: ""},
+		"http protocol":             {input: "http://example.com", expected: "example.com"},
+		"https protocol":            {input: "https://example.com/path", expected: "example.com/path"},
+		"ftp protocol":              {input: "ftp://ftp.example.com", expected: "ftp.example.com"},
+		"ws protocol":               {input: "ws://example.com:8080", expected: "example.com:8080"},
+		"wss protocol":              {input: "wss://example.com/socket", expected: "example.com/socket"},
+		"file protocol":             {input: "file://path/to/file", expected: "path/to/file"},
+		"no protocol":               {input: "example.com", expected: "example.com"},
+		"no protocol with path":     {input: "example.com/path/to/page", expected: "example.com/path/to/page"},
+		"custom protocol":           {input: "custom://custom.example.com", expected: "custom.example.com"},
+		"http with trailing spaces": {input: "http://example.com  ", expected: "example.com"},
+		"https with leading spaces": {input: "https://  example.com", expected: "example.com"},
+		"no protocol with spaces":   {input: "  example.com  ", expected: "example.com"},
+		"protocol with both spaces": {input: "  https://example.com  ", expected: "example.com"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, TrimProtocol(tc.input))
+		})
+	}
 }

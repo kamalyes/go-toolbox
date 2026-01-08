@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-12-28 00:00:00
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-12-28 00:00:00 09:00:00
+ * @LastEditTime: 2026-01-08 15:25:26
  * @FilePath: \go-toolbox\pkg\syncx\go_executor.go
  * @Description: Goroutine 执行器 - 链式调用风格，集成 contextx
  *
@@ -47,6 +47,8 @@ package syncx
 
 import (
 	"context"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -312,4 +314,200 @@ func (g *GoExecutor) Wait(fn GoExecutorWaitFunc) error {
 	}()
 
 	return <-errChan
+}
+
+// BatchExecutorMode 批量执行器模式
+type BatchExecutorMode int
+
+const (
+	// FailFastMode 快速失败模式：遇到第一个错误立即停止提交新任务
+	FailFastMode BatchExecutorMode = iota
+	// ContinueOnErrorMode 继续执行模式：即使有错误也继续执行所有任务
+	ContinueOnErrorMode
+)
+
+// BatchExecutor 批量并发执行器，支持并发限制和两种错误处理模式
+// 所有方法都是并发安全的
+type BatchExecutor struct {
+	ctx       context.Context
+	cancel    context.CancelFunc
+	mode      BatchExecutorMode // 执行模式
+	limit     int
+	onPanic   GoExecutorPanicHandler
+	onError   GoExecutorErrorHandler
+	semaphore chan struct{}   // channel 天然并发安全
+	wg        sync.WaitGroup  // WaitGroup 并发安全
+	taskID    atomic.Int64    // 任务ID生成器
+	errMu     sync.RWMutex    // 保护 errors 的读写
+	errors    map[int64]error // 每个任务的错误映射 taskID -> error
+	firstErr  error           // 第一个错误（快速失败模式用）
+}
+
+// NewBatchExecutor 创建批量并发执行器（默认快速失败模式）
+//
+// 示例:
+//
+//	exec := NewBatchExecutor(ctx).
+//	    SetLimit(10).
+//	    SetMode(ContinueOnErrorMode).  // 可选：设置继续执行模式
+//	    OnPanic(func(r interface{}) { log.Error("panic", r) }).
+//	    OnError(func(err error) { log.Error(err) })
+//
+//	for _, item := range items {
+//	    exec.Go(func() error {
+//	        return processItem(item)
+//	    })
+//	}
+//
+//	err := exec.Wait()  // 快速失败模式返回第一个错误
+//	errors := exec.Errors()  // 获取所有错误映射
+func NewBatchExecutor(ctx context.Context) *BatchExecutor {
+	ctx, cancel := context.WithCancel(ctx)
+	return &BatchExecutor{
+		ctx:    ctx,
+		cancel: cancel,
+		mode:   FailFastMode, // 默认快速失败
+		errors: make(map[int64]error),
+	}
+}
+
+// SetLimit 设置最大并发数
+func (b *BatchExecutor) SetLimit(n int) *BatchExecutor {
+	b.limit = n
+	if n > 0 {
+		b.semaphore = make(chan struct{}, n)
+	}
+	return b
+}
+
+// SetMode 设置执行模式
+func (b *BatchExecutor) SetMode(mode BatchExecutorMode) *BatchExecutor {
+	b.mode = mode
+	return b
+}
+
+// OnPanic 设置 panic 处理器
+func (b *BatchExecutor) OnPanic(fn GoExecutorPanicHandler) *BatchExecutor {
+	b.onPanic = fn
+	return b
+}
+
+// OnError 设置错误处理器（每个错误都会调用）
+func (b *BatchExecutor) OnError(fn GoExecutorErrorHandler) *BatchExecutor {
+	b.onError = fn
+	return b
+}
+
+// Go 提交一个任务（并发安全）
+func (b *BatchExecutor) Go(fn func() error) {
+	// 快速失败模式：检查是否已有错误
+	if b.mode == FailFastMode {
+		select {
+		case <-b.ctx.Done():
+			return
+		default:
+		}
+	}
+
+	// 生成任务ID
+	taskID := b.taskID.Add(1)
+
+	// 限流控制（阻塞式）
+	if b.semaphore != nil {
+		select {
+		case b.semaphore <- struct{}{}:
+		case <-b.ctx.Done():
+			// 快速失败模式下，context 取消后不再执行
+			if b.mode == FailFastMode {
+				return
+			}
+		}
+	}
+
+	b.wg.Add(1)
+	go func() {
+		defer b.wg.Done()
+		if b.semaphore != nil {
+			defer func() { <-b.semaphore }()
+		}
+
+		// panic 恢复和错误处理（局部变量，无并发问题）
+		var err error
+		defer RecoverAndHandle(&err, b.onPanic, func(e error) {
+			// 统一处理错误（panic 转换的或正常返回的）
+			if b.onError != nil {
+				b.onError(e)
+			}
+
+			// 记录错误到 map
+			b.errMu.Lock()
+			b.errors[taskID] = e
+
+			// 记录第一个错误
+			if b.firstErr == nil {
+				b.firstErr = e
+				// 快速失败模式：取消 context
+				if b.mode == FailFastMode {
+					b.cancel()
+				}
+			}
+			b.errMu.Unlock()
+		})
+
+		// 二次检查 context（可能在等待 semaphore 期间被取消）
+		if b.mode == FailFastMode {
+			select {
+			case <-b.ctx.Done():
+				return
+			default:
+			}
+		}
+
+		// 执行任务
+		err = fn()
+	}()
+}
+
+// Wait 等待所有任务完成，返回第一个错误（并发安全）
+func (b *BatchExecutor) Wait() error {
+	b.wg.Wait()
+	b.cancel() // 确保 context 被取消
+
+	b.errMu.RLock()
+	err := b.firstErr
+	b.errMu.RUnlock()
+	return err
+}
+
+// Errors 获取所有错误映射（并发安全）
+// 返回 map[taskID]error，其中 taskID 是任务提交的顺序编号（从1开始）
+func (b *BatchExecutor) Errors() map[int64]error {
+	b.errMu.RLock()
+	defer b.errMu.RUnlock()
+
+	// 返回副本，避免外部修改
+	result := make(map[int64]error, len(b.errors))
+	for k, v := range b.errors {
+		result[k] = v
+	}
+	return result
+}
+
+// ErrorCount 获取错误总数（并发安全）
+func (b *BatchExecutor) ErrorCount() int {
+	b.errMu.RLock()
+	defer b.errMu.RUnlock()
+	return len(b.errors)
+}
+
+// HasErrors 检查是否有错误（并发安全）
+func (b *BatchExecutor) HasErrors() bool {
+	b.errMu.RLock()
+	defer b.errMu.RUnlock()
+	return len(b.errors) > 0
+}
+
+// Context 返回执行器的 context
+func (b *BatchExecutor) Context() context.Context {
+	return b.ctx
 }

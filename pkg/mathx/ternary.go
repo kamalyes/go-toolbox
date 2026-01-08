@@ -492,6 +492,37 @@ func IfNotNil[T any](val *T, defaultVal T) T {
 	return defaultVal
 }
 
+// DefaultIfNilPtr 如果参数为 nil，返回指向默认值的指针；否则返回原参数
+// 适用于需要保持指针类型的场景，如分页参数、配置对象等
+//
+// 示例：
+//
+//	基础类型示例
+//	var count *int
+//	count = mathx.DefaultIfNilPtr(count, 10)
+//	fmt.Println(*count) // 输出: 10
+//
+//	字符串示例
+//	var name *string
+//	name = mathx.DefaultIfNilPtr(name, "default")
+//	fmt.Println(*name) // 输出: default
+//
+//	结构体示例（分页参数）
+//	var page *PageReq
+//	page = mathx.DefaultIfNilPtr(page, PageReq{Page: 1, PageSize: 10})
+//	page 现在指向默认值
+//
+//	已存在的指针保持原值
+//	existing := &PageReq{Page: 2, PageSize: 20}
+//	result := mathx.DefaultIfNilPtr(existing, PageReq{Page: 1, PageSize: 10})
+//	result == existing (保持原值，Page=2, PageSize=20)
+func DefaultIfNilPtr[T any](param *T, defaultValue T) *T {
+	if param == nil {
+		return &defaultValue
+	}
+	return param
+}
+
 // IfNotEmpty 空字符串检查三元运算
 // 如果字符串非空，返回原字符串；否则返回默认值
 func IfNotEmpty(str string, defaultVal string) string {
@@ -936,6 +967,76 @@ func IfErrOrNil[T comparable, R any](val T, err error, trueVal, falseVal R) R {
 // 检查计数是否大于阈值
 func IfCountGt[R any](count, threshold int64, trueVal, falseVal R) R {
 	return IF(count > threshold, trueVal, falseVal)
+}
+
+// ============================================================================
+// Numerical Comparison Functions (数值比较函数)
+// ============================================================================
+
+// IfGt 大于比较三元运算
+// 如果 a > b，返回 trueVal；否则返回 falseVal
+//
+// 示例：
+//
+//	result := mathx.IfGt(10, 5, "greater", "not greater")  // "greater"
+//	result := mathx.IfGt(3, 5, "greater", "not greater")   // "not greater"
+func IfGt[T types.Numerical, R any](a, b T, trueVal, falseVal R) R {
+	return IF(a > b, trueVal, falseVal)
+}
+
+// IfGe 大于等于比较三元运算
+// 如果 a >= b，返回 trueVal；否则返回 falseVal
+//
+// 示例：
+//
+//	result := mathx.IfGe(10, 10, "yes", "no")  // "yes"
+//	result := mathx.IfGe(9, 10, "yes", "no")   // "no"
+func IfGe[T types.Numerical, R any](a, b T, trueVal, falseVal R) R {
+	return IF(a >= b, trueVal, falseVal)
+}
+
+// IfLt 小于比较三元运算
+// 如果 a < b，返回 trueVal；否则返回 falseVal
+//
+// 示例：
+//
+//	result := mathx.IfLt(3, 5, "less", "not less")  // "less"
+//	result := mathx.IfLt(7, 5, "less", "not less")  // "not less"
+func IfLt[T types.Numerical, R any](a, b T, trueVal, falseVal R) R {
+	return IF(a < b, trueVal, falseVal)
+}
+
+// IfLe 小于等于比较三元运算
+// 如果 a <= b，返回 trueVal；否则返回 falseVal
+//
+// 示例：
+//
+//	result := mathx.IfLe(5, 5, "yes", "no")  // "yes"
+//	result := mathx.IfLe(6, 5, "yes", "no")  // "no"
+func IfLe[T types.Numerical, R any](a, b T, trueVal, falseVal R) R {
+	return IF(a <= b, trueVal, falseVal)
+}
+
+// IfEq 等于比较三元运算
+// 如果 a == b，返回 trueVal；否则返回 falseVal
+//
+// 示例：
+//
+//	result := mathx.IfEq(5, 5, "equal", "not equal")  // "equal"
+//	result := mathx.IfEq(5, 3, "equal", "not equal")  // "not equal"
+func IfEq[T comparable, R any](a, b T, trueVal, falseVal R) R {
+	return IF(a == b, trueVal, falseVal)
+}
+
+// IfNe 不等于比较三元运算
+// 如果 a != b，返回 trueVal；否则返回 falseVal
+//
+// 示例：
+//
+//	result := mathx.IfNe(5, 3, "different", "same")  // "different"
+//	result := mathx.IfNe(5, 5, "different", "same")  // "same"
+func IfNe[T comparable, R any](a, b T, trueVal, falseVal R) R {
+	return IF(a != b, trueVal, falseVal)
 }
 
 // ============================================================================

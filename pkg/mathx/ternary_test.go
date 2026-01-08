@@ -878,6 +878,71 @@ func TestIfNotNilValue(t *testing.T) {
 	assert.Equal(t, "has value", IfNotNilValue(&value, "has value", "no value"))
 }
 
+func TestDefaultIfNilPtr(t *testing.T) {
+	tests := map[string]struct {
+		input        *int
+		defaultValue int
+		expectedVal  int
+		shouldBeNil  bool
+	}{
+		"nil pointer returns default": {
+			input:        nil,
+			defaultValue: 100,
+			expectedVal:  100,
+			shouldBeNil:  false,
+		},
+		"existing pointer returns original": {
+			input:        func() *int { v := 50; return &v }(),
+			defaultValue: 100,
+			expectedVal:  50,
+			shouldBeNil:  false,
+		},
+		"zero value pointer returns original": {
+			input:        func() *int { v := 0; return &v }(),
+			defaultValue: 100,
+			expectedVal:  0,
+			shouldBeNil:  false,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			result := DefaultIfNilPtr(tc.input, tc.defaultValue)
+
+			if tc.shouldBeNil {
+				assert.Nil(t, result)
+			} else {
+				assert.NotNil(t, result)
+				assert.Equal(t, tc.expectedVal, *result)
+			}
+		})
+	}
+}
+
+func TestDefaultIfNilPtrWithStruct(t *testing.T) {
+	type PageReq struct {
+		Page     int
+		PageSize int
+	}
+
+	defaultPage := PageReq{Page: 1, PageSize: 10}
+
+	// Test nil pointer
+	var nilPage *PageReq
+	result := DefaultIfNilPtr(nilPage, defaultPage)
+	assert.NotNil(t, result)
+	assert.Equal(t, 1, result.Page)
+	assert.Equal(t, 10, result.PageSize)
+
+	// Test existing pointer
+	existingPage := &PageReq{Page: 2, PageSize: 20}
+	result = DefaultIfNilPtr(existingPage, defaultPage)
+	assert.NotNil(t, result)
+	assert.Equal(t, 2, result.Page)
+	assert.Equal(t, 20, result.PageSize)
+	assert.Same(t, existingPage, result) // Should be the same pointer
+}
+
 func TestIfCEmpty(t *testing.T) {
 	tests := []struct {
 		name     string
