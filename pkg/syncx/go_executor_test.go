@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-12-28 00:00:00
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2026-01-08 15:21:11
+ * @LastEditTime: 2026-01-08 15:37:52
  * @FilePath: \go-toolbox\pkg\syncx\go_executor_test.go
  * @Description: Goroutine 执行器测试
  *
@@ -587,4 +587,339 @@ func TestBatchExecutor_EmptyExecutor(t *testing.T) {
 	err := executor.Wait()
 	assert.NoError(t, err)
 	assert.Equal(t, 0, executor.ErrorCount())
+}
+
+// MockItem 模拟退款项目
+type MockItem struct {
+	ID      int
+	TraceID string
+	UserID  string
+}
+
+// MockProcessor 模拟退款处理器
+type MockProcessor struct {
+	successCount atomic.Int64
+	failedCount  atomic.Int64
+	skippedCount atomic.Int64
+	panicCount   atomic.Int64
+	processDelay time.Duration
+	failOnID     int // 在哪个ID失败
+	panicOnID    int // 在哪个ID panic
+}
+
+// process 处理单个项目
+func (m *MockProcessor) process(item *MockItem) (*MockItem, error) {
+	if m.processDelay > 0 {
+		time.Sleep(m.processDelay)
+	}
+
+	// 模拟 panic
+	if m.panicOnID > 0 && item.ID == m.panicOnID {
+		m.panicCount.Add(1)
+		panic(fmt.Sprintf("模拟 panic at ID %d", item.ID))
+	}
+
+	// 模拟失败
+	if m.failOnID > 0 && item.ID == m.failOnID {
+		m.failedCount.Add(1)
+		return nil, fmt.Errorf("模拟失败 at ID %d", item.ID)
+	}
+
+	// 模拟跳过（ID是10的倍数）
+	if item.ID%10 == 0 {
+		m.skippedCount.Add(1)
+		return nil, nil
+	}
+
+	// 成功
+	m.successCount.Add(1)
+	return item, nil
+}
+
+// TestBatchExecutorRefund_NormalProcessing 测试正常批量处理
+func TestBatchExecutorRefund_NormalProcessing(t *testing.T) {
+	mock := &MockProcessor{
+		processDelay: 5 * time.Millisecond,
+	}
+
+	// 创建50个测试项目
+	items := make([]*MockItem, 50)
+	for i := 0; i < 50; i++ {
+		items[i] = &MockItem{
+			ID:      i,
+			TraceID: fmt.Sprintf("trace_%d", i),
+			UserID:  fmt.Sprintf("user_%d", i),
+		}
+	}
+
+	// 使用 BatchExecutor 处理
+	ctx := context.Background()
+	executor := NewBatchExecutor(ctx).
+		SetLimit(10).
+		SetMode(ContinueOnErrorMode)
+
+	for _, item := range items {
+		capturedItem := item
+		executor.Go(func() error {
+			result, err := mock.process(capturedItem)
+			if err != nil {
+				return err
+			}
+			if result == nil {
+				// 跳过
+			}
+			return nil
+		})
+	}
+
+	err := executor.Wait()
+	assert.NoError(t, err)
+
+	// 验证：ID为 0,10,20,30,40 的5个跳过，其余45个成功
+	assert.Equal(t, int64(45), mock.successCount.Load(), "成功数量")
+	assert.Equal(t, int64(5), mock.skippedCount.Load(), "跳过数量")
+	assert.Equal(t, int64(0), mock.failedCount.Load(), "失败数量")
+
+	t.Logf("✅ 正常处理 - 总数:50, 成功:%d, 跳过:%d",
+		mock.successCount.Load(), mock.skippedCount.Load())
+}
+
+// TestBatchExecutorRefund_FailFastMode 测试快速失败模式
+func TestBatchExecutorRefund_FailFastMode(t *testing.T) {
+	mock := &MockProcessor{
+		processDelay: 10 * time.Millisecond,
+		failOnID:     15, // 在ID=15时失败
+	}
+
+	// 创建30个测试项目
+	items := make([]*MockItem, 30)
+	for i := 0; i < 30; i++ {
+		items[i] = &MockItem{
+			ID:      i,
+			TraceID: fmt.Sprintf("trace_%d", i),
+		}
+	}
+
+	ctx := context.Background()
+	executor := NewBatchExecutor(ctx).
+		SetLimit(5).
+		SetMode(FailFastMode). // 快速失败
+		OnError(func(err error) {
+			t.Logf("捕获错误: %v", err)
+		})
+
+	for _, item := range items {
+		capturedItem := item
+		executor.Go(func() error {
+			_, err := mock.process(capturedItem)
+			if err != nil {
+				return fmt.Errorf("处理失败 ID=%d: %w", capturedItem.ID, err)
+			}
+			return nil
+		})
+	}
+
+	err := executor.Wait()
+	assert.Error(t, err, "应该返回错误")
+	assert.Contains(t, err.Error(), "模拟失败", "错误信息")
+
+	totalProcessed := mock.successCount.Load() + mock.failedCount.Load() + mock.skippedCount.Load()
+	t.Logf("⚡ 快速失败 - 提交:%d, 实际处理:%d, 成功:%d, 失败:%d, 跳过:%d",
+		len(items), totalProcessed, mock.successCount.Load(), mock.failedCount.Load(), mock.skippedCount.Load())
+
+	// 快速失败模式下，处理的任务数应该远小于总数
+	assert.Less(t, totalProcessed, int64(len(items)), "快速失败应停止提交新任务")
+	assert.Equal(t, int64(1), mock.failedCount.Load(), "应该有1个失败")
+}
+
+// TestBatchExecutorRefund_PanicRecovery 测试 panic 恢复
+func TestBatchExecutorRefund_PanicRecovery(t *testing.T) {
+	mock := &MockProcessor{
+		processDelay: 5 * time.Millisecond,
+		panicOnID:    12, // 在ID=12时 panic
+	}
+
+	items := make([]*MockItem, 25)
+	for i := 0; i < 25; i++ {
+		items[i] = &MockItem{
+			ID:      i,
+			TraceID: fmt.Sprintf("trace_%d", i),
+		}
+	}
+
+	ctx := context.Background()
+	var panicRecovered bool
+	executor := NewBatchExecutor(ctx).
+		SetLimit(5).
+		SetMode(FailFastMode).
+		OnPanic(func(r interface{}) {
+			panicRecovered = true
+			t.Logf("🔥 捕获 panic: %v", r)
+		})
+
+	for _, item := range items {
+		capturedItem := item
+		executor.Go(func() error {
+			_, err := mock.process(capturedItem)
+			return err
+		})
+	}
+
+	err := executor.Wait()
+	assert.Error(t, err, "panic 应该被转换为 error")
+	assert.True(t, panicRecovered, "panic 应该被捕获")
+	assert.Equal(t, int64(1), mock.panicCount.Load(), "panic 次数")
+
+	t.Logf("🛡️ Panic 恢复 - panic次数:%d, 成功:%d",
+		mock.panicCount.Load(), mock.successCount.Load())
+}
+
+// TestBatchExecutorRefund_ConcurrentLimit 测试并发限制
+func TestBatchExecutorRefund_ConcurrentLimit(t *testing.T) {
+	mock := &MockProcessor{
+		processDelay: 50 * time.Millisecond,
+	}
+
+	items := make([]*MockItem, 20)
+	for i := 0; i < 20; i++ {
+		items[i] = &MockItem{ID: i}
+	}
+
+	start := time.Now()
+
+	ctx := context.Background()
+	executor := NewBatchExecutor(ctx).
+		SetLimit(4). // 限制并发为4
+		SetMode(ContinueOnErrorMode)
+
+	for _, item := range items {
+		capturedItem := item
+		executor.Go(func() error {
+			_, err := mock.process(capturedItem)
+			return err
+		})
+	}
+
+	err := executor.Wait()
+	assert.NoError(t, err)
+
+	elapsed := time.Since(start)
+
+	// 20个任务，每个50ms，并发4个：预期 (20/4) * 50ms = 250ms
+	t.Logf("⏱️  并发限制 - 耗时:%v, 成功:%d", elapsed, mock.successCount.Load())
+
+	assert.Greater(t, elapsed, 200*time.Millisecond, "并发限制应使总时间增加")
+	assert.Less(t, elapsed, 400*time.Millisecond, "不应该超时太多")
+}
+
+// TestBatchExecutorRefund_HealthCheckThenBatch 测试健康检查+批量处理模式（模拟真实场景）
+func TestBatchExecutorRefund_HealthCheckThenBatch(t *testing.T) {
+	mock := &MockProcessor{
+		processDelay: 5 * time.Millisecond,
+	}
+
+	// 创建100个项目
+	totalCount := 100
+	items := make([]*MockItem, totalCount)
+	for i := 0; i < totalCount; i++ {
+		items[i] = &MockItem{
+			ID:      i,
+			TraceID: fmt.Sprintf("trace_%d", i),
+		}
+	}
+
+	var (
+		successCount atomic.Int64
+		skippedCount atomic.Int64
+	)
+
+	// 1️⃣ 健康检查：先处理第一个
+	firstResult, firstErr := mock.process(items[0])
+	assert.NoError(t, firstErr, "健康检查应该成功")
+
+	if firstResult == nil {
+		skippedCount.Add(1)
+	} else {
+		successCount.Add(1)
+	}
+
+	if totalCount == 1 {
+		t.Skip("只有一条记录")
+	}
+
+	// 2️⃣ 批量处理剩余记录
+	ctx := context.Background()
+	executor := NewBatchExecutor(ctx).
+		SetLimit(10).
+		SetMode(FailFastMode).
+		OnPanic(func(r interface{}) {
+			t.Logf("panic: %v", r)
+		})
+
+	for i := 1; i < totalCount; i++ {
+		item := items[i]
+		executor.Go(func() error {
+			result, err := mock.process(item)
+			if err != nil {
+				return fmt.Errorf("处理失败 ID=%d: %w", item.ID, err)
+			}
+
+			if result == nil {
+				skippedCount.Add(1)
+			} else {
+				successCount.Add(1)
+			}
+			return nil
+		})
+	}
+
+	err := executor.Wait()
+	assert.NoError(t, err)
+
+	// 验证：0,10,20...90 共10个跳过，其余90个成功
+	assert.Equal(t, int64(90), successCount.Load(), "成功数量")
+	assert.Equal(t, int64(10), skippedCount.Load(), "跳过数量")
+
+	t.Logf("🎯 健康检查+批量 - 总数:%d, 成功:%d, 跳过:%d",
+		totalCount, successCount.Load(), skippedCount.Load())
+}
+
+// TestBatchExecutorRefund_ContinueOnErrorMode 测试继续执行模式
+func TestBatchExecutorRefund_ContinueOnErrorMode(t *testing.T) {
+	mock := &MockProcessor{
+		processDelay: 5 * time.Millisecond,
+		failOnID:     15, // 在ID=15时失败，但继续处理其他任务
+	}
+
+	items := make([]*MockItem, 30)
+	for i := 0; i < 30; i++ {
+		items[i] = &MockItem{ID: i}
+	}
+
+	ctx := context.Background()
+	executor := NewBatchExecutor(ctx).
+		SetLimit(5).
+		SetMode(ContinueOnErrorMode) // 继续执行模式
+
+	for _, item := range items {
+		capturedItem := item
+		executor.Go(func() error {
+			_, err := mock.process(capturedItem)
+			if err != nil {
+				return err // 虽然返回错误，但不会停止其他任务
+			}
+			return nil
+		})
+	}
+
+	err := executor.Wait()
+	assert.Error(t, err, "应该返回第一个错误")
+
+	// 继续执行模式：所有任务都应该被处理
+	totalProcessed := mock.successCount.Load() + mock.failedCount.Load() + mock.skippedCount.Load()
+	assert.Equal(t, int64(30), totalProcessed, "所有任务都应该被处理")
+	assert.Equal(t, int64(1), mock.failedCount.Load(), "应该有1个失败")
+
+	t.Logf("🔄 继续执行模式 - 总数:30, 实际处理:%d, 成功:%d, 失败:%d, 跳过:%d",
+		totalProcessed, mock.successCount.Load(), mock.failedCount.Load(), mock.skippedCount.Load())
 }
