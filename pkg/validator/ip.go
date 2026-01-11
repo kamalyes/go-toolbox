@@ -11,8 +11,10 @@
 package validator
 
 import (
+	"bytes"
 	"fmt"
 	"net"
+	"strings"
 )
 
 // IPBase IP验证器基类
@@ -27,25 +29,135 @@ func (b *IPBase) ValidateIP(ip string) error {
 	return nil
 }
 
-// checkIPInCIDR 检查 IP 是否在 CIDR 列表中
-func checkIPInCIDR(ip string, cidrList []string) bool {
+// MatchIPInList 检查 IP 是否匹配列表中的任一规则
+// 支持多种格式:
+// 1. 分隔符列表: 支持分号、逗号、换行符、空格分隔
+//   - "192.168.0.10;192.168.0.1"
+//   - "192.168.0.1,192.168.0.56"
+//   - "192.168.0.15\n192.168.0.1"
+//   - "192.168.0.15 192.168.0.17"
+//
+// 2. 精确匹配: "192.168.1.100"
+// 3. CIDR: "192.168.1.0/24"
+// 4. IP范围: "172.16.0.1-172.16.0.10"
+// 5. 通配符: "192.168.2.*" 或 "192.168.*.*"
+func MatchIPInList(ip string, ipList []string) bool {
 	clientIP := net.ParseIP(ip)
 	if clientIP == nil {
 		return false
 	}
 
-	for _, cidr := range cidrList {
-		// 精确匹配
-		if ip == cidr {
+	for _, pattern := range ipList {
+		// 1. 分隔符列表匹配 (支持分号、逗号、换行符、空格、Tab)
+		// 注意：如果包含 '-' 可能是 IP 范围，需要特殊处理
+		hasSeparator := strings.ContainsAny(pattern, ";,\n\t") ||
+			(strings.Contains(pattern, " ") && !strings.Contains(pattern, "-"))
+
+		if hasSeparator {
+			// 统一处理多种分隔符
+			pattern = strings.ReplaceAll(pattern, "\r\n", "\n")
+			pattern = strings.ReplaceAll(pattern, "\t", "\n")
+			pattern = strings.ReplaceAll(pattern, ";", "\n")
+			pattern = strings.ReplaceAll(pattern, ",", "\n")
+
+			// 按换行符分割
+			lines := strings.Split(pattern, "\n")
+			var subPatterns []string
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				if line == "" {
+					continue
+				}
+				// 如果行内还有空格，继续按空格分割
+				if strings.Contains(line, " ") {
+					parts := strings.Fields(line)
+					subPatterns = append(subPatterns, parts...)
+				} else {
+					subPatterns = append(subPatterns, line)
+				}
+			}
+
+			// 递归检查每个子模式
+			for _, subPattern := range subPatterns {
+				if subPattern == "" {
+					continue
+				}
+				if MatchIPInList(ip, []string{subPattern}) {
+					return true
+				}
+			}
+			continue
+		}
+		// 2. 精确匹配
+		if ip == pattern {
 			return true
 		}
-		// CIDR 格式匹配
-		_, ipNet, err := net.ParseCIDR(cidr)
+
+		// 3. CIDR 格式匹配
+		_, ipNet, err := net.ParseCIDR(pattern)
 		if err == nil && ipNet.Contains(clientIP) {
 			return true
 		}
+
+		// 4. IP范围匹配 (例如: "172.16.0.1-172.16.0.10")
+		if strings.Contains(pattern, "-") {
+			parts := strings.Split(pattern, "-")
+			if len(parts) == 2 {
+				startIP := net.ParseIP(strings.TrimSpace(parts[0]))
+				endIP := net.ParseIP(strings.TrimSpace(parts[1]))
+				if startIP != nil && endIP != nil {
+					if IsIPInRange(clientIP, startIP, endIP) {
+						return true
+					}
+				}
+			}
+		}
+
+		// 5. 通配符匹配 (例如: "192.168.2.*" 或 "192.168.*.*")
+		if strings.Contains(pattern, "*") {
+			if MatchIPWithWildcard(ip, pattern) {
+				return true
+			}
+		}
 	}
 	return false
+}
+
+// IsIPInRange 检查 IP 是否在指定范围内
+func IsIPInRange(ip, start, end net.IP) bool {
+	// 将IPv4地址转换为4字节表示
+	ipv4 := ip.To4()
+	startv4 := start.To4()
+	endv4 := end.To4()
+
+	// 如果任何一个不是IPv4,则不匹配
+	if ipv4 == nil || startv4 == nil || endv4 == nil {
+		return false
+	}
+
+	// 比较字节数组
+	return bytes.Compare(ipv4, startv4) >= 0 && bytes.Compare(ipv4, endv4) <= 0
+}
+
+// MatchIPWithWildcard 使用通配符匹配 IP
+func MatchIPWithWildcard(ip, pattern string) bool {
+	// 分割IP和模式为段
+	ipParts := strings.Split(ip, ".")
+	patternParts := strings.Split(pattern, ".")
+
+	// 长度必须相同
+	if len(ipParts) != len(patternParts) {
+		return false
+	}
+
+	// 逐段比较
+	for i := 0; i < len(ipParts); i++ {
+		if patternParts[i] != "*" && ipParts[i] != patternParts[i] {
+			return false
+		}
+	}
+
+	return true
 }
 
 // IsIPAllowed 检查 IP 是否在允许列表中
@@ -68,7 +180,7 @@ func IsIPAllowed(ip string, cidrList []string) bool {
 		}
 	}
 
-	return checkIPInCIDR(ip, cidrList)
+	return MatchIPInList(ip, cidrList)
 }
 
 // IsIPBlocked 检查 IP 是否在黑名单中
@@ -84,7 +196,7 @@ func IsIPBlocked(ip string, blacklist []string) bool {
 		return false
 	}
 
-	return checkIPInCIDR(ip, blacklist)
+	return MatchIPInList(ip, blacklist)
 }
 
 // MatchIPPattern 匹配 IP 模式（支持通配符 * 和 CIDR）
@@ -100,7 +212,7 @@ func MatchIPPattern(ip, pattern string) bool {
 		return true
 	}
 
-	return checkIPInCIDR(ip, []string{pattern})
+	return MatchIPInList(ip, []string{pattern})
 }
 
 // IsPrivateIP 检查是否是私有IP地址
@@ -122,5 +234,5 @@ func IsPrivateIP(ip string) bool {
 		"fe80::/10",      // IPv6 link-local
 	}
 
-	return checkIPInCIDR(ip, privateIPBlocks)
+	return MatchIPInList(ip, privateIPBlocks)
 }
