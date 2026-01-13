@@ -472,3 +472,96 @@ func TestMultiGzipCompressObject(t *testing.T) {
 
 	t.Logf("Gzip泛型多次压缩测试成功: 压缩后大小=%d字节", len(compressed))
 }
+
+// TestGzipCompressWithPrefix 测试带前缀的压缩功能
+func TestGzipCompressWithPrefix(t *testing.T) {
+	testData := []byte("Hello, World! This is a test for prefix compression.")
+
+	// 压缩并添加前缀
+	compressed, err := GzipCompressWithPrefix(testData)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, compressed, "压缩后数据为空")
+
+	// 验证前缀存在
+	assert.True(t, IsGzipCompressed(compressed), "压缩数据应该带有GZIP前缀")
+	assert.True(t, len(compressed) > GzipPrefixLen, "压缩数据长度应大于前缀长度")
+	assert.Equal(t, GzipPrefix, string(compressed[:GzipPrefixLen]), "前缀不匹配")
+
+	t.Logf("带前缀压缩成功: 原始=%d字节, 压缩后=%d字节(含前缀)", len(testData), len(compressed))
+}
+
+// TestGzipDecompressWithPrefix 测试带前缀的解压缩功能
+func TestGzipDecompressWithPrefix(t *testing.T) {
+	testData := []byte("Hello, World! Testing decompression with prefix.")
+
+	// 压缩并添加前缀
+	compressed, err := GzipCompressWithPrefix(testData)
+	assert.NoError(t, err)
+
+	// 解压缩（自动识别前缀）
+	decompressed, err := GzipDecompressWithPrefix(compressed)
+	assert.NoError(t, err)
+
+	// 验证数据一致性
+	assert.True(t, bytes.Equal(testData, decompressed), "解压缩后数据不一致")
+
+	t.Logf("带前缀解压缩成功: 解压后=%d字节", len(decompressed))
+}
+
+// TestGzipDecompressWithPrefix_NoPrefix 测试无前缀数据的解压缩
+func TestGzipDecompressWithPrefixNoPrefix(t *testing.T) {
+	testData := []byte("This data has no compression prefix")
+
+	// 直接解压（没有前缀应该返回原数据）
+	decompressed, err := GzipDecompressWithPrefix(testData)
+	assert.NoError(t, err)
+	assert.True(t, bytes.Equal(testData, decompressed), "无前缀数据应该原样返回")
+
+	t.Logf("无前缀数据处理成功: 原样返回%d字节", len(decompressed))
+}
+
+// TestIsGzipCompressed 测试压缩前缀检测
+func TestIsGzipCompressed(t *testing.T) {
+	// 测试带前缀的数据
+	compressedData, _ := GzipCompressWithPrefix([]byte("test data"))
+	assert.True(t, IsGzipCompressed(compressedData), "应该检测到GZIP前缀")
+
+	// 测试不带前缀的数据
+	normalData := []byte("normal data without prefix")
+	assert.False(t, IsGzipCompressed(normalData), "不应该检测到GZIP前缀")
+
+	// 测试空数据
+	emptyData := []byte("")
+	assert.False(t, IsGzipCompressed(emptyData), "空数据不应该检测到前缀")
+
+	t.Log("前缀检测测试通过")
+}
+
+// TestGzipPrefixRoundTrip 测试带前缀的完整往返
+func TestGzipPrefixRoundTrip(t *testing.T) {
+	testCases := []struct {
+		name string
+		data []byte
+	}{
+		{"短文本", []byte("short text")},
+		{"长文本", bytes.Repeat([]byte("long text data "), 100)},
+		{"二进制数据", []byte{0x00, 0x01, 0x02, 0xFF, 0xFE, 0xFD}},
+		{"中文内容", []byte("这是一段中文测试内容，用于验证压缩和解压缩功能")},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// 压缩
+			compressed, err := GzipCompressWithPrefix(tc.data)
+			assert.NoError(t, err)
+			assert.True(t, IsGzipCompressed(compressed))
+
+			// 解压
+			decompressed, err := GzipDecompressWithPrefix(compressed)
+			assert.NoError(t, err)
+			assert.True(t, bytes.Equal(tc.data, decompressed))
+
+			t.Logf("%s: 原始=%d字节, 压缩=%d字节", tc.name, len(tc.data), len(compressed))
+		})
+	}
+}

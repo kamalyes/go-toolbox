@@ -18,6 +18,13 @@ import (
 	"sync"
 )
 
+const (
+	// ZlibPrefix 是用于标识 zlib 压缩数据的前缀
+	ZlibPrefix = "ZLIB:"
+	// ZlibPrefixLen 是 zlib 前缀的长度
+	ZlibPrefixLen = len(ZlibPrefix)
+)
+
 // 创建一个 sync.Pool 来复用 bytes.Buffer
 var (
 	zlibBuffer = sync.Pool{
@@ -178,4 +185,32 @@ func MultiZlibDecompressObject[T any](compressedData []byte, times int) (T, erro
 	// 反序列化JSON
 	err = json.Unmarshal(data, &result)
 	return result, err
+}
+
+// ZlibCompressWithPrefix 压缩数据并添加 ZLIB: 前缀
+// 返回带前缀的压缩数据，适用于需要明确标识压缩格式的场景
+func ZlibCompressWithPrefix(data []byte) ([]byte, error) {
+	compressed, err := ZlibCompress(data)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]byte, ZlibPrefixLen+len(compressed))
+	copy(result, []byte(ZlibPrefix))
+	copy(result[ZlibPrefixLen:], compressed)
+	return result, nil
+}
+
+// ZlibDecompressWithPrefix 解压缩带 ZLIB: 前缀的数据
+// 如果数据带有前缀，自动去除后解压；否则直接返回原数据
+func ZlibDecompressWithPrefix(data []byte) ([]byte, error) {
+	if len(data) > ZlibPrefixLen && string(data[:ZlibPrefixLen]) == ZlibPrefix {
+		return ZlibDecompress(data[ZlibPrefixLen:])
+	}
+	// 如果没有前缀，直接返回原数据（假设未压缩）
+	return data, nil
+}
+
+// IsZlibCompressed 检查数据是否带有 ZLIB 压缩前缀
+func IsZlibCompressed(data []byte) bool {
+	return len(data) > ZlibPrefixLen && string(data[:ZlibPrefixLen]) == ZlibPrefix
 }

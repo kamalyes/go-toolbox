@@ -19,6 +19,13 @@ import (
 	"sync"
 )
 
+const (
+	// GzipPrefix 是用于标识 gzip 压缩数据的前缀
+	GzipPrefix = "GZIP:"
+	// GzipPrefixLen 是 gzip 前缀的长度
+	GzipPrefixLen = len(GzipPrefix)
+)
+
 var (
 	gzipWriter sync.Pool // gzip.Writer 的对象池
 	gzipReader sync.Pool // gzip.Reader 的对象池
@@ -177,4 +184,32 @@ func MultiGZipDecompressObject[T any](compressedData []byte, times int) (T, erro
 	// 反序列化JSON
 	err = json.Unmarshal(data, &result)
 	return result, err
+}
+
+// GzipCompressWithPrefix 压缩数据并添加 GZIP: 前缀
+// 返回带前缀的压缩数据，适用于需要明确标识压缩格式的场景
+func GzipCompressWithPrefix(data []byte) ([]byte, error) {
+	compressed, err := GzipCompress(data)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]byte, GzipPrefixLen+len(compressed))
+	copy(result, []byte(GzipPrefix))
+	copy(result[GzipPrefixLen:], compressed)
+	return result, nil
+}
+
+// GzipDecompressWithPrefix 解压缩带 GZIP: 前缀的数据
+// 如果数据带有前缀，自动去除后解压；否则直接返回原数据
+func GzipDecompressWithPrefix(data []byte) ([]byte, error) {
+	if len(data) > GzipPrefixLen && string(data[:GzipPrefixLen]) == GzipPrefix {
+		return GzipDecompress(data[GzipPrefixLen:])
+	}
+	// 如果没有前缀，直接返回原数据（假设未压缩）
+	return data, nil
+}
+
+// IsGzipCompressed 检查数据是否带有 GZIP 压缩前缀
+func IsGzipCompressed(data []byte) bool {
+	return len(data) > GzipPrefixLen && string(data[:GzipPrefixLen]) == GzipPrefix
 }
