@@ -30,7 +30,8 @@ func IsEmptyValue(v reflect.Value) bool {
 	case reflect.Array, reflect.Map, reflect.Slice:
 		return v.Len() == 0
 	case reflect.String:
-		return v.String() == ""
+		str := strings.TrimSpace(v.String())
+		return str == "" || IsUndefined(str) || IsNull(str)
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return v.Int() == 0
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
@@ -177,6 +178,16 @@ func IsAllEmpty(elems []interface{}) bool {
 // IsUndefined checks if a string is "undefined" (case insensitive).
 func IsUndefined(str string) bool {
 	return strings.EqualFold(strings.TrimSpace(str), "undefined")
+}
+
+// IsNull checks if a string is "null" (case insensitive).
+func IsNull(str string) bool {
+	return strings.EqualFold(strings.TrimSpace(str), "null")
+}
+
+// IfNullOrUndefined returns trueVal if str is "null" or "undefined"; otherwise, returns falseVal.
+func IfNullOrUndefined(str string) bool {
+	return IsNull(str) || IsUndefined(str)
 }
 
 // ContainsChinese checks if a string contains any Chinese characters.

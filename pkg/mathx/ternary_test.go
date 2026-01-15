@@ -18,6 +18,7 @@ import (
 
 	"github.com/kamalyes/go-toolbox/pkg/validator"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -333,6 +334,27 @@ func TestReturnIfErrComplexTypes(t *testing.T) {
 	testReturnIfErr[FuncType](t, "func with error", f, err, nil, err)
 }
 
+func TestIfNull(t *testing.T) {
+	assert := require.New(t)
+	assert.Equal("is null", IfNull("null", "is null", "not null"))
+	assert.Equal("is null", IfNull("NULL", "is null", "not null"))
+	assert.Equal("is null", IfNull(" null ", "is null", "not null"))
+	assert.Equal("not null", IfNull("undefined", "is null", "not null"))
+	assert.Equal("not null", IfNull("", "is null", "not null"))
+	assert.Equal("not null", IfNull("hello", "is null", "not null"))
+}
+
+func TestIfNullOrUndefined(t *testing.T) {
+	assert := require.New(t)
+	assert.Equal("empty", IfNullOrUndefined("null", "empty", "not empty"))
+	assert.Equal("empty", IfNullOrUndefined("undefined", "empty", "not empty"))
+	assert.Equal("empty", IfNullOrUndefined("NULL", "empty", "not empty"))
+	assert.Equal("empty", IfNullOrUndefined(" undefined ", "empty", "not empty"))
+	assert.Equal("not empty", IfNullOrUndefined("", "empty", "not empty"))
+	assert.Equal("not empty", IfNullOrUndefined("hello", "empty", "not empty"))
+}
+
+// TestIfDoWithErrorDefault 测试 IfDoWithErrorDefault 函数
 func TestIfDoWithErrorDefault(t *testing.T) {
 	type testCase[T any] struct {
 		name       string

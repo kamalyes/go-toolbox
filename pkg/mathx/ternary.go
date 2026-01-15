@@ -1218,3 +1218,28 @@ func IfContainsChinese[T any](str string, trueVal, falseVal T) T {
 func IfUndefined[T any](str string, trueVal, falseVal T) T {
 	return IF(validator.IsUndefined(str), trueVal, falseVal)
 }
+
+// IfNull "null"字符串检查三元运算
+// 使用 validator.IsNull 检查字符串是否为 "null"
+// 如果是，返回 trueVal；否则返回 falseVal
+//
+// 示例：
+//
+//	result := mathx.IfNull("null", "is null", "not null")  // "is null"
+//	result := mathx.IfNull("undefined", "is null", "not null") // "not null"
+func IfNull[T any](str string, trueVal, falseVal T) T {
+	return IF(validator.IsNull(str), trueVal, falseVal)
+}
+
+// IfNullOrUndefined "null"或"undefined"字符串检查三元运算
+// 同时支持 "null" 和 "undefined" 字符串
+// 如果是其中之一，返回 trueVal；否则返回 falseVal
+//
+// 示例：
+//
+//	result := mathx.IfNullOrUndefined("null", "empty", "not empty")        // "empty"
+//	result := mathx.IfNullOrUndefined("undefined", "empty", "not empty")   // "empty"
+//	result := mathx.IfNullOrUndefined("hello", "empty", "not empty")       // "not empty"
+func IfNullOrUndefined[T any](str string, trueVal, falseVal T) T {
+	return IF(validator.IfNullOrUndefined(str), trueVal, falseVal)
+}

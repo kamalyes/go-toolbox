@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -32,6 +33,13 @@ func TestIsEmptyValue(t *testing.T) {
 	}{
 		{"", true},                                // 空字符串
 		{"Hello", false},                          // 非空字符串
+		{"null", true},                            // "null" 字符串
+		{"NULL", true},                            // "NULL" 字符串（大写）
+		{"Null", true},                            // "Null" 字符串（混合）
+		{" null ", true},                          // 带空格的 "null"
+		{"undefined", true},                       // "undefined" 字符串
+		{"UNDEFINED", true},                       // "UNDEFINED" 字符串（大写）
+		{" undefined ", true},                     // 带空格的 "undefined"
 		{nil, true},                               // nil 值
 		{0, true},                                 // 整数 0
 		{1, false},                                // 非零整数
@@ -110,6 +118,7 @@ func TestIsUndefined(t *testing.T) {
 		{"undefined", true},
 		{"Undefined", true},
 		{"UNDEFINED", true},
+		{" undefined ", true},
 		{"defined", false},
 		{"", false},
 	}
@@ -120,6 +129,41 @@ func TestIsUndefined(t *testing.T) {
 			assert.Equal(t, test.expected, result)
 		})
 	}
+}
+
+func TestIsNull(t *testing.T) {
+	tests := []struct {
+		str      string
+		expected bool
+	}{
+		{"null", true},
+		{"Null", true},
+		{"NULL", true},
+		{" null ", true},
+		{"", false},
+		{"nil", false},
+		{"nothing", false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.str, func(t *testing.T) {
+			result := IsNull(test.str)
+			assert.Equal(t, test.expected, result)
+		})
+	}
+}
+
+func TestIfNullOrUndefined(t *testing.T) {
+	assert := require.New(t)
+	assert.True(IfNullOrUndefined("null"))
+	assert.True(IfNullOrUndefined("NULL"))
+	assert.True(IfNullOrUndefined(" null "))
+	assert.True(IfNullOrUndefined("undefined"))
+	assert.True(IfNullOrUndefined("UNDEFINED"))
+	assert.True(IfNullOrUndefined(" undefined "))
+	assert.False(IfNullOrUndefined(""))
+	assert.False(IfNullOrUndefined("hello"))
+	assert.False(IfNullOrUndefined("nil"))
 }
 
 func TestContainsChinese(t *testing.T) {
