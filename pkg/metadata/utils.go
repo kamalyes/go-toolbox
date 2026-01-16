@@ -52,6 +52,9 @@ func ParseAcceptLanguage(acceptLang string) (language, region, fullTag string) {
 		return "", "", ""
 	}
 
+	// 标准化：替换下划线为连字符
+	fullTag = strings.ReplaceAll(fullTag, "_", "-")
+
 	// 解析语言和地区代码
 	// 格式可能是: "zh-CN", "en-US", "zh", "en"
 	parts := strings.Split(fullTag, "-")
@@ -60,9 +63,36 @@ func ParseAcceptLanguage(acceptLang string) (language, region, fullTag string) {
 	}
 	if len(parts) >= 2 {
 		region = strings.ToUpper(parts[1])
+		// 重新组合标准化后的 fullTag
+		fullTag = language + "-" + region
+	} else {
+		// 单一语言代码
+		fullTag = language
 	}
 
 	return language, region, fullTag
+}
+
+// NormalizeLanguage 标准化语言代码
+// 例如: "zh-cn" -> "zh-CN", "zh_CN" -> "zh-CN", "EN" -> "en"
+func NormalizeLanguage(lang string) string {
+	lang = strings.TrimSpace(lang)
+	if lang == "" {
+		return ""
+	}
+
+	// 替换下划线为连字符
+	lang = strings.ReplaceAll(lang, "_", "-")
+
+	// 处理常见的语言代码格式
+	parts := strings.Split(lang, "-")
+	if len(parts) == 2 {
+		// 例如: zh-cn -> zh-CN, EN-us -> en-US
+		return strings.ToLower(parts[0]) + "-" + strings.ToUpper(parts[1])
+	}
+
+	// 单一语言代码，统一小写
+	return strings.ToLower(lang)
 }
 
 // GetRemoteIP 从 RemoteAddr 中提取 IP 地址（去除端口）

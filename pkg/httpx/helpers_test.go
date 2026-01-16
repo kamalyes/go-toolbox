@@ -142,3 +142,248 @@ func BenchmarkGetUserID(b *testing.B) {
 		GetUserID(req, userIDKey, "X-User-ID")
 	}
 }
+
+// TestBuildParams 测试构建请求参数
+func TestBuildParams(t *testing.T) {
+	tests := []struct {
+		name     string
+		base     map[string]string
+		opts     []func(map[string]string)
+		expected map[string]string
+	}{
+		{
+			name: "仅基础参数",
+			base: map[string]string{
+				"key1": "value1",
+				"key2": "value2",
+			},
+			opts: nil,
+			expected: map[string]string{
+				"key1": "value1",
+				"key2": "value2",
+			},
+		},
+		{
+			name: "基础参数加可选参数",
+			base: map[string]string{
+				"domain": "example.com",
+			},
+			opts: []func(map[string]string){
+				WithParam(true, "auto_renew", "1"),
+				WithParam(false, "private", "1"),
+			},
+			expected: map[string]string{
+				"domain":     "example.com",
+				"auto_renew": "1",
+			},
+		},
+		{
+			name: "使用WithParamNotEmpty",
+			base: map[string]string{
+				"domain": "example.com",
+			},
+			opts: []func(map[string]string){
+				WithParamNotEmpty("coupon", "SAVE10"),
+				WithParamNotEmpty("empty", ""),
+			},
+			expected: map[string]string{
+				"domain": "example.com",
+				"coupon": "SAVE10",
+			},
+		},
+		{
+			name: "空基础参数",
+			base: map[string]string{},
+			opts: []func(map[string]string){
+				WithParam(true, "key1", "value1"),
+			},
+			expected: map[string]string{
+				"key1": "value1",
+			},
+		},
+		{
+			name: "nil可选参数",
+			base: map[string]string{
+				"key1": "value1",
+			},
+			opts: []func(map[string]string){
+				nil,
+				WithParam(true, "key2", "value2"),
+				nil,
+			},
+			expected: map[string]string{
+				"key1": "value1",
+				"key2": "value2",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := BuildParams(tt.base, tt.opts...)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestWithParam 测试条件添加参数
+func TestWithParam(t *testing.T) {
+	tests := []struct {
+		name      string
+		condition bool
+		key       string
+		value     string
+		shouldAdd bool
+	}{
+		{
+			name:      "条件为true应该添加",
+			condition: true,
+			key:       "auto_renew",
+			value:     "1",
+			shouldAdd: true,
+		},
+		{
+			name:      "条件为false不应该添加",
+			condition: false,
+			key:       "private",
+			value:     "1",
+			shouldAdd: false,
+		},
+		{
+			name:      "true且value为空也应该添加",
+			condition: true,
+			key:       "empty_key",
+			value:     "",
+			shouldAdd: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			params := make(map[string]string)
+			fn := WithParam(tt.condition, tt.key, tt.value)
+			fn(params)
+
+			if tt.shouldAdd {
+				assert.Contains(t, params, tt.key)
+				assert.Equal(t, tt.value, params[tt.key])
+			} else {
+				assert.NotContains(t, params, tt.key)
+			}
+		})
+	}
+}
+
+// TestWithParamNotEmpty 测试非空添加参数
+func TestWithParamNotEmpty(t *testing.T) {
+	tests := []struct {
+		name      string
+		key       string
+		value     string
+		shouldAdd bool
+	}{
+		{
+			name:      "非空字符串应该添加",
+			key:       "coupon",
+			value:     "DISCOUNT20",
+			shouldAdd: true,
+		},
+		{
+			name:      "空字符串不应该添加",
+			key:       "empty_coupon",
+			value:     "",
+			shouldAdd: false,
+		},
+		{
+			name:      "空格字符串不应该添加",
+			key:       "spaces",
+			value:     "   ",
+			shouldAdd: false,
+		},
+		{
+			name:      "有效字符串应该添加",
+			key:       "payment_id",
+			value:     "PAY123",
+			shouldAdd: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			params := make(map[string]string)
+			fn := WithParamNotEmpty(tt.key, tt.value)
+			fn(params)
+
+			if tt.shouldAdd {
+				assert.Contains(t, params, tt.key)
+				assert.Equal(t, tt.value, params[tt.key])
+			} else {
+				assert.NotContains(t, params, tt.key)
+			}
+		})
+	}
+}
+
+// TestBuildParams_Integration 集成测试
+func TestBuildParams_Integration(t *testing.T) {
+	// 模拟域名注册请求
+	params := BuildParams(
+		map[string]string{
+			"domain": "example.com",
+			"years":  "2",
+		},
+		WithParam(true, "auto_renew", "1"),
+		WithParam(false, "private", "1"),
+		WithParamNotEmpty("coupon", "SAVE10"),
+		WithParamNotEmpty("payment_id", ""),
+	)
+
+	expected := map[string]string{
+		"domain":     "example.com",
+		"years":      "2",
+		"auto_renew": "1",
+		"coupon":     "SAVE10",
+	}
+
+	assert.Equal(t, expected, params)
+}
+
+// BenchmarkBuildParams 性能测试
+func BenchmarkBuildParams(b *testing.B) {
+	base := map[string]string{
+		"domain": "example.com",
+		"years":  "1",
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		BuildParams(
+			base,
+			WithParam(true, "auto_renew", "1"),
+			WithParam(true, "private", "1"),
+			WithParamNotEmpty("coupon", "SAVE10"),
+		)
+	}
+}
+
+// BenchmarkWithParam 性能测试
+func BenchmarkWithParam(b *testing.B) {
+	params := make(map[string]string)
+	fn := WithParam(true, "key", "value")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		fn(params)
+	}
+}
+
+// BenchmarkWithParamNotEmpty 性能测试
+func BenchmarkWithParamNotEmpty(b *testing.B) {
+	params := make(map[string]string)
+	fn := WithParamNotEmpty("key", "value")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		fn(params)
+	}
+}

@@ -11,7 +11,9 @@
 package metadata
 
 import (
+	"context"
 	"crypto/tls"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
@@ -265,4 +267,53 @@ func TestExtractRequestMetadataCompleteRequest(t *testing.T) {
 	assert.False(t, metadata.IsMobile)
 	assert.False(t, metadata.IsTablet)
 	assert.False(t, metadata.IsBot)
+}
+
+// 定义常量作为上下文键和其他测试用的字符串
+
+const (
+	TestQueryKeyFoo                 = "foo"
+	TestHeaderKeyCustom             = "X-Custom-Header"
+	TestCookieKeySession            = "session"
+	TestContextKey       ContextKey = "contextKey"
+	TestContextValue                = "contextValue"
+	TestDefaultValue                = "defaultValue"
+)
+
+func TestMetadataExtractor(t *testing.T) {
+	// 创建一个上下文
+	ctx := context.Background()
+
+	// 创建一个 HTTP 请求
+	req := httptest.NewRequest("GET", "http://example.com?"+TestQueryKeyFoo+"=bar", nil)
+	req.Header.Set(TestHeaderKeyCustom, "headerValue")
+	req.AddCookie(&http.Cookie{Name: TestCookieKeySession, Value: "cookieValue"})
+
+	// 创建 MetadataExtractor 实例
+	extractor := NewMetadataExtractor(ctx, req)
+
+	// 测试从查询参数中提取值
+	extractor.FromQuery(TestQueryKeyFoo)
+	assert.Equal(t, "bar", extractor.Get(), "应该从查询参数中提取到值")
+
+	// 测试从 HTTP header 中提取值
+	extractor = NewMetadataExtractor(ctx, req) // 重新创建实例
+	extractor.FromHeader(TestHeaderKeyCustom)
+	assert.Equal(t, "headerValue", extractor.Get(), "应该从 HTTP header 中提取到值")
+
+	// 测试从 HTTP cookie 中提取值
+	extractor = NewMetadataExtractor(ctx, req) // 重新创建实例
+	extractor.FromCookie(TestCookieKeySession)
+	assert.Equal(t, "cookieValue", extractor.Get(), "应该从 HTTP cookie 中提取到值")
+
+	// 测试从 context 中提取值
+	ctx = context.WithValue(ctx, TestContextKey, TestContextValue)
+	extractor = NewMetadataExtractor(ctx, req) // 重新创建实例
+	extractor.FromContext(TestContextKey)
+	assert.Equal(t, TestContextValue, extractor.Get(), "应该从 context 中提取到值")
+
+	// 测试默认值
+	extractor = NewMetadataExtractor(ctx, req) // 重新创建实例
+	extractor.Default(TestDefaultValue)
+	assert.Equal(t, TestDefaultValue, extractor.Get(), "所有来源均未提取到值时应该返回默认值")
 }
