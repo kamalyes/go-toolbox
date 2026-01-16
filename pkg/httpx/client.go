@@ -25,6 +25,124 @@ type Client struct {
 	client *http.Client    // 底层 http.Client 实例
 }
 
+// ClientOption 客户端选项函数
+type ClientOption func(*clientConfig)
+
+// clientConfig 客户端配置
+type clientConfig struct {
+	timeout             time.Duration
+	maxIdleConns        int
+	maxIdleConnsPerHost int
+	maxConnsPerHost     int
+	idleConnTimeout     time.Duration
+	tlsHandshakeTimeout time.Duration
+	insecureSkipVerify  bool
+	ctx                 context.Context
+}
+
+// defaultClientConfig 返回默认配置
+func defaultClientConfig() *clientConfig {
+	return &clientConfig{
+		timeout:             30 * time.Second,
+		maxIdleConns:        0,
+		maxIdleConnsPerHost: 1000,
+		maxConnsPerHost:     1000,
+		idleConnTimeout:     60 * time.Second,
+		tlsHandshakeTimeout: 10 * time.Second,
+		insecureSkipVerify:  false,
+		ctx:                 context.Background(),
+	}
+}
+
+// NewClient 创建一个新的 HTTP 客户端（支持函数式选项）
+func NewClient(opts ...ClientOption) *Client {
+	cfg := defaultClientConfig()
+
+	// 应用选项
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
+	// 创建 http.Client
+	httpClient := &http.Client{
+		Timeout: cfg.timeout,
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			DialContext: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 60 * time.Second,
+			}).DialContext,
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: cfg.insecureSkipVerify,
+			},
+			MaxIdleConns:          cfg.maxIdleConns,
+			MaxIdleConnsPerHost:   cfg.maxIdleConnsPerHost,
+			MaxConnsPerHost:       cfg.maxConnsPerHost,
+			IdleConnTimeout:       cfg.idleConnTimeout,
+			TLSHandshakeTimeout:   cfg.tlsHandshakeTimeout,
+			ExpectContinueTimeout: time.Second,
+		},
+	}
+
+	return newClient(cfg.ctx, httpClient)
+}
+
+// WithTimeout 设置请求超时时间
+func WithTimeout(timeout time.Duration) ClientOption {
+	return func(c *clientConfig) {
+		c.timeout = timeout
+	}
+}
+
+// WithMaxIdleConns 设置最大空闲连接数
+func WithMaxIdleConns(n int) ClientOption {
+	return func(c *clientConfig) {
+		c.maxIdleConns = n
+	}
+}
+
+// WithMaxIdleConnsPerHost 设置每个主机最大空闲连接数
+func WithMaxIdleConnsPerHost(n int) ClientOption {
+	return func(c *clientConfig) {
+		c.maxIdleConnsPerHost = n
+	}
+}
+
+// WithMaxConnsPerHost 设置每个主机最大连接数
+func WithMaxConnsPerHost(n int) ClientOption {
+	return func(c *clientConfig) {
+		c.maxConnsPerHost = n
+	}
+}
+
+// WithIdleConnTimeout 设置空闲连接超时时间
+func WithIdleConnTimeout(timeout time.Duration) ClientOption {
+	return func(c *clientConfig) {
+		c.idleConnTimeout = timeout
+	}
+}
+
+// WithTLSHandshakeTimeout 设置 TLS 握手超时时间
+func WithTLSHandshakeTimeout(timeout time.Duration) ClientOption {
+	return func(c *clientConfig) {
+		c.tlsHandshakeTimeout = timeout
+	}
+}
+
+// WithInsecureSkipVerify 设置是否跳过 TLS 证书验证（生产环境慎用）
+func WithInsecureSkipVerify(skip bool) ClientOption {
+	return func(c *clientConfig) {
+		c.insecureSkipVerify = skip
+	}
+}
+
+// WithContext 设置请求上下文
+func WithContext(ctx context.Context) ClientOption {
+	return func(c *clientConfig) {
+		c.ctx = ctx
+	}
+}
+
 // NewHttpClient 创建一个使用自定义 http.Client 的 Client 实例，默认上下文为 context.Background()
 func NewHttpClient(client *http.Client) *Client {
 	return newClient(context.Background(), client)

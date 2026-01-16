@@ -55,7 +55,7 @@ func TestRequestSetHeader(t *testing.T) {
 	req := setupRequest("GET", testURL).
 		SetHeader("X-Custom-Header", "value")
 
-	assert.Equal(t, "value", req.GetHeaders().Get("X-Custom-Header"))
+	assert.Equal(t, "value", req.Header().Get("X-Custom-Header"))
 }
 
 func TestRequestSend(t *testing.T) {
@@ -74,7 +74,7 @@ func TestRequestSend(t *testing.T) {
 
 	resp, err := req.Send()
 	assert.NoError(t, err)
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Response.Body)
 	assert.NoError(t, err)
 	assert.Equal(t, "Success", string(body))
 }
@@ -103,7 +103,7 @@ func TestRequestSetBodyMultipart(t *testing.T) {
 
 	resp, err := req.Send()
 	assert.NoError(t, err)
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Response.Body)
 	assert.NoError(t, err)
 	assert.Equal(t, "File Uploaded", string(body))
 }

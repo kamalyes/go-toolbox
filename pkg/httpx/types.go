@@ -19,6 +19,7 @@ const (
 	HeaderAccept        = "Accept"        // HTTP 请求头中的 Accept
 	HeaderAuthorization = "Authorization" // HTTP 请求头中的 Authorization
 	HeaderUserAgent     = "User-Agent"    // HTTP 请求头中的 User-Agent
+	HeaderCookie        = "Cookie"        // HTTP 请求头中的 Cookie
 
 	// 常见的 Content-Type
 	ContentTypeTextPlain                    = "text/plain"                        // 纯文本格式

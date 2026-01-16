@@ -51,28 +51,64 @@ func NewRequest(ctx context.Context, client *http.Client, method, endpoint strin
 
 // Getter 方法
 
-// GetCtx 返回请求的上下文
-func (r *Request) GetCtx() context.Context {
+// Context 返回请求的上下文（标准方法，与 net/http 保持一致）
+func (r *Request) Context() context.Context {
 	return r.ctx
 }
 
-// GetClient 返回 HTTP 客户端
-func (r *Request) GetClient() *http.Client {
+// WithContext 返回一个使用新上下文的请求副本
+func (r *Request) WithContext(ctx context.Context) *Request {
+	clone := r.Clone()
+	clone.ctx = ctx
+	return clone
+}
+
+// GetCtx 返回请求的上下文
+// Deprecated: 使用 Context() 代替
+func (r *Request) GetCtx() context.Context {
+	return r.Context()
+}
+
+// Client 返回 HTTP 客户端
+func (r *Request) Client() *http.Client {
 	return r.client
 }
 
-// GetURL 返回请求的 URL
-func (r *Request) GetURL() string {
+// URL 返回请求的 URL（标准方法）
+func (r *Request) URL() string {
 	return r.endpoint
 }
 
-// GetMethod 返回请求的方法
-func (r *Request) GetMethod() string {
+// Method 返回请求的方法（标准方法）
+func (r *Request) Method() string {
 	return r.method
+}
+
+// GetClient 返回 HTTP 客户端
+// Deprecated: 使用 Client() 代替
+func (r *Request) GetClient() *http.Client {
+	return r.Client()
+}
+
+// GetURL 返回请求的 URL
+// Deprecated: 使用 URL() 代替
+func (r *Request) GetURL() string {
+	return r.URL()
+}
+
+// GetMethod 返回请求的方法
+// Deprecated: 使用 Method() 代替
+func (r *Request) GetMethod() string {
+	return r.Method()
 }
 
 // GetHeaders 返回请求头
 func (r *Request) GetHeaders() http.Header {
+	return r.headers
+}
+
+// Header 返回请求头（标准方法，与 net/http.Request 一致）
+func (r *Request) Header() http.Header {
 	return r.headers
 }
 
@@ -101,8 +137,8 @@ func (r *Request) GetError() error {
 	return r.err
 }
 
-// GetFullURL 返回包含查询参数的完整 URL
-func (r *Request) GetFullURL() string {
+// FullURL 返回包含查询参数的完整 URL（标准方法）
+func (r *Request) FullURL() string {
 	if len(r.queryValues) == 0 {
 		return r.endpoint
 	}
@@ -111,6 +147,12 @@ func (r *Request) GetFullURL() string {
 		separator = "&"
 	}
 	return r.endpoint + separator + r.queryValues.Encode()
+}
+
+// GetFullURL 返回包含查询参数的完整 URL
+// Deprecated: 使用 FullURL() 代替
+func (r *Request) GetFullURL() string {
+	return r.FullURL()
 }
 
 // Setter 方法
@@ -284,6 +326,35 @@ func (r *Request) SetBodyMultipart(fieldName, fileName string, fileContent []byt
 	return r
 }
 
+// Cookie 获取指定名称的 Cookie（标准方法，与 net/http.Request 一致）
+func (r *Request) Cookie(name string) (*http.Cookie, error) {
+	if r.headers == nil {
+		return nil, http.ErrNoCookie
+	}
+	cookieHeader := r.headers.Get(HeaderCookie)
+	if cookieHeader == "" {
+		return nil, http.ErrNoCookie
+	}
+	// 解析 Cookie 头
+	header := http.Header{}
+	header.Add(HeaderCookie, cookieHeader)
+	req := &http.Request{Header: header}
+	return req.Cookie(name)
+}
+
+// AddCookie 添加 Cookie 到请求（标准方法，与 net/http.Request 一致）
+func (r *Request) AddCookie(cookie *http.Cookie) *Request {
+	if cookie == nil {
+		return r
+	}
+	if r.headers.Get(HeaderCookie) == "" {
+		r.headers.Set(HeaderCookie, cookie.String())
+	} else {
+		r.headers.Add(HeaderCookie, cookie.String())
+	}
+	return r
+}
+
 // SetBodyMultipartWithFields 设置请求体为 multipart/form-data（支持多个字段）
 func (r *Request) SetBodyMultipartWithFields(fields map[string]string, files map[string]FileField) *Request {
 	var buf bytes.Buffer
@@ -392,6 +463,23 @@ func (r *Request) Send() (Response, error) {
 	} // 将原始 HTTP 响应赋值给 Response 结构体
 
 	return Response{Response: resp}, nil
+}
+
+// Do 执行 HTTP 请求并返回响应字节数据（简化版本，用于快速获取响应体）
+func (r *Request) Do(ctx context.Context) ([]byte, error) {
+	// 如果传入了新的 context，更新请求的 context
+	if ctx != nil {
+		r.ctx = ctx
+	}
+
+	// 调用 Send 方法执行请求
+	resp, err := r.Send()
+	if err != nil {
+		return nil, err
+	}
+
+	// 返回响应体字节数据
+	return resp.Bytes()
 }
 
 // MustSend 执行 HTTP 请求，如果失败则 panic
