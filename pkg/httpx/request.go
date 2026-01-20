@@ -451,9 +451,24 @@ func (r *Request) Send() (Response, error) {
 		return Response{}, err // 如果请求创建失败，记录错误并返回
 	}
 	req.Header = r.headers // 设置请求头
-	// 设置查询参数
 
-	req.URL.RawQuery = r.queryValues.Encode()
+	// 合并 URL 参数和 queryValues（queryValues 优先级更高）
+	if req.URL.RawQuery != "" || len(r.queryValues) > 0 {
+		// 解析 URL 中的现有参数
+		finalParams := make(url.Values)
+		if req.URL.RawQuery != "" {
+			if existingParams, err := url.ParseQuery(req.URL.RawQuery); err == nil {
+				finalParams = existingParams
+			}
+		}
+
+		// 合并 queryValues（覆盖同名参数）
+		for key, values := range r.queryValues {
+			finalParams[key] = values
+		}
+
+		req.URL.RawQuery = finalParams.Encode()
+	}
 
 	// 执行请求
 

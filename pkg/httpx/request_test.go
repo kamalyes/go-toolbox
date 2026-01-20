@@ -403,3 +403,77 @@ func TestChainedMethods(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }
+
+// TestRequestURLWithExistingQueryParams 测试 URL 中已有查询参数不被覆盖
+func TestRequestURLWithExistingQueryParams(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 验证 URL 中原有的参数保留
+		assert.Equal(t, "1", r.URL.Query().Get("version"))
+		assert.Equal(t, "json", r.URL.Query().Get("type"))
+		assert.Equal(t, "abc123", r.URL.Query().Get("key"))
+		assert.Equal(t, "example.com", r.URL.Query().Get("domain"))
+		w.Write([]byte("OK"))
+	}))
+	defer server.Close()
+
+	// 构建已包含查询参数的 URL
+	fullURL := server.URL + "?version=1&type=json&key=abc123&domain=example.com"
+
+	client := &http.Client{}
+	// 直接使用带查询参数的 URL，不调用 SetQuery 或 SetQueryValues
+	req := NewRequest(context.Background(), client, "GET", fullURL)
+
+	resp, err := req.Send()
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+// TestRequestMergeURLAndQueryValues 测试 URL 参数和 queryValues 合并
+func TestRequestMergeURLAndQueryValues(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 验证 URL 中的参数和 SetQuery 设置的参数都存在
+		assert.Equal(t, "1", r.URL.Query().Get("version"))
+		assert.Equal(t, "json", r.URL.Query().Get("type"))
+		assert.Equal(t, "10", r.URL.Query().Get("page"))
+		assert.Equal(t, "20", r.URL.Query().Get("size"))
+		w.Write([]byte("OK"))
+	}))
+	defer server.Close()
+
+	// URL 中包含部分参数
+	urlWithParams := server.URL + "?version=1&type=json"
+
+	client := &http.Client{}
+	// 通过 SetQuery 添加额外参数
+	req := NewRequest(context.Background(), client, "GET", urlWithParams).
+		SetQuery("page", "10").
+		SetQuery("size", "20")
+
+	resp, err := req.Send()
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+// TestRequestQueryValuesPriority 测试 queryValues 优先级高于 URL 参数
+func TestRequestQueryValuesPriority(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// queryValues 中的值应该覆盖 URL 中的同名参数
+		assert.Equal(t, "2", r.URL.Query().Get("version"))
+		assert.Equal(t, "xml", r.URL.Query().Get("type"))
+		w.Write([]byte("OK"))
+	}))
+	defer server.Close()
+
+	// URL 中包含参数
+	urlWithParams := server.URL + "?version=1&type=json"
+
+	client := &http.Client{}
+	// 使用 SetQuery 覆盖 URL 中的参数
+	req := NewRequest(context.Background(), client, "GET", urlWithParams).
+		SetQuery("version", "2").
+		SetQuery("type", "xml")
+
+	resp, err := req.Send()
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
