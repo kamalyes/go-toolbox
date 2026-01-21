@@ -271,3 +271,230 @@ func TestSetNestedMapValue(t *testing.T) {
 
 	assert.Equal("test", b["c"])
 }
+
+// TestMergeLayeredKeyValues 测试多层级 key-value 合并
+func TestMergeLayeredKeyValues(t *testing.T) {
+	assert := assert.New(t)
+
+	// 定义测试用的结构体
+	type LocalizedText struct {
+		Key   string
+		Value string
+	}
+
+	type Config struct {
+		Messages []LocalizedText
+	}
+
+	// 创建合并器（只需创建一次）
+	merger := NewLayeredMerger[Config, LocalizedText]("Key", "Value")
+
+	t.Run("基本三层合并", func(t *testing.T) {
+		// 第一层：硬编码默认值
+		hardcoded := &Config{
+			Messages: []LocalizedText{
+				{Key: "en", Value: "Hello"},
+				{Key: "zh", Value: "你好"},
+			},
+		}
+
+		// 第二层：owner 配置
+		owner := &Config{
+			Messages: []LocalizedText{
+				{Key: "en", Value: "Hi"}, // 覆盖英文
+				{Key: "fr", Value: "Bonjour"},
+			},
+		}
+
+		// 第三层：agent 配置
+		agent := &Config{
+			Messages: []LocalizedText{
+				{Key: "en", Value: "Hey"}, // 再次覆盖英文
+				{Key: "es", Value: "Hola"},
+			},
+		}
+
+		result := merger.Merge(
+			[]*Config{hardcoded, owner, agent},
+			func(c *Config) []LocalizedText { return c.Messages },
+		)
+
+		// 验证结果
+		assert.Equal(4, len(result))
+		assert.Equal("en", result[0].Key)
+		assert.Equal("Hey", result[0].Value) // agent 优先级最高
+		assert.Equal("zh", result[1].Key)
+		assert.Equal("你好", result[1].Value) // 只在 hardcoded 中
+		assert.Equal("fr", result[2].Key)
+		assert.Equal("Bonjour", result[2].Value) // 只在 owner 中
+		assert.Equal("es", result[3].Key)
+		assert.Equal("Hola", result[3].Value) // 只在 agent 中
+	})
+
+	t.Run("跳过nil层级", func(t *testing.T) {
+		layer1 := &Config{
+			Messages: []LocalizedText{{Key: "en", Value: "Hello"}},
+		}
+		layer3 := &Config{
+			Messages: []LocalizedText{{Key: "zh", Value: "你好"}},
+		}
+
+		result := merger.Merge(
+			[]*Config{layer1, nil, layer3},
+			func(c *Config) []LocalizedText { return c.Messages },
+		)
+
+		assert.Equal(2, len(result))
+		assert.Equal("en", result[0].Key)
+		assert.Equal("zh", result[1].Key)
+	})
+
+	t.Run("跳过空值", func(t *testing.T) {
+		layer1 := &Config{
+			Messages: []LocalizedText{
+				{Key: "en", Value: "Hello"},
+				{Key: "zh", Value: "你好"},
+			},
+		}
+		layer2 := &Config{
+			Messages: []LocalizedText{
+				{Key: "en", Value: ""}, // 空值，不应覆盖
+				{Key: "fr", Value: "Bonjour"},
+			},
+		}
+
+		result := merger.Merge(
+			[]*Config{layer1, layer2},
+			func(c *Config) []LocalizedText { return c.Messages },
+		)
+
+		assert.Equal(3, len(result))
+		assert.Equal("Hello", result[0].Value) // 空值未覆盖
+		assert.Equal("你好", result[1].Value)
+		assert.Equal("Bonjour", result[2].Value)
+	})
+
+	t.Run("保持key首次出现顺序", func(t *testing.T) {
+		layer1 := &Config{
+			Messages: []LocalizedText{
+				{Key: "a", Value: "1"},
+				{Key: "b", Value: "2"},
+				{Key: "c", Value: "3"},
+			},
+		}
+		layer2 := &Config{
+			Messages: []LocalizedText{
+				{Key: "d", Value: "4"},
+				{Key: "b", Value: "22"}, // 覆盖，但顺序保持在原位
+			},
+		}
+
+		result := merger.Merge(
+			[]*Config{layer1, layer2},
+			func(c *Config) []LocalizedText { return c.Messages },
+		)
+
+		assert.Equal(4, len(result))
+		assert.Equal("a", result[0].Key)
+		assert.Equal("b", result[1].Key)
+		assert.Equal("22", result[1].Value) // 值被覆盖
+		assert.Equal("c", result[2].Key)
+		assert.Equal("d", result[3].Key) // 新 key 在最后
+	})
+
+	t.Run("空layers数组", func(t *testing.T) {
+		result := merger.Merge(
+			[]*Config{},
+			func(c *Config) []LocalizedText { return c.Messages },
+		)
+
+		assert.Equal(0, len(result))
+	})
+
+	t.Run("全nil layers", func(t *testing.T) {
+		result := merger.Merge(
+			[]*Config{nil, nil, nil},
+			func(c *Config) []LocalizedText { return c.Messages },
+		)
+
+		assert.Equal(0, len(result))
+	})
+
+	t.Run("支持更多层级", func(t *testing.T) {
+		layers := make([]*Config, 5)
+		for i := 0; i < 5; i++ {
+			layers[i] = &Config{
+				Messages: []LocalizedText{
+					{Key: "key", Value: string(rune('A' + i))}, // A, B, C, D, E
+				},
+			}
+		}
+
+		result := merger.Merge(
+			layers,
+			func(c *Config) []LocalizedText { return c.Messages },
+		)
+
+		assert.Equal(1, len(result))
+		assert.Equal("E", result[0].Value) // 最后一层优先级最高
+	})
+
+	t.Run("多语言场景真实测试", func(t *testing.T) {
+		// 模拟实际的多语言配置场景
+		systemDefault := &Config{
+			Messages: []LocalizedText{
+				{Key: "en", Value: "Welcome"},
+				{Key: "zh", Value: "欢迎"},
+				{Key: "es", Value: "Bienvenido"},
+			},
+		}
+
+		companyConfig := &Config{
+			Messages: []LocalizedText{
+				{Key: "en", Value: "Welcome to our company"},
+				{Key: "vi", Value: "Chào mừng"}, // 新增越南语
+			},
+		}
+
+		agentCustom := &Config{
+			Messages: []LocalizedText{
+				{Key: "en", Value: "Hi, I'm your agent!"}, // 个性化英文
+			},
+		}
+
+		result := merger.Merge(
+			[]*Config{systemDefault, companyConfig, agentCustom},
+			func(c *Config) []LocalizedText { return c.Messages },
+		)
+
+		// 验证合并结果
+		assert.Equal(4, len(result))
+
+		msgMap := make(map[string]string)
+		for _, msg := range result {
+			msgMap[msg.Key] = msg.Value
+		}
+
+		assert.Equal("Hi, I'm your agent!", msgMap["en"]) // agent 覆盖
+		assert.Equal("欢迎", msgMap["zh"])                  // 系统默认
+		assert.Equal("Bienvenido", msgMap["es"])          // 系统默认
+		assert.Equal("Chào mừng", msgMap["vi"])           // 公司配置
+	})
+
+	t.Run("直接调用MergeLayeredKeyValues兼容性测试", func(t *testing.T) {
+		// 验证直接调用底层函数也能正常工作
+		layer1 := &Config{
+			Messages: []LocalizedText{{Key: "en", Value: "Hello"}},
+		}
+
+		result := MergeLayeredKeyValues(
+			[]*Config{layer1},
+			func(c *Config) []LocalizedText { return c.Messages },
+			"Key",
+			"Value",
+		)
+
+		assert.Equal(1, len(result))
+		assert.Equal("Hello", result[0].Value)
+	})
+}

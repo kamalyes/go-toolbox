@@ -418,3 +418,178 @@ func CloneMap[K comparable, V any](m map[K]V) map[K]V {
 	}
 	return result
 }
+
+// LayeredMerger 多层级键值对合并器（避免重复传递字段名）
+type LayeredMerger[T any, KV any] struct {
+	keyFieldName   string
+	valueFieldName string
+}
+
+// NewLayeredMerger 创建多层级合并器
+//
+// 参数：
+//   - keyFieldName: 键值对结构中 key 字段的名称（如 "Key"）
+//   - valueFieldName: 键值对结构中 value 字段的名称（如 "Value"）
+//
+// 示例：
+//
+//	merger := NewLayeredMerger[Config, LocalizedText]("Key", "Value")
+//	result := merger.Merge(layers, func(c *Config) []LocalizedText { return c.Messages })
+func NewLayeredMerger[T any, KV any](keyFieldName, valueFieldName string) *LayeredMerger[T, KV] {
+	return &LayeredMerger[T, KV]{
+		keyFieldName:   keyFieldName,
+		valueFieldName: valueFieldName,
+	}
+}
+
+// Merge 执行多层级合并
+//
+// 参数：
+//   - layers: 配置层级切片，从低到高优先级（越靠后优先级越高）
+//   - fieldGetter: 从配置对象中提取键值对切片的函数
+//
+// 返回：合并后的键值对切片
+func (m *LayeredMerger[T, KV]) Merge(layers []*T, fieldGetter func(*T) []KV) []KV {
+	return MergeLayeredKeyValues(layers, fieldGetter, m.keyFieldName, m.valueFieldName)
+}
+
+// MergeLayeredKeyValues 多层级键值对合并工具（支持传入任意数量的配置层级）
+//
+// 参数：
+//   - layers: 配置层级切片，从低到高优先级（越靠后优先级越高，后面的会覆盖前面的）
+//   - fieldGetter: 从配置对象中提取键值对切片的函数
+//   - keyFieldName: 键值对结构中 key 字段的名称（如 "Key"）
+//   - valueFieldName: 键值对结构中 value 字段的名称（如 "Value"）
+//
+// 返回：合并后的键值对切片，保持 key 首次出现的顺序
+//
+// 特性：
+//   - 支持任意层级的链式合并
+//   - 自动跳过 nil 层级
+//   - 自动跳过空值（值为空字符串的项不会覆盖已有值）
+//   - 保持 key 的首次出现顺序
+//   - 使用反射自动提取字段，支持任意结构体
+//
+// 示例：
+//
+//	type LocalizedText struct {
+//	    Key   string
+//	    Value string
+//	}
+//
+//	type Config struct {
+//	    Messages []LocalizedText
+//	}
+//
+//	result := MergeLayeredKeyValues(
+//	    []*Config{hardcodedDefault, ownerConfig, agentConfig},
+//	    func(c *Config) []LocalizedText { return c.Messages },
+//	    "Key",
+//	    "Value",
+//	)
+func MergeLayeredKeyValues[T any, KV any](
+	layers []*T,
+	fieldGetter func(*T) []KV,
+	keyFieldName string,
+	valueFieldName string,
+) []KV {
+	if len(layers) == 0 {
+		return []KV{}
+	}
+
+	// 使用 map 存储合并结果，key 为字段 key，value 为字段 value
+	valueMap := make(map[string]string)
+	// 记录 key 的出现顺序
+	keyOrder := make([]string, 0)
+
+	// 按层级顺序合并（从低优先级到高优先级）
+	for _, layer := range layers {
+		if layer == nil {
+			continue
+		}
+
+		items := fieldGetter(layer)
+		for i := range items {
+			item := &items[i]
+
+			// 使用反射提取 key 和 value
+			key := extractFieldValue(item, keyFieldName)
+			value := extractFieldValue(item, valueFieldName)
+
+			// 跳过空值
+			if value == "" {
+				continue
+			}
+
+			// 记录首次出现的顺序
+			if _, exists := valueMap[key]; !exists {
+				keyOrder = append(keyOrder, key)
+			}
+
+			// 覆盖或新增
+			valueMap[key] = value
+		}
+	}
+
+	// 按顺序构建结果
+	result := make([]KV, 0, len(keyOrder))
+	for _, key := range keyOrder {
+		value := valueMap[key]
+		item := buildKeyValueItem[KV](keyFieldName, key, valueFieldName, value)
+		result = append(result, item)
+	}
+
+	return result
+}
+
+// extractFieldValue 通过反射提取结构体字段的字符串值
+func extractFieldValue(item interface{}, fieldName string) string {
+	val := reflect.ValueOf(item)
+
+	// 处理指针
+	if val.Kind() == reflect.Ptr {
+		if val.IsNil() {
+			return ""
+		}
+		val = val.Elem()
+	}
+
+	// 确保是结构体
+	if val.Kind() != reflect.Struct {
+		return ""
+	}
+
+	// 获取字段值
+	fieldVal := val.FieldByName(fieldName)
+	if !fieldVal.IsValid() {
+		return ""
+	}
+
+	// 转换为字符串
+	if fieldVal.Kind() == reflect.String {
+		return fieldVal.String()
+	}
+
+	return ""
+}
+
+// buildKeyValueItem 创建 key-value 结构体实例
+func buildKeyValueItem[KV any](keyFieldName, keyValue, valueFieldName, valueValue string) KV {
+	var item KV
+	itemType := reflect.TypeOf(item)
+	itemVal := reflect.New(itemType).Elem()
+
+	// 设置 key 字段
+	keyField := itemVal.FieldByName(keyFieldName)
+	if keyField.IsValid() && keyField.CanSet() && keyField.Kind() == reflect.String {
+		keyField.SetString(keyValue)
+	}
+
+	// 设置 value 字段
+	valueField := itemVal.FieldByName(valueFieldName)
+	if valueField.IsValid() && valueField.CanSet() && valueField.Kind() == reflect.String {
+		valueField.SetString(valueValue)
+	}
+
+	return itemVal.Interface().(KV)
+}
