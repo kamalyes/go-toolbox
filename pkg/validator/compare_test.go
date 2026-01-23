@@ -229,18 +229,27 @@ func TestValidateStatusCode(t *testing.T) {
 		name     string
 		actual   int
 		expect   int
+		op       CompareOperator
 		wantPass bool
 	}{
-		{"200 OK", 200, 200, true},
-		{"404 Not Found", 404, 404, true},
-		{"不匹配", 200, 404, false},
-		{"500 错误", 500, 500, true},
+		{"200 OK 相等", 200, 200, OpEqual, true},
+		{"404 Not Found 相等", 404, 404, OpEqual, true},
+		{"不匹配", 200, 404, OpEqual, false},
+		{"500 错误", 500, 500, OpEqual, true},
+		{"大于", 404, 200, OpGreaterThan, true},
+		{"小于", 200, 404, OpLessThan, true},
+		{"大于等于-相等", 200, 200, OpGreaterThanOrEqual, true},
+		{"大于等于-大于", 404, 200, OpGreaterThanOrEqual, true},
+		{"小于等于-相等", 200, 200, OpLessThanOrEqual, true},
+		{"小于等于-小于", 200, 404, OpLessThanOrEqual, true},
+		{"不等于-通过", 200, 404, OpNotEqual, true},
+		{"不等于-失败", 200, 200, OpNotEqual, false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ValidateStatusCode(tt.actual, tt.expect)
-			a.Equal(tt.wantPass, result.Success)
+			result := ValidateStatusCode(tt.actual, tt.expect, tt.op)
+			a.Equal(tt.wantPass, result.Success, "message: %s", result.Message)
 		})
 	}
 }
@@ -290,6 +299,102 @@ func TestCompareResult(t *testing.T) {
 	a.Equal("测试消息", result.Message)
 	a.Equal("实际值", result.Actual)
 	a.Equal("期望值", result.Expect)
+}
+
+func TestValidateJSONWithData(t *testing.T) {
+	a := assert.New(t)
+	data := []byte(`{"name":"test","value":123}`)
+	parsed, err := ValidateJSONWithData(data)
+	a.NoError(err)
+	m, ok := parsed.(map[string]any)
+	a.True(ok)
+	a.Equal("test", m["name"])
+	a.Equal(float64(123), m["value"])
+
+	invalid := []byte(`{name:"test"}`)
+	_, err = ValidateJSONWithData(invalid)
+	a.Error(err)
+}
+
+func TestValidateJSONField(t *testing.T) {
+	a := assert.New(t)
+	data := []byte(`{"name":"test","value":123}`)
+	result := ValidateJSONField(data, "name", "test")
+	a.True(result.Success)
+	result = ValidateJSONField(data, "value", float64(123))
+	a.True(result.Success)
+	result = ValidateJSONField(data, "missing", "x")
+	a.False(result.Success)
+	result = ValidateJSONField(data, "name", "x")
+	a.False(result.Success)
+}
+
+func TestValidateJSONFields(t *testing.T) {
+	a := assert.New(t)
+	data := []byte(`{"name":"test","value":123}`)
+	rules := map[string]any{"name": "test", "value": float64(123)}
+	results := ValidateJSONFields(data, rules)
+	a.Len(results, 2)
+	for _, r := range results {
+		a.True(r.Success)
+	}
+}
+
+func TestValidateContains(t *testing.T) {
+	a := assert.New(t)
+	body := []byte("hello world")
+	result := ValidateContains(body, "world")
+	a.True(result.Success)
+	result = ValidateContains(body, "test")
+	a.False(result.Success)
+	result = ValidateContains(body, "")
+	a.True(result.Success)
+}
+
+func TestValidateNotContains(t *testing.T) {
+	a := assert.New(t)
+	body := []byte("hello world")
+	result := ValidateNotContains(body, "test")
+	a.True(result.Success)
+	result = ValidateNotContains(body, "hello")
+	a.False(result.Success)
+	result = ValidateNotContains(body, "")
+	a.True(result.Success)
+}
+
+func TestValidateRegex(t *testing.T) {
+	a := assert.New(t)
+	body := []byte("abc123")
+	result := ValidateRegex(body, "^[a-z]+[0-9]+$")
+	a.True(result.Success)
+	result = ValidateRegex(body, "^[0-9]+[a-z]+$")
+	a.False(result.Success)
+	result = ValidateRegex(body, "")
+	a.True(result.Success)
+	result = ValidateRegex(body, "[")
+	a.False(result.Success)
+}
+
+func TestValidateHeader(t *testing.T) {
+	a := assert.New(t)
+	headers := map[string]string{"Content-Type": "application/json", "X-Test": "abc"}
+	result := ValidateHeader(headers, "Content-Type", "json", OpContains)
+	a.True(result.Success)
+	result = ValidateHeader(headers, "X-Test", "abc", OpEqual)
+	a.True(result.Success)
+	result = ValidateHeader(headers, "X-Test", "xyz", OpEqual)
+	a.False(result.Success)
+	result = ValidateHeader(headers, "Missing", "x", OpEqual)
+	a.False(result.Success)
+}
+
+func TestValidateContentType(t *testing.T) {
+	a := assert.New(t)
+	headers := map[string]string{"Content-Type": "application/json; charset=utf-8"}
+	result := ValidateContentType(headers, "json")
+	a.True(result.Success)
+	result = ValidateContentType(headers, "xml")
+	a.False(result.Success)
 }
 
 // Benchmark tests

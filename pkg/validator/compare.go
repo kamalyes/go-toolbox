@@ -133,15 +133,74 @@ func CompareNumbers[T types.Numerical](actual, expect T, op CompareOperator) Com
 	return result
 }
 
-// ValidateJSON 验证JSON结构
+// ValidateJSON 验证JSON结构（基础版，仅验证格式）
 func ValidateJSON(data []byte) error {
 	var v interface{}
 	return json.Unmarshal(data, &v)
 }
 
-// ValidateStatusCode 验证HTTP状态码
-func ValidateStatusCode(actual, expect int) CompareResult {
-	return CompareNumbers(actual, expect, OpEqual)
+// ValidateJSONWithData 验证JSON并返回解析后的数据
+func ValidateJSONWithData(body []byte) (any, error) {
+	var data any
+	if err := json.Unmarshal(body, &data); err != nil {
+		return nil, fmt.Errorf("响应不是有效的JSON: %w", err)
+	}
+	return data, nil
+}
+
+// ValidateJSONField 验证JSON字段值
+func ValidateJSONField(body []byte, field string, expected any) CompareResult {
+	result := CompareResult{
+		Expect: fmt.Sprintf("%v", expected),
+	}
+
+	// 解析JSON
+	data, err := ValidateJSONWithData(body)
+	if err != nil {
+		result.Message = err.Error()
+		return result
+	}
+
+	// 检查是否为对象
+	dataMap, ok := data.(map[string]any)
+	if !ok {
+		result.Message = "JSON根节点不是对象"
+		return result
+	}
+
+	// 检查字段是否存在
+	actual, ok := dataMap[field]
+	if !ok {
+		result.Message = fmt.Sprintf("字段不存在: %s", field)
+		return result
+	}
+
+	// 比较字段值
+	result.Actual = fmt.Sprintf("%v", actual)
+	result.Success = actual == expected
+	if !result.Success {
+		result.Message = fmt.Sprintf("字段值不匹配: %s, 期望: %v, 实际: %v", field, expected, actual)
+	}
+
+	return result
+}
+
+// ValidateJSONFields 批量验证JSON字段
+func ValidateJSONFields(body []byte, rules map[string]any) []CompareResult {
+	results := make([]CompareResult, 0, len(rules))
+	for field, expected := range rules {
+		result := ValidateJSONField(body, field, expected)
+		results = append(results, result)
+	}
+	return results
+}
+
+// ValidateStatusCode 验证HTTP状态码 - 支持多种比较操作符
+func ValidateStatusCode(statusCode, expected int, op CompareOperator) CompareResult {
+	if op == "" {
+		op = OpEqual // 默认相等比较
+	}
+	return CompareNumbers(statusCode, expected, op)
 }
 
 // ValidateStatusCodeRange 验证HTTP状态码在范围内
@@ -158,4 +217,93 @@ func ValidateStatusCodeRange(actual, min, max int) CompareResult {
 	}
 
 	return result
+}
+
+// ValidateContains 验证响应体包含指定字符串
+func ValidateContains(body []byte, substring string) CompareResult {
+	result := CompareResult{
+		Actual: string(body),
+		Expect: substring,
+	}
+
+	if substring == "" {
+		result.Success = true
+		return result
+	}
+
+	result.Success = strings.Contains(string(body), substring)
+	if !result.Success {
+		result.Message = fmt.Sprintf("响应不包含: %s", substring)
+	}
+
+	return result
+}
+
+// ValidateNotContains 验证响应体不包含指定字符串
+func ValidateNotContains(body []byte, substring string) CompareResult {
+	result := CompareResult{
+		Actual: string(body),
+		Expect: fmt.Sprintf("不包含: %s", substring),
+	}
+
+	if substring == "" {
+		result.Success = true
+		return result
+	}
+
+	result.Success = !strings.Contains(string(body), substring)
+	if !result.Success {
+		result.Message = fmt.Sprintf("响应包含不应存在的内容: %s", substring)
+	}
+
+	return result
+}
+
+// ValidateRegex 验证响应体匹配正则表达式
+func ValidateRegex(body []byte, pattern string) CompareResult {
+	result := CompareResult{
+		Actual: string(body),
+		Expect: fmt.Sprintf("匹配正则: %s", pattern),
+	}
+
+	if pattern == "" {
+		result.Success = true
+		return result
+	}
+
+	regex, err := regexp.Compile(pattern)
+	if err != nil {
+		result.Message = fmt.Sprintf("正则表达式编译失败: %v", err)
+		return result
+	}
+
+	result.Success = regex.Match(body)
+	if !result.Success {
+		result.Message = fmt.Sprintf("响应不匹配正则: %s", pattern)
+	}
+
+	return result
+}
+
+// ValidateHeader 验证HTTP头部字段
+func ValidateHeader(headers map[string]string, key, expected string, op CompareOperator) CompareResult {
+	actual, ok := headers[key]
+	if !ok {
+		return CompareResult{
+			Success: false,
+			Message: fmt.Sprintf("Header 不存在: %s", key),
+			Expect:  expected,
+		}
+	}
+
+	if op == "" {
+		op = OpEqual
+	}
+
+	return CompareStrings(actual, expected, op)
+}
+
+// ValidateContentType 验证 Content-Type
+func ValidateContentType(headers map[string]string, expected string) CompareResult {
+	return ValidateHeader(headers, "Content-Type", expected, OpContains)
 }
