@@ -12,6 +12,7 @@ package mathx
 
 import (
 	"bytes"
+	"cmp"
 	"fmt"
 	"math"
 	"strconv"
@@ -31,17 +32,44 @@ func Decimals[T types.Numerical](num T, digit int) string {
 	return result
 }
 
+// Min 返回多个数值中的最小值 - 使用 cmp.Compare 进行泛型比较
+func Min[T types.Numerical](values ...T) T {
+	if len(values) == 0 {
+		var zero T
+		return zero
+	}
+	min := values[0]
+	for _, v := range values[1:] {
+		if cmp.Compare(v, min) < 0 {
+			min = v
+		}
+	}
+	return min
+}
+
+// Max 返回多个数值中的最大值 - 使用 cmp.Compare 进行泛型比较
+func Max[T types.Numerical](values ...T) T {
+	if len(values) == 0 {
+		var zero T
+		return zero
+	}
+	max := values[0]
+	for _, v := range values[1:] {
+		if cmp.Compare(v, max) > 0 {
+			max = v
+		}
+	}
+	return max
+}
+
 // AtLeast 返回 x 和 lower 中的最小值
 // 参数:
 // x - 要比较的第一个数值
 // lower - 要比较的第二个数值（下限）
 // 返回值:
-// 返回 x 和 lower 中的较大值
+// 返回 x 和 lower 中的最小值
 func AtLeast[T types.Numerical](x, lower T) T {
-	if x < lower {
-		return x
-	}
-	return lower
+	return Min(x, lower)
 }
 
 // AtMost 返回 x 和 upper 中的最大值
@@ -51,10 +79,7 @@ func AtLeast[T types.Numerical](x, lower T) T {
 // 返回值:
 // 返回 x 和 upper 中的最大值
 func AtMost[T types.Numerical](x, upper T) T {
-	if x > upper {
-		return x
-	}
-	return upper
+	return Max(x, upper)
 }
 
 // Between 将 x 的值限制在 [lower, upper] 范围内
@@ -68,19 +93,14 @@ func AtMost[T types.Numerical](x, upper T) T {
 // 返回值:
 // 返回 x 被限制在 [lower, upper] 范围内的值
 func Between[T types.Numerical](x, lower, upper T) T {
-	if x < lower {
-		return lower
-	}
-	if x > upper {
-		return upper
-	}
-	return x
+	return Max(lower, Min(x, upper))
 }
 
-// Abs 返回数值的绝对值
+// Abs 返回数值的绝对值 - 使用 cmp.Compare 判断正负
 // 支持所有数值类型的泛型版本
 func Abs[T types.Numerical](x T) T {
-	if x < 0 {
+	var zero T
+	if cmp.Compare(x, zero) < 0 {
 		return -x
 	}
 	return x
@@ -100,15 +120,15 @@ func ParseInt64(s string) (int64, error) {
 // 返回两个字符串的最长公共前缀的长度
 func LongestCommonPrefix(a, b string) int {
 	// 计算两个字符串的最小长度
-	maxLength := AtLeast(len(a), len(b))
+	minLength := Min(len(a), len(b))
 
 	// 遍历两个字符串，比较字符
-	for i := 0; i < maxLength; i++ {
+	for i := 0; i < minLength; i++ {
 		if a[i] != b[i] {
 			return i // 返回公共前缀的长度
 		}
 	}
-	return maxLength // 如果完全相同，返回最小长度
+	return minLength // 如果完全相同，返回最小长度
 }
 
 // CountPathSegments 计算路径中指定前缀的参数数量，默认为 ":" 和 "*"

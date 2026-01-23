@@ -24,6 +24,22 @@ import (
 	"github.com/kamalyes/go-toolbox/pkg/validator"
 )
 
+// MinSlice 返回切片中的最小值
+func MinSlice(values []float64) float64 {
+	if len(values) == 0 {
+		return 0
+	}
+	return Min(values...)
+}
+
+// MaxSlice 返回切片中的最大值
+func MaxSlice(values []float64) float64 {
+	if len(values) == 0 {
+		return 0
+	}
+	return Max(values...)
+}
+
 // SliceMinMax 计算列表中元素的最小值或最大值
 // 接收一个切片和一个 MinMaxFunc 类型的函数，
 // 根据提供的函数决定是计算最小值还是最大值

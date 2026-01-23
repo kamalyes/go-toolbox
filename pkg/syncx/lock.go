@@ -10,7 +10,10 @@
  */
 package syncx
 
-import "errors"
+import (
+	"errors"
+	"sync"
+)
 
 // Locker 是一个接口，定义了锁定和解锁的方法
 type Locker interface {
@@ -213,4 +216,44 @@ func WithTryRLockReturnWithE[T any, E any](lock TryRLocker, operation func() (T,
 	}
 	defer lock.RUnlock()
 	return operation()
+}
+
+// RWLock 读写锁实现
+type RWLock struct {
+	mu sync.RWMutex
+}
+
+// NewRWLock 创建新的读写锁
+func NewRWLock() *RWLock {
+	return &RWLock{}
+}
+
+// Lock 获取写锁
+func (l *RWLock) Lock() {
+	l.mu.Lock()
+}
+
+// Unlock 释放写锁
+func (l *RWLock) Unlock() {
+	l.mu.Unlock()
+}
+
+// RLock 获取读锁
+func (l *RWLock) RLock() {
+	l.mu.RLock()
+}
+
+// RUnlock 释放读锁
+func (l *RWLock) RUnlock() {
+	l.mu.RUnlock()
+}
+
+// TryLock 尝试获取写锁
+func (l *RWLock) TryLock() bool {
+	return l.mu.TryLock()
+}
+
+// TryRLock 尝试获取读锁
+func (l *RWLock) TryRLock() bool {
+	return l.mu.TryRLock()
 }

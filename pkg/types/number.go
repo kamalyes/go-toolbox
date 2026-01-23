@@ -19,17 +19,18 @@ type Unsigned interface {
 
 // Integer
 type Integer interface {
-	int | int8 | int16 | int32 | int64
+	~int | ~int8 | ~int16 | ~int32 | ~int64
 }
 
 // Float 是一个约束，允许任何浮点数类型。
 // 如果未来的 Go 版本添加了新的预定义浮点数类型，
 // 这个约束将会被修改以包含它们。
 type Float interface {
-	float32 | float64
+	~float32 | ~float64
 }
 
 // Numerical 是一个接口，表示一系列数值类型，包括有符号和无符号的整数以及浮点数。
+// 使用 ~ 支持底层类型相同的类型别名（如 time.Duration 是 ~int64）
 type Numerical interface {
 	Integer | Unsigned | Float
 }

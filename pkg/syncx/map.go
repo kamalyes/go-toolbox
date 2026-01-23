@@ -180,6 +180,155 @@ func (m *Map[K, V]) Clone() *Map[K, V] {
 	return newMap // 返回新的 Map 实例
 }
 
+// Filter 过滤 Map，返回满足条件的元素组成的新切片
+func (m *Map[K, V]) Filter(predicate func(K, V) bool) []V {
+	result := make([]V, 0)
+	m.Range(func(key K, value V) bool {
+		if predicate(key, value) {
+			result = append(result, value)
+		}
+		return true
+	})
+	return result
+}
+
+// FilterKeys 过滤 Map，返回满足条件的键组成的切片
+func (m *Map[K, V]) FilterKeys(predicate func(K, V) bool) []K {
+	result := make([]K, 0)
+	m.Range(func(key K, value V) bool {
+		if predicate(key, value) {
+			result = append(result, key)
+		}
+		return true
+	})
+	return result
+}
+
+// FilterMap 过滤 Map，返回满足条件的元素组成的新 Map
+func (m *Map[K, V]) FilterMap(predicate func(K, V) bool) *Map[K, V] {
+	newMap := NewMap[K, V]()
+	m.Range(func(key K, value V) bool {
+		if predicate(key, value) {
+			newMap.Store(key, value)
+		}
+		return true
+	})
+	return newMap
+}
+
+// ForEach 遍历 Map 并对每个元素执行操作
+func (m *Map[K, V]) ForEach(fn func(K, V)) {
+	m.Range(func(key K, value V) bool {
+		fn(key, value)
+		return true
+	})
+}
+
+// Update 更新指定键的值，如果键存在则使用 updater 函数更新，返回是否更新成功
+func (m *Map[K, V]) Update(key K, updater func(V) V) bool {
+	value, exists := m.Load(key)
+	if !exists {
+		return false
+	}
+	m.Store(key, updater(value))
+	return true
+}
+
+// GetOrStore 获取键对应的值，如果不存在则存储并返回默认值
+func (m *Map[K, V]) GetOrStore(key K, defaultValue V) V {
+	value, _ := m.LoadOrStore(key, defaultValue)
+	return value
+}
+
+// GetOrCompute 获取键对应的值，如果不存在则计算并存储
+func (m *Map[K, V]) GetOrCompute(key K, compute func() V) V {
+	if value, exists := m.Load(key); exists {
+		return value
+	}
+	newValue := compute()
+	actual, _ := m.LoadOrStore(key, newValue)
+	return actual
+}
+
+// DeleteIf 删除满足条件的所有元素
+func (m *Map[K, V]) DeleteIf(predicate func(K, V) bool) int {
+	count := 0
+	keysToDelete := make([]K, 0)
+	m.Range(func(key K, value V) bool {
+		if predicate(key, value) {
+			keysToDelete = append(keysToDelete, key)
+		}
+		return true
+	})
+	for _, key := range keysToDelete {
+		m.Delete(key)
+		count++
+	}
+	return count
+}
+
+// Any 判断是否存在满足条件的元素
+func (m *Map[K, V]) Any(predicate func(K, V) bool) bool {
+	found := false
+	m.Range(func(key K, value V) bool {
+		if predicate(key, value) {
+			found = true
+			return false // 停止遍历
+		}
+		return true
+	})
+	return found
+}
+
+// All 判断是否所有元素都满足条件
+func (m *Map[K, V]) All(predicate func(K, V) bool) bool {
+	allMatch := true
+	m.Range(func(key K, value V) bool {
+		if !predicate(key, value) {
+			allMatch = false
+			return false // 停止遍历
+		}
+		return true
+	})
+	return allMatch
+}
+
+// Count 返回满足条件的元素数量
+func (m *Map[K, V]) Count(predicate func(K, V) bool) int {
+	count := 0
+	m.Range(func(key K, value V) bool {
+		if predicate(key, value) {
+			count++
+		}
+		return true
+	})
+	return count
+}
+
+// IsEmpty 判断 Map 是否为空
+func (m *Map[K, V]) IsEmpty() bool {
+	return m.Size() == 0
+}
+
+// ToMap 将 syncx.Map 转换为普通 map
+func (m *Map[K, V]) ToMap() map[K]V {
+	result := make(map[K]V)
+	m.Range(func(key K, value V) bool {
+		result[key] = value
+		return true
+	})
+	return result
+}
+
+// FromMap 从普通 map 创建 syncx.Map
+func FromMap[K comparable, V comparable](data map[K]V) *Map[K, V] {
+	m := NewMap[K, V]()
+	for k, v := range data {
+		m.Store(k, v)
+	}
+	return m
+}
+
 // CopyMeta 复制 src 中的所有键值对到 dst 中。
 // 如果 dst 为 nil，则不进行任何操作。
 func CopyMeta(src, dst map[string]string) {
