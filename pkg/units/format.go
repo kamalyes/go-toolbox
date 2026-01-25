@@ -53,3 +53,18 @@ func HumanSize(size float64) string {
 func BytesSize(size float64) string {
 	return CustomSize("%.4g%s", size, 1024.0, BinaryAbbrs)
 }
+
+// FormatBytes 格式化字节数为可读字符串
+func FormatBytes(bytes uint64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := uint64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	units := []string{"KB", "MB", "GB", "TB", "PB"}
+	return fmt.Sprintf("%.2f %s", float64(bytes)/float64(div), units[exp])
+}

@@ -103,3 +103,50 @@ func TestEdgeCases(t *testing.T) {
 		})
 	}
 }
+
+func TestParseBytes(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		want      uint64
+		wantError bool
+	}{
+		// 二进制单位（优先匹配）
+		{"1GB binary", "1GB", 1073741824, false},    // 1 GiB = 1024^3
+		{"512MB binary", "512MB", 536870912, false}, // 512 MiB
+		{"2048KB binary", "2048KB", 2097152, false}, // 2048 KiB
+		{"1GiB explicit", "1GiB", 1073741824, false},
+		{"100MiB explicit", "100MiB", 104857600, false},
+
+		// 无单位（纯数字）
+		{"plain number", "1024", 1024, false},
+		{"plain with b", "2048b", 2048, false},
+
+		// 大小写不敏感
+		{"lowercase gb", "1gb", 1073741824, false},
+		{"uppercase GB", "1GB", 1073741824, false},
+		{"mixed case Mb", "512Mb", 536870912, false},
+
+		// 边界情况
+		{"zero", "0", 0, false},
+		{"zero with unit", "0MB", 0, false},
+
+		// 错误情况
+		{"invalid unit", "100XB", 0, true},
+		{"invalid format", "abc", 0, true},
+		{"empty string", "", 0, true},
+		{"negative", "-100MB", 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParseBytes(tt.input)
+			if tt.wantError {
+				assert.Error(t, err, "Expected error for input: %s", tt.input)
+			} else {
+				assert.NoError(t, err, "Unexpected error for input: %s", tt.input)
+				assert.Equal(t, tt.want, got, "ParseBytes(%s) = %d, want %d", tt.input, got, tt.want)
+			}
+		})
+	}
+}

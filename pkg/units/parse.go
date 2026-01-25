@@ -21,6 +21,27 @@ import (
 
 const errFmtWrappedWithString = "%w: '%s'"
 
+// ParseBytes 解析字节大小字符串（支持二进制和十进制单位）
+// 示例：ParseBytes("1GB") -> 1073741824 (使用二进制单位 1 GiB)
+//
+//	ParseBytes("512MB") -> 536870912
+//	ParseBytes("2048KB") -> 2097152
+func ParseBytes(size string) (uint64, error) {
+	// 优先尝试二进制单位（KiB, MiB, GiB 等）
+	result, err := ParseSizeBinary(size)
+	if err == nil {
+		return uint64(result), nil
+	}
+
+	// 如果失败，尝试十进制单位（kB, MB, GB 等）
+	result, err = ParseSizeDecimal(size)
+	if err != nil {
+		return 0, err
+	}
+
+	return uint64(result), nil
+}
+
 // ParseSizeDecimal 解析十进制单位格式的字符串（如 "22kB", "17MB"），返回对应字节数
 func ParseSizeDecimal(size string) (int64, error) {
 	return parseSize(size, DecimalMap)
