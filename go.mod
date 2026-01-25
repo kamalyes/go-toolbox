@@ -1,6 +1,6 @@
 module github.com/kamalyes/go-toolbox
 
-go 1.20
+go 1.23
 
 require (
 	github.com/disintegration/imaging v1.6.2
@@ -30,9 +30,10 @@ require (
 	github.com/klauspost/cpuid/v2 v2.2.7 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
+	github.com/oliveagle/jsonpath v0.0.0-20180606110733-2e52cf6e6852
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	golang.org/x/arch v0.8.0 // indirect
 	golang.org/x/crypto v0.23.0
 	golang.org/x/sys v0.25.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
+	gopkg.in/yaml.v3 v3.0.1
 )

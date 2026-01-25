@@ -175,7 +175,7 @@ func parseStringToInt[T types.Numerical](v string, mode RoundMode) (T, error) {
 //
 // 返回值: 转换后的浮点数和可能的错误
 func MustFloatT[T types.Float](value any, mode RoundMode) (T, error) {
-	f, err := toFloat64(value)
+	f, err := ToFloat64(value)
 	if err != nil {
 		return 0, err
 	}
@@ -194,8 +194,8 @@ func MustFloatT[T types.Float](value any, mode RoundMode) (T, error) {
 	}
 }
 
-// toFloat64 将各种类型转换为 float64
-func toFloat64(value any) (float64, error) {
+// ToFloat64 将各种类型转换为 float64
+func ToFloat64(value any) (float64, error) {
 	v := reflect.ValueOf(value)
 
 	switch v.Kind() {
