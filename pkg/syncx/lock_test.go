@@ -548,3 +548,125 @@ func TestWithTryRLockReturnWithE(t *testing.T) {
 	assert.NoError(t, err, "expected no error")
 	assert.Equal(t, 42, result, "expected result 42")
 }
+
+// TestNewLock 测试 NewLock 函数
+func TestNewLock(t *testing.T) {
+	lock := NewLock()
+	assert.NotNil(t, lock, "NewLock should not return nil")
+}
+
+// TestLockBasic 测试 Lock 的基本功能
+func TestLockBasic(t *testing.T) {
+	lock := NewLock()
+	counter := 0
+	
+	lock.Lock()
+	counter++
+	lock.Unlock()
+	
+	assert.Equal(t, 1, counter, "Counter should be 1")
+}
+
+// TestLockConcurrency 测试 Lock 在并发场景下的正确性
+func TestLockConcurrency(t *testing.T) {
+	lock := NewLock()
+	counter := int32(0)
+	iterations := 1000
+	goroutines := 10
+	
+	var wg sync.WaitGroup
+	for i := 0; i < goroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < iterations; j++ {
+				lock.Lock()
+				atomic.AddInt32(&counter, 1)
+				lock.Unlock()
+			}
+		}()
+	}
+	
+	wg.Wait()
+	
+	expected := int32(goroutines * iterations)
+	assert.Equal(t, expected, counter, "Counter should be %d", expected)
+}
+
+// TestLockTryLock 测试 TryLock 功能
+func TestLockTryLock(t *testing.T) {
+	lock := NewLock()
+	
+	// 第一次应该成功
+	assert.True(t, lock.TryLock(), "First TryLock should succeed")
+	
+	// 已经锁定，第二次应该失败
+	assert.False(t, lock.TryLock(), "Second TryLock should fail")
+	
+	lock.Unlock()
+	
+	// 解锁后应该能再次获取
+	assert.True(t, lock.TryLock(), "TryLock after unlock should succeed")
+	lock.Unlock()
+}
+
+// TestLockWithLock 测试 WithLock 配合 Lock 使用
+func TestLockWithLock(t *testing.T) {
+	lock := NewLock()
+	executed := false
+	
+	WithLock(lock, func() {
+		executed = true
+	})
+	
+	assert.True(t, executed, "Operation should be executed")
+}
+
+// TestLockWithTryLock 测试 WithTryLock 配合 Lock 使用
+func TestLockWithTryLock(t *testing.T) {
+	lock := NewLock()
+	
+	// 应该成功
+	err := WithTryLock(lock, func() error {
+		return nil
+	})
+	assert.NoError(t, err, "WithTryLock should succeed")
+	
+	// 锁定后再尝试应该失败
+	lock.Lock()
+	err = WithTryLock(lock, func() error {
+		return nil
+	})
+	assert.Equal(t, ErrLockNotAcquired, err, "WithTryLock should return ErrLockNotAcquired")
+	lock.Unlock()
+}
+
+// BenchmarkNewLock 基准测试 Lock 的创建
+func BenchmarkNewLock(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_ = NewLock()
+	}
+}
+
+// BenchmarkLockUnlock 基准测试 Lock/Unlock
+func BenchmarkLockUnlock(b *testing.B) {
+	lock := NewLock()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			lock.Lock()
+			lock.Unlock()
+		}
+	})
+}
+
+// BenchmarkLockTryLock 基准测试 TryLock
+func BenchmarkLockTryLock(b *testing.B) {
+	lock := NewLock()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			if lock.TryLock() {
+				lock.Unlock()
+			}
+		}
+	})
+}

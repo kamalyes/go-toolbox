@@ -257,3 +257,28 @@ func (l *RWLock) TryLock() bool {
 func (l *RWLock) TryRLock() bool {
 	return l.mu.TryRLock()
 }
+
+// Lock 互斥锁实现
+type Lock struct {
+	mu sync.Mutex
+}
+
+// NewLock 创建新的互斥锁
+func NewLock() *Lock {
+	return &Lock{}
+}
+
+// Lock 获取锁
+func (l *Lock) Lock() {
+	l.mu.Lock()
+}
+
+// Unlock 释放锁
+func (l *Lock) Unlock() {
+	l.mu.Unlock()
+}
+
+// TryLock 尝试获取锁
+func (l *Lock) TryLock() bool {
+	return l.mu.TryLock()
+}
