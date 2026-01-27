@@ -195,3 +195,62 @@ func ComputeHashes(filePath string) (map[sign.HashCryptoFunc]string, error) {
 
 	return results, nil
 }
+
+// FindFiles 查找匹配 glob 模式的文件，支持 ** 通配符用于递归匹配
+// 参数：pattern - glob 模式，支持标准模式和递归模式（**/）
+// 返回：匹配的文件路径切片和可能的错误
+// 示例：
+//   - "./pb/*.pb.go" - 查找 pb 目录下所有 pb.go 文件
+//   - "./pb/**/*.pb.go" - 递归查找所有子目录下的 pb.go 文件
+func FindFiles(pattern string) ([]string, error) {
+	// 处理 ** 通配符（递归匹配）
+	if strings.Contains(pattern, "**") {
+		return FindFilesRecursive(pattern)
+	}
+
+	// 使用标准 glob 匹配
+	return filepath.Glob(pattern)
+}
+
+// FindFilesRecursive 递归查找文件，支持 ** 通配符
+// 内部函数，用于处理包含 ** 的模式
+func FindFilesRecursive(pattern string) ([]string, error) {
+	var files []string
+
+	// 分割路径和模式
+	parts := strings.Split(pattern, "**")
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid recursive pattern: %s", pattern)
+	}
+
+	baseDir := parts[0]
+	if baseDir == "" {
+		baseDir = "."
+	}
+	filePattern := strings.TrimPrefix(parts[1], string(filepath.Separator))
+
+	// 递归遍历目录
+	err := filepath.Walk(baseDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		// 检查文件名是否匹配
+		matched, err := filepath.Match(filePattern, filepath.Base(path))
+		if err != nil {
+			return err
+		}
+
+		if matched {
+			files = append(files, path)
+		}
+
+		return nil
+	})
+
+	return files, err
+}

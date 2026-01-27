@@ -40,14 +40,10 @@ func TestGetDirFiles(t *testing.T) {
 
 	// 获取目录中的文件
 	files, err := GetDirFiles(tempDir)
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
+	assert.NoError(t, err)
 
 	// 检查返回的文件数量
-	if len(files) != 3 {
-		t.Fatalf("Expected 3 files, got %d", len(files))
-	}
+	assert.Equal(t, 3, len(files))
 }
 
 // createTestImage 创建一个简单的测试图像并保存到指定文件
@@ -82,17 +78,14 @@ func TestCheckImageExists(t *testing.T) {
 
 	// 创建有效图像
 	validFilename := "valid_image.png"
-	if err := createTestImage(validFilename); err != nil {
-		t.Fatalf("Failed to create test image: %v", err)
-	}
+	err := createTestImage(validFilename)
+	assert.NoError(t, err)
 	t.Cleanup(func() { os.Remove(validFilename) }) // 清理测试文件
 
 	// 创建无效图像
 	invalidImageFilename := "invalid_image.png"
 	file, err := os.Create(invalidImageFilename)
-	if err != nil {
-		t.Fatalf("Failed to create invalid image file: %v", err)
-	}
+	assert.NoError(t, err)
 	file.WriteString("This is not an image.")
 	file.Close()
 	t.Cleanup(func() { os.Remove(invalidImageFilename) }) // 清理测试文件
@@ -100,9 +93,7 @@ func TestCheckImageExists(t *testing.T) {
 	for filename, tc := range testCases {
 		t.Run(filename, func(t *testing.T) {
 			exists := CheckImageExists(filename) == nil
-			if exists != tc.shouldExist {
-				t.Errorf("Expected existence of %s to be %v, but got %v", filename, tc.shouldExist, exists)
-			}
+			assert.Equal(t, tc.shouldExist, exists, fmt.Sprintf("Expected existence of %s to be %v", filename, tc.shouldExist))
 		})
 	}
 }
@@ -111,9 +102,8 @@ func TestCheckImageExists(t *testing.T) {
 func TestSaveImage(t *testing.T) {
 	// 创建一个临时图像文件
 	tempImageFilename := "temp_image.png"
-	if err := createTestImage(tempImageFilename); err != nil {
-		t.Fatalf("Failed to create test image: %v", err)
-	}
+	err := createTestImage(tempImageFilename)
+	assert.NoError(t, err)
 	t.Cleanup(func() { os.Remove(tempImageFilename) }) // 清理临时图像文件
 
 	// 使用 map 组织测试用例
@@ -130,18 +120,16 @@ func TestSaveImage(t *testing.T) {
 	for filename, tc := range testCases {
 		t.Run(filename, func(t *testing.T) {
 			imgData, err := os.ReadFile(tempImageFilename) // 读取临时图像文件数据
-			if err != nil {
-				t.Fatalf("Failed to read temp image data: %v", err)
-			}
+			assert.NoError(t, err)
 
 			err = SaveImage(filename, imgData, tc.quality)
-			if (err != nil) != tc.expectErr {
-				t.Errorf("Expected error status %v for %s, but got %v", tc.expectErr, filename, err != nil)
+			if tc.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.NoError(t, CheckImageExists(filename))
 			}
 			t.Cleanup(func() { os.Remove(filename) }) // 清理测试文件
-			if err == nil && CheckImageExists(filename) != nil {
-				t.Errorf("Expected %s to exist after saving, but it does not", filename)
-			}
 		})
 	}
 }
@@ -232,23 +220,17 @@ func TestCreateIfNotExist(t *testing.T) {
 func TestHash(t *testing.T) {
 	// 创建临时文件
 	tempFile, err := os.CreateTemp("", "tempFile.txt")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	defer os.Remove(tempFile.Name())
 
 	// 写入测试内容
 	_, err = tempFile.Write([]byte("Hello, World!"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	tempFile.Close()
 
 	// 计算哈希，返回map
 	hashMap, err := ComputeHashes(tempFile.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	// 验证哈希值是否正确
 	expected := map[sign.HashCryptoFunc]string{
@@ -263,10 +245,170 @@ func TestHash(t *testing.T) {
 	// 遍历期望值逐个断言
 	for algo, expectedHash := range expected {
 		actualHash, ok := hashMap[algo]
-		if !ok {
-			t.Errorf("缺少算法 %s 的哈希结果", algo)
-			continue
-		}
+		assert.True(t, ok, fmt.Sprintf("应该包含算法 %s 的哈希结果", algo))
 		assert.Equal(t, expectedHash, actualHash, fmt.Sprintf("算法 %s 哈希不匹配", algo))
+	}
+}
+
+// TestFindFiles 测试 FindFiles 函数
+func TestFindFiles(t *testing.T) {
+	// 创建临时目录结构用于测试
+	tempDir := t.TempDir()
+
+	// 创建目录结构
+	//  tempDir/
+	//  ├── file1.pb.go
+	//  ├── file2.pb.go
+	//  ├── other.txt
+	//  └── subdir/
+	//      ├── file3.pb.go
+	//      └── nested/
+	//          └── file5.pb.go
+
+	pbFile1 := filepath.Join(tempDir, "file1.pb.go")
+	pbFile2 := filepath.Join(tempDir, "file2.pb.go")
+	otherFile := filepath.Join(tempDir, "other.txt")
+	subDir := filepath.Join(tempDir, "subdir")
+	pbFile3 := filepath.Join(subDir, "file3.pb.go")
+	nestedDir := filepath.Join(subDir, "nested")
+	pbFile4 := filepath.Join(nestedDir, "file5.pb.go")
+
+	// 创建文件
+	for _, f := range []string{pbFile1, pbFile2, otherFile} {
+		err := os.WriteFile(f, []byte("test"), 0644)
+		assert.NoError(t, err, "Failed to create test file")
+	}
+
+	// 创建子目录和文件
+	err := os.MkdirAll(nestedDir, 0755)
+	assert.NoError(t, err, "Failed to create test directories")
+	for _, f := range []string{pbFile3, pbFile4} {
+		err := os.WriteFile(f, []byte("test"), 0644)
+		assert.NoError(t, err, "Failed to create test file")
+	}
+
+	testCases := []struct {
+		name      string
+		pattern   string
+		expectLen int
+		desc      string
+	}{
+		{
+			name:      "simple_glob",
+			pattern:   filepath.Join(tempDir, "*.pb.go"),
+			expectLen: 2,
+			desc:      "Should find only .pb.go files in root directory",
+		},
+		{
+			name:      "recursive_glob",
+			pattern:   filepath.Join(tempDir, "**", "*.pb.go"),
+			expectLen: 4,
+			desc:      "Should find all .pb.go files recursively",
+		},
+		{
+			name:      "non_matching_pattern",
+			pattern:   filepath.Join(tempDir, "*.xyz"),
+			expectLen: 0,
+			desc:      "Should return empty slice for non-matching pattern",
+		},
+		{
+			name:      "txt_files",
+			pattern:   filepath.Join(tempDir, "*.txt"),
+			expectLen: 1,
+			desc:      "Should find .txt files",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			files, err := FindFiles(tc.pattern)
+			assert.NoError(t, err, "FindFiles should not return error")
+			assert.Equal(t, tc.expectLen, len(files), tc.desc)
+
+			// 验证返回的文件都存在
+			for _, f := range files {
+				assert.True(t, FileExists(f), "Returned file should exist: "+f)
+			}
+		})
+	}
+}
+
+// TestFindFilesRecursive 测试 findFilesRecursive 内部函数（间接测试）
+func TestFindFilesRecursive(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// 创建深层目录结构
+	//  tempDir/
+	//  ├── level1/
+	//  │   ├── file.txt
+	//  │   └── level2/
+	//  │       ├── file.txt
+	//  │       └── level3/
+	//  │           └── file.txt
+
+	level1 := filepath.Join(tempDir, "level1")
+	level2 := filepath.Join(level1, "level2")
+	level3 := filepath.Join(level2, "level3")
+
+	err := os.MkdirAll(level3, 0755)
+	assert.NoError(t, err, "Failed to create test directories")
+
+	testFiles := []string{
+		filepath.Join(level1, "file.txt"),
+		filepath.Join(level2, "file.txt"),
+		filepath.Join(level3, "file.txt"),
+	}
+
+	for _, f := range testFiles {
+		err := os.WriteFile(f, []byte("test"), 0644)
+		assert.NoError(t, err, "Failed to create test file")
+	}
+
+	// 使用递归模式查找所有 file.txt
+	pattern := filepath.Join(level1, "**", "file.txt")
+	files, err := FindFiles(pattern)
+
+	assert.NoError(t, err, "FindFiles should not return error for recursive pattern")
+	assert.Equal(t, 3, len(files), "Should find 3 files in nested directories")
+
+	// 验证找到的文件都在正确的位置
+	for _, f := range files {
+		assert.True(t, FileExists(f), "Returned file should exist: "+f)
+		assert.Contains(t, f, "file.txt", "Returned file should be file.txt")
+	}
+}
+
+// TestFindFilesEdgeCases 测试 FindFiles 的边界情况
+func TestFindFilesEdgeCases(t *testing.T) {
+	testCases := []struct {
+		name      string
+		pattern   string
+		shouldErr bool
+		desc      string
+	}{
+		{
+			name:      "empty_pattern",
+			pattern:   "",
+			shouldErr: false,
+			desc:      "Empty pattern should not error (glob behavior)",
+		},
+		{
+			name:      "invalid_recursive_pattern",
+			pattern:   "path/with/**/multiple/**/stars/file.txt",
+			shouldErr: true,
+			desc:      "Pattern with multiple ** should error",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := FindFiles(tc.pattern)
+			if tc.shouldErr {
+				assert.Error(t, err, tc.desc)
+			} else {
+				// 不应该 panic，可能返回错误或空结果
+				// 主要验证函数不会崩溃
+			}
+		})
 	}
 }
