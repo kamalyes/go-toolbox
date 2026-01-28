@@ -116,22 +116,73 @@ func TestMapTR(t *testing.T) {
 
 // TestUnique 测试 Unique 方法
 func TestUnique(t *testing.T) {
-	t.Run("有重复", func(t *testing.T) {
+	t.Run("单个切片-有重复", func(t *testing.T) {
 		slice := []int{1, 2, 2, 3, 3, 3, 4}
 		unique := Unique(slice)
 		assert.Equal(t, []int{1, 2, 3, 4}, unique)
 	})
 
-	t.Run("无重复", func(t *testing.T) {
+	t.Run("单个切片-无重复", func(t *testing.T) {
 		slice := []int{1, 2, 3, 4}
 		unique := Unique(slice)
 		assert.Equal(t, []int{1, 2, 3, 4}, unique)
 	})
 
-	t.Run("空切片", func(t *testing.T) {
+	t.Run("单个切片-空切片", func(t *testing.T) {
 		var slice []int
 		unique := Unique(slice)
 		assert.Empty(t, unique)
+	})
+
+	t.Run("多个切片-合并去重", func(t *testing.T) {
+		slice1 := []int{1, 2, 3}
+		slice2 := []int{3, 4, 5}
+		unique := Unique(slice1, slice2)
+		assert.Equal(t, []int{1, 2, 3, 4, 5}, unique)
+	})
+
+	t.Run("多个切片-有重复元素", func(t *testing.T) {
+		slice1 := []int{1, 2, 2, 3}
+		slice2 := []int{2, 3, 4, 4}
+		slice3 := []int{3, 4, 5}
+		unique := Unique(slice1, slice2, slice3)
+		assert.Equal(t, []int{1, 2, 3, 4, 5}, unique)
+	})
+
+	t.Run("多个切片-保持顺序", func(t *testing.T) {
+		slice1 := []string{"a", "b", "c"}
+		slice2 := []string{"b", "d", "e"}
+		slice3 := []string{"c", "e", "f"}
+		unique := Unique(slice1, slice2, slice3)
+		// 应该保持第一次出现的顺序
+		assert.Equal(t, []string{"a", "b", "c", "d", "e", "f"}, unique)
+	})
+
+	t.Run("多个切片-包含空切片", func(t *testing.T) {
+		slice1 := []int{1, 2}
+		var slice2 []int
+		slice3 := []int{2, 3}
+		unique := Unique(slice1, slice2, slice3)
+		assert.Equal(t, []int{1, 2, 3}, unique)
+	})
+
+	t.Run("多个切片-全部为空", func(t *testing.T) {
+		var slice1, slice2, slice3 []int
+		unique := Unique(slice1, slice2, slice3)
+		assert.Empty(t, unique)
+	})
+
+	t.Run("无参数调用", func(t *testing.T) {
+		unique := Unique[int]()
+		assert.Empty(t, unique)
+	})
+
+	t.Run("字符串类型-多切片", func(t *testing.T) {
+		slice1 := []string{"apple", "banana"}
+		slice2 := []string{"banana", "cherry"}
+		slice3 := []string{"cherry", "date"}
+		unique := Unique(slice1, slice2, slice3)
+		assert.Equal(t, []string{"apple", "banana", "cherry", "date"}, unique)
 	})
 }
 
@@ -209,6 +260,63 @@ func BenchmarkContains(b *testing.B) {
 // BenchmarkUnique 性能测试
 func BenchmarkUnique(b *testing.B) {
 	slice := []int{1, 2, 3, 2, 4, 3, 5, 1, 6, 4, 7, 5}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		Unique(slice)
+	}
+}
+
+// BenchmarkUniqueMultipleSlices 多切片合并去重性能测试
+func BenchmarkUniqueMultipleSlices(b *testing.B) {
+	slice1 := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+	slice2 := []int{5, 6, 7, 8, 9, 10, 11, 12, 13, 14}
+	slice3 := []int{10, 11, 12, 13, 14, 15, 16, 17, 18, 19}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		Unique(slice1, slice2, slice3)
+	}
+}
+
+// BenchmarkUniqueLargeSlice 大切片性能测试
+func BenchmarkUniqueLargeSlice(b *testing.B) {
+	// 创建一个包含 1000 个元素的切片，约 50% 重复率
+	slice := make([]int, 1000)
+	for i := 0; i < 1000; i++ {
+		slice[i] = i % 500
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		Unique(slice)
+	}
+}
+
+// BenchmarkUniqueNoDuplicates 无重复元素性能测试
+func BenchmarkUniqueNoDuplicates(b *testing.B) {
+	slice := make([]int, 100)
+	for i := 0; i < 100; i++ {
+		slice[i] = i
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		Unique(slice)
+	}
+}
+
+// BenchmarkUniqueAllDuplicates 全部重复元素性能测试
+func BenchmarkUniqueAllDuplicates(b *testing.B) {
+	slice := make([]int, 100)
+	for i := 0; i < 100; i++ {
+		slice[i] = 1
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		Unique(slice)
+	}
+}
+
+// BenchmarkUniqueSmallSlice 小切片性能测试
+func BenchmarkUniqueSmallSlice(b *testing.B) {
+	slice := []int{1, 2, 3, 2, 4, 3, 5}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		Unique(slice)

@@ -72,14 +72,60 @@ func MapTR[T any, R any](slice []T, mapper func(T) R) []R {
 	return result
 }
 
-// Unique 去重切片（保持原始顺序）
-func Unique[T comparable](slice []T) []T {
-	seen := make(map[T]struct{}, len(slice))
-	result := make([]T, 0, len(slice))
-	for _, item := range slice {
-		if _, exists := seen[item]; !exists {
-			seen[item] = struct{}{}
-			result = append(result, item)
+// Unique 去重切片（保持原始顺序），支持合并多个切片后去重
+// 性能优化：
+// - 使用 map 快速查重，每次查找 O(1)，总体时间复杂度 O(n)
+// - 预分配合理容量减少内存分配
+// - 单次遍历完成去重
+func Unique[T comparable](slices ...[]T) []T {
+	if len(slices) == 0 {
+		return nil
+	}
+
+	// 快速路径：单个切片且为空
+	if len(slices) == 1 {
+		slice := slices[0]
+		if len(slice) == 0 {
+			return []T{}
+		}
+		// 单个切片优化路径
+		seen := make(map[T]struct{}, len(slice))
+		result := make([]T, 0, len(slice))
+		for _, item := range slice {
+			if _, exists := seen[item]; !exists {
+				seen[item] = struct{}{}
+				result = append(result, item)
+			}
+		}
+		return result
+	}
+
+	// 计算总长度用于 map 预分配
+	totalLen := 0
+	for _, slice := range slices {
+		totalLen += len(slice)
+	}
+
+	if totalLen == 0 {
+		return []T{}
+	}
+
+	// map 预分配完整容量，result 预估去重后容量
+	// 假设有 30% 重复率，这是一个经验值
+	seen := make(map[T]struct{}, totalLen)
+	estimatedCap := totalLen - totalLen/3
+	if estimatedCap < 8 {
+		estimatedCap = totalLen
+	}
+	result := make([]T, 0, estimatedCap)
+
+	// 遍历所有切片
+	for _, slice := range slices {
+		for _, item := range slice {
+			if _, exists := seen[item]; !exists {
+				seen[item] = struct{}{}
+				result = append(result, item)
+			}
 		}
 	}
 	return result
