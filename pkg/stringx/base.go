@@ -367,12 +367,21 @@ func ToPascalCase(s string) string {
 // ToSnakeCase 将字符串转换为蛇形命名法（例如：user_name）
 // 支持输入格式：camelCase, PascalCase, kebab-case
 func ToSnakeCase(s string) string {
+	// 先去除首尾空格
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return s
+	}
+
 	var result strings.Builder
 
 	for i, r := range s {
 		// 将连字符和空格都转换为下划线
 		if r == '-' || r == ' ' {
-			result.WriteRune('_')
+			// 避免连续的下划线
+			if result.Len() > 0 && result.String()[result.Len()-1] != '_' {
+				result.WriteRune('_')
+			}
 			continue
 		}
 
@@ -380,7 +389,7 @@ func ToSnakeCase(s string) string {
 			// 如果不是第一个字符，且前一个字符不是大写，添加下划线
 			if i > 0 {
 				prevRune := rune(s[i-1])
-				if !unicode.IsUpper(prevRune) && prevRune != '_' {
+				if !unicode.IsUpper(prevRune) && prevRune != '_' && prevRune != ' ' && prevRune != '-' {
 					result.WriteRune('_')
 				}
 			}

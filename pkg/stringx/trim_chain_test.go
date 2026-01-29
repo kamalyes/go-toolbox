@@ -71,3 +71,65 @@ func TestTrimProtocolChain(t *testing.T) {
 		})
 	}
 }
+
+// TestTrimAllChain 测试 TrimAllChain 函数
+func TestTrimAllChain(t *testing.T) {
+	result := New("aa-bb-cc-dd").TrimAllChain("-").Value()
+	assert.Equal(t, "aabbccdd", result)
+}
+
+// TestTrimAnyChain 测试 TrimAnyChain 函数
+func TestTrimAnyChain(t *testing.T) {
+	strsToRemove := []string{"a", "b"}
+	result := New("aa-bb-cc-dd").TrimAnyChain(strsToRemove).Value()
+	assert.Equal(t, "--cc-dd", result)
+}
+
+// TestTrimAllLineBreaksChain 测试 TrimAllLineBreaksChain 函数
+func TestTrimAllLineBreaksChain(t *testing.T) {
+	result := New("Hello\nWorld\r\n").TrimAllLineBreaksChain().Value()
+	assert.Equal(t, "HelloWorld", result)
+}
+
+// TestTrimPrefixChain 测试 TrimPrefixChain 函数
+func TestTrimPrefixChain(t *testing.T) {
+	result := New("HelloWorld").TrimPrefixChain("Hello").Value()
+	assert.Equal(t, "World", result)
+
+	result = New("World").TrimPrefixChain("Hello").Value()
+	assert.Equal(t, "World", result)
+}
+
+// TestTrimPrefixIgnoreCaseChain 测试 TrimPrefixIgnoreCaseChain 函数
+func TestTrimPrefixIgnoreCaseChain(t *testing.T) {
+	result := New("HelloWorld").TrimPrefixIgnoreCaseChain("hello").Value()
+	assert.Equal(t, "World", result)
+
+	result = New("World").TrimPrefixIgnoreCaseChain("hello").Value()
+	assert.Equal(t, "World", result)
+}
+
+// TestTrimSuffixChain 测试 TrimSuffixChain 函数
+func TestTrimSuffixChain(t *testing.T) {
+	result := New("HelloWorld").TrimSuffixChain("World").Value()
+	assert.Equal(t, "Hello", result)
+
+	result = New("Hello").TrimSuffixChain("World").Value()
+	assert.Equal(t, "Hello", result)
+}
+
+// TestTrimSuffixIgnoreCaseChain 测试 TrimSuffixIgnoreCaseChain 函数
+func TestTrimSuffixIgnoreCaseChain(t *testing.T) {
+	result := New("HelloWorld").TrimSuffixIgnoreCaseChain("world").Value()
+	assert.Equal(t, "Hello", result)
+
+	result = New("Hello").TrimSuffixIgnoreCaseChain("world").Value()
+	assert.Equal(t, "Hello", result)
+}
+
+// TestTrimSymbolsChain 测试 TrimSymbolsChain 函数
+func TestTrimSymbolsChain(t *testing.T) {
+	input := New("Hello, World! 123")
+	result := input.TrimSymbolsChain().Value()
+	assert.Equal(t, "HelloWorld123", result, "Expected cleaned string")
+}

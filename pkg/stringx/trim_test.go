@@ -109,3 +109,64 @@ func TestTrimProtocol(t *testing.T) {
 		})
 	}
 }
+
+// TestTrimAll 测试 TrimAll 函数
+func TestTrimAll(t *testing.T) {
+	result := TrimAll("aa-bb-cc-dd", "-")
+	assert.Equal(t, "aabbccdd", result)
+}
+
+// TestTrimAny 测试 TrimAny 函数
+func TestTrimAny(t *testing.T) {
+	result := TrimAny("aa-bb-cc-dd", []string{"-", "b"})
+	assert.Equal(t, "aaccdd", result)
+}
+
+// TestTrimAllLineBreaks 测试 TrimAllLineBreaks 函数
+func TestTrimAllLineBreaks(t *testing.T) {
+	result := TrimAllLineBreaks("Hello\r\nWorld")
+	assert.Equal(t, "HelloWorld", result)
+}
+
+// TestTrimPrefix 测试 TrimPrefix 函数
+func TestTrimPrefix(t *testing.T) {
+	result := TrimPrefix("hello", "he")
+	assert.Equal(t, "llo", result)
+}
+
+// TestTrimPrefixIgnoreCase 测试 TrimPrefixIgnoreCase 函数
+func TestTrimPrefixIgnoreCase(t *testing.T) {
+	result := TrimPrefixIgnoreCase("hELLo", "he")
+	assert.Equal(t, "LLo", result)
+
+	result = TrimPrefixIgnoreCase("HeLLo", "he")
+	assert.Equal(t, "LLo", result)
+
+	result = TrimPrefixIgnoreCase("heLlo", "he")
+	assert.Equal(t, "Llo", result)
+}
+
+// TestTrimSuffix 测试 TrimSuffix 函数
+func TestTrimSuffix(t *testing.T) {
+	result := TrimSuffix("hello", "lo")
+	assert.Equal(t, "hel", result)
+}
+
+// TestTrimSuffixIgnoreCase 测试 TrimSuffixIgnoreCase 函数
+func TestTrimSuffixIgnoreCase(t *testing.T) {
+	result := TrimSuffixIgnoreCase("helLO", "lo")
+	assert.Equal(t, "hel", result)
+
+	result = TrimPrefixIgnoreCase("HeLlo", "he")
+	assert.Equal(t, "Llo", result)
+
+	result = TrimPrefixIgnoreCase("heLlo", "he")
+	assert.Equal(t, "Llo", result)
+}
+
+// TestTrimSymbols 测试 TrimSymbols 函数
+func TestTrimSymbols(t *testing.T) {
+	input := "Hello, World! 123"
+	result := TrimSymbols(input)
+	assert.Equal(t, "HelloWorld123", result, "Expected cleaned string")
+}

@@ -12,6 +12,7 @@ package stringx
 
 import (
 	"reflect"
+	"regexp"
 	"strings"
 
 	"github.com/kamalyes/go-toolbox/pkg/validator"
@@ -19,9 +20,6 @@ import (
 
 // Trim 除去字符串头尾部的空白
 func Trim(str string) string {
-	if validator.IsEmptyValue(reflect.ValueOf(str)) {
-		return str
-	}
 	return strings.TrimSpace(str)
 }
 
@@ -34,7 +32,7 @@ func (s *StringX) TrimChain() *StringX {
 // TrimStart 除去字符串头部的空白
 func TrimStart(str string) string {
 	return strings.TrimLeftFunc(str, func(r rune) bool {
-		return r == ' '
+		return r == ' ' || r == '\t' || r == '\n' || r == '\r'
 	})
 }
 
@@ -47,7 +45,7 @@ func (s *StringX) TrimStartChain() *StringX {
 // TrimEnd 除去字符串尾部的空白
 func TrimEnd(str string) string {
 	return strings.TrimRightFunc(str, func(r rune) bool {
-		return r == ' '
+		return r == ' ' || r == '\t' || r == '\n' || r == '\r'
 	})
 }
 
@@ -85,5 +83,169 @@ func TrimProtocol(url string) string {
 // TrimProtocolChain 移除URL的协议前缀（链式调用）
 func (s *StringX) TrimProtocolChain() *StringX {
 	s.value = TrimProtocol(s.value)
+	return s
+}
+
+// TrimNewlines 除去字符串首尾的换行符（\n 和 \r）
+func TrimNewlines(str string) string {
+	if validator.IsEmptyValue(reflect.ValueOf(str)) {
+		return str
+	}
+	return strings.Trim(str, "\r\n")
+}
+
+// TrimNewlinesChain 除去字符串首尾的换行符（链式调用）
+func (s *StringX) TrimNewlinesChain() *StringX {
+	s.value = TrimNewlines(s.value)
+	return s
+}
+
+// TrimStartNewlines 除去字符串开头的换行符（\n 和 \r）
+func TrimStartNewlines(str string) string {
+	if validator.IsEmptyValue(reflect.ValueOf(str)) {
+		return str
+	}
+	return strings.TrimLeft(str, "\r\n")
+}
+
+// TrimStartNewlinesChain 除去字符串开头的换行符（链式调用）
+func (s *StringX) TrimStartNewlinesChain() *StringX {
+	s.value = TrimStartNewlines(s.value)
+	return s
+}
+
+// TrimEndNewlines 除去字符串结尾的换行符（\n 和 \r）
+func TrimEndNewlines(str string) string {
+	if validator.IsEmptyValue(reflect.ValueOf(str)) {
+		return str
+	}
+	return strings.TrimRight(str, "\r\n")
+}
+
+// TrimEndNewlinesChain 除去字符串结尾的换行符（链式调用）
+func (s *StringX) TrimEndNewlinesChain() *StringX {
+	s.value = TrimEndNewlines(s.value)
+	return s
+}
+
+// TrimAll 移除字符串中所有给定字符串
+// 示例：TrimAll("aa-bb-cc-dd", "-") => "aabbccdd"
+func TrimAll(str string, strToRemove string) string {
+	if str == "" || strToRemove == "" {
+		return str
+	}
+	return ReplaceAll(str, strToRemove, "")
+}
+
+// TrimAllChain 移除字符串中所有给定字符串（链式调用）
+func (s *StringX) TrimAllChain(strToRemove string) *StringX {
+	s.value = TrimAll(s.value, strToRemove)
+	return s
+}
+
+// TrimAny 移除字符串中所有给定的多个字符串
+func TrimAny(str string, strsToRemove []string) string {
+	result := str
+	hasEmpty, _ := validator.HasEmpty([]any{str})
+	if !hasEmpty {
+		for _, s := range strsToRemove {
+			result = TrimAll(result, s)
+		}
+	}
+	return result
+}
+
+// TrimAnyChain 移除字符串中所有给定的多个字符串（链式调用）
+func (s *StringX) TrimAnyChain(strsToRemove []string) *StringX {
+	s.value = TrimAny(s.value, strsToRemove)
+	return s
+}
+
+// TrimAllLineBreaks 去除所有换行符，包括：\r \n
+func TrimAllLineBreaks(str string) string {
+	return TrimAny(str, []string{"\r", "\n"})
+}
+
+// TrimAllLineBreaksChain 去除所有换行符（链式调用）
+func (s *StringX) TrimAllLineBreaksChain() *StringX {
+	s.value = TrimAllLineBreaks(s.value)
+	return s
+}
+
+// TrimPrefix 去掉指定前缀
+func TrimPrefix(str string, prefix string) string {
+	hasEmpty, _ := validator.HasEmpty([]any{str, prefix})
+	if hasEmpty {
+		return str
+	}
+	if strings.HasPrefix(str, prefix) {
+		return str[len(prefix):]
+	}
+	return str
+}
+
+// TrimPrefixChain 去掉指定前缀（链式调用）
+func (s *StringX) TrimPrefixChain(prefix string) *StringX {
+	s.value = TrimPrefix(s.value, prefix)
+	return s
+}
+
+// TrimPrefixIgnoreCase 忽略大小写去掉指定前缀
+func TrimPrefixIgnoreCase(str string, prefix string) string {
+	if strings.HasPrefix(strings.ToLower(str), strings.ToLower(prefix)) {
+		return str[len(prefix):]
+	}
+	return str
+}
+
+// TrimPrefixIgnoreCaseChain 忽略大小写去掉指定前缀（链式调用）
+func (s *StringX) TrimPrefixIgnoreCaseChain(prefix string) *StringX {
+	s.value = TrimPrefixIgnoreCase(s.value, prefix)
+	return s
+}
+
+// TrimSuffix 去掉指定后缀
+func TrimSuffix(str string, suffix string) string {
+	hasEmpty, _ := validator.HasEmpty([]any{str, suffix})
+	if hasEmpty {
+		return str
+	}
+	if strings.HasSuffix(str, suffix) {
+		return str[:len(str)-len(suffix)]
+	}
+	return str
+}
+
+// TrimSuffixChain 去掉指定后缀（链式调用）
+func (s *StringX) TrimSuffixChain(suffix string) *StringX {
+	s.value = TrimSuffix(s.value, suffix)
+	return s
+}
+
+// TrimSuffixIgnoreCase 去掉指定后缀（忽略大小写）
+func TrimSuffixIgnoreCase(str string, suffix string) string {
+	lowerStr := strings.ToLower(str)
+	lowerSuffix := strings.ToLower(suffix)
+	if strings.HasSuffix(lowerStr, lowerSuffix) {
+		return str[:len(str)-len(suffix)]
+	}
+	return str
+}
+
+// TrimSuffixIgnoreCaseChain 去掉指定后缀（链式调用，忽略大小写）
+func (s *StringX) TrimSuffixIgnoreCaseChain(suffix string) *StringX {
+	s.value = TrimSuffixIgnoreCase(s.value, suffix)
+	return s
+}
+
+// TrimSymbols 使用正则表达式去掉字符串中的所有符号
+func TrimSymbols(str string) string {
+	reg := regexp.MustCompile(`[^\w]+`)
+	return reg.ReplaceAllString(str, "")
+}
+
+// TrimSymbolsChain 使用正则表达式去掉字符串中的所有符号（链式调用）
+func (s *StringX) TrimSymbolsChain() *StringX {
+	s.value = TrimSymbols(s.value)
 	return s
 }

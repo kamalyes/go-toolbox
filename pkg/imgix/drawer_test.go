@@ -949,7 +949,10 @@ func TestResizeImage(t *testing.T) {
 	assert.Equal(t, 50, resizedImg.Bounds().Dy(), "Resized image height should be 50")
 
 	// 可选：将结果保存到文件以便手动检查
-	outFile, err := os.Create("test_resize_mage.png")
+	testFileName := "test_resize_mage.png"
+	defer os.Remove(testFileName) // 测试结束后删除临时文件
+
+	outFile, err := os.Create(testFileName)
 	assert.NoError(t, err, "Error creating output file")
 	defer outFile.Close()
 
