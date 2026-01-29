@@ -5,6 +5,7 @@ go 1.23
 require (
 	github.com/disintegration/imaging v1.6.2
 	github.com/google/uuid v1.6.0
+	github.com/kamalyes/go-jsonpath v0.0.0-20260129163507-0b67ed48bb28
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/protobuf v1.36.10
 )
@@ -30,7 +31,6 @@ require (
 	github.com/klauspost/cpuid/v2 v2.2.7 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	github.com/oliveagle/jsonpath v0.0.0-20180606110733-2e52cf6e6852
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	golang.org/x/arch v0.8.0 // indirect
 	golang.org/x/crypto v0.23.0

@@ -14,7 +14,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/oliveagle/jsonpath"
+	"github.com/kamalyes/go-jsonpath"
 )
 
 // ValidateJSON 验证JSON结构（基础版，仅验证格式）
