@@ -568,3 +568,217 @@ func TestGetTime(t *testing.T) {
 	ctx.WithValue(TestKey3, timestamp)
 	assert.Equal(t, time.Unix(timestamp, 0), ctx.GetTime(TestKey3))
 }
+
+// TestGetValue 测试从标准 context.Context 获取值
+func TestGetValue(t *testing.T) {
+	t.Run("nil context", func(t *testing.T) {
+		result := GetValue[string](nil, "key")
+		assert.Equal(t, "", result)
+	})
+
+	t.Run("string value", func(t *testing.T) {
+		ctx := context.WithValue(context.Background(), "key", "value")
+		result := GetValue[string](ctx, "key")
+		assert.Equal(t, "value", result)
+	})
+
+	t.Run("int value", func(t *testing.T) {
+		ctx := context.WithValue(context.Background(), "count", 123)
+		result := GetValue[int](ctx, "count")
+		assert.Equal(t, 123, result)
+	})
+
+	t.Run("bool value", func(t *testing.T) {
+		ctx := context.WithValue(context.Background(), "enabled", true)
+		result := GetValue[bool](ctx, "enabled")
+		assert.True(t, result)
+	})
+
+	t.Run("float64 value", func(t *testing.T) {
+		ctx := context.WithValue(context.Background(), "price", 99.99)
+		result := GetValue[float64](ctx, "price")
+		assert.Equal(t, 99.99, result)
+	})
+
+	t.Run("custom struct", func(t *testing.T) {
+		type User struct {
+			Name string
+			Age  int
+		}
+		user := User{Name: "Alice", Age: 30}
+		ctx := context.WithValue(context.Background(), "user", user)
+		result := GetValue[User](ctx, "user")
+		assert.Equal(t, user, result)
+	})
+
+	t.Run("pointer type", func(t *testing.T) {
+		type Config struct {
+			Host string
+			Port int
+		}
+		config := &Config{Host: "localhost", Port: 8080}
+		ctx := context.WithValue(context.Background(), "config", config)
+		result := GetValue[*Config](ctx, "config")
+		assert.Equal(t, config, result)
+		assert.Equal(t, "localhost", result.Host)
+		assert.Equal(t, 8080, result.Port)
+	})
+
+	t.Run("slice type", func(t *testing.T) {
+		slice := []string{"a", "b", "c"}
+		ctx := context.WithValue(context.Background(), "items", slice)
+		result := GetValue[[]string](ctx, "items")
+		assert.Equal(t, slice, result)
+	})
+
+	t.Run("map type", func(t *testing.T) {
+		data := map[string]int{"x": 1, "y": 2}
+		ctx := context.WithValue(context.Background(), "data", data)
+		result := GetValue[map[string]int](ctx, "data")
+		assert.Equal(t, data, result)
+	})
+
+	t.Run("time.Duration", func(t *testing.T) {
+		duration := 5 * time.Second
+		ctx := context.WithValue(context.Background(), "timeout", duration)
+		result := GetValue[time.Duration](ctx, "timeout")
+		assert.Equal(t, duration, result)
+	})
+
+	t.Run("time.Time", func(t *testing.T) {
+		now := time.Now()
+		ctx := context.WithValue(context.Background(), "timestamp", now)
+		result := GetValue[time.Time](ctx, "timestamp")
+		assert.Equal(t, now, result)
+	})
+
+	t.Run("key not found", func(t *testing.T) {
+		ctx := context.Background()
+		result := GetValue[string](ctx, "nonexistent")
+		assert.Equal(t, "", result)
+	})
+
+	t.Run("nil value", func(t *testing.T) {
+		ctx := context.WithValue(context.Background(), "key", nil)
+		result := GetValue[string](ctx, "key")
+		assert.Equal(t, "", result)
+	})
+
+	t.Run("type mismatch returns zero value", func(t *testing.T) {
+		ctx := context.WithValue(context.Background(), "key", "string value")
+		result := GetValue[int](ctx, "key")
+		assert.Equal(t, 0, result)
+	})
+
+	t.Run("zero value for different types", func(t *testing.T) {
+		ctx := context.Background()
+
+		assert.Equal(t, "", GetValue[string](ctx, "key"))
+		assert.Equal(t, 0, GetValue[int](ctx, "key"))
+		assert.Equal(t, int64(0), GetValue[int64](ctx, "key"))
+		assert.Equal(t, false, GetValue[bool](ctx, "key"))
+		assert.Equal(t, 0.0, GetValue[float64](ctx, "key"))
+		assert.Nil(t, GetValue[[]string](ctx, "key"))
+		assert.Nil(t, GetValue[map[string]int](ctx, "key"))
+		assert.Equal(t, time.Duration(0), GetValue[time.Duration](ctx, "key"))
+		assert.Equal(t, time.Time{}, GetValue[time.Time](ctx, "key"))
+	})
+
+	t.Run("nested context values", func(t *testing.T) {
+		ctx1 := context.WithValue(context.Background(), "key1", "value1")
+		ctx2 := context.WithValue(ctx1, "key2", "value2")
+
+		assert.Equal(t, "value1", GetValue[string](ctx2, "key1"))
+		assert.Equal(t, "value2", GetValue[string](ctx2, "key2"))
+	})
+
+	t.Run("interface{} type", func(t *testing.T) {
+		ctx := context.WithValue(context.Background(), "data", "any value")
+		result := GetValue[interface{}](ctx, "data")
+		assert.Equal(t, "any value", result)
+	})
+
+	t.Run("any type", func(t *testing.T) {
+		ctx := context.WithValue(context.Background(), "data", 12345)
+		result := GetValue[any](ctx, "data")
+		assert.Equal(t, 12345, result)
+	})
+}
+
+// TestGetValueEdgeCases 测试边界情况
+func TestGetValueEdgeCases(t *testing.T) {
+	t.Run("empty string key", func(t *testing.T) {
+		ctx := context.WithValue(context.Background(), "", "value")
+		result := GetValue[string](ctx, "")
+		assert.Equal(t, "value", result)
+	})
+
+	t.Run("pointer value", func(t *testing.T) {
+		str := "test"
+		ctx := context.WithValue(context.Background(), "key", &str)
+		result := GetValue[*string](ctx, "key")
+		assert.NotNil(t, result)
+		assert.Equal(t, "test", *result)
+	})
+
+	t.Run("nil pointer value", func(t *testing.T) {
+		var ptr *string
+		ctx := context.WithValue(context.Background(), "key", ptr)
+		result := GetValue[*string](ctx, "key")
+		assert.Nil(t, result)
+	})
+
+	t.Run("empty slice", func(t *testing.T) {
+		slice := []string{}
+		ctx := context.WithValue(context.Background(), "key", slice)
+		result := GetValue[[]string](ctx, "key")
+		assert.NotNil(t, result)
+		assert.Len(t, result, 0)
+	})
+
+	t.Run("empty map", func(t *testing.T) {
+		m := map[string]int{}
+		ctx := context.WithValue(context.Background(), "key", m)
+		result := GetValue[map[string]int](ctx, "key")
+		assert.NotNil(t, result)
+		assert.Len(t, result, 0)
+	})
+}
+
+// BenchmarkGetValue 性能测试
+func BenchmarkGetValue(b *testing.B) {
+	ctx := context.WithValue(context.Background(), "key", "value")
+
+	b.Run("string", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_ = GetValue[string](ctx, "key")
+		}
+	})
+
+	b.Run("int", func(b *testing.B) {
+		ctx := context.WithValue(context.Background(), "count", 123)
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = GetValue[int](ctx, "count")
+		}
+	})
+
+	b.Run("struct", func(b *testing.B) {
+		type User struct {
+			Name string
+			Age  int
+		}
+		user := User{Name: "Alice", Age: 30}
+		ctx := context.WithValue(context.Background(), "user", user)
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = GetValue[User](ctx, "user")
+		}
+	})
+
+	b.Run("missing key", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_ = GetValue[string](ctx, "nonexistent")
+		}
+	})
+}

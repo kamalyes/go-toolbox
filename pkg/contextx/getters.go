@@ -11,6 +11,7 @@
 package contextx
 
 import (
+	"context"
 	"time"
 
 	"github.com/kamalyes/go-toolbox/pkg/convert"
@@ -137,6 +138,35 @@ func Get[T any](c *Context, key interface{}) T {
 		case int64:
 			return any(time.Unix(v, 0)).(T)
 		}
+	}
+
+	return zero
+}
+
+// GetValue 从标准 context.Context 获取指定类型的值（泛型版本，仅支持类型断言）
+//
+// 与 Get 函数的区别：
+//   - GetValue: 适用于标准 context.Context，key 必须是 string，仅支持类型断言
+//   - Get: 适用于自定义 *Context，key 可以是任意类型，支持智能类型转换
+//
+// 使用示例:
+//
+//	ctx := context.WithValue(context.Background(), "key", "value")
+//	str := GetValue[string](ctx, "key")  // "value"
+//	num := GetValue[int](ctx, "count")   // 0 (类型不匹配返回零值)
+func GetValue[T any](ctx context.Context, key string) T {
+	var zero T
+	if ctx == nil {
+		return zero
+	}
+
+	val := ctx.Value(key)
+	if val == nil {
+		return zero
+	}
+
+	if v, ok := val.(T); ok {
+		return v
 	}
 
 	return zero
