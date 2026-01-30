@@ -802,3 +802,353 @@ func TestNormalizeToStringSlice(t *testing.T) {
 		})
 	}
 }
+
+// TestMustConvertTo 测试通用类型转换函数
+func TestMustConvertTo(t *testing.T) {
+	t.Run("String conversion", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			input    any
+			expected string
+			ok       bool
+		}{
+			{"int to string", 123, "123", true},
+			{"float to string", 3.14, "3.14", true},
+			{"bool to string", true, "true", true},
+			{"string to string", "hello", "hello", true},
+			{"nil to string", nil, "", true},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				result, ok := MustConvertTo[string](tt.input)
+				assert.Equal(t, tt.ok, ok)
+				if ok {
+					assert.Equal(t, tt.expected, result)
+				}
+			})
+		}
+	})
+
+	t.Run("Bool conversion", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			input    any
+			expected bool
+			ok       bool
+		}{
+			{"true string", "true", true, true},
+			{"false string", "false", false, true},
+			{"1 to true", 1, true, true},
+			{"0 to false", 0, false, true},
+			{"bool to bool", true, true, true},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				result, ok := MustConvertTo[bool](tt.input)
+				assert.Equal(t, tt.ok, ok)
+				if ok {
+					assert.Equal(t, tt.expected, result)
+				}
+			})
+		}
+	})
+
+	t.Run("Int conversion", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			input    any
+			expected int
+			ok       bool
+		}{
+			{"string to int", "123", 123, true},
+			{"float to int", 123.0, 123, true},
+			{"int to int", 456, 456, true},
+			{"int64 to int", int64(789), 789, true},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				result, ok := MustConvertTo[int](tt.input)
+				assert.Equal(t, tt.ok, ok)
+				if ok {
+					assert.Equal(t, tt.expected, result)
+				}
+			})
+		}
+	})
+
+	t.Run("Int8 conversion", func(t *testing.T) {
+		result, ok := MustConvertTo[int8]("127")
+		assert.True(t, ok)
+		assert.Equal(t, int8(127), result)
+	})
+
+	t.Run("Int16 conversion", func(t *testing.T) {
+		result, ok := MustConvertTo[int16]("32767")
+		assert.True(t, ok)
+		assert.Equal(t, int16(32767), result)
+	})
+
+	t.Run("Int32 conversion", func(t *testing.T) {
+		result, ok := MustConvertTo[int32]("2147483647")
+		assert.True(t, ok)
+		assert.Equal(t, int32(2147483647), result)
+	})
+
+	t.Run("Int64 conversion", func(t *testing.T) {
+		result, ok := MustConvertTo[int64]("123456789")
+		assert.True(t, ok)
+		assert.Equal(t, int64(123456789), result)
+	})
+
+	t.Run("Uint conversion", func(t *testing.T) {
+		result, ok := MustConvertTo[uint]("123")
+		assert.True(t, ok)
+		assert.Equal(t, uint(123), result)
+	})
+
+	t.Run("Uint8 conversion", func(t *testing.T) {
+		result, ok := MustConvertTo[uint8]("255")
+		assert.True(t, ok)
+		assert.Equal(t, uint8(255), result)
+	})
+
+	t.Run("Uint16 conversion", func(t *testing.T) {
+		result, ok := MustConvertTo[uint16]("65535")
+		assert.True(t, ok)
+		assert.Equal(t, uint16(65535), result)
+	})
+
+	t.Run("Uint32 conversion", func(t *testing.T) {
+		result, ok := MustConvertTo[uint32]("4294967295")
+		assert.True(t, ok)
+		assert.Equal(t, uint32(4294967295), result)
+	})
+
+	t.Run("Uint64 conversion", func(t *testing.T) {
+		result, ok := MustConvertTo[uint64]("123456789")
+		assert.True(t, ok)
+		assert.Equal(t, uint64(123456789), result)
+	})
+
+	t.Run("Float32 conversion", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			input    any
+			expected float32
+			ok       bool
+		}{
+			{"string to float32", "3.14", 3.14, true},
+			{"int to float32", 42, 42.0, true},
+			{"float64 to float32", 3.14159, 3.14159, true},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				result, ok := MustConvertTo[float32](tt.input)
+				assert.Equal(t, tt.ok, ok)
+				if ok {
+					assert.InDelta(t, tt.expected, result, 0.0001)
+				}
+			})
+		}
+	})
+
+	t.Run("Float64 conversion", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			input    any
+			expected float64
+			ok       bool
+		}{
+			{"string to float64", "3.14159", 3.14159, true},
+			{"int to float64", 42, 42.0, true},
+			{"float32 to float64", float32(3.14), 3.14, true},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				result, ok := MustConvertTo[float64](tt.input)
+				assert.Equal(t, tt.ok, ok)
+				if ok {
+					assert.InDelta(t, tt.expected, result, 0.0001)
+				}
+			})
+		}
+	})
+
+	t.Run("Bytes conversion", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			input    any
+			expected []byte
+			ok       bool
+		}{
+			{"string to bytes", "hello", []byte("hello"), true},
+			{"bytes to bytes", []byte("world"), []byte("world"), true},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				result, ok := MustConvertTo[[]byte](tt.input)
+				assert.Equal(t, tt.ok, ok)
+				if ok {
+					assert.Equal(t, tt.expected, result)
+				}
+			})
+		}
+	})
+
+	t.Run("Map conversion", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			input    any
+			expected map[string]any
+			ok       bool
+		}{
+			{
+				"map[string]any to map[string]any",
+				map[string]any{"key": "value"},
+				map[string]any{"key": "value"},
+				true,
+			},
+			{
+				"map[interface{}]interface{} to map[string]any",
+				map[interface{}]interface{}{"key": "value"},
+				map[string]any{"key": "value"},
+				true,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				result, ok := MustConvertTo[map[string]any](tt.input)
+				assert.Equal(t, tt.ok, ok)
+				if ok {
+					assert.Equal(t, tt.expected, result)
+				}
+			})
+		}
+	})
+
+	t.Run("Slice conversion", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			input    any
+			expected []any
+			ok       bool
+		}{
+			{
+				"[]any to []any",
+				[]any{1, 2, 3},
+				[]any{1, 2, 3},
+				true,
+			},
+			{
+				"[]int to []any",
+				[]int{1, 2, 3},
+				[]any{1, 2, 3},
+				true,
+			},
+			{
+				"[]string to []any",
+				[]string{"a", "b", "c"},
+				[]any{"a", "b", "c"},
+				true,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				result, ok := MustConvertTo[[]any](tt.input)
+				assert.Equal(t, tt.ok, ok)
+				if ok {
+					assert.Equal(t, tt.expected, result)
+				}
+			})
+		}
+	})
+
+	t.Run("Same type conversion", func(t *testing.T) {
+		// 测试相同类型直接返回
+		input := 123
+		result, ok := MustConvertTo[int](input)
+		assert.True(t, ok)
+		assert.Equal(t, input, result)
+	})
+
+	t.Run("Invalid conversion", func(t *testing.T) {
+		// 测试无效转换 - "invalid" 字符串无法转换为 int，但 MustIntT 会返回 0
+		result, ok := MustConvertTo[int]("invalid")
+		// MustIntT 对于无效字符串会返回错误，所以 ok 应该是 false
+		assert.False(t, ok)
+		assert.Equal(t, 0, result)
+	})
+}
+
+// TestMustConvertToEdgeCases 测试边界情况
+func TestMustConvertToEdgeCases(t *testing.T) {
+	t.Run("Empty string to int", func(t *testing.T) {
+		result, ok := MustConvertTo[int]("")
+		assert.False(t, ok)
+		assert.Equal(t, 0, result)
+	})
+
+	t.Run("Nil to bytes", func(t *testing.T) {
+		result, ok := MustConvertTo[[]byte](nil)
+		assert.False(t, ok)
+		assert.Nil(t, result)
+	})
+
+	t.Run("Empty slice", func(t *testing.T) {
+		result, ok := MustConvertTo[[]any]([]int{})
+		assert.False(t, ok)
+		assert.Empty(t, result)
+	})
+
+	t.Run("Nil map", func(t *testing.T) {
+		var m map[string]any
+		result, ok := MustConvertTo[map[string]any](m)
+		assert.True(t, ok)
+		assert.Nil(t, result)
+	})
+}
+
+// TestMustConvertToTypeCoercion 测试类型强制转换
+func TestMustConvertToTypeCoercion(t *testing.T) {
+	t.Run("Float to int truncation", func(t *testing.T) {
+		result, ok := MustConvertTo[int](3.99)
+		assert.True(t, ok)
+		assert.Equal(t, 3, result)
+	})
+
+	t.Run("String number with spaces", func(t *testing.T) {
+		result, ok := MustConvertTo[int]("  123  ")
+		assert.False(t, ok) // MustIntT 不会自动 trim
+		assert.Equal(t, 0, result)
+	})
+
+	t.Run("Bool from string variations", func(t *testing.T) {
+		tests := []struct {
+			input    string
+			expected bool
+		}{
+			{"true", true},
+			{"TRUE", true},
+			{"1", true},
+			{"false", false},
+			{"FALSE", false},
+			{"0", false},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.input, func(t *testing.T) {
+				result, ok := MustConvertTo[bool](tt.input)
+				assert.True(t, ok)
+				assert.Equal(t, tt.expected, result)
+			})
+		}
+	})
+}

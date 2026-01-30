@@ -97,7 +97,7 @@ func formatTime(t time.Time, timeLayout ...string) string {
 }
 
 // convertFallback 默认转换方式
-func convertFallback(v interface{}) string {
+func convertFallback(v any) string {
 	if b, err := json.Marshal(v); err == nil {
 		return string(b)
 	}
@@ -253,12 +253,12 @@ func MustBool[T any](v T) bool {
 }
 
 // MustJSONIndent 转 json 返回 []byte
-func MustJSONIndent(v interface{}) ([]byte, error) {
+func MustJSONIndent(v any) ([]byte, error) {
 	return json.MarshalIndent(v, "", "  ")
 }
 
 // MustJSON 转 json 返回 []byte
-func MustJSON(v interface{}) ([]byte, error) {
+func MustJSON(v any) ([]byte, error) {
 	return json.Marshal(v)
 }
 
@@ -309,32 +309,32 @@ func sliceMapErr[T any, R any](slice []T, fn func(T) (R, error)) ([]R, error) {
 	return result, nil
 }
 
-// AnySliceToInterfaceSlice 将任意类型的切片或数组转换为 []interface{}
+// AnySliceToInterfaceSlice 将任意类型的切片或数组转换为 []any
 // 支持所有类型切片: []string, []int, []int32, []int64, []uint, []bool, 自定义类型切片等
 // 支持数组类型: [3]int, [5]string 等
 // 如果传入的不是切片/数组类型或为空，返回空切片
-func AnySliceToInterfaceSlice(slice interface{}) []interface{} {
+func AnySliceToInterfaceSlice(slice any) []any {
 	if slice == nil {
-		return []interface{}{}
+		return []any{}
 	}
 
 	v := reflect.ValueOf(slice)
 	// 支持切片和数组
 	if v.Kind() != reflect.Slice && v.Kind() != reflect.Array {
-		return []interface{}{}
+		return []any{}
 	}
 
 	length := v.Len()
-	result := make([]interface{}, length)
+	result := make([]any, length)
 	for i := 0; i < length; i++ {
 		result[i] = v.Index(i).Interface()
 	}
 	return result
 }
 
-// StringSliceToInterfaceSlice 将 []string 转换为 []interface{}
+// StringSliceToInterfaceSlice 将 []string 转换为 []any
 // 为了向后兼容保留，内部调用 AnySliceToInterfaceSlice
-func StringSliceToInterfaceSlice(slice []string) []interface{} {
+func StringSliceToInterfaceSlice(slice []string) []any {
 	return AnySliceToInterfaceSlice(slice)
 }
 
@@ -380,8 +380,8 @@ func normalizeToStringSlice(input any, separator string) ([]string, error) {
 	}
 }
 
-// InterfaceSliceToStringSlice 将 []interface{} 转换为 []string
-func InterfaceSliceToStringSlice(slice []interface{}) []string {
+// InterfaceSliceToStringSlice 将 []any 转换为 []string
+func InterfaceSliceToStringSlice(slice []any) []string {
 	result := make([]string, len(slice))
 	for i, v := range slice {
 		result[i] = MustString(v)
@@ -389,8 +389,8 @@ func InterfaceSliceToStringSlice(slice []interface{}) []string {
 	return result
 }
 
-// InterfaceSliceToIntSlice 将 []interface{} 转换为 []int
-func InterfaceSliceToIntSlice(slice []interface{}, mode *RoundMode) []int {
+// InterfaceSliceToIntSlice 将 []any 转换为 []int
+func InterfaceSliceToIntSlice(slice []any, mode *RoundMode) []int {
 	result := make([]int, 0, len(slice))
 	for _, v := range slice {
 		if num, err := MustIntT[int](v, mode); err == nil {
@@ -400,13 +400,212 @@ func InterfaceSliceToIntSlice(slice []interface{}, mode *RoundMode) []int {
 	return result
 }
 
-// InterfaceMapToStringMap 将 map[interface{}]interface{} 转换为 map[string]interface{}
-func InterfaceMapToStringMap(m map[interface{}]interface{}) map[string]interface{} {
-	result := make(map[string]interface{}, len(m))
+// InterfaceMapToStringMap 将 map[any]any 转换为 map[string]any
+func InterfaceMapToStringMap(m map[any]any) map[string]any {
+	result := make(map[string]any, len(m))
 	for k, v := range m {
 		if key, ok := k.(string); ok {
 			result[key] = v
 		}
+	}
+	return result
+}
+
+// MustConvertTo 通用的泛型类型转换函数
+// 自动将 value 转换为目标类型 T
+//
+// 参数:
+//   - value: 要转换的值
+//
+// 返回值:
+//   - 转换后的值和是否成功的标志
+//
+// 支持的类型:
+//   - string: 字符串
+//   - bool: 布尔值
+//   - int, int8, int16, int32, int64: 有符号整数
+//   - uint, uint8, uint16, uint32, uint64: 无符号整数
+//   - float32, float64: 浮点数
+//   - []byte: 字节切片
+//   - map[string]any: 字典类型
+//   - []any: 切片类型
+//
+// 示例:
+//
+//	str, ok := MustConvertTo[string](123)           // "123", true
+//	num, ok := MustConvertTo[int]("567")            // 567, true
+//	flag, ok := MustConvertTo[bool]("true")         // true, true
+//	f64, ok := MustConvertTo[float64]("3.14")       // 3.14, true
+//	bytes, ok := MustConvertTo[[]byte]("hello")     // []byte("hello"), true
+//	m, ok := MustConvertTo[map[string]any](data)    // map, true
+func MustConvertTo[T types.Convertible](value any) (T, bool) {
+	var zero T
+
+	// 如果值已经是目标类型，直接返回
+	if v, ok := value.(T); ok {
+		return v, true
+	}
+
+	// 使用反射判断目标类型的 Kind
+	typ := reflect.TypeOf(zero)
+	var result any
+
+	switch typ.Kind() {
+	case reflect.String:
+		result = MustString(value)
+	case reflect.Bool:
+		result = MustBool(value)
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		result = convertToNumerical(typ, value)
+		if result == nil {
+			return zero, false
+		}
+	case reflect.Float32, reflect.Float64:
+		result = convertToFloating(typ, value)
+		if result == nil {
+			return zero, false
+		}
+	case reflect.Slice:
+		if typ.Elem().Kind() == reflect.Uint8 { // []byte
+			result = convertToBytes(value)
+		} else { // []any
+			result = convertToSlice(value)
+		}
+		if result == nil {
+			return zero, false
+		}
+	case reflect.Map:
+		result = convertToMap(value)
+		if result == nil {
+			return zero, false
+		}
+	default:
+		return zero, false
+	}
+
+	if v, ok := result.(T); ok {
+		return v, true
+	}
+	return zero, false
+}
+
+// convertToNumerical 转换为数字类型（整数）
+func convertToNumerical(typ reflect.Type, value any) any {
+	switch typ.Kind() {
+	case reflect.Int:
+		v, err := MustIntT[int](value, nil)
+		if err != nil {
+			return nil
+		}
+		return v
+	case reflect.Int8:
+		v, err := MustIntT[int8](value, nil)
+		if err != nil {
+			return nil
+		}
+		return v
+	case reflect.Int16:
+		v, err := MustIntT[int16](value, nil)
+		if err != nil {
+			return nil
+		}
+		return v
+	case reflect.Int32:
+		v, err := MustIntT[int32](value, nil)
+		if err != nil {
+			return nil
+		}
+		return v
+	case reflect.Int64:
+		v, err := MustIntT[int64](value, nil)
+		if err != nil {
+			return nil
+		}
+		return v
+	case reflect.Uint:
+		v, err := MustIntT[uint](value, nil)
+		if err != nil {
+			return nil
+		}
+		return v
+	case reflect.Uint8:
+		v, err := MustIntT[uint8](value, nil)
+		if err != nil {
+			return nil
+		}
+		return v
+	case reflect.Uint16:
+		v, err := MustIntT[uint16](value, nil)
+		if err != nil {
+			return nil
+		}
+		return v
+	case reflect.Uint32:
+		v, err := MustIntT[uint32](value, nil)
+		if err != nil {
+			return nil
+		}
+		return v
+	case reflect.Uint64:
+		v, err := MustIntT[uint64](value, nil)
+		if err != nil {
+			return nil
+		}
+		return v
+	}
+	return nil
+}
+
+// convertToFloating 转换为浮点数类型
+func convertToFloating(typ reflect.Type, value any) any {
+	switch typ.Kind() {
+	case reflect.Float32:
+		v, err := MustFloatT[float32](value, RoundNone)
+		if err != nil {
+			return nil
+		}
+		return v
+	case reflect.Float64:
+		v, err := MustFloatT[float64](value, RoundNone)
+		if err != nil {
+			return nil
+		}
+		return v
+	}
+	return nil
+}
+
+// convertToBytes 转换为字节切片
+func convertToBytes(value any) any {
+	if s, ok := value.(string); ok {
+		return []byte(s)
+	}
+	if b, ok := value.([]byte); ok {
+		return b
+	}
+	return nil
+}
+
+// convertToMap 转换为字典类型
+func convertToMap(value any) any {
+	if m, ok := value.(map[string]any); ok {
+		return m
+	}
+	if m, ok := value.(map[interface{}]interface{}); ok {
+		return InterfaceMapToStringMap(m)
+	}
+	return nil
+}
+
+// convertToSlice 转换为切片类型
+func convertToSlice(value any) any {
+	if s, ok := value.([]any); ok {
+		return s
+	}
+	result := AnySliceToInterfaceSlice(value)
+	if len(result) == 0 && value != nil {
+		return nil
 	}
 	return result
 }
