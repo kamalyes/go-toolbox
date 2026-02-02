@@ -570,3 +570,157 @@ func TestIsAllowedField(t *testing.T) {
 		assert.Equal(t, test.isSafe, result, "Expected IsAllowedField(%q) to be %v", test.field, test.isSafe)
 	}
 }
+
+// TestCheckEmptyTimePointer_UnexportedFields 测试修复后的代码能正确处理未导出字段
+// 这个测试验证 CanInterface() 检查是否正确工作，避免反射 panic
+func TestCheckEmptyTimePointer_UnexportedFields(t *testing.T) {
+	// 定义一个包含未导出字段的结构体
+	type ConfigWithUnexportedFields struct {
+		PublicField  string
+		privateField string // 未导出字段
+	}
+
+	tests := []struct {
+		name     string
+		value    any
+		expected bool
+		handled  bool
+	}{
+		{
+			name:     "struct with unexported fields",
+			value:    &ConfigWithUnexportedFields{PublicField: "test", privateField: "private"},
+			expected: false,
+			handled:  false, // 不是时间类型，handled 应该为 false
+		},
+		{
+			name:     "nil pointer",
+			value:    (*ConfigWithUnexportedFields)(nil),
+			expected: false,
+			handled:  false,
+		},
+		{
+			name:     "normal time pointer",
+			value:    func() *time.Time { t := time.Now(); return &t }(),
+			expected: false,
+			handled:  true,
+		},
+		{
+			name:     "nil time pointer",
+			value:    (*time.Time)(nil),
+			expected: true,
+			handled:  true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// 这个测试的关键是：不应该 panic
+			isEmpty, handled := CheckEmptyTimePointer(reflect.ValueOf(test.value))
+			assert.Equal(t, test.expected, isEmpty, "isEmpty mismatch")
+			assert.Equal(t, test.handled, handled, "handled mismatch")
+		})
+	}
+}
+
+// TestCheckEmptyTimeStruct_UnexportedFields 测试修复后的代码能正确处理未导出字段的结构体
+func TestCheckEmptyTimeStruct_UnexportedFields(t *testing.T) {
+	// 定义一个包含未导出字段的结构体
+	type StructWithUnexportedFields struct {
+		PublicField  string
+		privateField string // 未导出字段
+	}
+
+	tests := []struct {
+		name     string
+		value    any
+		expected bool
+		handled  bool
+	}{
+		{
+			name:     "struct with unexported fields",
+			value:    StructWithUnexportedFields{PublicField: "test", privateField: "private"},
+			expected: false,
+			handled:  false, // 不是时间类型，handled 应该为 false
+		},
+		{
+			name:     "zero time.Time",
+			value:    time.Time{},
+			expected: true,
+			handled:  true,
+		},
+		{
+			name:     "non-zero time.Time",
+			value:    time.Now(),
+			expected: false,
+			handled:  true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// 这个测试的关键是：不应该 panic
+			isEmpty, handled := CheckEmptyTimeStruct(reflect.ValueOf(test.value))
+			assert.Equal(t, test.expected, isEmpty, "isEmpty mismatch")
+			assert.Equal(t, test.handled, handled, "handled mismatch")
+		})
+	}
+}
+
+// TestIsEmptyValue_WithUnexportedFields 测试 IsEmptyValue 能正确处理包含未导出字段的结构体
+// 这是对整个修复的集成测试
+func TestIsEmptyValue_WithUnexportedFields(t *testing.T) {
+	// 模拟 logger.ILogger 接口的场景
+	type mockLogger struct {
+		level        string // 未导出字段
+		output       string // 未导出字段
+		PublicConfig string // 导出字段
+	}
+
+	type ConfigWithLogger struct {
+		Name   string
+		Logger *mockLogger // 包含未导出字段的结构体指针
+	}
+
+	tests := []struct {
+		name     string
+		value    any
+		expected bool
+	}{
+		{
+			name: "config with nil logger",
+			value: ConfigWithLogger{
+				Name:   "test",
+				Logger: nil,
+			},
+			expected: false, // Name 非空，所以整体非空
+		},
+		{
+			name: "config with logger",
+			value: ConfigWithLogger{
+				Name: "test",
+				Logger: &mockLogger{
+					level:        "info",
+					output:       "stdout",
+					PublicConfig: "public",
+				},
+			},
+			expected: false, // 有非空字段
+		},
+		{
+			name: "empty config",
+			value: ConfigWithLogger{
+				Name:   "",
+				Logger: nil,
+			},
+			expected: true, // 所有字段都为空
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// 这个测试的关键是：不应该 panic
+			result := IsEmptyValue(reflect.ValueOf(test.value))
+			assert.Equal(t, test.expected, result)
+		})
+	}
+}

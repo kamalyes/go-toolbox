@@ -88,6 +88,10 @@ func IsEmptyStruct(v reflect.Value) bool {
 
 // CheckEmptyTimePointer 检查指针类型的时间是否为空
 func CheckEmptyTimePointer(v reflect.Value) (isEmpty bool, handled bool) {
+	if !v.CanInterface() {
+		return false, false
+	}
+
 	// 检查 *time.Time
 	if t, ok := v.Interface().(*time.Time); ok {
 		return t == nil || IsTimeEmpty(t), true
@@ -103,6 +107,10 @@ func CheckEmptyTimePointer(v reflect.Value) (isEmpty bool, handled bool) {
 
 // CheckEmptyTimeStruct 检查结构体类型的时间是否为空
 func CheckEmptyTimeStruct(v reflect.Value) (isEmpty bool, handled bool) {
+	if !v.CanInterface() {
+		return false, false
+	}
+
 	// 检查 time.Time
 	if t, ok := v.Interface().(time.Time); ok {
 		return IsTimeEmpty(&t), true
