@@ -109,3 +109,66 @@ func pkcs7Unpadding(data []byte) ([]byte, error) {
 	}
 	return data[:(length - unpadding)], nil
 }
+
+// AesEncryptWithIV 使用自定义 IV 的 AES-CBC-PKCS7 加密
+// [EN] AES-CBC-PKCS7 encryption with custom IV
+func AesEncryptWithIV(plainText string, key, iv []byte) (string, error) {
+	if len(key) == 0 {
+		return "", errors.New("key cannot be empty")
+	}
+	if len(iv) != aes.BlockSize {
+		return "", errors.New("IV length must equal block size")
+	}
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", err
+	}
+
+	// PKCS7 填充
+	plainTextBytes := []byte(plainText)
+	plainTextBytes = pkcs7Padding(plainTextBytes, block.BlockSize())
+
+	cipherText := make([]byte, len(plainTextBytes))
+	mode := cipher.NewCBCEncrypter(block, iv)
+	mode.CryptBlocks(cipherText, plainTextBytes)
+
+	return base64.StdEncoding.EncodeToString(cipherText), nil
+}
+
+// AesDecryptWithIV 使用自定义 IV 的 AES-CBC-PKCS7 解密
+// [EN] AES-CBC-PKCS7 decryption with custom IV
+func AesDecryptWithIV(cipherText string, key, iv []byte) (string, error) {
+	if len(key) == 0 {
+		return "", errors.New("key cannot be empty")
+	}
+	if len(iv) != aes.BlockSize {
+		return "", errors.New("IV length must equal block size")
+	}
+
+	cipherTextBytes, err := base64.StdEncoding.DecodeString(cipherText)
+	if err != nil {
+		return "", err
+	}
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", err
+	}
+
+	if len(cipherTextBytes)%aes.BlockSize != 0 {
+		return "", errors.New("ciphertext is not a multiple of the block size")
+	}
+
+	plainTextBytes := make([]byte, len(cipherTextBytes))
+	mode := cipher.NewCBCDecrypter(block, iv)
+	mode.CryptBlocks(plainTextBytes, cipherTextBytes)
+
+	// 去掉 PKCS7 填充
+	plainTextBytes, err = pkcs7Unpadding(plainTextBytes)
+	if err != nil {
+		return "", err
+	}
+
+	return string(plainTextBytes), nil
+}

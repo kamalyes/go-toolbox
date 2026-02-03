@@ -51,6 +51,7 @@ func NewGenerator(config *GeneratorConfig) *Generator {
 	// 设置默认值
 	config.HeaderName = mathx.IfEmpty(config.HeaderName, "X-Sign")
 	config.TimestampHeader = mathx.IfEmpty(config.TimestampHeader, "X-Timestamp")
+	config.NonceHeader = mathx.IfEmpty(config.NonceHeader, "X-Nonce")
 	config.Algorithm = mathx.IfEmpty(config.Algorithm, AlgorithmSHA256)
 
 	return &Generator{config: config}
@@ -112,11 +113,15 @@ func (g *Generator) buildSignString(method, path, timestamp, body string, header
 
 // buildCustomFormatString 构建自定义格式的签名字符串
 func (g *Generator) buildCustomFormatString(method, path, timestamp, body string, headers map[string]string, queryParams url.Values) string {
+	// 获取 nonce
+	nonce := headers[g.config.NonceHeader]
+
 	// 构建占位符映射表
 	placeholders := map[string]string{
 		"{method}":    strings.ToUpper(method),
 		"{path}":      path,
 		"{timestamp}": timestamp,
+		"{nonce}":     nonce,
 		"{body}":      body,
 		"{query}":     g.sortedQueryString(queryParams),
 	}

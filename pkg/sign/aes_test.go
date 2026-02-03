@@ -151,3 +151,102 @@ func BenchmarkAesEncryptDecrypt(b *testing.B) {
 		}
 	})
 }
+
+// TestAesEncryptDecryptWithIV 测试自定义 IV 的加密解密
+func TestAesEncryptDecryptWithIV(t *testing.T) {
+	password := "example1235678"
+	key := GenerateByteKey(password, 32)
+	iv := []byte("gtfrdbhytfredrji") // 16 字节 IV
+
+	testCases := []struct {
+		name             string
+		plainText        string
+		key              []byte
+		iv               []byte
+		expectEncryptErr bool
+		expectDecryptErr bool
+	}{
+		{"normal", "Hello, World!", key, iv, false, false},
+		{"empty string", "", key, iv, false, false},
+		{"long string", "A long string that exceeds the typical block size to test the AES encryption and decryption functionality.", key, iv, false, false},
+		{"special characters", "Special characters: !@#$%^&*()_+[]{}|;':\",.<>?/`~", key, iv, false, false},
+		{"unicode", "Unicode test: 你好，世界！", key, iv, false, false},
+		{"json data", `{"key":"test/upload.txt"}`, key, iv, false, false},
+		{"empty key", "Hello, World!", []byte{}, iv, true, true},
+		{"invalid IV length", "Hello, World!", key, []byte("short"), true, true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			encryptedText, err := AesEncryptWithIV(tc.plainText, tc.key, tc.iv)
+
+			if tc.expectEncryptErr {
+				assert.Error(t, err, "Expected error for encryption")
+				return
+			}
+
+			assert.NoError(t, err, "Encryption failed: %v", err)
+			assert.NotEmpty(t, encryptedText, "Encrypted text should not be empty")
+
+			decryptedText, err := AesDecryptWithIV(encryptedText, tc.key, tc.iv)
+
+			if tc.expectDecryptErr {
+				assert.Error(t, err, "Expected error for decryption")
+				return
+			}
+
+			assert.NoError(t, err, "Decryption failed: %v", err)
+			assert.Equal(t, tc.plainText, decryptedText, "Decrypted text does not match original")
+
+			t.Logf("Encrypted (Base64): %s | Decrypted: %s", encryptedText, decryptedText)
+		})
+	}
+}
+
+// TestAesWithIVCompatibility 测试与 Cloudflare Worker 的兼容性
+func TestAesWithIVCompatibility(t *testing.T) {
+	// 使用与 Cloudflare Worker 相同的配置
+	key := []byte("mkjnhbgvfrquedhsgdbchgyutrfdhsij") // 32 字节
+	iv := []byte("gtfrdbhytfredrji")                  // 16 字节
+
+	// 测试 JSON 数据（模拟 R2 上传签名）
+	jsonData := `{"key":"test/upload.txt"}`
+
+	encrypted, err := AesEncryptWithIV(jsonData, key, iv)
+	assert.NoError(t, err, "Encryption failed")
+	assert.NotEmpty(t, encrypted, "Encrypted text should not be empty")
+
+	decrypted, err := AesDecryptWithIV(encrypted, key, iv)
+	assert.NoError(t, err, "Decryption failed")
+	assert.Equal(t, jsonData, decrypted, "Decrypted text does not match original")
+
+	t.Logf("Original: %s", jsonData)
+	t.Logf("Encrypted: %s", encrypted)
+	t.Logf("Decrypted: %s", decrypted)
+}
+
+// BenchmarkAesEncryptDecryptWithIV 性能测试
+func BenchmarkAesEncryptDecryptWithIV(b *testing.B) {
+	password := "example1235678"
+	key := GenerateByteKey(password, 32)
+	iv := []byte("gtfrdbhytfredrji")
+	plainText := generateRandomString(4096) // 4 KB
+
+	b.Run("EncryptDecryptWithIV", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			encryptedText, err := AesEncryptWithIV(plainText, key, iv)
+			if err != nil {
+				b.Fatalf("Encryption failed: %v", err)
+			}
+
+			decryptedText, err := AesDecryptWithIV(encryptedText, key, iv)
+			if err != nil {
+				b.Fatalf("Decryption failed: %v", err)
+			}
+
+			if plainText != decryptedText {
+				b.Fatalf("Decrypted text does not match original")
+			}
+		}
+	})
+}
