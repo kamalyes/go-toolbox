@@ -114,6 +114,7 @@ type ParallelExecutor[K comparable, V any, R any] struct {
 //	- R=int: 返回发送的字节数
 type ParallelSliceExecutor[T any, R any] struct {
 	data           []T
+	maxConcurrency int // 最大并发数，0表示不限制
 	onSuccess      ParallelSliceSuccessCallback[T, R]
 	onError        ParallelSliceErrorCallback[T]
 	onComplete     ParallelSliceCompleteCallback[R]
@@ -232,7 +233,33 @@ func (p *ParallelSliceExecutor[T, R]) OnEachComplete(fn ParallelSliceEachComplet
 	return p
 }
 
+// WithConcurrency 设置最大并发数
+//
+// 参数:
+//   - maxConcurrency: 最大并发 goroutine 数量
+//   - 0: 不限制并发数，所有任务立即启动（默认行为）
+//   - >0: 限制同时运行的 goroutine 数量，使用信号量控制
+//
+// 注意:
+//   - 这只是控制并发数，所有任务最终都会被执行完
+//   - 例如: 100个任务，maxConcurrency=10，表示同时最多10个任务在执行，
+//     当一个任务完成后，会自动启动下一个任务，直到所有100个任务都完成
+func (p *ParallelSliceExecutor[T, R]) WithConcurrency(maxConcurrency int) *ParallelSliceExecutor[T, R] {
+	p.maxConcurrency = maxConcurrency
+	return p
+}
+
 // Execute 执行并发任务
+//
+// 工作原理:
+//   - 如果设置了 maxConcurrency，使用信号量控制同时运行的 goroutine 数量
+//   - 所有任务都会被执行，只是控制了并发度
+//   - 使用 WaitGroup 确保所有任务完成后才返回
+//
+// 示例:
+//   - 100个任务，maxConcurrency=10:
+//     同时最多10个 goroutine 在运行，当一个完成后，立即启动下一个
+//     最终所有100个任务都会执行完成
 func (p *ParallelSliceExecutor[T, R]) Execute(fn ParallelSliceExecuteFunc[T, R]) {
 	if len(p.data) == 0 {
 		if p.onComplete != nil {
@@ -248,31 +275,52 @@ func (p *ParallelSliceExecutor[T, R]) Execute(fn ParallelSliceExecuteFunc[T, R])
 		errors  = make([]error, len(p.data))
 	)
 
-	for i, v := range p.data {
-		wg.Add(1)
-		go func(idx int, val T) {
-			defer wg.Done()
+	// 处理单个任务的公共逻辑
+	processTask := func(idx int, val T) {
+		defer wg.Done()
 
-			result, err := fn(idx, val)
+		result, err := fn(idx, val)
 
-			mu.Lock()
-			if err != nil {
-				errors[idx] = err
-				if p.onError != nil {
-					p.onError(idx, val, err)
-				}
-			} else {
-				results[idx] = result
-				if p.onSuccess != nil {
-					p.onSuccess(idx, val, result)
-				}
+		mu.Lock()
+		defer mu.Unlock()
+
+		if err != nil {
+			errors[idx] = err
+			if p.onError != nil {
+				p.onError(idx, val, err)
 			}
-
-			if p.onEachComplete != nil {
-				p.onEachComplete(idx)
+		} else {
+			results[idx] = result
+			if p.onSuccess != nil {
+				p.onSuccess(idx, val, result)
 			}
-			mu.Unlock()
-		}(i, v)
+		}
+
+		if p.onEachComplete != nil {
+			p.onEachComplete(idx)
+		}
+	}
+
+	// 如果设置了并发限制，使用信号量控制
+	// 注意: 所有任务都会被执行，信号量只是控制同时运行的数量
+	if p.maxConcurrency > 0 {
+		semaphore := make(chan struct{}, p.maxConcurrency)
+
+		for i, v := range p.data {
+			wg.Add(1)
+			semaphore <- struct{}{} // 获取信号量（阻塞直到有空位）
+
+			go func(idx int, val T) {
+				defer func() { <-semaphore }() // 释放信号量，让下一个任务可以启动
+				processTask(idx, val)
+			}(i, v)
+		}
+	} else {
+		// 无并发限制，直接启动所有 goroutine
+		for i, v := range p.data {
+			wg.Add(1)
+			go processTask(i, v)
+		}
 	}
 
 	wg.Wait()

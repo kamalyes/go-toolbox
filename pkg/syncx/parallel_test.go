@@ -585,3 +585,278 @@ func ExampleParallelSliceExecutor() {
 	// 索引 4: 50 -> 100
 	// 所有任务完成!
 }
+
+// TestParallelSliceExecutor_WithConcurrency 测试并发控制功能
+func TestParallelSliceExecutor_WithConcurrency(t *testing.T) {
+	t.Run("限制并发数为1", func(t *testing.T) {
+		data := []int{1, 2, 3, 4, 5}
+		var (
+			mu             sync.Mutex
+			currentRunning int32
+			maxRunning     int32
+		)
+
+		NewParallelSliceExecutor[int, int](data).
+			WithConcurrency(1).
+			Execute(func(idx int, val int) (int, error) {
+				current := atomic.AddInt32(&currentRunning, 1)
+
+				// 记录最大并发数
+				mu.Lock()
+				if current > maxRunning {
+					maxRunning = current
+				}
+				mu.Unlock()
+
+				time.Sleep(10 * time.Millisecond) // 模拟耗时操作
+				atomic.AddInt32(&currentRunning, -1)
+				return val * 2, nil
+			})
+
+		if maxRunning != 1 {
+			t.Errorf("期望最大并发数为 1，实际为 %d", maxRunning)
+		}
+	})
+
+	t.Run("限制并发数为3", func(t *testing.T) {
+		data := make([]int, 10)
+		for i := range data {
+			data[i] = i + 1
+		}
+
+		var (
+			mu             sync.Mutex
+			currentRunning int32
+			maxRunning     int32
+		)
+
+		NewParallelSliceExecutor[int, int](data).
+			WithConcurrency(3).
+			Execute(func(idx int, val int) (int, error) {
+				current := atomic.AddInt32(&currentRunning, 1)
+
+				mu.Lock()
+				if current > maxRunning {
+					maxRunning = current
+				}
+				mu.Unlock()
+
+				time.Sleep(20 * time.Millisecond)
+				atomic.AddInt32(&currentRunning, -1)
+				return val * 2, nil
+			})
+
+		if maxRunning > 3 {
+			t.Errorf("期望最大并发数不超过 3，实际为 %d", maxRunning)
+		}
+		if maxRunning < 2 {
+			t.Errorf("期望最大并发数至少为 2，实际为 %d", maxRunning)
+		}
+	})
+
+	t.Run("不限制并发数", func(t *testing.T) {
+		data := make([]int, 20)
+		for i := range data {
+			data[i] = i + 1
+		}
+
+		var (
+			mu             sync.Mutex
+			currentRunning int32
+			maxRunning     int32
+		)
+
+		NewParallelSliceExecutor[int, int](data).
+			Execute(func(idx int, val int) (int, error) {
+				current := atomic.AddInt32(&currentRunning, 1)
+
+				mu.Lock()
+				if current > maxRunning {
+					maxRunning = current
+				}
+				mu.Unlock()
+
+				time.Sleep(10 * time.Millisecond)
+				atomic.AddInt32(&currentRunning, -1)
+				return val * 2, nil
+			})
+
+		// 不限制时，并发数应该接近数据量
+		if maxRunning < 10 {
+			t.Errorf("期望最大并发数至少为 10，实际为 %d", maxRunning)
+		}
+	})
+
+	t.Run("并发控制下结果正确性", func(t *testing.T) {
+		data := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+		var results []int
+		var mu sync.Mutex
+
+		NewParallelSliceExecutor[int, int](data).
+			WithConcurrency(3).
+			OnSuccess(func(idx int, val int, result int) {
+				mu.Lock()
+				results = append(results, result)
+				mu.Unlock()
+			}).
+			Execute(func(idx int, val int) (int, error) {
+				time.Sleep(5 * time.Millisecond)
+				return val * 2, nil
+			})
+
+		if len(results) != 10 {
+			t.Errorf("期望 10 个结果，实际 %d 个", len(results))
+		}
+
+		// 验证所有结果都存在
+		resultMap := make(map[int]bool)
+		for _, r := range results {
+			resultMap[r] = true
+		}
+		for _, v := range data {
+			expected := v * 2
+			if !resultMap[expected] {
+				t.Errorf("缺少结果 %d", expected)
+			}
+		}
+	})
+
+	t.Run("并发控制下错误处理", func(t *testing.T) {
+		data := []int{1, 2, 3, 4, 5}
+		var (
+			successCount int32
+			errorCount   int32
+		)
+
+		NewParallelSliceExecutor[int, int](data).
+			WithConcurrency(2).
+			OnSuccess(func(idx int, val int, result int) {
+				atomic.AddInt32(&successCount, 1)
+			}).
+			OnError(func(idx int, val int, err error) {
+				atomic.AddInt32(&errorCount, 1)
+			}).
+			Execute(func(idx int, val int) (int, error) {
+				time.Sleep(10 * time.Millisecond)
+				if val%2 == 0 {
+					return 0, fmt.Errorf("偶数错误: %d", val)
+				}
+				return val * 2, nil
+			})
+
+		if successCount != 3 {
+			t.Errorf("期望成功 3 次，实际 %d 次", successCount)
+		}
+		if errorCount != 2 {
+			t.Errorf("期望错误 2 次，实际 %d 次", errorCount)
+		}
+	})
+
+	t.Run("链式调用WithConcurrency", func(t *testing.T) {
+		data := []int{1, 2, 3, 4, 5}
+		var completed bool
+
+		NewParallelSliceExecutor[int, int](data).
+			WithConcurrency(2).
+			OnSuccess(func(idx int, val int, result int) {
+				// 成功回调
+			}).
+			OnError(func(idx int, val int, err error) {
+				// 错误回调
+			}).
+			OnComplete(func(results []int, errors []error) {
+				completed = true
+			}).
+			Execute(func(idx int, val int) (int, error) {
+				return val * 2, nil
+			})
+
+		if !completed {
+			t.Error("OnComplete 未执行")
+		}
+	})
+}
+
+// BenchmarkParallelSliceExecutor_Concurrency 测试不同并发数的性能
+func BenchmarkParallelSliceExecutor_Concurrency(b *testing.B) {
+	data := make([]int, 100)
+	for i := range data {
+		data[i] = i + 1
+	}
+
+	b.Run("无限制", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			NewParallelSliceExecutor[int, int](data).
+				Execute(func(idx int, val int) (int, error) {
+					time.Sleep(time.Microsecond)
+					return val * 2, nil
+				})
+		}
+	})
+
+	b.Run("并发数10", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			NewParallelSliceExecutor[int, int](data).
+				WithConcurrency(10).
+				Execute(func(idx int, val int) (int, error) {
+					time.Sleep(time.Microsecond)
+					return val * 2, nil
+				})
+		}
+	})
+
+	b.Run("并发数50", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			NewParallelSliceExecutor[int, int](data).
+				WithConcurrency(50).
+				Execute(func(idx int, val int) (int, error) {
+					time.Sleep(time.Microsecond)
+					return val * 2, nil
+				})
+		}
+	})
+}
+
+// 示例：使用并发控制处理大量任务
+func ExampleParallelSliceExecutor_WithConcurrency() {
+	// 模拟100个任务，但只允许10个并发
+	tasks := make([]int, 100)
+	for i := range tasks {
+		tasks[i] = i + 1
+	}
+
+	var completed int32
+
+	NewParallelSliceExecutor[int, string](tasks).
+		WithConcurrency(10). // 限制最多10个并发
+		OnSuccess(func(idx int, val int, result string) {
+			count := atomic.AddInt32(&completed, 1)
+			if count%10 == 0 {
+				fmt.Printf("已完成 %d 个任务\n", count)
+			}
+		}).
+		OnComplete(func(results []string, errors []error) {
+			fmt.Printf("全部完成！总计 %d 个任务\n", len(results))
+		}).
+		Execute(func(idx int, val int) (string, error) {
+			// 模拟耗时操作
+			time.Sleep(time.Millisecond)
+			return fmt.Sprintf("任务 %d 完成", val), nil
+		})
+
+	// Output:
+	// 已完成 10 个任务
+	// 已完成 20 个任务
+	// 已完成 30 个任务
+	// 已完成 40 个任务
+	// 已完成 50 个任务
+	// 已完成 60 个任务
+	// 已完成 70 个任务
+	// 已完成 80 个任务
+	// 已完成 90 个任务
+	// 已完成 100 个任务
+	// 全部完成！总计 100 个任务
+}
