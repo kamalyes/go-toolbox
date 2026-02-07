@@ -288,6 +288,231 @@ func TestGo_ChainedCallbacks(t *testing.T) {
 	assert.Equal(t, int32(0), atomic.LoadInt32(&cancelCalled))
 }
 
+func TestGo_ExecWithChildren_BasicExecution(t *testing.T) {
+	var (
+		task1Done = int32(0)
+		task2Done = int32(0)
+		task3Done = int32(0)
+	)
+
+	done := make(chan struct{})
+
+	Go().
+		OnPanic(func(r interface{}) {
+			t.Errorf("unexpected panic: %v", r)
+		}).
+		ExecWithChildren(func(children *ChildRunner) {
+			children.Go(func() {
+				time.Sleep(10 * time.Millisecond)
+				atomic.StoreInt32(&task1Done, 1)
+			})
+
+			children.Go(func() {
+				time.Sleep(20 * time.Millisecond)
+				atomic.StoreInt32(&task2Done, 1)
+			})
+
+			children.GoWithError(func() error {
+				time.Sleep(15 * time.Millisecond)
+				atomic.StoreInt32(&task3Done, 1)
+				return nil
+			})
+
+			// 等待所有子任务完成后关闭 done channel
+			go func() {
+				children.Wait()
+				close(done)
+			}()
+		})
+
+	// 等待所有任务完成
+	<-done
+
+	assert.Equal(t, int32(1), atomic.LoadInt32(&task1Done))
+	assert.Equal(t, int32(1), atomic.LoadInt32(&task2Done))
+	assert.Equal(t, int32(1), atomic.LoadInt32(&task3Done))
+}
+
+func TestGo_ExecWithChildren_WithErrorHandling(t *testing.T) {
+	errorCaught := int32(0)
+	testErr := errors.New("test error")
+	done := make(chan struct{})
+
+	Go().
+		OnError(func(err error) {
+			if err == testErr {
+				atomic.AddInt32(&errorCaught, 1)
+			}
+		}).
+		ExecWithChildren(func(children *ChildRunner) {
+			children.GoWithError(func() error {
+				return testErr
+			})
+
+			children.GoWithError(func() error {
+				return nil
+			})
+
+			go func() {
+				children.Wait()
+				close(done)
+			}()
+		})
+
+	<-done
+	time.Sleep(50 * time.Millisecond)
+	assert.Equal(t, int32(1), atomic.LoadInt32(&errorCaught))
+}
+
+func TestGo_ExecWithChildren_WithPanicHandling(t *testing.T) {
+	panicCaught := int32(0)
+	done := make(chan struct{})
+
+	Go().
+		OnPanic(func(r interface{}) {
+			atomic.AddInt32(&panicCaught, 1)
+		}).
+		ExecWithChildren(func(children *ChildRunner) {
+			children.Go(func() {
+				panic("test panic")
+			})
+
+			children.Go(func() {
+				// 正常任务应该继续执行
+			})
+
+			go func() {
+				children.Wait()
+				close(done)
+			}()
+		})
+
+	<-done
+	time.Sleep(50 * time.Millisecond)
+	assert.Equal(t, int32(1), atomic.LoadInt32(&panicCaught))
+}
+
+func TestGo_ExecSubs_BasicExecution(t *testing.T) {
+	var (
+		task1Done = int32(0)
+		task2Done = int32(0)
+		task3Done = int32(0)
+	)
+
+	done := make(chan struct{})
+
+	Go().
+		OnPanic(func(r interface{}) {
+			t.Errorf("unexpected panic: %v", r)
+		}).
+		Sub(func() {
+			time.Sleep(10 * time.Millisecond)
+			atomic.StoreInt32(&task1Done, 1)
+		}).
+		Sub(func() {
+			time.Sleep(20 * time.Millisecond)
+			atomic.StoreInt32(&task2Done, 1)
+		}).
+		SubWithError(func() error {
+			time.Sleep(15 * time.Millisecond)
+			atomic.StoreInt32(&task3Done, 1)
+			return nil
+		}).
+		ExecSubs()
+
+	// 等待足够时间让所有任务完成
+	time.Sleep(100 * time.Millisecond)
+
+	assert.Equal(t, int32(1), atomic.LoadInt32(&task1Done))
+	assert.Equal(t, int32(1), atomic.LoadInt32(&task2Done))
+	assert.Equal(t, int32(1), atomic.LoadInt32(&task3Done))
+
+	close(done)
+}
+
+func TestGo_ExecSubs_WithErrorHandling(t *testing.T) {
+	errorCaught := int32(0)
+	testErr := errors.New("test error")
+
+	Go().
+		OnError(func(err error) {
+			if err == testErr {
+				atomic.AddInt32(&errorCaught, 1)
+			}
+		}).
+		SubWithError(func() error {
+			return testErr
+		}).
+		SubWithError(func() error {
+			return nil
+		}).
+		ExecSubs()
+
+	time.Sleep(100 * time.Millisecond)
+	assert.Equal(t, int32(1), atomic.LoadInt32(&errorCaught))
+}
+
+func TestGo_ExecSubs_WithPanicHandling(t *testing.T) {
+	panicCaught := int32(0)
+	normalTaskDone := int32(0)
+
+	Go().
+		OnPanic(func(r interface{}) {
+			atomic.AddInt32(&panicCaught, 1)
+		}).
+		Sub(func() {
+			panic("test panic")
+		}).
+		Sub(func() {
+			time.Sleep(10 * time.Millisecond)
+			atomic.StoreInt32(&normalTaskDone, 1)
+		}).
+		ExecSubs()
+
+	time.Sleep(100 * time.Millisecond)
+	assert.Equal(t, int32(1), atomic.LoadInt32(&panicCaught))
+	assert.Equal(t, int32(1), atomic.LoadInt32(&normalTaskDone), "正常任务应该继续执行")
+}
+
+func TestGo_ExecSubs_ConcurrentExecution(t *testing.T) {
+	start := time.Now()
+	allDone := int32(0)
+
+	Go().
+		Sub(func() {
+			time.Sleep(50 * time.Millisecond)
+		}).
+		Sub(func() {
+			time.Sleep(50 * time.Millisecond)
+		}).
+		Sub(func() {
+			time.Sleep(50 * time.Millisecond)
+		}).
+		ExecSubs()
+
+	time.Sleep(100 * time.Millisecond)
+	elapsed := time.Since(start)
+
+	// 如果是并发执行，总耗时应该接近 50ms（最长的任务）
+	// 而不是 150ms（顺序执行的总和）
+	assert.Less(t, elapsed, 120*time.Millisecond, "应该并发执行，而非顺序执行")
+
+	atomic.StoreInt32(&allDone, 1)
+	assert.Equal(t, int32(1), atomic.LoadInt32(&allDone))
+}
+
+func TestGo_ExecSubs_EmptySubTasks(t *testing.T) {
+	// 测试没有子任务的情况
+	Go().
+		OnPanic(func(r interface{}) {
+			t.Errorf("unexpected panic: %v", r)
+		}).
+		ExecSubs()
+
+	time.Sleep(50 * time.Millisecond)
+	// 不应该 panic
+}
+
 // 基准测试
 func BenchmarkGo_Exec(b *testing.B) {
 	for i := 0; i < b.N; i++ {

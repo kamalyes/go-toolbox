@@ -102,6 +102,14 @@ type GoExecutor struct {
 	onPanic  GoExecutorPanicHandler
 	onCancel GoExecutorCancelHandler
 	ctx      context.Context
+	wg       *sync.WaitGroup // 可选：管理子 goroutine
+	subTasks []subTask       // 子任务列表
+}
+
+// subTask 子任务定义
+type subTask struct {
+	fn      GoExecutorFunc
+	fnError GoExecutorWaitFunc
 }
 
 // Go 创建一个新的 Goroutine 执行器
@@ -202,6 +210,133 @@ func (g *GoExecutor) Exec(fn GoExecutorFunc) {
 		}
 
 		fn()
+	}()
+}
+
+// ChildRunner 子任务运行器，用于在父 goroutine 中启动子 goroutine
+type ChildRunner struct {
+	wg      sync.WaitGroup
+	onPanic GoExecutorPanicHandler
+	onError GoExecutorErrorHandler
+}
+
+// Go 启动一个子 goroutine
+func (c *ChildRunner) Go(fn GoExecutorFunc) *ChildRunner {
+	c.wg.Add(1)
+	go func() {
+		defer c.wg.Done()
+		defer RecoverWithHandler(c.onPanic)
+		fn()
+	}()
+	return c
+}
+
+// GoWithError 启动一个带错误返回的子 goroutine
+func (c *ChildRunner) GoWithError(fn GoExecutorWaitFunc) *ChildRunner {
+	c.wg.Add(1)
+	go func() {
+		defer c.wg.Done()
+		defer RecoverWithHandler(c.onPanic)
+
+		if err := fn(); err != nil && c.onError != nil {
+			c.onError(err)
+		}
+	}()
+	return c
+}
+
+// Wait 等待所有子 goroutine 完成
+func (c *ChildRunner) Wait() {
+	c.wg.Wait()
+}
+
+// Sub 添加子 goroutine 任务（链式调用）
+//
+// 示例:
+//
+//	Go().OnPanic(handler).
+//	    Sub(func() { startHeartbeat() }).
+//	    Sub(func() { subscribe1() }).
+//	    Sub(func() { subscribe2() }).
+//	    ExecSubs()
+func (g *GoExecutor) Sub(fn GoExecutorFunc) *GoExecutor {
+	g.subTasks = append(g.subTasks, subTask{fn: fn})
+	return g
+}
+
+// SubWithError 添加带错误返回的子 goroutine 任务（链式调用）
+func (g *GoExecutor) SubWithError(fn GoExecutorWaitFunc) *GoExecutor {
+	g.subTasks = append(g.subTasks, subTask{fnError: fn})
+	return g
+}
+
+// ExecSubs 执行所有子 goroutine 任务并等待完成
+//
+// 示例:
+//
+//	Go().OnPanic(handler).
+//	    Sub(func() { task1() }).
+//	    Sub(func() { task2() }).
+//	    SubWithError(func() error { return task3() }).
+//	    ExecSubs()
+func (g *GoExecutor) ExecSubs() {
+	go func() {
+		defer RecoverWithHandler(g.onPanic)
+
+		// 延迟执行
+		if !g.waitWithDelay(g.ctx) {
+			return
+		}
+
+		// 创建子任务运行器（继承父级的 panic/error handler）
+		children := &ChildRunner{
+			onPanic: g.onPanic,
+			onError: g.onError,
+		}
+
+		// 启动所有子任务
+		for _, task := range g.subTasks {
+			if task.fn != nil {
+				children.Go(task.fn)
+			} else if task.fnError != nil {
+				children.GoWithError(task.fnError)
+			}
+		}
+
+		// 等待所有子任务完成
+		children.Wait()
+	}()
+}
+
+// ExecWithChildren 在父 goroutine 中执行，并管理多个子 goroutine
+//
+// 示例:
+//
+//	Go().OnPanic(handler).ExecWithChildren(func(children *ChildRunner) {
+//	    children.Go(func() { startHeartbeat() })
+//	    children.Go(func() { subscribe1() })
+//	    children.Go(func() { subscribe2() })
+//	})
+func (g *GoExecutor) ExecWithChildren(fn func(*ChildRunner)) {
+	go func() {
+		defer RecoverWithHandler(g.onPanic)
+
+		// 延迟执行
+		if !g.waitWithDelay(g.ctx) {
+			return
+		}
+
+		// 创建子任务运行器（继承父级的 panic/error handler）
+		children := &ChildRunner{
+			onPanic: g.onPanic,
+			onError: g.onError,
+		}
+
+		// 执行用户函数（启动子任务）
+		fn(children)
+
+		// 等待所有子任务完成
+		children.Wait()
 	}()
 }
 
