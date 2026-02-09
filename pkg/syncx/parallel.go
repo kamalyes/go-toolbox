@@ -42,7 +42,10 @@
  */
 package syncx
 
-import "sync"
+import (
+	"fmt"
+	"sync"
+)
 
 // ParallelExecuteFunc 并发执行函数类型 (Map)
 type ParallelExecuteFunc[K comparable, V any, R any] func(K, V) (R, error)
@@ -74,6 +77,12 @@ type ParallelEachCompleteCallback[K comparable] func(K)
 // ParallelSliceEachCompleteCallback 每个任务完成回调函数类型 (Slice)
 type ParallelSliceEachCompleteCallback func(int)
 
+// ParallelPanicCallback panic 回调函数类型 (Map)
+type ParallelPanicCallback[K comparable, V any] func(K, V, any)
+
+// ParallelSlicePanicCallback panic 回调函数类型 (Slice)
+type ParallelSlicePanicCallback[T any] func(int, T, any)
+
 // ParallelForEachFunc 遍历函数类型 (Map)
 type ParallelForEachFunc[K comparable, V any] func(K, V)
 
@@ -99,6 +108,7 @@ type ParallelExecutor[K comparable, V any, R any] struct {
 	onError        ParallelErrorCallback[K, V]
 	onComplete     ParallelCompleteCallback[K, R]
 	onEachComplete ParallelEachCompleteCallback[K]
+	onPanic        ParallelPanicCallback[K, V]
 }
 
 // ParallelSliceExecutor 并发 Slice 执行器配置
@@ -119,6 +129,7 @@ type ParallelSliceExecutor[T any, R any] struct {
 	onError        ParallelSliceErrorCallback[T]
 	onComplete     ParallelSliceCompleteCallback[R]
 	onEachComplete ParallelSliceEachCompleteCallback
+	onPanic        ParallelSlicePanicCallback[T]
 }
 
 // NewParallelExecutor 创建并发执行器
@@ -159,6 +170,12 @@ func (p *ParallelExecutor[K, V, R]) OnEachComplete(fn ParallelEachCompleteCallba
 	return p
 }
 
+// OnPanic 设置 panic 回调
+func (p *ParallelExecutor[K, V, R]) OnPanic(fn ParallelPanicCallback[K, V]) *ParallelExecutor[K, V, R] {
+	p.onPanic = fn
+	return p
+}
+
 // Execute 执行并发任务
 func (p *ParallelExecutor[K, V, R]) Execute(fn ParallelExecuteFunc[K, V, R]) {
 	if len(p.data) == 0 {
@@ -178,7 +195,18 @@ func (p *ParallelExecutor[K, V, R]) Execute(fn ParallelExecuteFunc[K, V, R]) {
 	for k, v := range p.data {
 		wg.Add(1)
 		go func(key K, val V) {
-			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					mu.Lock()
+					errors[key] = fmt.Errorf("panic: %v", r)
+					mu.Unlock()
+
+					if p.onPanic != nil {
+						p.onPanic(key, val, r)
+					}
+				}
+				wg.Done()
+			}()
 
 			result, err := fn(key, val)
 
@@ -233,6 +261,12 @@ func (p *ParallelSliceExecutor[T, R]) OnEachComplete(fn ParallelSliceEachComplet
 	return p
 }
 
+// OnPanic 设置 panic 回调
+func (p *ParallelSliceExecutor[T, R]) OnPanic(fn ParallelSlicePanicCallback[T]) *ParallelSliceExecutor[T, R] {
+	p.onPanic = fn
+	return p
+}
+
 // WithConcurrency 设置最大并发数
 //
 // 参数:
@@ -277,7 +311,18 @@ func (p *ParallelSliceExecutor[T, R]) Execute(fn ParallelSliceExecuteFunc[T, R])
 
 	// 处理单个任务的公共逻辑
 	processTask := func(idx int, val T) {
-		defer wg.Done()
+		defer func() {
+			if r := recover(); r != nil {
+				mu.Lock()
+				errors[idx] = fmt.Errorf("panic: %v", r)
+				mu.Unlock()
+
+				if p.onPanic != nil {
+					p.onPanic(idx, val, r)
+				}
+			}
+			wg.Done()
+		}()
 
 		result, err := fn(idx, val)
 

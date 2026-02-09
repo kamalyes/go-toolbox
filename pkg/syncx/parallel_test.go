@@ -16,6 +16,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // 对比 WaitGroup vs Channel 的性能
@@ -859,4 +861,256 @@ func ExampleParallelSliceExecutor_WithConcurrency() {
 	// 已完成 90 个任务
 	// 已完成 100 个任务
 	// 全部完成！总计 100 个任务
+}
+
+// TestParallelSliceExecutor_OnPanic_BasicPanicHandling 测试基本的 panic 捕获
+func TestParallelSliceExecutor_OnPanic_BasicPanicHandling(t *testing.T) {
+	data := []int{1, 2, 3, 4, 5}
+	panicIndex := 2 // 第3个元素会 panic
+
+	var (
+		mu           sync.Mutex
+		panicCalls   []int
+		panicValues  []any
+		successCalls []int
+	)
+
+	NewParallelSliceExecutor[int, string](data).
+		OnSuccess(func(idx int, val int, result string) {
+			mu.Lock()
+			defer mu.Unlock()
+			successCalls = append(successCalls, idx)
+		}).
+		OnPanic(func(idx int, val int, panicVal any) {
+			mu.Lock()
+			defer mu.Unlock()
+			panicCalls = append(panicCalls, idx)
+			panicValues = append(panicValues, panicVal)
+		}).
+		Execute(func(idx int, val int) (string, error) {
+			if idx == panicIndex {
+				panic("intentional panic")
+			}
+			return "success", nil
+		})
+
+	// 验证 panic 被捕获
+	assert.Len(t, panicCalls, 1, "期望捕获 1 次 panic")
+	assert.Equal(t, panicIndex, panicCalls[0], "panic 索引应该匹配")
+	assert.Len(t, panicValues, 1, "期望有 1 个 panic 值")
+	assert.Equal(t, "intentional panic", panicValues[0], "panic 值应该匹配")
+
+	// 验证其他任务正常执行
+	assert.Len(t, successCalls, len(data)-1, "其他任务应该正常执行")
+}
+
+// TestParallelSliceExecutor_OnPanic_MultiplePanics 测试多个任务同时 panic
+func TestParallelSliceExecutor_OnPanic_MultiplePanics(t *testing.T) {
+	data := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+	panicIndices := map[int]bool{2: true, 5: true, 8: true}
+
+	var (
+		mu           sync.Mutex
+		panicCount   int
+		successCount int
+	)
+
+	NewParallelSliceExecutor[int, string](data).
+		OnSuccess(func(idx int, val int, result string) {
+			mu.Lock()
+			defer mu.Unlock()
+			successCount++
+		}).
+		OnPanic(func(idx int, val int, panicVal any) {
+			mu.Lock()
+			defer mu.Unlock()
+			panicCount++
+			assert.True(t, panicIndices[idx], "panic 索引应该在预期范围内: %d", idx)
+		}).
+		Execute(func(idx int, val int) (string, error) {
+			if panicIndices[idx] {
+				panic("intentional panic")
+			}
+			return "success", nil
+		})
+
+	// 验证所有 panic 都被捕获
+	assert.Equal(t, len(panicIndices), panicCount, "应该捕获所有 panic")
+
+	// 验证其他任务正常执行
+	expectedSuccess := len(data) - len(panicIndices)
+	assert.Equal(t, expectedSuccess, successCount, "其他任务应该正常执行")
+}
+
+// TestParallelSliceExecutor_OnPanic_WithError 测试 panic 和 error 同时存在
+func TestParallelSliceExecutor_OnPanic_WithError(t *testing.T) {
+	data := []int{1, 2, 3, 4, 5}
+
+	var (
+		mu           sync.Mutex
+		panicCount   int
+		errorCount   int
+		successCount int
+	)
+
+	NewParallelSliceExecutor[int, string](data).
+		OnSuccess(func(idx int, val int, result string) {
+			mu.Lock()
+			defer mu.Unlock()
+			successCount++
+		}).
+		OnError(func(idx int, val int, err error) {
+			mu.Lock()
+			defer mu.Unlock()
+			errorCount++
+		}).
+		OnPanic(func(idx int, val int, panicVal any) {
+			mu.Lock()
+			defer mu.Unlock()
+			panicCount++
+		}).
+		Execute(func(idx int, val int) (string, error) {
+			switch idx {
+			case 1:
+				panic("panic at index 1")
+			case 3:
+				return "", &testError{msg: "error at index 3"}
+			default:
+				return "success", nil
+			}
+		})
+
+	// 验证统计
+	assert.Equal(t, 1, panicCount, "应该有 1 次 panic")
+	assert.Equal(t, 1, errorCount, "应该有 1 次 error")
+	assert.Equal(t, 3, successCount, "应该有 3 次成功")
+}
+
+// TestParallelSliceExecutor_OnPanic_NoPanicCallback 测试没有设置 OnPanic 时不会崩溃
+func TestParallelSliceExecutor_OnPanic_NoPanicCallback(t *testing.T) {
+	data := []int{1, 2, 3}
+
+	var (
+		mu           sync.Mutex
+		successCount int
+	)
+
+	// 不设置 OnPanic，验证不会导致程序崩溃
+	NewParallelSliceExecutor[int, string](data).
+		OnSuccess(func(idx int, val int, result string) {
+			mu.Lock()
+			defer mu.Unlock()
+			successCount++
+		}).
+		Execute(func(idx int, val int) (string, error) {
+			if idx == 1 {
+				panic("panic without callback")
+			}
+			return "success", nil
+		})
+
+	// 验证其他任务仍然执行
+	assert.Equal(t, 2, successCount, "其他任务应该仍然执行")
+}
+
+// TestParallelSliceExecutor_OnPanic_WithConcurrency 测试带并发限制的 panic 处理
+func TestParallelSliceExecutor_OnPanic_WithConcurrency(t *testing.T) {
+	data := make([]int, 20)
+	for i := range data {
+		data[i] = i
+	}
+
+	var (
+		mu           sync.Mutex
+		panicCount   int
+		successCount int
+	)
+
+	NewParallelSliceExecutor[int, string](data).
+		WithConcurrency(5). // 限制并发数为 5
+		OnSuccess(func(idx int, val int, result string) {
+			mu.Lock()
+			defer mu.Unlock()
+			successCount++
+		}).
+		OnPanic(func(idx int, val int, panicVal any) {
+			mu.Lock()
+			defer mu.Unlock()
+			panicCount++
+		}).
+		Execute(func(idx int, val int) (string, error) {
+			// 每隔 5 个元素 panic 一次
+			if idx%5 == 0 && idx > 0 {
+				panic("periodic panic")
+			}
+			return "success", nil
+		})
+
+	// 验证统计（索引 5, 10, 15 会 panic）
+	expectedPanics := 3
+	assert.Equal(t, expectedPanics, panicCount, "应该捕获预期数量的 panic")
+
+	expectedSuccess := len(data) - expectedPanics
+	assert.Equal(t, expectedSuccess, successCount, "其他任务应该正常执行")
+}
+
+// TestParallelSliceExecutor_OnPanic_PanicValue 测试不同类型的 panic 值
+func TestParallelSliceExecutor_OnPanic_PanicValue(t *testing.T) {
+	data := []int{1, 2, 3, 4}
+
+	var (
+		mu          sync.Mutex
+		panicValues []any
+	)
+
+	NewParallelSliceExecutor[int, string](data).
+		OnPanic(func(idx int, val int, panicVal any) {
+			mu.Lock()
+			defer mu.Unlock()
+			panicValues = append(panicValues, panicVal)
+		}).
+		Execute(func(idx int, val int) (string, error) {
+			switch idx {
+			case 0:
+				panic("string panic")
+			case 1:
+				panic(42)
+			case 2:
+				panic(&testError{msg: "error panic"})
+			default:
+				return "success", nil
+			}
+		})
+
+	// 验证捕获了 3 种不同类型的 panic
+	assert.Len(t, panicValues, 3, "应该捕获 3 次 panic")
+
+	// 验证 panic 值类型
+	hasString := false
+	hasInt := false
+	hasError := false
+
+	for _, pv := range panicValues {
+		switch pv.(type) {
+		case string:
+			hasString = true
+		case int:
+			hasInt = true
+		case *testError:
+			hasError = true
+		}
+	}
+
+	assert.True(t, hasString, "应该捕获 string 类型的 panic")
+	assert.True(t, hasInt, "应该捕获 int 类型的 panic")
+	assert.True(t, hasError, "应该捕获 error 类型的 panic")
+}
+
+// testError 测试用的错误类型
+type testError struct {
+	msg string
+}
+
+func (e *testError) Error() string {
+	return e.msg
 }
