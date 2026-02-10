@@ -1338,19 +1338,16 @@ func TestPeriodicTaskManagerRemoveMultipleTasks(t *testing.T) {
 	// 添加多个任务
 	manager.AddSimpleTask("task1", time.Millisecond*50, func(ctx context.Context) error {
 		atomic.AddInt32(&task1Count, 1)
-		time.Sleep(time.Millisecond * 10)
 		return nil
 	})
 
 	manager.AddSimpleTask("task2", time.Millisecond*75, func(ctx context.Context) error {
 		atomic.AddInt32(&task2Count, 1)
-		time.Sleep(time.Millisecond * 10)
 		return nil
 	})
 
 	manager.AddSimpleTask("task3", time.Millisecond*100, func(ctx context.Context) error {
 		atomic.AddInt32(&task3Count, 1)
-		time.Sleep(time.Millisecond * 10)
 		return nil
 	})
 
@@ -1360,8 +1357,9 @@ func TestPeriodicTaskManagerRemoveMultipleTasks(t *testing.T) {
 	err := manager.Start()
 	assert.NoError(t, err, "should start successfully")
 
-	// 等待任务执行
-	time.Sleep(time.Millisecond * 100)
+	// 等待所有任务至少执行一次
+	err = manager.WaitForExecution(time.Second)
+	assert.NoError(t, err, "all tasks should execute")
 
 	// 移除其中两个任务
 	removed1 := manager.RemoveTask("task1")

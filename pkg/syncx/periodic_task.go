@@ -42,6 +42,8 @@ type PeriodicTask struct {
 	isExecuting  bool               // 是否正在执行
 	cancelFunc   context.CancelFunc // 任务取消函数
 	taskCtx      context.Context    // 任务专用上下文
+	executed     bool               // 是否已执行过
+	executedOnce sync.Once          // 确保只标记一次
 }
 
 // PeriodicTaskManager 周期性任务管理器
@@ -484,6 +486,11 @@ func (m *PeriodicTaskManager) executeTask(task *PeriodicTask) {
 			task.onError(task.name, err)
 		}
 	}
+
+	// 标记任务已执行过
+	task.executedOnce.Do(func() {
+		task.executed = true
+	})
 }
 
 // Stop 停止所有周期性任务
@@ -533,6 +540,37 @@ func (m *PeriodicTaskManager) IsRunning() bool {
 // Wait 等待所有任务完成
 func (m *PeriodicTaskManager) Wait() {
 	m.wg.Wait()
+}
+
+// WaitForExecution 等待所有任务至少执行一次
+// timeout: 最大等待时间，0表示无限等待
+func (m *PeriodicTaskManager) WaitForExecution(timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	if timeout == 0 {
+		deadline = time.Now().Add(24 * time.Hour) // 使用一个很大的超时时间
+	}
+
+	for {
+		m.mu.RLock()
+		allExecuted := true
+		for _, task := range m.tasks {
+			if !task.executed {
+				allExecuted = false
+				break
+			}
+		}
+		m.mu.RUnlock()
+
+		if allExecuted {
+			return nil
+		}
+
+		if time.Now().After(deadline) {
+			return fmt.Errorf("timeout waiting for all tasks to execute")
+		}
+
+		time.Sleep(time.Millisecond)
+	}
 }
 
 // ======================== PeriodicTask Getter Methods ========================
