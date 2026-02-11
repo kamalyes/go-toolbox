@@ -11,10 +11,12 @@
 package safe
 
 import (
-	"github.com/stretchr/testify/assert"
+	"fmt"
 	"math"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFastHash(t *testing.T) {
@@ -48,13 +50,274 @@ func TestFastHash(t *testing.T) {
 				assert.Equal(t, uint64(1), result)
 			} else {
 				// 检查哈希值的一致性
-				assert.Equal(t, FastHash(tt.input), result)
-				// 检查不同字符串产生不同哈希值
-				if tt.input != "hello" {
-					assert.NotEqual(t, FastHash("hello"), result)
-				}
+				assert.Equal(t, tt.expected, result)
 			}
 		})
+	}
+}
+
+// TestShortHash 测试短哈希生成（默认7位）
+func TestShortHash(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		checkFn func(t *testing.T, result string)
+	}{
+		{
+			name:  "空字符串",
+			input: "",
+			checkFn: func(t *testing.T, result string) {
+				// 默认7位 Base36 字符
+				assert.Len(t, result, 7)
+				assert.Regexp(t, "^[0-9a-z]+$", result)
+			},
+		},
+		{
+			name:  "简单字符串",
+			input: "hello",
+			checkFn: func(t *testing.T, result string) {
+				assert.Len(t, result, 7)
+				assert.Regexp(t, "^[0-9a-z]+$", result)
+			},
+		},
+		{
+			name:  "IP:Port格式",
+			input: "192.168.1.100:8080",
+			checkFn: func(t *testing.T, result string) {
+				assert.Len(t, result, 7)
+				assert.Regexp(t, "^[0-9a-z]+$", result)
+			},
+		},
+		{
+			name:  "中文字符",
+			input: "你好世界",
+			checkFn: func(t *testing.T, result string) {
+				assert.Len(t, result, 7)
+				assert.Regexp(t, "^[0-9a-z]+$", result)
+			},
+		},
+		{
+			name:  "长字符串",
+			input: "The quick brown fox jumps over the lazy dog",
+			checkFn: func(t *testing.T, result string) {
+				assert.Len(t, result, 7)
+				assert.Regexp(t, "^[0-9a-z]+$", result)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ShortHash(tt.input)
+			tt.checkFn(t, result)
+
+			// 测试一致性：相同输入应该产生相同输出
+			result2 := ShortHash(tt.input)
+			assert.Equal(t, result, result2, "相同输入应该产生相同的短哈希")
+		})
+	}
+}
+
+// TestShortHashWithLength 测试可配置长度的短哈希
+func TestShortHashWithLength(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  string
+		length int
+		want   int // 期望长度
+	}{
+		{"6位哈希", "test-input", 6, 6},
+		{"7位哈希", "test-input", 7, 7},
+		{"8位哈希", "test-input", 8, 8},
+		{"10位哈希", "test-input", 10, 10},
+		{"边界-最小", "test", 1, 1},
+		{"边界-最大", "test", 13, 13},
+		{"超出最大", "test", 20, 13}, // 自动限制为13
+		{"小于最小", "test", 0, 1},   // 自动限制为1
+		{"负数", "test", -5, 1},    // 自动限制为1
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ShortHashWithLength(tt.input, tt.length)
+			assert.Len(t, result, tt.want)
+			assert.Regexp(t, "^[0-9a-z]+$", result)
+
+			// 测试一致性
+			result2 := ShortHashWithLength(tt.input, tt.length)
+			assert.Equal(t, result, result2)
+		})
+	}
+}
+
+// TestShortHashUniqueness 测试短哈希的唯一性（7位）
+func TestShortHashUniqueness(t *testing.T) {
+	inputs := []string{
+		"192.168.1.100:8080",
+		"192.168.1.100:8081",
+		"192.168.1.101:8080",
+		"10.0.0.1:8080",
+		"localhost:8080",
+		"example.com:443",
+		"node-1",
+		"node-2",
+		"pod-abc-123",
+		"pod-abc-124",
+	}
+
+	hashes := make(map[string]string)
+	for _, input := range inputs {
+		hash := ShortHash(input)
+		if existing, found := hashes[hash]; found {
+			t.Errorf("哈希冲突: %s 和 %s 产生了相同的哈希 %s", input, existing, hash)
+		}
+		hashes[hash] = input
+		t.Logf("输入: %-25s -> 哈希: %s", input, hash)
+	}
+}
+
+// TestShortHashWithLengthUniqueness 测试不同长度的唯一性
+func TestShortHashWithLengthUniqueness(t *testing.T) {
+	inputs := []string{
+		"192.168.1.100:8080",
+		"192.168.1.100:8081",
+		"192.168.1.101:8080",
+		"10.0.0.1:8080",
+		"localhost:8080",
+	}
+
+	lengths := []int{6, 7, 8}
+	for _, length := range lengths {
+		t.Run(fmt.Sprintf("长度%d", length), func(t *testing.T) {
+			hashes := make(map[string]string)
+			for _, input := range inputs {
+				hash := ShortHashWithLength(input, length)
+				if existing, found := hashes[hash]; found {
+					t.Errorf("哈希冲突: %s 和 %s 产生了相同的哈希 %s", input, existing, hash)
+				}
+				hashes[hash] = input
+			}
+		})
+	}
+}
+
+// TestShortHashConsistency 测试短哈希的一致性
+func TestShortHashConsistency(t *testing.T) {
+	input := "192.168.1.100:8080"
+
+	// 多次调用应该返回相同结果
+	results := make([]string, 10000)
+	for i := 0; i < 10000; i++ {
+		results[i] = ShortHash(input)
+	}
+
+	first := results[0]
+	for i, result := range results {
+		assert.Equal(t, first, result, "第 %d 次调用返回了不同的结果", i)
+	}
+}
+
+// TestShortHashCollisionResistance 测试短哈希的抗冲突能力（7位）
+func TestShortHashCollisionResistance(t *testing.T) {
+	const testCount = 10000
+	hashes := make(map[string]string, testCount)
+	collisions := 0
+
+	for i := 0; i < testCount; i++ {
+		input := fmt.Sprintf("test-input-%d", i)
+		hash := ShortHash(input)
+
+		if existing, found := hashes[hash]; found {
+			collisions++
+			t.Logf("发现冲突 #%d: %s 和 %s 产生了相同的哈希 %s", collisions, input, existing, hash)
+		}
+		hashes[hash] = input
+	}
+
+	// 7位 Base36 约 36^7 = 78,364,164,096 种可能
+	// 10000 个输入，期望冲突 < 1 个
+	assert.LessOrEqual(t, collisions, 1, "在 %d 个输入中冲突应该 <= 1", testCount)
+	t.Logf("测试完成: %d 个输入，%d 个唯一哈希，%d 个冲突", testCount, len(hashes), collisions)
+}
+
+// TestShortHashWithLengthCollisionResistance 测试不同长度的抗冲突能力
+func TestShortHashWithLengthCollisionResistance(t *testing.T) {
+	const testCount = 10000
+
+	tests := []struct {
+		length           int
+		maxCollisions    int
+		expectedCapacity int64
+	}{
+		{6, 5, 2176782336},    // 36^6 ≈ 21亿
+		{7, 1, 78364164096},   // 36^7 ≈ 783亿
+		{8, 0, 2821109907456}, // 36^8 ≈ 2.8万亿
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("长度%d", tt.length), func(t *testing.T) {
+			hashes := make(map[string]string, testCount)
+			collisions := 0
+
+			for i := 0; i < testCount; i++ {
+				input := fmt.Sprintf("test-input-%d", i)
+				hash := ShortHashWithLength(input, tt.length)
+
+				if existing, found := hashes[hash]; found {
+					collisions++
+					if collisions <= 3 { // 只记录前3个冲突
+						t.Logf("冲突 #%d: %s 和 %s -> %s", collisions, input, existing, hash)
+					}
+				}
+				hashes[hash] = input
+			}
+
+			assert.LessOrEqual(t, collisions, tt.maxCollisions,
+				"长度 %d 在 %d 个输入中冲突应该 <= %d", tt.length, testCount, tt.maxCollisions)
+			t.Logf("长度 %d: %d 输入，%d 唯一哈希，%d 冲突（容量: %d）",
+				tt.length, testCount, len(hashes), collisions, tt.expectedCapacity)
+		})
+	}
+}
+
+// BenchmarkShortHash 短哈希性能测试（默认7位）
+func BenchmarkShortHash(b *testing.B) {
+	input := "192.168.1.100:8080"
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = ShortHash(input)
+	}
+}
+
+// BenchmarkShortHashWithLength 不同长度的性能测试
+func BenchmarkShortHashWithLength(b *testing.B) {
+	input := "192.168.1.100:8080"
+	lengths := []int{6, 7, 8, 10, 13}
+
+	for _, length := range lengths {
+		b.Run(fmt.Sprintf("长度%d", length), func(b *testing.B) {
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_ = ShortHashWithLength(input, length)
+			}
+		})
+	}
+}
+
+// BenchmarkShortHashWithVariedInputs 不同输入的性能测试
+func BenchmarkShortHashWithVariedInputs(b *testing.B) {
+	inputs := []string{
+		"short",
+		"192.168.1.100:8080",
+		"pod-name-abc-123-xyz",
+		"这是一个中文字符串测试",
+		"The quick brown fox jumps over the lazy dog",
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		input := inputs[i%len(inputs)]
+		_ = ShortHash(input)
 	}
 }
 
@@ -1217,7 +1480,7 @@ func BenchmarkSafeAccessStringAt(b *testing.B) {
 		},
 	}
 	safe := Safe(data)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		safe.StringAt("app.name", "default")
@@ -1231,7 +1494,7 @@ func BenchmarkSafeAccessTraditional(b *testing.B) {
 		},
 	}
 	safe := Safe(data)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		safe.Field("app").Field("name").String("default")
