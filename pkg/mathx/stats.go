@@ -125,6 +125,30 @@ func SortByKeyDesc[T any, K cmp.Ordered](items []T, getKey func(T) K) {
 	})
 }
 
+// SortByKeyDescUnique 按键排序统计数据（降序）并去重
+// 去重规则：保留每个唯一标识的第一个元素（即排序后权重最大的）
+// getKey: 用于排序的键提取函数
+// getID: 用于去重的唯一标识提取函数
+func SortByKeyDescUnique[T any, K cmp.Ordered, ID comparable](items []T, getKey func(T) K, getID func(T) ID) []T {
+	// 先按键降序排序
+	sort.Slice(items, func(i, j int) bool {
+		return cmp.Compare(getKey(items[i]), getKey(items[j])) > 0
+	})
+
+	// 去重：保留每个 ID 的第一个元素（权重最大的）
+	seen := make(map[ID]bool, len(items))
+	result := make([]T, 0, len(items))
+	for _, item := range items {
+		id := getID(item)
+		if !seen[id] {
+			seen[id] = true
+			result = append(result, item)
+		}
+	}
+
+	return result
+}
+
 // StatsSummary 统计摘要
 type StatsSummary struct {
 	Count  int     `json:"count"`

@@ -283,6 +283,134 @@ func TestPercentiles(t *testing.T) {
 	assert.Equal(t, 0.0, emptyPercentiles[90], "空切片应返回 0")
 }
 
+type Agent struct {
+	ID     string
+	Weight int32
+	Name   string
+}
+
+func TestSortByKeyDescUnique(t *testing.T) {
+	tests := []struct {
+		name     string
+		agents   []Agent
+		expected []Agent
+	}{
+		{
+			name: "去重保留权重最大的",
+			agents: []Agent{
+				{ID: "agent1", Weight: 100, Name: "Alice"},
+				{ID: "agent2", Weight: 200, Name: "Bob"},
+				{ID: "agent1", Weight: 50, Name: "Alice-Duplicate"}, // 重复，权重更小
+				{ID: "agent3", Weight: 150, Name: "Charlie"},
+				{ID: "agent2", Weight: 180, Name: "Bob-Duplicate"}, // 重复，权重更小
+			},
+			expected: []Agent{
+				{ID: "agent2", Weight: 200, Name: "Bob"},     // 权重最大
+				{ID: "agent3", Weight: 150, Name: "Charlie"}, // 第二大
+				{ID: "agent1", Weight: 100, Name: "Alice"},   // 第三大（保留权重100的，丢弃50的）
+			},
+		},
+		{
+			name: "无重复元素",
+			agents: []Agent{
+				{ID: "agent1", Weight: 100, Name: "Alice"},
+				{ID: "agent2", Weight: 200, Name: "Bob"},
+				{ID: "agent3", Weight: 150, Name: "Charlie"},
+			},
+			expected: []Agent{
+				{ID: "agent2", Weight: 200, Name: "Bob"},
+				{ID: "agent3", Weight: 150, Name: "Charlie"},
+				{ID: "agent1", Weight: 100, Name: "Alice"},
+			},
+		},
+		{
+			name: "全部重复",
+			agents: []Agent{
+				{ID: "agent1", Weight: 100, Name: "Alice-1"},
+				{ID: "agent1", Weight: 90, Name: "Alice-2"},
+				{ID: "agent1", Weight: 80, Name: "Alice-3"},
+			},
+			expected: []Agent{
+				{ID: "agent1", Weight: 100, Name: "Alice-1"}, // 只保留权重最大的
+			},
+		},
+		{
+			name:     "空列表",
+			agents:   []Agent{},
+			expected: []Agent{},
+		},
+		{
+			name: "单个元素",
+			agents: []Agent{
+				{ID: "agent1", Weight: 100, Name: "Alice"},
+			},
+			expected: []Agent{
+				{ID: "agent1", Weight: 100, Name: "Alice"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := SortByKeyDescUnique(
+				tt.agents,
+				func(a Agent) int32 { return a.Weight },
+				func(a Agent) string { return a.ID },
+			)
+
+			if len(result) != len(tt.expected) {
+				t.Errorf("长度不匹配: got %d, want %d", len(result), len(tt.expected))
+				return
+			}
+
+			for i := range result {
+				if result[i].ID != tt.expected[i].ID ||
+					result[i].Weight != tt.expected[i].Weight ||
+					result[i].Name != tt.expected[i].Name {
+					t.Errorf("索引 %d 不匹配:\ngot  %+v\nwant %+v",
+						i, result[i], tt.expected[i])
+				}
+			}
+		})
+	}
+}
+
+func TestSortByKeyDescUnique_IntKey(t *testing.T) {
+	type Item struct {
+		ID    int
+		Score float64
+	}
+
+	items := []Item{
+		{ID: 1, Score: 95.5},
+		{ID: 2, Score: 88.0},
+		{ID: 1, Score: 92.0}, // 重复，分数更低
+		{ID: 3, Score: 99.0},
+	}
+
+	result := SortByKeyDescUnique(
+		items,
+		func(i Item) float64 { return i.Score },
+		func(i Item) int { return i.ID },
+	)
+
+	expected := []Item{
+		{ID: 3, Score: 99.0},
+		{ID: 1, Score: 95.5}, // 保留分数更高的
+		{ID: 2, Score: 88.0},
+	}
+
+	if len(result) != len(expected) {
+		t.Fatalf("长度不匹配: got %d, want %d", len(result), len(expected))
+	}
+
+	for i := range result {
+		if result[i] != expected[i] {
+			t.Errorf("索引 %d 不匹配: got %+v, want %+v", i, result[i], expected[i])
+		}
+	}
+}
+
 // TestMean 测试平均值计算
 func TestMean(t *testing.T) {
 	tests := []struct {
@@ -387,5 +515,31 @@ func BenchmarkSortByKey(b *testing.B) {
 		SortByKey(testItems, func(item Item) int {
 			return item.ID
 		})
+	}
+}
+
+// BenchmarkSortByKeyDescUnique 性能测试
+func BenchmarkSortByKeyDescUnique(b *testing.B) {
+	// 准备测试数据：1000个元素，50%重复
+	agents := make([]Agent, 1000)
+	for i := 0; i < 1000; i++ {
+		agents[i] = Agent{
+			ID:     string(rune('A' + (i % 500))), // 50%重复率
+			Weight: int32(1000 - i),
+			Name:   "Agent",
+		}
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		// 每次测试都复制一份数据
+		testData := make([]Agent, len(agents))
+		copy(testData, agents)
+
+		_ = SortByKeyDescUnique(
+			testData,
+			func(a Agent) int32 { return a.Weight },
+			func(a Agent) string { return a.ID },
+		)
 	}
 }
