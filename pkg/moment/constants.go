@@ -17,7 +17,15 @@ const (
 	// 默认时区
 	DefaultTimezone = "Asia/Shanghai"
 
+	// 默认时间格式
 	DefaultTimeFormat = "2006-01-02 15:04:05"
+
+	// 紧凑格式 - 用于文件名、日志、缓存键等场景
+	CompactDateFormat          = "20060102"           // 紧凑日期格式 YYYYMMDD
+	CompactDateHourFormat      = "2006010215"         // 紧凑日期+小时格式 YYYYMMDDHH
+	CompactDateTimeFormat      = "200601021504"       // 紧凑日期时间格式 YYYYMMDDHHMM
+	CompactDateTimeSecFormat   = "20060102150405"     // 紧凑日期时间秒格式 YYYYMMDDHHMMSS
+	CompactDateTimeMilliFormat = "20060102150405.000" // 紧凑日期时间毫秒格式 YYYYMMDDHHMMSS.sss
 
 	// 纳秒，作为最基础的时间单位
 	NanosecondDuration time.Duration = 1

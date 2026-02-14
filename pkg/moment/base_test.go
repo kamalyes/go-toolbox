@@ -905,3 +905,492 @@ func TestHumanDuration(t *testing.T) {
 		})
 	}
 }
+
+// TestFormatCompact 测试通用紧凑格式化函数
+func TestFormatCompact(t *testing.T) {
+	testTime := time.Date(2024, 2, 14, 15, 30, 45, 123456789, time.UTC)
+
+	tests := []struct {
+		name     string
+		format   string
+		expected string
+	}{
+		{"Compact Date", CompactDateFormat, "20240214"},
+		{"Compact Date Hour", CompactDateHourFormat, "2024021415"},
+		{"Compact Date Time", CompactDateTimeFormat, "202402141530"},
+		{"Compact Date Time Sec", CompactDateTimeSecFormat, "20240214153045"},
+		{"Compact Date Time Milli", CompactDateTimeMilliFormat, "20240214153045.123"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := FormatCompact(testTime, tt.format)
+			assert.Equal(t, tt.expected, result, "FormatCompact with %s should match", tt.name)
+		})
+	}
+}
+
+// TestParseCompact 测试通用紧凑格式解析函数
+func TestParseCompact(t *testing.T) {
+	tests := []struct {
+		name        string
+		value       string
+		format      string
+		expectYear  int
+		expectMonth time.Month
+		expectDay   int
+		expectHour  int
+		expectMin   int
+		expectSec   int
+		shouldError bool
+	}{
+		{
+			name:        "Parse Compact Date",
+			value:       "20240214",
+			format:      CompactDateFormat,
+			expectYear:  2024,
+			expectMonth: time.February,
+			expectDay:   14,
+			expectHour:  0,
+			expectMin:   0,
+			expectSec:   0,
+			shouldError: false,
+		},
+		{
+			name:        "Parse Compact Date Hour",
+			value:       "2024021415",
+			format:      CompactDateHourFormat,
+			expectYear:  2024,
+			expectMonth: time.February,
+			expectDay:   14,
+			expectHour:  15,
+			expectMin:   0,
+			expectSec:   0,
+			shouldError: false,
+		},
+		{
+			name:        "Parse Compact Date Time",
+			value:       "202402141530",
+			format:      CompactDateTimeFormat,
+			expectYear:  2024,
+			expectMonth: time.February,
+			expectDay:   14,
+			expectHour:  15,
+			expectMin:   30,
+			expectSec:   0,
+			shouldError: false,
+		},
+		{
+			name:        "Parse Compact Date Time Sec",
+			value:       "20240214153045",
+			format:      CompactDateTimeSecFormat,
+			expectYear:  2024,
+			expectMonth: time.February,
+			expectDay:   14,
+			expectHour:  15,
+			expectMin:   30,
+			expectSec:   45,
+			shouldError: false,
+		},
+		{
+			name:        "Parse Invalid Format",
+			value:       "invalid",
+			format:      CompactDateFormat,
+			shouldError: true,
+		},
+		{
+			name:        "Parse Wrong Length",
+			value:       "2024",
+			format:      CompactDateFormat,
+			shouldError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := ParseCompact(tt.value, tt.format)
+
+			if tt.shouldError {
+				assert.Error(t, err, "Should return error for %s", tt.name)
+			} else {
+				assert.NoError(t, err, "Should not return error for %s", tt.name)
+				assert.Equal(t, tt.expectYear, result.Year(), "Year should match")
+				assert.Equal(t, tt.expectMonth, result.Month(), "Month should match")
+				assert.Equal(t, tt.expectDay, result.Day(), "Day should match")
+				assert.Equal(t, tt.expectHour, result.Hour(), "Hour should match")
+				assert.Equal(t, tt.expectMin, result.Minute(), "Minute should match")
+				assert.Equal(t, tt.expectSec, result.Second(), "Second should match")
+			}
+		})
+	}
+}
+
+// TestFormatCompactDate 测试紧凑日期格式化
+func TestFormatCompactDate(t *testing.T) {
+	tests := []struct {
+		name     string
+		time     time.Time
+		expected string
+	}{
+		{
+			name:     "Normal Date",
+			time:     time.Date(2024, 2, 14, 15, 30, 45, 0, time.UTC),
+			expected: "20240214",
+		},
+		{
+			name:     "First Day of Year",
+			time:     time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			expected: "20240101",
+		},
+		{
+			name:     "Last Day of Year",
+			time:     time.Date(2024, 12, 31, 23, 59, 59, 0, time.UTC),
+			expected: "20241231",
+		},
+		{
+			name:     "Leap Year Feb 29",
+			time:     time.Date(2024, 2, 29, 12, 0, 0, 0, time.UTC),
+			expected: "20240229",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := FormatCompactDate(tt.time)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestFormatCompactDateHour 测试紧凑日期+小时格式化
+func TestFormatCompactDateHour(t *testing.T) {
+	tests := []struct {
+		name     string
+		time     time.Time
+		expected string
+	}{
+		{
+			name:     "Afternoon Hour",
+			time:     time.Date(2024, 2, 14, 15, 30, 45, 0, time.UTC),
+			expected: "2024021415",
+		},
+		{
+			name:     "Midnight",
+			time:     time.Date(2024, 2, 14, 0, 0, 0, 0, time.UTC),
+			expected: "2024021400",
+		},
+		{
+			name:     "Last Hour of Day",
+			time:     time.Date(2024, 2, 14, 23, 59, 59, 0, time.UTC),
+			expected: "2024021423",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := FormatCompactDateHour(tt.time)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestFormatCompactDateTime 测试紧凑日期时间格式化
+func TestFormatCompactDateTime(t *testing.T) {
+	tests := []struct {
+		name     string
+		time     time.Time
+		expected string
+	}{
+		{
+			name:     "Normal DateTime",
+			time:     time.Date(2024, 2, 14, 15, 30, 45, 0, time.UTC),
+			expected: "202402141530",
+		},
+		{
+			name:     "Midnight",
+			time:     time.Date(2024, 2, 14, 0, 0, 0, 0, time.UTC),
+			expected: "202402140000",
+		},
+		{
+			name:     "Last Minute of Day",
+			time:     time.Date(2024, 2, 14, 23, 59, 0, 0, time.UTC),
+			expected: "202402142359",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := FormatCompactDateTime(tt.time)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestFormatCompactDateTimeSec 测试紧凑日期时间秒格式化
+func TestFormatCompactDateTimeSec(t *testing.T) {
+	tests := []struct {
+		name     string
+		time     time.Time
+		expected string
+	}{
+		{
+			name:     "Normal DateTime with Seconds",
+			time:     time.Date(2024, 2, 14, 15, 30, 45, 0, time.UTC),
+			expected: "20240214153045",
+		},
+		{
+			name:     "Midnight",
+			time:     time.Date(2024, 2, 14, 0, 0, 0, 0, time.UTC),
+			expected: "20240214000000",
+		},
+		{
+			name:     "Last Second of Day",
+			time:     time.Date(2024, 2, 14, 23, 59, 59, 0, time.UTC),
+			expected: "20240214235959",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := FormatCompactDateTimeSec(tt.time)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestFormatCompactDateTimeMilli 测试紧凑日期时间毫秒格式化
+func TestFormatCompactDateTimeMilli(t *testing.T) {
+	tests := []struct {
+		name     string
+		time     time.Time
+		expected string
+	}{
+		{
+			name:     "With Milliseconds",
+			time:     time.Date(2024, 2, 14, 15, 30, 45, 123000000, time.UTC),
+			expected: "20240214153045.123",
+		},
+		{
+			name:     "Zero Milliseconds",
+			time:     time.Date(2024, 2, 14, 15, 30, 45, 0, time.UTC),
+			expected: "20240214153045.000",
+		},
+		{
+			name:     "Max Milliseconds",
+			time:     time.Date(2024, 2, 14, 15, 30, 45, 999000000, time.UTC),
+			expected: "20240214153045.999",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := FormatCompactDateTimeMilli(tt.time)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestNowCompactDate 测试获取当前紧凑日期
+func TestNowCompactDate(t *testing.T) {
+	result := NowCompactDate()
+	assert.Len(t, result, 8, "Compact date should be 8 characters (YYYYMMDD)")
+	assert.Regexp(t, `^\d{8}$`, result, "Should match YYYYMMDD pattern")
+
+	// 验证可以解析回时间
+	parsed, err := ParseCompact(result, CompactDateFormat)
+	assert.NoError(t, err, "Should be able to parse back")
+	assert.Equal(t, time.Now().Year(), parsed.Year(), "Year should match current year")
+	assert.Equal(t, time.Now().Month(), parsed.Month(), "Month should match current month")
+	assert.Equal(t, time.Now().Day(), parsed.Day(), "Day should match current day")
+}
+
+// TestNowCompactDateHour 测试获取当前紧凑日期+小时
+func TestNowCompactDateHour(t *testing.T) {
+	result := NowCompactDateHour()
+	assert.Len(t, result, 10, "Compact date hour should be 10 characters (YYYYMMDDHH)")
+	assert.Regexp(t, `^\d{10}$`, result, "Should match YYYYMMDDHH pattern")
+
+	// 验证可以解析回时间
+	parsed, err := ParseCompact(result, CompactDateHourFormat)
+	assert.NoError(t, err, "Should be able to parse back")
+	assert.Equal(t, time.Now().Hour(), parsed.Hour(), "Hour should match current hour")
+}
+
+// TestNowCompactDateTime 测试获取当前紧凑日期时间
+func TestNowCompactDateTime(t *testing.T) {
+	result := NowCompactDateTime()
+	assert.Len(t, result, 12, "Compact date time should be 12 characters (YYYYMMDDHHMM)")
+	assert.Regexp(t, `^\d{12}$`, result, "Should match YYYYMMDDHHMM pattern")
+
+	// 验证可以解析回时间
+	parsed, err := ParseCompact(result, CompactDateTimeFormat)
+	assert.NoError(t, err, "Should be able to parse back")
+	now := time.Now()
+	assert.Equal(t, now.Year(), parsed.Year(), "Year should match")
+	assert.Equal(t, now.Month(), parsed.Month(), "Month should match")
+	assert.Equal(t, now.Day(), parsed.Day(), "Day should match")
+	assert.Equal(t, now.Hour(), parsed.Hour(), "Hour should match")
+	assert.Equal(t, now.Minute(), parsed.Minute(), "Minute should match")
+}
+
+// TestNowCompactDateTimeSec 测试获取当前紧凑日期时间秒
+func TestNowCompactDateTimeSec(t *testing.T) {
+	before := time.Now()
+	result := NowCompactDateTimeSec()
+	after := time.Now()
+
+	assert.Len(t, result, 14, "Compact date time sec should be 14 characters (YYYYMMDDHHMMSS)")
+	assert.Regexp(t, `^\d{14}$`, result, "Should match YYYYMMDDHHMMSS pattern")
+
+	// 验证可以解析回时间 - 使用 ParseInLocation 因为格式化时使用的是本地时间
+	parsedLocal, err := time.ParseInLocation(CompactDateTimeSecFormat, result, time.Local)
+	assert.NoError(t, err, "Should parse in local timezone")
+
+	// 验证解析的时间在 before 和 after 之间（允许1秒误差）
+	assert.True(t,
+		parsedLocal.Unix() >= before.Unix()-1 && parsedLocal.Unix() <= after.Unix()+1,
+		"Parsed time should be between before (%v) and after (%v), got %v",
+		before, after, parsedLocal)
+}
+
+// TestNowCompactDateTimeMilli 测试获取当前紧凑日期时间毫秒
+func TestNowCompactDateTimeMilli(t *testing.T) {
+	result := NowCompactDateTimeMilli()
+	assert.Len(t, result, 18, "Compact date time milli should be 18 characters (YYYYMMDDHHMMSS.sss)")
+	assert.Regexp(t, `^\d{14}\.\d{3}$`, result, "Should match YYYYMMDDHHMMSS.sss pattern")
+}
+
+// TestCompactFormatRoundTrip 测试格式化和解析的往返转换
+func TestCompactFormatRoundTrip(t *testing.T) {
+	originalTime := time.Date(2024, 2, 14, 15, 30, 45, 123000000, time.UTC)
+
+	tests := []struct {
+		name       string
+		format     string
+		formatFunc func(time.Time) string
+	}{
+		{"Date", CompactDateFormat, FormatCompactDate},
+		{"Date Hour", CompactDateHourFormat, FormatCompactDateHour},
+		{"Date Time", CompactDateTimeFormat, FormatCompactDateTime},
+		{"Date Time Sec", CompactDateTimeSecFormat, FormatCompactDateTimeSec},
+		{"Date Time Milli", CompactDateTimeMilliFormat, FormatCompactDateTimeMilli},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// 格式化
+			formatted := tt.formatFunc(originalTime)
+
+			// 解析回来
+			parsed, err := ParseCompact(formatted, tt.format)
+			assert.NoError(t, err, "Should parse successfully")
+
+			// 根据格式精度验证
+			assert.Equal(t, originalTime.Year(), parsed.Year(), "Year should match")
+			assert.Equal(t, originalTime.Month(), parsed.Month(), "Month should match")
+			assert.Equal(t, originalTime.Day(), parsed.Day(), "Day should match")
+
+			// 根据格式检查时分秒
+			if tt.format != CompactDateFormat {
+				assert.Equal(t, originalTime.Hour(), parsed.Hour(), "Hour should match")
+			}
+			if tt.format == CompactDateTimeFormat || tt.format == CompactDateTimeSecFormat || tt.format == CompactDateTimeMilliFormat {
+				assert.Equal(t, originalTime.Minute(), parsed.Minute(), "Minute should match")
+			}
+			if tt.format == CompactDateTimeSecFormat || tt.format == CompactDateTimeMilliFormat {
+				assert.Equal(t, originalTime.Second(), parsed.Second(), "Second should match")
+			}
+		})
+	}
+}
+
+// BenchmarkFormatCompact 性能基准测试
+func BenchmarkFormatCompact(b *testing.B) {
+	testTime := time.Now()
+
+	benchmarks := []struct {
+		name   string
+		format string
+	}{
+		{"Date", CompactDateFormat},
+		{"DateHour", CompactDateHourFormat},
+		{"DateTime", CompactDateTimeFormat},
+		{"DateTimeSec", CompactDateTimeSecFormat},
+		{"DateTimeMilli", CompactDateTimeMilliFormat},
+	}
+
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				_ = FormatCompact(testTime, bm.format)
+			}
+		})
+	}
+}
+
+// BenchmarkParseCompact 解析性能基准测试
+func BenchmarkParseCompact(b *testing.B) {
+	benchmarks := []struct {
+		name   string
+		value  string
+		format string
+	}{
+		{"Date", "20240214", CompactDateFormat},
+		{"DateHour", "2024021415", CompactDateHourFormat},
+		{"DateTime", "202402141530", CompactDateTimeFormat},
+		{"DateTimeSec", "20240214153045", CompactDateTimeSecFormat},
+		{"DateTimeMilli", "20240214153045.123", CompactDateTimeMilliFormat},
+	}
+
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				_, _ = ParseCompact(bm.value, bm.format)
+			}
+		})
+	}
+}
+
+// TestCompactFormatEdgeCases 测试边界情况
+func TestCompactFormatEdgeCases(t *testing.T) {
+	tests := []struct {
+		name     string
+		time     time.Time
+		expected string
+	}{
+		{
+			name:     "Leap Year Feb 29",
+			time:     time.Date(2024, 2, 29, 0, 0, 0, 0, time.UTC),
+			expected: "20240229",
+		},
+		{
+			name:     "Year 2000",
+			time:     time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
+			expected: "20000101",
+		},
+		{
+			name:     "Year 1900",
+			time:     time.Date(1900, 12, 31, 23, 59, 59, 0, time.UTC),
+			expected: "19001231",
+		},
+		{
+			name:     "Future Year 2100",
+			time:     time.Date(2100, 6, 15, 12, 30, 45, 0, time.UTC),
+			expected: "21000615",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := FormatCompactDate(tt.time)
+			assert.Equal(t, tt.expected, result)
+
+			// 验证可以解析回来
+			parsed, err := ParseCompact(result, CompactDateFormat)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.time.Year(), parsed.Year())
+			assert.Equal(t, tt.time.Month(), parsed.Month())
+			assert.Equal(t, tt.time.Day(), parsed.Day())
+		})
+	}
+}

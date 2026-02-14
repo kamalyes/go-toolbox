@@ -540,3 +540,86 @@ func ParseFlexibleDate(dateStr string) (time.Time, error) {
 
 	return time.Time{}, fmt.Errorf("无法解析日期格式: %s", dateStr)
 }
+
+// FormatCompact 使用紧凑格式格式化时间
+// 参数:
+//   - t: 要格式化的时间
+//   - format: 紧凑格式类型（使用 CompactXxxFormat 常量）
+//
+// 返回: 格式化后的字符串
+//
+// 示例:
+//
+//	FormatCompact(time.Now(), CompactDateFormat)         // "20060102"
+//	FormatCompact(time.Now(), CompactDateHourFormat)     // "2006010215"
+//	FormatCompact(time.Now(), CompactDateTimeFormat)     // "200601021504"
+//	FormatCompact(time.Now(), CompactDateTimeSecFormat)  // "20060102150405"
+func FormatCompact(t time.Time, format string) string {
+	return t.Format(format)
+}
+
+// ParseCompact 解析紧凑格式的时间字符串
+// 参数:
+//   - value: 紧凑格式的时间字符串
+//   - format: 紧凑格式类型（使用 CompactXxxFormat 常量）
+//
+// 返回: 解析后的时间和可能的错误
+//
+// 示例:
+//
+//	ParseCompact("20240214", CompactDateFormat)         // 解析日期 2024-02-14
+//	ParseCompact("2024021415", CompactDateHourFormat)   // 解析日期+小时 2024-02-14 15:00
+//	ParseCompact("202402141530", CompactDateTimeFormat) // 解析日期+时间 2024-02-14 15:30
+func ParseCompact(value string, format string) (time.Time, error) {
+	return time.Parse(format, value)
+}
+
+// FormatCompactDate 格式化为紧凑日期格式 (YYYYMMDD)
+func FormatCompactDate(t time.Time) string {
+	return t.Format(CompactDateFormat)
+}
+
+// FormatCompactDateHour 格式化为紧凑日期+小时格式 (YYYYMMDDHH)
+func FormatCompactDateHour(t time.Time) string {
+	return t.Format(CompactDateHourFormat)
+}
+
+// FormatCompactDateTime 格式化为紧凑日期时间格式 (YYYYMMDDHHMM)
+func FormatCompactDateTime(t time.Time) string {
+	return t.Format(CompactDateTimeFormat)
+}
+
+// FormatCompactDateTimeSec 格式化为紧凑日期时间秒格式 (YYYYMMDDHHMMSS)
+func FormatCompactDateTimeSec(t time.Time) string {
+	return t.Format(CompactDateTimeSecFormat)
+}
+
+// FormatCompactDateTimeMilli 格式化为紧凑日期时间毫秒格式 (YYYYMMDDHHMMSS.sss)
+func FormatCompactDateTimeMilli(t time.Time) string {
+	return t.Format(CompactDateTimeMilliFormat)
+}
+
+// NowCompactDate 获取当前时间的紧凑日期格式 (YYYYMMDD)
+func NowCompactDate() string {
+	return time.Now().Format(CompactDateFormat)
+}
+
+// NowCompactDateHour 获取当前时间的紧凑日期+小时格式 (YYYYMMDDHH)
+func NowCompactDateHour() string {
+	return time.Now().Format(CompactDateHourFormat)
+}
+
+// NowCompactDateTime 获取当前时间的紧凑日期时间格式 (YYYYMMDDHHMM)
+func NowCompactDateTime() string {
+	return time.Now().Format(CompactDateTimeFormat)
+}
+
+// NowCompactDateTimeSec 获取当前时间的紧凑日期时间秒格式 (YYYYMMDDHHMMSS)
+func NowCompactDateTimeSec() string {
+	return time.Now().Format(CompactDateTimeSecFormat)
+}
+
+// NowCompactDateTimeMilli 获取当前时间的紧凑日期时间毫秒格式 (YYYYMMDDHHMMSS.sss)
+func NowCompactDateTimeMilli() string {
+	return time.Now().Format(CompactDateTimeMilliFormat)
+}
