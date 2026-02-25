@@ -68,6 +68,15 @@ func ZlibCompress(data []byte) ([]byte, error) {
 	return result, nil
 }
 
+// ZlibCompressWithInfo 压缩数据并返回压缩信息
+func ZlibCompressWithInfo(data []byte) (*CompressResult, error) {
+	compressed, err := ZlibCompress(data)
+	if err != nil {
+		return nil, err
+	}
+	return newCompressResult(data, compressed), nil
+}
+
 // ZlibDecompress 解压缩数据（优化版本，使用对象池）
 func ZlibDecompress(compressedData []byte) ([]byte, error) {
 	// 创建一个新的读取器
@@ -106,6 +115,15 @@ func MultiZlibCompress(data []byte, times int) ([]byte, error) {
 	return compressedData, nil // 返回最终的压缩数据
 }
 
+// MultiZlibCompressWithInfo 支持多次压缩并返回压缩信息
+func MultiZlibCompressWithInfo(data []byte, times int) (*CompressResult, error) {
+	compressed, err := MultiZlibCompress(data, times)
+	if err != nil {
+		return nil, err
+	}
+	return newCompressResult(data, compressed), nil
+}
+
 // MultiZlibDecompress 支持多次解压缩
 func MultiZlibDecompress(compressedData []byte, times int) ([]byte, error) {
 	var err error
@@ -129,6 +147,20 @@ func ZlibCompressObject[T any](obj T) ([]byte, error) {
 	}
 	// 压缩JSON数据
 	return ZlibCompress(data)
+}
+
+// ZlibCompressObjectWithInfo 泛型压缩函数，支持任意类型自动JSON序列化并返回压缩信息
+func ZlibCompressObjectWithInfo[T any](obj T) (*CompressResult, error) {
+	compressed, originalSize, err := ZlibCompressObjectWithSize(obj)
+	if err != nil {
+		return nil, err
+	}
+	return &CompressResult{
+		Data:           compressed,
+		OriginalSize:   originalSize,
+		CompressedSize: len(compressed),
+		Ratio:          float64(len(compressed)) / float64(originalSize),
+	}, nil
 }
 
 // ZlibCompressObjectWithSize 泛型压缩函数，返回压缩后的数据和原始JSON数据大小
@@ -172,6 +204,19 @@ func MultiZlibCompressObject[T any](obj T, times int) ([]byte, error) {
 	return MultiZlibCompress(data, times)
 }
 
+// MultiZlibCompressObjectWithInfo 泛型多次压缩函数，支持任意类型自动JSON序列化并返回压缩信息
+func MultiZlibCompressObjectWithInfo[T any](obj T, times int) (*CompressResult, error) {
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+	compressed, err := MultiZlibCompress(data, times)
+	if err != nil {
+		return nil, err
+	}
+	return newCompressResult(data, compressed), nil
+}
+
 // MultiZlibDecompressObject 泛型多次解压缩函数，支持自动JSON反序列化
 func MultiZlibDecompressObject[T any](compressedData []byte, times int) (T, error) {
 	var result T
@@ -200,17 +245,55 @@ func ZlibCompressWithPrefix(data []byte) ([]byte, error) {
 	return result, nil
 }
 
-// ZlibDecompressWithPrefix 解压缩带 ZLIB: 前缀的数据
-// 如果数据带有前缀，自动去除后解压；否则直接返回原数据
-func ZlibDecompressWithPrefix(data []byte) ([]byte, error) {
-	if len(data) > ZlibPrefixLen && string(data[:ZlibPrefixLen]) == ZlibPrefix {
-		return ZlibDecompress(data[ZlibPrefixLen:])
+// ZlibCompressWithPrefixInfo 压缩数据并添加 ZLIB: 前缀，同时返回压缩信息
+func ZlibCompressWithPrefixInfo(data []byte) (*CompressResult, error) {
+	compressed, err := ZlibCompressWithPrefix(data)
+	if err != nil {
+		return nil, err
 	}
-	// 如果没有前缀，直接返回原数据（假设未压缩）
-	return data, nil
+	return newCompressResult(data, compressed), nil
 }
 
 // IsZlibCompressed 检查数据是否带有 ZLIB 压缩前缀
 func IsZlibCompressed(data []byte) bool {
 	return len(data) > ZlibPrefixLen && string(data[:ZlibPrefixLen]) == ZlibPrefix
+}
+
+// ZlibSmartDecompress 智能解压缩函数
+// 自动检测数据是否被压缩，如果是则解压，否则直接返回原数据
+// 适用于需要兼容压缩/未压缩数据的场景
+func ZlibSmartDecompress(data []byte) ([]byte, error) {
+	// 1. 检查是否有 ZLIB 前缀
+	if IsZlibCompressed(data) {
+		return ZlibDecompress(data[ZlibPrefixLen:])
+	}
+
+	// 2. 尝试直接解压缩（处理没有前缀但被压缩的数据）
+	decompressed, err := ZlibDecompress(data)
+	if err == nil {
+		return decompressed, nil
+	}
+
+	// 3. 解压失败，返回原数据
+	return data, nil
+}
+
+// ZlibSmartDecompressObject 智能解压缩对象函数
+// 自动检测数据是否被压缩，支持自动JSON反序列化
+// 适用于需要兼容压缩/未压缩数据的场景
+func ZlibSmartDecompressObject[T any](data []byte) (T, error) {
+	var result T
+
+	// 智能解压缩
+	decompressed, err := ZlibSmartDecompress(data)
+	if err != nil {
+		return result, err
+	}
+
+	// 反序列化
+	if err := json.Unmarshal(decompressed, &result); err != nil {
+		return result, err
+	}
+
+	return result, nil
 }
