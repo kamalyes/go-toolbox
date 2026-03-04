@@ -71,11 +71,8 @@ func (t *Timer) Run() {
 		t.endTime = t.startTime  // 初始化结束时间
 		go func() {
 			// 只需在 goroutine 中执行一次打印
-			select {
-			case <-t.stopChan: // 如果接收到停止信号，退出并打印持续时间
-				t.printLog()
-				return
-			}
+			<-t.stopChan // 如果接收到停止信号，退出并打印持续时间
+			t.printLog()
 		}()
 	})
 }
