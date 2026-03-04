@@ -142,9 +142,8 @@ func TestNewContextWithTimeout(t *testing.T) {
 }
 
 func TestDeadline(t *testing.T) {
-	parentCtx := context.Background()
 	timeout := TestTimeout1s
-	customCtx := NewContextWithTimeout(timeout).WithParent(parentCtx)
+	customCtx := NewContextWithTimeout(timeout)
 	deadline, ok := customCtx.Deadline()
 	assert.True(t, ok, "Expected deadline to be set")
 	assert.WithinDuration(t, time.Now().Add(timeout), deadline, time.Second, "Expected deadline to be within duration of timeout")

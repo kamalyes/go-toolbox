@@ -278,3 +278,293 @@ func TestWithTimeoutOrBackground_WithValidParent(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, executed)
 }
+
+// TestWithTimeoutDecorators_Success 测试成功创建带超时的context
+func TestWithTimeoutDecorators_Success(t *testing.T) {
+	ctx, cancel := WithTimeoutDecorators(TestTimeout1s)
+	defer cancel()
+
+	assert.NotNil(t, ctx)
+	deadline, ok := ctx.Deadline()
+	assert.True(t, ok)
+	assert.True(t, time.Until(deadline) > 0)
+}
+
+// TestWithTimeoutDecorators_Decorator 测试带装饰器的context创建
+func TestWithTimeoutDecorators_Decorator(t *testing.T) {
+	type contextKey string
+	const userKey contextKey = "user"
+
+	decorator := func(ctx context.Context) context.Context {
+		return context.WithValue(ctx, userKey, "test_user")
+	}
+
+	ctx, cancel := WithTimeoutDecorators(TestTimeout1s, decorator)
+	defer cancel()
+
+	assert.NotNil(t, ctx)
+	assert.Equal(t, "test_user", ctx.Value(userKey))
+
+	deadline, ok := ctx.Deadline()
+	assert.True(t, ok)
+	assert.True(t, time.Until(deadline) > 0)
+}
+
+// TestWithTimeoutDecorators_MultipleDecorators 测试多个装饰器
+func TestWithTimeoutDecorators_MultipleDecorators(t *testing.T) {
+	type contextKey string
+	const (
+		userKey  contextKey = "user"
+		traceKey contextKey = "trace_id"
+	)
+
+	decorator1 := func(ctx context.Context) context.Context {
+		return context.WithValue(ctx, userKey, "test_user")
+	}
+	decorator2 := func(ctx context.Context) context.Context {
+		return context.WithValue(ctx, traceKey, "trace_123")
+	}
+
+	ctx, cancel := WithTimeoutDecorators(TestTimeout1s, decorator1, decorator2)
+	defer cancel()
+
+	assert.NotNil(t, ctx)
+	assert.Equal(t, "test_user", ctx.Value(userKey))
+	assert.Equal(t, "trace_123", ctx.Value(traceKey))
+}
+
+// TestWithTimeoutDecorators_Timeout 测试超时触发
+func TestWithTimeoutDecorators_Timeout(t *testing.T) {
+	ctx, cancel := WithTimeoutDecorators(TestTimeout100ms)
+	defer cancel()
+
+	select {
+	case <-time.After(TestTimeout200ms):
+		t.Fatal("context should have timed out")
+	case <-ctx.Done():
+		assert.Equal(t, context.DeadlineExceeded, ctx.Err())
+	}
+}
+
+// TestWithDeadlineDecorators_Success 测试成功创建带截止时间的context
+func TestWithDeadlineDecorators_Success(t *testing.T) {
+	deadline := time.Now().Add(TestTimeout1s)
+	ctx, cancel := WithDeadlineDecorators(deadline)
+	defer cancel()
+
+	assert.NotNil(t, ctx)
+	ctxDeadline, ok := ctx.Deadline()
+	assert.True(t, ok)
+	assert.True(t, ctxDeadline.Equal(deadline) || ctxDeadline.Before(deadline.Add(time.Millisecond)))
+}
+
+// TestWithDeadlineDecorators_Decorator 测试带装饰器的deadline context
+func TestWithDeadlineDecorators_Decorator(t *testing.T) {
+	type contextKey string
+	const requestIDKey contextKey = "request_id"
+
+	decorator := func(ctx context.Context) context.Context {
+		return context.WithValue(ctx, requestIDKey, "req_456")
+	}
+
+	deadline := time.Now().Add(TestTimeout1s)
+	ctx, cancel := WithDeadlineDecorators(deadline, decorator)
+	defer cancel()
+
+	assert.NotNil(t, ctx)
+	assert.Equal(t, "req_456", ctx.Value(requestIDKey))
+
+	ctxDeadline, ok := ctx.Deadline()
+	assert.True(t, ok)
+	assert.True(t, time.Until(ctxDeadline) > 0)
+}
+
+// TestWithDeadlineDecorators_Timeout 测试截止时间触发
+func TestWithDeadlineDecorators_Timeout(t *testing.T) {
+	deadline := time.Now().Add(TestTimeout100ms)
+	ctx, cancel := WithDeadlineDecorators(deadline)
+	defer cancel()
+
+	select {
+	case <-time.After(TestTimeout200ms):
+		t.Fatal("context should have reached deadline")
+	case <-ctx.Done():
+		assert.Equal(t, context.DeadlineExceeded, ctx.Err())
+	}
+}
+
+// TestMustGet_Success 测试成功获取值
+func TestMustGet_Success(t *testing.T) {
+	type contextKey string
+	const configKey contextKey = "config"
+
+	type Config struct {
+		Value string
+	}
+
+	ctx := context.WithValue(context.Background(), configKey, &Config{Value: "test"})
+	config := MustGet[*Config](ctx, configKey)
+
+	assert.NotNil(t, config)
+	assert.Equal(t, "test", config.Value)
+}
+
+// TestMustGet_Panic_NotFound 测试值不存在时panic
+func TestMustGet_Panic_NotFound(t *testing.T) {
+	type contextKey string
+	const missingKey contextKey = "missing"
+
+	ctx := context.Background()
+
+	assert.Panics(t, func() {
+		MustGet[string](ctx, missingKey)
+	})
+}
+
+// TestMustGet_Panic_TypeMismatch 测试类型不匹配时panic
+func TestMustGet_Panic_TypeMismatch(t *testing.T) {
+	type contextKey string
+	const valueKey contextKey = "value"
+
+	ctx := context.WithValue(context.Background(), valueKey, "string_value")
+
+	assert.Panics(t, func() {
+		MustGet[int](ctx, valueKey)
+	})
+}
+
+// TestMustGet_DifferentTypes 测试不同类型的值获取
+func TestMustGet_DifferentTypes(t *testing.T) {
+	type contextKey string
+
+	// string类型
+	ctx := context.WithValue(context.Background(), contextKey("str"), "hello")
+	strVal := MustGet[string](ctx, contextKey("str"))
+	assert.Equal(t, "hello", strVal)
+
+	// int类型
+	ctx = context.WithValue(ctx, contextKey("num"), TestInt99)
+	intVal := MustGet[int](ctx, contextKey("num"))
+	assert.Equal(t, TestInt99, intVal)
+
+	// slice类型
+	ctx = context.WithValue(ctx, contextKey("slice"), []int{1, 2, 3})
+	sliceVal := MustGet[[]int](ctx, contextKey("slice"))
+	assert.Equal(t, []int{1, 2, 3}, sliceVal)
+}
+
+// TestMustGetWithMessage_Success 测试成功获取值
+func TestMustGetWithMessage_Success(t *testing.T) {
+	type contextKey string
+	const userKey contextKey = "user"
+
+	ctx := context.WithValue(context.Background(), userKey, "john")
+	user := MustGetWithMessage[string](ctx, userKey, "用户信息不存在")
+
+	assert.Equal(t, "john", user)
+}
+
+// TestMustGetWithMessage_Panic_CustomMessage 测试自定义panic消息
+func TestMustGetWithMessage_Panic_CustomMessage(t *testing.T) {
+	type contextKey string
+	const missingKey contextKey = "missing"
+
+	ctx := context.Background()
+	customMsg := "配置信息不存在于上下文中"
+
+	defer func() {
+		r := recover()
+		assert.NotNil(t, r)
+		assert.Equal(t, customMsg, r)
+	}()
+
+	MustGetWithMessage[string](ctx, missingKey, customMsg)
+}
+
+// TestMustGetWithMessage_Panic_TypeMismatch 测试类型不匹配时的自定义消息
+func TestMustGetWithMessage_Panic_TypeMismatch(t *testing.T) {
+	type contextKey string
+	const valueKey contextKey = "value"
+
+	ctx := context.WithValue(context.Background(), valueKey, "string_value")
+	customMsg := "环境信息不存在于上下文中"
+
+	defer func() {
+		r := recover()
+		assert.NotNil(t, r)
+		panicMsg := r.(string)
+		assert.Contains(t, panicMsg, customMsg)
+		assert.Contains(t, panicMsg, "type mismatch")
+	}()
+
+	MustGetWithMessage[int](ctx, valueKey, customMsg)
+}
+
+// TestGetOrDefault_ValueExists 测试值存在时返回值
+func TestGetOrDefault_ValueExists(t *testing.T) {
+	type contextKey string
+	const timeoutKey contextKey = "timeout"
+
+	ctx := context.WithValue(context.Background(), timeoutKey, 30*time.Second)
+	timeout := GetOrDefault(ctx, timeoutKey, 10*time.Second)
+
+	assert.Equal(t, 30*time.Second, timeout)
+}
+
+// TestGetOrDefault_ValueNotExists 测试值不存在时返回默认值
+func TestGetOrDefault_ValueNotExists(t *testing.T) {
+	type contextKey string
+	const missingKey contextKey = "missing"
+
+	ctx := context.Background()
+	defaultValue := "anonymous"
+	userID := GetOrDefault(ctx, missingKey, defaultValue)
+
+	assert.Equal(t, defaultValue, userID)
+}
+
+// TestGetOrDefault_TypeMismatch 测试类型不匹配时返回默认值
+func TestGetOrDefault_TypeMismatch(t *testing.T) {
+	type contextKey string
+	const valueKey contextKey = "value"
+
+	ctx := context.WithValue(context.Background(), valueKey, "string_value")
+	defaultValue := TestInt99
+	intVal := GetOrDefault(ctx, valueKey, defaultValue)
+
+	assert.Equal(t, defaultValue, intVal)
+}
+
+// TestGetOrDefault_DifferentTypes 测试不同类型的默认值
+func TestGetOrDefault_DifferentTypes(t *testing.T) {
+	type contextKey string
+	ctx := context.Background()
+
+	// string类型
+	strVal := GetOrDefault(ctx, contextKey("str"), "default")
+	assert.Equal(t, "default", strVal)
+
+	// int类型
+	intVal := GetOrDefault(ctx, contextKey("num"), TestInt)
+	assert.Equal(t, TestInt, intVal)
+
+	// bool类型
+	boolVal := GetOrDefault(ctx, contextKey("flag"), true)
+	assert.True(t, boolVal)
+
+	// duration类型
+	durationVal := GetOrDefault(ctx, contextKey("timeout"), TestTimeout1s)
+	assert.Equal(t, TestTimeout1s, durationVal)
+}
+
+// TestGetOrDefault_NilValue 测试nil值时返回默认值
+func TestGetOrDefault_NilValue(t *testing.T) {
+	type contextKey string
+	const nilKey contextKey = "nil_value"
+
+	ctx := context.WithValue(context.Background(), nilKey, nil)
+	defaultValue := "default"
+	result := GetOrDefault(ctx, nilKey, defaultValue)
+
+	assert.Equal(t, defaultValue, result)
+}

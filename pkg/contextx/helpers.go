@@ -12,6 +12,7 @@ package contextx
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
 
@@ -118,4 +119,103 @@ func WithTimeoutFrom(parent context.Context, timeout time.Duration, fn func(cont
 //	})
 func WithTimeoutOrBackground(parent context.Context, timeout time.Duration, fn func(context.Context) error) error {
 	return WithTimeoutFrom(OrBackground(parent), timeout, fn)
+}
+
+// WithTimeoutDecorators 创建带超时的标准 context 并应用装饰器
+// 支持可选的装饰器函数来增强 context
+//
+// 使用示例:
+//
+//	ctx, cancel := contextx.WithTimeoutDecorators(5*time.Second)
+//	defer cancel()
+//
+//	或者带装饰器
+//	ctx, cancel := contextx.WithTimeoutDecorators(5*time.Second, WithUser(user), WithTraceID(id))
+//	defer cancel()
+func WithTimeoutDecorators(timeout time.Duration, decorators ...func(context.Context) context.Context) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	for _, decorator := range decorators {
+		ctx = decorator(ctx)
+	}
+	return ctx, cancel
+}
+
+// WithDeadlineDecorators 创建带截止时间的 context 并应用装饰器
+// 支持可选的装饰器函数来增强 context
+//
+// 使用示例:
+//
+//	deadline := time.Now().Add(10 * time.Second)
+//	ctx, cancel := contextx.WithDeadlineDecorators(deadline)
+//	defer cancel()
+//
+//	或者带装饰器
+//	ctx, cancel := contextx.WithDeadlineDecorators(deadline, WithUser(user))
+//	defer cancel()
+func WithDeadlineDecorators(deadline time.Time, decorators ...func(context.Context) context.Context) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithDeadline(context.Background(), deadline)
+	for _, decorator := range decorators {
+		ctx = decorator(ctx)
+	}
+	return ctx, cancel
+}
+
+// MustGet 从上下文中获取值，如果不存在则 panic
+// 这是一个通用的 Must 模式实现
+//
+// 使用示例:
+//
+//	config := contextx.MustGet[*Config](ctx, "config")
+//	userID := contextx.MustGet[string](ctx, "user_id")
+func MustGet[T any](ctx context.Context, key any) T {
+	value := ctx.Value(key)
+	if value == nil {
+		panic(fmt.Sprintf("value for key %v not found in context", key))
+	}
+
+	result, ok := value.(T)
+	if !ok {
+		panic(fmt.Sprintf("value for key %v has wrong type: expected %T, got %T", key, *new(T), value))
+	}
+
+	return result
+}
+
+// MustGetWithMessage 从上下文中获取值，如果不存在则 panic 并显示自定义消息
+//
+// 使用示例:
+//
+//	config := contextx.MustGetWithMessage[*Config](ctx, "config", "配置信息不存在于上下文中")
+func MustGetWithMessage[T any](ctx context.Context, key any, message string) T {
+	value := ctx.Value(key)
+	if value == nil {
+		panic(message)
+	}
+
+	result, ok := value.(T)
+	if !ok {
+		panic(fmt.Sprintf("%s (type mismatch: expected %T, got %T)", message, *new(T), value))
+	}
+
+	return result
+}
+
+// GetOrDefault 从上下文中获取值，如果不存在则返回默认值
+//
+// 使用示例:
+//
+//	timeout := contextx.GetOrDefault(ctx, "timeout", 30*time.Second)
+//	userID := contextx.GetOrDefault(ctx, "user_id", "anonymous")
+func GetOrDefault[T any](ctx context.Context, key any, defaultValue T) T {
+	value := ctx.Value(key)
+	if value == nil {
+		return defaultValue
+	}
+
+	result, ok := value.(T)
+	if !ok {
+		return defaultValue
+	}
+
+	return result
 }
