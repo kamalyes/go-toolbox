@@ -598,6 +598,50 @@ func IfNotZero[T comparable](val T, defaultVal T) T {
 	return IF(val != zero, val, defaultVal)
 }
 
+// IfLeZero 小于等于零时使用默认值
+// 如果 val <= 0，返回 defaultVal；否则返回 val
+// 适用于配置参数、超时时间等场景
+//
+// 示例：
+//
+//	config.CleanupInterval = mathx.IfLeZero(config.CleanupInterval, time.Minute*10)
+//	config.PageSize = mathx.IfLeZero(config.PageSize, 10)
+//	config.Timeout = mathx.IfLeZero(config.Timeout, 30*time.Second)
+func IfLeZero[T types.Numerical](val, defaultVal T) T {
+	return IF(val <= 0, defaultVal, val)
+}
+
+// IfLtZero 小于零时使用默认值
+// 如果 val < 0，返回 defaultVal；否则返回 val
+//
+// 示例：
+//
+//	config.MinValue = mathx.IfLtZero(config.MinValue, 10)
+//	config.Offset = mathx.IfLtZero(config.Offset, 0)
+func IfLtZero[T types.Numerical](val, defaultVal T) T {
+	return IF(val < 0, defaultVal, val)
+}
+
+// IfGeZero 大于等于零时使用默认值
+// 如果 val >= 0，返回 defaultVal；否则返回 val
+//
+// 示例：
+//
+//	config.ErrorCode = mathx.IfGeZero(config.ErrorCode, -1)
+func IfGeZero[T types.Numerical](val, defaultVal T) T {
+	return IF(val >= 0, defaultVal, val)
+}
+
+// IfGtZero 大于零时使用默认值
+// 如果 val > 0，返回 defaultVal；否则返回 val
+//
+// 示例：
+//
+//	config.MaxSize = mathx.IfGtZero(config.MaxSize, 100)
+func IfGtZero[T types.Numerical](val, defaultVal T) T {
+	return IF(val > 0, defaultVal, val)
+}
+
 // IfContains 包含检查三元运算
 // 检查 slice 是否包含 target
 // 如果包含，返回 trueVal；否则返回 falseVal

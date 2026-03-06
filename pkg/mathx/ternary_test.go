@@ -1453,3 +1453,124 @@ func BenchmarkIfTimeToProto(b *testing.B) {
 		IfTimeToProto(&now, -30*24*time.Hour)
 	}
 }
+
+// TestIfLeZero 测试小于等于零时使用默认值
+func TestIfLeZero(t *testing.T) {
+	tests := []struct {
+		name       string
+		val        int
+		defaultVal int
+		want       int
+	}{
+		{"负数返回默认值", -5, 10, 10},
+		{"零返回默认值", 0, 10, 10},
+		{"正数返回原值", 5, 10, 5},
+		{"大正数返回原值", 100, 10, 100},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IfLeZero(tt.val, tt.defaultVal)
+			assert.Equal(t, tt.want, result)
+		})
+	}
+
+	// 测试 time.Duration 类型
+	t.Run("time.Duration类型", func(t *testing.T) {
+		assert.Equal(t, time.Minute*10, IfLeZero(time.Duration(0), time.Minute*10))
+		assert.Equal(t, time.Minute*10, IfLeZero(time.Duration(-5), time.Minute*10))
+		assert.Equal(t, time.Second*30, IfLeZero(time.Second*30, time.Minute*10))
+	})
+
+	// 测试 float64 类型
+	t.Run("float64类型", func(t *testing.T) {
+		assert.Equal(t, 0.5, IfLeZero(0.0, 0.5))
+		assert.Equal(t, 0.5, IfLeZero(-0.1, 0.5))
+		assert.Equal(t, 0.8, IfLeZero(0.8, 0.5))
+	})
+}
+
+// TestIfLtZero 测试小于零时使用默认值
+func TestIfLtZero(t *testing.T) {
+	tests := []struct {
+		name       string
+		val        int
+		defaultVal int
+		want       int
+	}{
+		{"负数返回默认值", -5, 10, 10},
+		{"零返回原值", 0, 10, 0},
+		{"正数返回原值", 5, 10, 5},
+		{"大正数返回原值", 100, 10, 100},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IfLtZero(tt.val, tt.defaultVal)
+			assert.Equal(t, tt.want, result)
+		})
+	}
+
+	// 测试 int64 类型
+	t.Run("int64类型", func(t *testing.T) {
+		assert.Equal(t, int64(10), IfLtZero(int64(-1), int64(10)))
+		assert.Equal(t, int64(0), IfLtZero(int64(0), int64(10)))
+		assert.Equal(t, int64(5), IfLtZero(int64(5), int64(10)))
+	})
+}
+
+// TestIfGeZero 测试大于等于零时使用默认值
+func TestIfGeZero(t *testing.T) {
+	tests := []struct {
+		name       string
+		val        int
+		defaultVal int
+		want       int
+	}{
+		{"负数返回原值", -5, -1, -5},
+		{"零返回默认值", 0, -1, -1},
+		{"正数返回默认值", 5, -1, -1},
+		{"大正数返回默认值", 100, -1, -1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IfGeZero(tt.val, tt.defaultVal)
+			assert.Equal(t, tt.want, result)
+		})
+	}
+
+	// 测试错误码场景
+	t.Run("错误码场景", func(t *testing.T) {
+		errorCode := 0
+		assert.Equal(t, -1, IfGeZero(errorCode, -1))
+
+		errorCode = 500
+		assert.Equal(t, -1, IfGeZero(errorCode, -1))
+
+		errorCode = -5
+		assert.Equal(t, -5, IfGeZero(errorCode, -1))
+	})
+}
+
+// TestIfGtZero 测试大于零时使用默认值
+func TestIfGtZero(t *testing.T) {
+	tests := []struct {
+		name       string
+		val        int
+		defaultVal int
+		want       int
+	}{
+		{"负数返回原值", -5, 100, -5},
+		{"零返回原值", 0, 100, 0},
+		{"正数返回默认值", 5, 100, 100},
+		{"大正数返回默认值", 200, 100, 100},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IfGtZero(tt.val, tt.defaultVal)
+			assert.Equal(t, tt.want, result)
+		})
+	}
+}
