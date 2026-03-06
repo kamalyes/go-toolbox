@@ -15,8 +15,9 @@ import "fmt"
 
 // 预定义的错误类型
 const (
+	ErrTypeUnknownError ErrorType = -1
 	// 参数错误
-	ErrTypeInvalidParam ErrorType = iota + 1000
+	ErrTypeInvalidParam = iota + 1000
 	ErrTypeMissingParam
 	ErrTypeInvalidFormat
 

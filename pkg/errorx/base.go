@@ -28,7 +28,8 @@ func WrapError(message string, err ...error) error {
 
 // 定义 BaseError 结构体
 type BaseError struct {
-	Msg string
+	Msg  string
+	Type ErrorType
 }
 
 // 错误类型常量
@@ -45,13 +46,22 @@ var (
 )
 
 // NewBaseError 创建一个新的 BaseError 实例
-func NewBaseError(msg string) BaseError {
-	return BaseError{Msg: msg}
+func NewBaseError(msg string, errTypes ...ErrorType) BaseError {
+	var errType ErrorType
+	if len(errTypes) > 0 {
+		errType = errTypes[0]
+	}
+	return BaseError{Msg: msg, Type: errType}
 }
 
 // Error 实现 error 接口，返回错误信息
 func (e BaseError) Error() string {
 	return e.Msg
+}
+
+// GetType 获取错误类型
+func (e BaseError) GetType() ErrorType {
+	return e.Type
 }
 
 // RegisterError 注册错误类型和消息
@@ -72,12 +82,22 @@ func NewError(errType ErrorType, args ...interface{}) BaseError {
 	var result BaseError
 	syncx.WithLock(&mu, func() {
 		if msg, ok := errorMessages[errType]; ok {
-			result = NewBaseError(fmt.Sprintf(msg, args...))
+			result = NewBaseError(fmt.Sprintf(msg, args...), errType)
 		} else {
 			result = NewBaseError("unknown error")
 		}
 	})
 	return result
+}
+
+// ClassifyError 获取错误的 ErrorType
+// 如果错误是 BaseError 类型，返回其错误类型；否则返回 ErrTypeUnknownError
+func ClassifyError(err error) ErrorType {
+	var baseErr BaseError
+	if errors.As(err, &baseErr) {
+		return baseErr.GetType()
+	}
+	return ErrTypeUnknownError
 }
 
 // 打印错误映射（调试用）

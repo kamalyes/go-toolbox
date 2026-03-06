@@ -25,16 +25,15 @@ func TestWrapError(t *testing.T) {
 		err      []error
 		expected string
 	}{
-		{"with error", "an error occurred", []error{errors.New("original error")}, "an error occurred: original error"},
-		{"without error", "another error", []error{}, "another error"},
-		{"with nil error", "nil error", []error{nil}, "nil error"},
-		{"with wrapped error", "wrapped error", []error{errors.New("something went wrong")}, "wrapped error: something went wrong"},
+		{"包装错误", "an error occurred", []error{errors.New("original error")}, "an error occurred: original error"},
+		{"无错误", "another error", []error{}, "another error"},
+		{"nil错误", "nil error", []error{nil}, "nil error"},
+		{"包装错误链", "wrapped error", []error{errors.New("something went wrong")}, "wrapped error: something went wrong"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := WrapError(tt.message, tt.err...)
-
 			assert.NotNil(t, got)
 			assert.EqualError(t, got, tt.expected)
 		})
@@ -52,7 +51,12 @@ func TestConcurrentErrorCreation(t *testing.T) {
 			defer wg.Done()
 			errType := ErrorType(i)
 			RegisterError(errType, "resource not found")
-			NewError(errType)
+			err := NewError(errType)
+			assert.Equal(t, errType, err.GetType())
+
+			// 校验 ClassifyError
+			classifiedType := ClassifyError(err)
+			assert.Equal(t, errType, classifiedType)
 		}(i)
 	}
 
@@ -83,6 +87,11 @@ func TestNewErrorUnknownType(t *testing.T) {
 	ResetErrorMap()
 	unknownError := NewError(ErrorType(999))
 	assert.EqualError(t, unknownError, "unknown error", "应返回未知错误消息")
+	assert.Equal(t, ErrorType(0), unknownError.GetType(), "未知错误类型应为0")
+
+	// 校验 ClassifyError
+	classifiedType := ClassifyError(unknownError)
+	assert.Equal(t, ErrorType(0), classifiedType)
 }
 
 func TestConcurrentErrorRetrieval(t *testing.T) {
@@ -98,6 +107,11 @@ func TestConcurrentErrorRetrieval(t *testing.T) {
 			defer wg.Done()
 			err := NewError(1)
 			assert.EqualError(t, err, "resource not found", "应返回正确的错误消息")
+			assert.Equal(t, ErrorType(1), err.GetType(), "应返回正确的错误类型")
+
+			// 校验 ClassifyError
+			classifiedType := ClassifyError(err)
+			assert.Equal(t, ErrorType(1), classifiedType)
 		}()
 	}
 
@@ -123,6 +137,11 @@ func TestErrorMessageFormatting(t *testing.T) {
 	RegisterError(1, "error occurred with code %d")
 	err := NewError(1, 404)
 	assert.EqualError(t, err, "error occurred with code 404", "错误消息格式化不正确")
+	assert.Equal(t, ErrorType(1), err.GetType(), "应返回正确的错误类型")
+
+	// 校验 ClassifyError
+	classifiedType := ClassifyError(err)
+	assert.Equal(t, ErrorType(1), classifiedType)
 }
 
 func TestConcurrentResetErrorMap(t *testing.T) {
@@ -147,4 +166,15 @@ func TestPrintErrorMap(t *testing.T) {
 	RegisterError(1, "resource not found")
 	RegisterError(2, "another error")
 	PrintErrorMap() // 确保不会引发错误
+
+	// 校验 ClassifyError 对标准错误的处理
+	standardErr := errors.New("standard error")
+	classifiedType := ClassifyError(standardErr)
+	assert.Equal(t, ErrTypeUnknownError, classifiedType)
+
+	// 校验 ClassifyError 对包装错误的处理
+	baseErr := NewError(1)
+	wrappedErr := WrapError("wrapped", baseErr)
+	classifiedType = ClassifyError(wrappedErr)
+	assert.Equal(t, ErrorType(1), classifiedType)
 }
