@@ -4,7 +4,7 @@
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2025-12-04 19:31:22
  * @FilePath: \go-toolbox\pkg\osx\base.go
- * @Description:
+ * @Description: 操作系统相关工具函数
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
@@ -20,12 +20,77 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/kamalyes/go-toolbox/pkg/mathx"
 	"github.com/kamalyes/go-toolbox/pkg/random"
 	"github.com/kamalyes/go-toolbox/pkg/stringx"
 )
+
+// WorkerIDConfig WorkerID 配置
+type WorkerIDConfig struct {
+	maxWorkerID     atomic.Int64 // WorkerID 最大值（默认 1024）
+	maxDatacenterID atomic.Int64 // DatacenterID 最大值（默认 32）
+	maxSnowflakeID  atomic.Int64 // 雪花算法 ID 最大值（默认 32）
+}
+
+// RunTimeCaller 运行时调用栈信息
+type RunTimeCaller struct {
+	Pc       uintptr // 程序计数器
+	File     string  // 文件路径
+	Line     int     // 行号
+	FuncName string  // 函数名
+}
+
+var (
+	globalWorkerIDConfig = &WorkerIDConfig{}
+	callerPool           = sync.Pool{
+		New: func() any {
+			return &RunTimeCaller{}
+		},
+	}
+)
+
+func init() {
+	// 设置默认值
+	globalWorkerIDConfig.maxWorkerID.Store(1024)
+	globalWorkerIDConfig.maxDatacenterID.Store(32)
+	globalWorkerIDConfig.maxSnowflakeID.Store(32)
+}
+
+// SetMaxWorkerID 设置 WorkerID 的最大值（范围限制）
+// 默认值: 1024
+func SetMaxWorkerID(max int64) {
+	globalWorkerIDConfig.maxWorkerID.Store(mathx.IfLeZero(max, 1024))
+}
+
+// SetMaxDatacenterID 设置 DatacenterID 的最大值（范围限制）
+// 默认值: 32（雪花算法标准）
+func SetMaxDatacenterID(max int64) {
+	globalWorkerIDConfig.maxDatacenterID.Store(mathx.IfLeZero(max, 32))
+}
+
+// SetMaxSnowflakeWorkerID 设置雪花算法 WorkerID 的最大值（范围限制）
+// 默认值: 32（雪花算法标准的5位）
+func SetMaxSnowflakeWorkerID(max int64) {
+	globalWorkerIDConfig.maxSnowflakeID.Store(mathx.IfLeZero(max, 32))
+}
+
+// GetMaxWorkerID 获取 WorkerID 的最大值
+func GetMaxWorkerID() int64 {
+	return globalWorkerIDConfig.maxWorkerID.Load()
+}
+
+// GetMaxDatacenterID 获取 DatacenterID 的最大值
+func GetMaxDatacenterID() int64 {
+	return globalWorkerIDConfig.maxDatacenterID.Load()
+}
+
+// GetMaxSnowflakeWorkerID 获取雪花算法 WorkerID 的最大值
+func GetMaxSnowflakeWorkerID() int64 {
+	return globalWorkerIDConfig.maxSnowflakeID.Load()
+}
 
 // GetHostName 获取主机名，如果失败则返回错误
 func GetHostName() (string, error) {
@@ -36,7 +101,7 @@ func GetHostName() (string, error) {
 	return hostname, nil
 }
 
-// 获取主机名函数
+// SafeGetHostName 安全获取主机名，失败时返回随机字符串
 func SafeGetHostName() string {
 	output, err := GetHostName()
 	if err != nil || output == "" {
@@ -46,7 +111,7 @@ func SafeGetHostName() string {
 	return stringx.ReplaceSpecialChars(output, 'x')
 }
 
-// HashUnixMicroCipherText
+// HashUnixMicroCipherText 生成基于时间戳和主机名的哈希密文
 func HashUnixMicroCipherText() string {
 	var (
 		nowUnixMicro = time.Now().UnixMicro()
@@ -59,62 +124,127 @@ func HashUnixMicroCipherText() string {
 }
 
 // GetWorkerId 获取唯一的 Worker ID (智能增强版)
-// 优先级: 环境变量 WORKER_ID > 主机名哈希
-// 支持环境变量: WORKER_ID, NODE_ID, POD_ORDINAL
-// 返回范围: 0-1023
+// 优先级: K8s Pod Name > K8s Hostname > 环境变量 > 主机名哈希
+// 支持环境变量: POD_NAME, HOSTNAME, WORKER_ID, NODE_ID, POD_ORDINAL
+// 返回范围: 0 到 (maxWorkerID-1)，默认 0-1023
 func GetWorkerId() int64 {
-	// 1. 尝试从环境变量获取
+	maxWorkerID := globalWorkerIDConfig.maxWorkerID.Load()
+
+	// 1. 优先从 K8s Pod Name 提取序号（如 myapp-0, myapp-1）
+	if podName := os.Getenv("POD_NAME"); podName != "" {
+		if id := extractOrdinalFromName(podName); id >= 0 {
+			return id % maxWorkerID
+		}
+	}
+
+	// 2. 从 K8s Hostname 提取序号
+	if hostname := os.Getenv("HOSTNAME"); hostname != "" {
+		if id := extractOrdinalFromName(hostname); id >= 0 {
+			return id % maxWorkerID
+		}
+	}
+
+	// 3. 尝试从环境变量获取
 	envVars := []string{"WORKER_ID", "NODE_ID", "POD_ORDINAL"}
 	for _, envVar := range envVars {
 		if workerID := os.Getenv(envVar); workerID != "" {
 			if id, err := mathx.ParseInt64(workerID); err == nil {
-				// 确保在 0-1023 范围内
-				return mathx.Abs(id) % 1024
+				return mathx.Abs(id) % maxWorkerID
 			}
 		}
 	}
 
-	// 2. 从主机名生成唯一的 Worker ID
+	// 4. 从主机名生成唯一的 Worker ID
 	hostName := SafeGetHostName()
 	hash := sha256.Sum256([]byte(hostName))
 	hostNameHash := int64(binary.BigEndian.Uint64(hash[:8]))
 
-	// 确保在 0-1023 范围内
-	workerId := mathx.Abs(hostNameHash) % 1024
-	return workerId
+	return mathx.Abs(hostNameHash) % maxWorkerID
 }
 
-// GetDatacenterId 获取数据中心ID (新增)
-// 优先级: 环境变量 DATACENTER_ID > 区域环境变量 > 默认值1
-// 返回范围: 0-31 (雪花算法标准)
+// extractOrdinalFromName 从名称中提取序号
+// 支持格式: myapp-0, myapp-1, myapp-statefulset-0 等
+// 返回 -1 表示未找到序号
+func extractOrdinalFromName(name string) int64 {
+	// 从后往前查找最后一个 '-' 后的数字
+	lastDash := strings.LastIndex(name, "-")
+	if lastDash == -1 || lastDash == len(name)-1 {
+		return -1
+	}
+
+	ordinalStr := name[lastDash+1:]
+	if id, err := mathx.ParseInt64(ordinalStr); err == nil {
+		return id
+	}
+
+	return -1
+}
+
+// GetDatacenterId 获取数据中心ID
+// 优先级: 自定义环境变量 > 容器编排平台 > 数据中心标识 > 默认值1
+// 注意：不使用 REGION/ZONE 等区域变量，因为同一区域内的多台机器值相同，无法区分节点
+// 返回范围: 0 到 (maxDatacenterID-1)，默认 0-31（雪花算法标准）
 func GetDatacenterId() int64 {
-	// 1. 尝试从环境变量获取
-	envVars := []string{"DATACENTER_ID", "DC_ID", "ZONE_ID", "REGION_ID"}
-	for _, envVar := range envVars {
+	maxDatacenterID := globalWorkerIDConfig.maxDatacenterID.Load()
+
+	// 1. 优先使用自定义环境变量（数字类型，直接使用）
+	customEnvVars := []string{"DATACENTER_ID", "DC_ID", "DATA_CENTER_ID"}
+	for _, envVar := range customEnvVars {
 		if dcID := os.Getenv(envVar); dcID != "" {
 			if id, err := mathx.ParseInt64(dcID); err == nil {
-				// 确保在 0-31 范围内 (雪花算法的datacenter位数限制)
-				return mathx.Abs(id) % 32
+				return mathx.Abs(id) % maxDatacenterID
 			}
 		}
 	}
 
-	// 2. 从Kubernetes相关环境变量推导
-	if namespace := os.Getenv("KUBERNETES_NAMESPACE"); namespace != "" {
-		hash := sha256.Sum256([]byte(namespace))
-		return int64(binary.BigEndian.Uint32(hash[:4])) % 32
+	// 2. 从容器编排平台环境变量推导（这些能区分不同节点/环境）
+	orchestrationEnvVars := []string{
+		// Kubernetes - 命名空间和集群名可以区分不同环境
+		"KUBERNETES_NAMESPACE", "K8S_NAMESPACE", "POD_NAMESPACE",
+		"KUBERNETES_CLUSTER_NAME", "K8S_CLUSTER_NAME",
+
+		// Docker Swarm - 节点 ID 可以区分不同节点
+		"DOCKER_SWARM_NODE_ID", "SWARM_NODE_ID",
+
+		// Nomad - DC 和命名空间可以区分
+		"NOMAD_DC", "NOMAD_NAMESPACE",
+
+		// Mesos - 任务 ID 可以区分
+		"MESOS_TASK_ID", "MARATHON_APP_ID",
+
+		// OpenShift - 命名空间可以区分
+		"OPENSHIFT_BUILD_NAMESPACE", "OPENSHIFT_DEPLOYMENT_NAMESPACE",
+	}
+	for _, envVar := range orchestrationEnvVars {
+		if value := os.Getenv(envVar); value != "" {
+			hash := sha256.Sum256([]byte(value))
+			return int64(binary.BigEndian.Uint32(hash[:4])) % maxDatacenterID
+		}
 	}
 
-	// 3. 默认返回 1
+	// 3. 从明确的数据中心/集群标识推导
+	datacenterEnvVars := []string{
+		// 数据中心/机房标识
+		"DATACENTER", "DC", "IDC", "SITE_ID",
+
+		// 集群标识
+		"CLUSTER_ID",
+	}
+	for _, envVar := range datacenterEnvVars {
+		if value := os.Getenv(envVar); value != "" {
+			hash := sha256.Sum256([]byte(value))
+			return int64(binary.BigEndian.Uint32(hash[:4])) % maxDatacenterID
+		}
+	}
+
+	// 4. 默认返回 1
 	return 1
 }
 
-// GetWorkerIdForSnowflake 专门为雪花算法获取WorkerId (新增)
-// 返回范围: 0-31 (雪花算法标准的5位worker id)
+// GetWorkerIdForSnowflake 获取适合雪花算法的 WorkerID（0-31，5位）
 func GetWorkerIdForSnowflake() int64 {
-	workerId := GetWorkerId()
-	// 雪花算法的worker id只有5位，范围0-31
-	return workerId % 32
+	maxSnowflakeID := globalWorkerIDConfig.maxSnowflakeID.Load()
+	return GetWorkerId() % maxSnowflakeID
 }
 
 // StableHashSlot 根据输入字符串 s 和范围 [minNum, maxNum]，返回一个稳定且范围内的整数
@@ -136,21 +266,7 @@ func StableHashSlot(s string, minNum, maxNum int) int {
 		rangeSize = maxNum - minNum + 1
 		result    = int(hashVal%uint64(rangeSize)) + minNum
 	)
-	return mathx.IF(result > 0, result, 1)
-}
-
-// RunTimeCaller 结构体用于存储调用栈信息
-type RunTimeCaller struct {
-	Pc       uintptr // 程序计数器
-	File     string  // 文件名
-	Line     int     // 行号
-	FuncName string  // 函数名
-}
-
-var callerPool = sync.Pool{
-	New: func() interface{} {
-		return &RunTimeCaller{}
-	},
+	return mathx.IfGtZero(result, 1)
 }
 
 // GetRuntimeCaller 获取调用栈信息，调用者使用完需调用 Release() 归还对象
@@ -210,10 +326,7 @@ func (c *RunTimeCaller) String() string {
 // Command 执行系统命令
 func Command(bin string, argv []string, baseDir string) ([]byte, error) {
 	cmd := exec.Command(bin, argv...)
-
-	if baseDir != "" {
-		cmd.Dir = baseDir
-	}
+	cmd.Dir = mathx.IF(baseDir != "", baseDir, "")
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
