@@ -18,8 +18,9 @@ import (
 	"sync"
 	"time"
 
+	"encoding/json"
+
 	"github.com/kamalyes/go-toolbox/pkg/convert"
-	"github.com/kamalyes/go-toolbox/pkg/json"
 )
 
 // RandGeneratorFunc 自定义随机数据生成器函数类型
