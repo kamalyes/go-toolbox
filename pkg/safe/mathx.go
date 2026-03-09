@@ -16,6 +16,8 @@ import (
 	"math/big"
 	"strconv"
 	"unsafe"
+
+	"github.com/kamalyes/go-toolbox/pkg/mathx"
 )
 
 // 定义常用的数学常数
@@ -85,10 +87,11 @@ func ShortHash(s string) string {
 //
 // 参数：
 //   - s: 输入字符串
-//   - length: 哈希长度（1-13），推荐值：
+//   - length: 哈希长度（最小为1），推荐值：
 //   - 6位: 适合小规模（< 1万节点），冲突概率 < 0.002%
 //   - 7位: 适合中规模（< 10万节点），冲突概率 < 0.007%（推荐）
 //   - 8位: 适合大规模（< 100万节点），冲突概率 < 0.0002%
+//   - 12-16位: 适合超大规模或需要更低冲突概率的场景
 //
 // 返回：指定长度的Base36字符串
 //
@@ -96,13 +99,9 @@ func ShortHash(s string) string {
 //
 //	ShortHashWithLength("192.168.1.100:8080", 7) → "3g5e9ss"
 //	ShortHashWithLength("pod-abc-123", 8) → "2k3m4n5p"
+//	ShortHashWithLength("user123", 16) → "3g5e9ss000000000"
 func ShortHashWithLength(s string, length int) string {
-	if length < 1 {
-		length = 1
-	}
-	if length > 13 {
-		length = 13
-	}
+	length = mathx.IfLeZero(length, 1)
 
 	hash := FastHash(s)
 	encoded := strconv.FormatUint(hash, 36)

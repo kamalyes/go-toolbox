@@ -40,6 +40,9 @@ func IsEmptyValue(v reflect.Value) bool {
 		return v.Float() == 0.0
 	case reflect.Bool:
 		return !v.Bool()
+	case reflect.Func:
+		// 函数类型：nil 为空
+		return v.IsNil()
 	case reflect.Ptr, reflect.Interface:
 		return IsEmptyPointer(v)
 	case reflect.Struct:
