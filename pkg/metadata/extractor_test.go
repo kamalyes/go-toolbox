@@ -169,6 +169,7 @@ func TestExtractRequestMetadataCDN(t *testing.T) {
 	req.Header.Set("CF-Connecting-IP", "203.0.113.100")
 	req.Header.Set("CF-IPCountry", "US")
 	req.Header.Set("X-Request-ID", "req-abc123")
+	req.Header.Set("X-Device-ID", "device-xyz789")
 
 	metadata := ExtractRequestMetadata(req)
 
@@ -177,6 +178,7 @@ func TestExtractRequestMetadataCDN(t *testing.T) {
 	assert.Equal(t, "203.0.113.100", metadata.CFConnectingIP)
 	assert.Equal(t, "US", metadata.CFIPCountry)
 	assert.Equal(t, "req-abc123", metadata.XRequestID)
+	assert.Equal(t, "device-xyz789", metadata.XDeviceID)
 }
 
 func TestExtractRequestMetadataEmptyUserAgent(t *testing.T) {

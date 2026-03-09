@@ -70,6 +70,7 @@ func ExtractRequestMetadata(r *http.Request) *RequestMetadata {
 		CFIPCountry:    r.Header.Get("CF-IPCountry"),
 		XRequestID:     r.Header.Get("X-Request-ID"),
 		XCorrelationID: r.Header.Get("X-Correlation-ID"),
+		XDeviceID:      r.Header.Get("X-Device-ID"),
 
 		// 缓存和条件请求
 		CacheControl:    r.Header.Get("Cache-Control"),

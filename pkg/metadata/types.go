@@ -53,6 +53,7 @@ type RequestMetadata struct {
 	CFIPCountry    string `json:"cf_ipcountry"`
 	XRequestID     string `json:"x_request_id"`
 	XCorrelationID string `json:"x_correlation_id"`
+	XDeviceID      string `json:"x_device_id"` // 设备唯一标识
 
 	// 缓存和条件请求
 	CacheControl    string `json:"cache_control"`
