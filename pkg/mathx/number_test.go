@@ -415,3 +415,52 @@ func TestSafeGetIndexOrDefaultNoSpace(t *testing.T) {
 		}
 	}
 }
+
+// testConfig 用于 MergeLayeredScalar 测试的配置结构体
+type testConfig struct {
+	Timeout int32
+	Ratio   float64
+	Count   int
+}
+
+func TestMergeLayeredScalar(t *testing.T) {
+	tests := []struct {
+		name   string
+		layers []*testConfig
+		getter func(*testConfig) int32
+		want   int32
+	}{
+		{"agent覆盖owner", []*testConfig{{Timeout: 30}, {Timeout: 60}, {Timeout: 9999}}, func(c *testConfig) int32 { return c.Timeout }, 9999},
+		{"agent为零取owner", []*testConfig{{Timeout: 30}, {Timeout: 60}, {Timeout: 0}}, func(c *testConfig) int32 { return c.Timeout }, 60},
+		{"agent和owner都为零取hardcoded", []*testConfig{{Timeout: 30}, {Timeout: 0}, {Timeout: 0}}, func(c *testConfig) int32 { return c.Timeout }, 30},
+		{"全为零返回零值", []*testConfig{{Timeout: 0}, {Timeout: 0}, {Timeout: 0}}, func(c *testConfig) int32 { return c.Timeout }, 0},
+		{"nil层跳过", []*testConfig{{Timeout: 30}, nil, nil}, func(c *testConfig) int32 { return c.Timeout }, 30},
+		{"空layers返回零值", []*testConfig{}, func(c *testConfig) int32 { return c.Timeout }, 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := MergeLayeredScalar(tt.layers, tt.getter)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestMergeLayeredScalarFloat64(t *testing.T) {
+	tests := []struct {
+		name   string
+		layers []*testConfig
+		want   float64
+	}{
+		{"agent覆盖", []*testConfig{{Ratio: 0.5}, {Ratio: 0.8}, {Ratio: 0.9}}, 0.9},
+		{"agent为零取owner", []*testConfig{{Ratio: 0.5}, {Ratio: 0.8}, {Ratio: 0}}, 0.8},
+		{"全为零", []*testConfig{{Ratio: 0}, {Ratio: 0}, {Ratio: 0}}, 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := MergeLayeredScalar(tt.layers, func(c *testConfig) float64 { return c.Ratio })
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

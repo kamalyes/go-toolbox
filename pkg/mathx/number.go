@@ -204,3 +204,27 @@ func SafeGetIndexOrDefaultNoSpace(slice []string, index int, defaultVal string) 
 	val := SafeGetIndexOrDefault(slice, index, defaultVal)
 	return stringx.ReplaceAll(val, " ", "")
 }
+
+// MergeLayeredScalar 多层级标量字段合并，从高优先级层取第一个非零值
+//
+// 参数：
+//   - layers: 配置层级切片，从低到高优先级（越靠后优先级越高）
+//   - fieldGetter: 从配置对象中提取标量值的函数
+//
+// 返回：第一个非零值，若全为零值则返回零值
+//
+// 示例：
+//
+//	timeout := MergeLayeredScalar(layers, func(c *Config) int32 { return c.Timeout })
+//	ratio := MergeLayeredScalar(layers, func(c *Config) float64 { return c.Ratio })
+func MergeLayeredScalar[T any, V types.Numerical](layers []*T, fieldGetter func(*T) V) V {
+	var zero V
+	for i := len(layers) - 1; i >= 0; i-- {
+		if layers[i] != nil {
+			if v := fieldGetter(layers[i]); v != zero {
+				return v
+			}
+		}
+	}
+	return zero
+}
