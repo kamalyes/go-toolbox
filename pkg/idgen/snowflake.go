@@ -39,26 +39,26 @@ func NewSnowflakeGenerator(workerID, datacenter int64) *SnowflakeGenerator {
 
 // GenerateTraceID 生成跟踪ID
 func (g *SnowflakeGenerator) GenerateTraceID() string {
-	return fmt.Sprintf("%d", g.generateSnowflake())
+	return fmt.Sprintf("%d", g.Generate())
 }
 
 // GenerateSpanID 生成跨度ID
 func (g *SnowflakeGenerator) GenerateSpanID() string {
-	return fmt.Sprintf("%d", g.generateSnowflake())
+	return fmt.Sprintf("%d", g.Generate())
 }
 
 // GenerateRequestID 生成请求ID
 func (g *SnowflakeGenerator) GenerateRequestID() string {
-	return fmt.Sprintf("%d", g.generateSnowflake())
+	return fmt.Sprintf("%d", g.Generate())
 }
 
 // GenerateCorrelationID 生成关联ID
 func (g *SnowflakeGenerator) GenerateCorrelationID() string {
-	return fmt.Sprintf("%d", g.generateSnowflake())
+	return fmt.Sprintf("%d", g.Generate())
 }
 
-// generateSnowflake 生成 Snowflake ID
-func (g *SnowflakeGenerator) generateSnowflake() int64 {
+// Generate 生成 Snowflake ID
+func (g *SnowflakeGenerator) Generate() int64 {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 

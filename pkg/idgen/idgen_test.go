@@ -12,10 +12,11 @@
 package idgen
 
 import (
-	"github.com/kamalyes/go-toolbox/pkg/assert"
 	"regexp"
 	"sync"
 	"testing"
+
+	"github.com/kamalyes/go-toolbox/pkg/assert"
 )
 
 // TestDefaultIDGenerator 测试默认 Hex 生成器
@@ -150,7 +151,7 @@ func TestSnowflakeGenerator(t *testing.T) {
 	t.Run("Monotonic", func(t *testing.T) {
 		var lastID int64
 		for i := 0; i < 100; i++ {
-			id := gen.generateSnowflake()
+			id := gen.Generate()
 			assert.True(id > lastID, "Snowflake ID 应单调递增")
 			lastID = id
 		}
