@@ -11,6 +11,8 @@
 package httpx
 
 import (
+	"bytes"
+	"io"
 	"net/http"
 	"reflect"
 
@@ -53,26 +55,85 @@ func WithParamNotEmpty(key, value string) func(map[string]string) {
 	}
 }
 
-// GetUserID 从 HTTP 请求中获取用户ID
-// 优先从上下文获取，然后从请求头获取
-// contextKey: 上下文中存储用户ID的键
-// headerKey: 请求头中存储用户ID的键
-func GetUserID(r *http.Request, contextKey interface{}, headerKey string) string {
+// GetRequestValue 从 HTTP 请求中获取指定值
+//
+// 查找顺序：
+// 1. 优先从上下文（Context）获取
+// 2. 然后从请求头（Header）获取
+// 3. 最后从查询参数（Query）获取
+//
+// 参数：
+//   - r: HTTP 请求对象
+//   - contextKey: 上下文中存储的键（可为 nil）
+//   - headerName: 请求头中的字段名
+//   - queryName: 查询参数中的字段名
+//
+// 返回：找到的值，未找到则返回空字符串
+func GetRequestValue(r *http.Request, contextKey interface{}, headerName, queryName string) string {
 	// 优先从上下文获取
 	if contextKey != nil {
-		if userID := r.Context().Value(contextKey); userID != nil {
-			if uid, ok := userID.(string); ok {
-				return uid
+		if value := r.Context().Value(contextKey); value != nil {
+			if val, ok := value.(string); ok {
+				return val
 			}
 		}
 	}
+	return GetValueFromHeaderOrQuery(r, headerName, queryName)
+}
 
-	// 从请求头获取
-	if headerKey != "" {
-		if userID := r.Header.Get(headerKey); userID != "" {
-			return userID
-		}
+// GetValueFromHeaderOrQuery 从请求头或查询参数中获取值
+//
+// 查找顺序：
+// 1. 优先从请求头（Header）获取
+// 2. 然后从查询参数（Query）获取
+//
+// 常用于获取签名、时间戳、Nonce 等可能在 Header 或 Query 中的参数
+//
+// 参数：
+//   - r: HTTP 请求对象
+//   - headerName: 请求头中的字段名
+//   - queryName: 查询参数中的字段名
+//
+// 返回：找到的值，未找到则返回空字符串
+func GetValueFromHeaderOrQuery(r *http.Request, headerName, queryName string) string {
+	// 优先从请求头获取
+	if value := r.Header.Get(headerName); value != "" {
+		return value
+	}
+
+	// 从查询参数获取
+	if value := r.URL.Query().Get(queryName); value != "" {
+		return value
 	}
 
 	return ""
+}
+
+// ReadRequestBody 读取 HTTP 请求体（支持重复读取）
+//
+// 读取后会重新设置请求体，使其可以被后续处理器再次读取
+// 这对于需要多次访问请求体的中间件（如签名验证、日志记录）非常有用
+//
+// 参数：
+//   - r: HTTP 请求对象
+//
+// 返回：
+//   - 请求体内容（字节数组）
+//   - 读取错误（如果有）
+//
+// 注意：如果请求体为 nil，返回 (nil, nil)
+func ReadRequestBody(r *http.Request) ([]byte, error) {
+	if r.Body == nil {
+		return nil, nil
+	}
+
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// 重新设置请求体，使其可以被后续处理器再次读取
+	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+	return bodyBytes, nil
 }
