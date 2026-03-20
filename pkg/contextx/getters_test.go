@@ -572,7 +572,7 @@ func TestGetTime(t *testing.T) {
 // TestGetValue 测试从标准 context.Context 获取值
 func TestGetValue(t *testing.T) {
 	t.Run("nil context", func(t *testing.T) {
-		result := GetValue[string](nil, "key")
+		result := GetValue[string](context.TODO(), "key")
 		assert.Equal(t, "", result)
 	})
 
@@ -743,6 +743,48 @@ func TestGetValueEdgeCases(t *testing.T) {
 		assert.NotNil(t, result)
 		assert.Len(t, result, 0)
 	})
+}
+func TestWithValue(t *testing.T) {
+	type ctxKey string
+
+	tests := map[string]struct {
+		ctx    context.Context
+		key    any
+		value  any
+		assert func(t *testing.T, ctx context.Context, key any)
+	}{
+		"nil context uses background": {
+			ctx:   nil,
+			key:   "key",
+			value: "value",
+			assert: func(t *testing.T, ctx context.Context, key any) {
+				assert.Equal(t, "value", GetValue[string](ctx, key))
+			},
+		},
+		"string key": {
+			ctx:   context.Background(),
+			key:   "trace_id",
+			value: "trace-123",
+			assert: func(t *testing.T, ctx context.Context, key any) {
+				assert.Equal(t, "trace-123", GetValue[string](ctx, key))
+			},
+		},
+		"typed key": {
+			ctx:   context.Background(),
+			key:   ctxKey("user_id"),
+			value: "user-123",
+			assert: func(t *testing.T, ctx context.Context, key any) {
+				assert.Equal(t, "user-123", ctx.Value(key))
+			},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctx := WithValue(tt.ctx, tt.key, tt.value)
+			tt.assert(t, ctx, tt.key)
+		})
+	}
 }
 
 // BenchmarkGetValue 性能测试

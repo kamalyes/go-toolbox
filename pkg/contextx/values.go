@@ -11,6 +11,7 @@
 package contextx
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 
@@ -60,6 +61,19 @@ func (c *Context) Value(key interface{}) interface{} {
 		}
 		return c.Context.Value(key)
 	})
+}
+
+// WithValue 为标准 context.Context 设置值
+func WithValue(ctx context.Context, key, value interface{}) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	if err := validateKey(key); err != nil {
+		return ctx
+	}
+
+	return context.WithValue(ctx, key, value)
 }
 
 // WithByteSlice 处理字节切片的存储，支持链式调用

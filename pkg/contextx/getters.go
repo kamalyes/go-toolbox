@@ -154,7 +154,7 @@ func Get[T any](c *Context, key interface{}) T {
 //	ctx := context.WithValue(context.Background(), "key", "value")
 //	str := GetValue[string](ctx, "key")  // "value"
 //	num := GetValue[int](ctx, "count")   // 0 (类型不匹配返回零值)
-func GetValue[T any](ctx context.Context, key string) T {
+func GetValue[T any](ctx context.Context, key any) T {
 	var zero T
 	if ctx == nil {
 		return zero
