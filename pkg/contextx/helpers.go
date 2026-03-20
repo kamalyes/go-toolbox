@@ -84,6 +84,17 @@ func OrBackground(ctx context.Context) context.Context {
 	}
 }
 
+// OrWithoutCancel 返回一个忽略父 context 取消信号的新 context
+// 会保留父 context 的 Value，但不会继承父 context 的 Done 和 Deadline
+// 调用方不应传入 nil；如果传入 nil，会回退到 context.Background() 作为防御性兜底
+func OrWithoutCancel(ctx context.Context) context.Context {
+	if ctx == nil {
+		return context.Background()
+	}
+
+	return context.WithoutCancel(ctx)
+}
+
 // WithTimeoutFrom 在指定的父context基础上创建带超时的context并执行函数
 // 自动处理 cancel 调用,并监听 context 超时
 //
@@ -119,6 +130,29 @@ func WithTimeoutFrom(parent context.Context, timeout time.Duration, fn func(cont
 //	})
 func WithTimeoutOrBackground(parent context.Context, timeout time.Duration, fn func(context.Context) error) error {
 	return WithTimeoutFrom(OrBackground(parent), timeout, fn)
+}
+
+// NewDetachedTimeout 在忽略父 context 取消信号的基础上创建带超时的 context
+// 会保留父 context 的 Value，但不会继承父 context 的 Done 和 Deadline
+//
+// 使用示例:
+//
+//	ctx, cancel := contextx.NewDetachedTimeout(parentCtx, 5*time.Second)
+//	defer cancel()
+func NewDetachedTimeout(parent context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(OrWithoutCancel(parent), timeout)
+}
+
+// WithDetachedTimeout 在忽略父 context 取消信号的基础上创建带超时的 context 并执行函数
+// 会保留父 context 的 Value，但不会继承父 context 的 Done 和 Deadline
+//
+// 使用示例:
+//
+//	err := contextx.WithDetachedTimeout(h.ctx, 2*time.Second, func(ctx context.Context) error {
+//	    return repo.SaveData(ctx, data)
+//	})
+func WithDetachedTimeout(parent context.Context, timeout time.Duration, fn func(context.Context) error) error {
+	return WithTimeoutFrom(OrWithoutCancel(parent), timeout, fn)
 }
 
 // WithTimeoutDecorators 创建带超时的标准 context 并应用装饰器

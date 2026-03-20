@@ -228,6 +228,40 @@ func TestOrBackground_WithValidContext(t *testing.T) {
 	assert.Equal(t, ctx, result)
 }
 
+// TestOrWithoutCancel_PreserveValues 测试保留父 context 的 Value
+func TestOrWithoutCancel_PreserveValues(t *testing.T) {
+	type ctxKey string
+
+	parent := context.WithValue(context.Background(), ctxKey("trace_id"), TestStringValue)
+	result := OrWithoutCancel(parent)
+
+	assert.Equal(t, TestStringValue, result.Value(ctxKey("trace_id")))
+}
+
+// TestOrWithoutCancel_WithTODOContext 测试使用 TODO context 时的行为
+func TestOrWithoutCancel_WithTODOContext(t *testing.T) {
+	result := OrWithoutCancel(context.TODO())
+	assert.NotNil(t, result)
+}
+
+// TestOrWithoutCancel_IgnoreCancelAndDeadline 测试忽略父 context 的取消和超时
+func TestOrWithoutCancel_IgnoreCancelAndDeadline(t *testing.T) {
+	parent, cancel := context.WithTimeout(context.Background(), TestTimeout100ms)
+	defer cancel()
+
+	result := OrWithoutCancel(parent)
+	cancel()
+
+	select {
+	case <-result.Done():
+		t.Fatal("detached context should not be cancelled by parent")
+	default:
+	}
+
+	_, ok := result.Deadline()
+	assert.False(t, ok)
+}
+
 // TestWithTimeoutFrom_Success 测试从父context创建超时context
 func TestWithTimeoutFrom_Success(t *testing.T) {
 	parent := context.Background()
@@ -277,6 +311,62 @@ func TestWithTimeoutOrBackground_WithValidParent(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.True(t, executed)
+}
+
+// TestNewDetachedTimeout_PreserveValueAndTimeout 测试 detached timeout context 保留值并创建新的 deadline
+func TestNewDetachedTimeout_PreserveValueAndTimeout(t *testing.T) {
+	type ctxKey string
+
+	parent := context.WithValue(context.Background(), ctxKey("user_id"), TestStringValue)
+	ctx, cancel := NewDetachedTimeout(parent, TestTimeout1s)
+	defer cancel()
+
+	assert.Equal(t, TestStringValue, ctx.Value(ctxKey("user_id")))
+
+	deadline, ok := ctx.Deadline()
+	assert.True(t, ok)
+	assert.WithinDuration(t, time.Now().Add(TestTimeout1s), deadline, TestTimeoutMargin)
+}
+
+// TestNewDetachedTimeout_IgnoreParentCancel 测试 detached timeout context 不受父 context 取消影响
+func TestNewDetachedTimeout_IgnoreParentCancel(t *testing.T) {
+	parent, cancelParent := context.WithCancel(context.Background())
+	ctx, cancel := NewDetachedTimeout(parent, TestTimeout1s)
+	defer cancel()
+
+	cancelParent()
+
+	select {
+	case <-ctx.Done():
+		t.Fatal("detached timeout context should not be cancelled by parent")
+	default:
+	}
+}
+
+// TestWithDetachedTimeout_WithCancelledParent 测试父 context 已取消时仍可执行
+func TestWithDetachedTimeout_WithCancelledParent(t *testing.T) {
+	parent, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	executed := false
+	err := WithDetachedTimeout(parent, TestTimeout1s, func(ctx context.Context) error {
+		executed = true
+		return nil
+	})
+
+	assert.NoError(t, err)
+	assert.True(t, executed)
+}
+
+// TestWithDetachedTimeout_Timeout 测试 detached timeout 正常超时
+func TestWithDetachedTimeout_Timeout(t *testing.T) {
+	err := WithDetachedTimeout(context.Background(), TestTimeout100ms, func(ctx context.Context) error {
+		<-ctx.Done()
+		return ctx.Err()
+	})
+
+	assert.Error(t, err)
+	assert.Equal(t, context.DeadlineExceeded, err)
 }
 
 // TestWithTimeoutDecorators_Success 测试成功创建带超时的context
