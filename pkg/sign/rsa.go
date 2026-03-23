@@ -29,7 +29,7 @@ var (
 	ErrPublicKey          = errors.New("公钥解析错误")
 	ErrEncryptFail        = errors.New("加密失败")
 	ErrDecryptFail        = errors.New("解密失败")
-	ErrPemBlockTypeFail   = errors.New("PEM Block 类型不是PUBLIC KEY")
+	ErrPemBlockTypeFail   = errors.New("PEM Block 类型不是 PUBLIC KEY 或 RSA PUBLIC KEY")
 	ErrNotRsaPrivateKey   = errors.New("不是RSA Private密钥")
 	ErrNotRsaPublicKeyKey = errors.New("不是RSA Public密钥")
 	ErrSaltEmpty          = errors.New("盐值不能为空") // 新增盐值为空的错误
@@ -37,8 +37,10 @@ var (
 
 // PEM类型常量
 const (
-	PrivateKeyType = "PRIVATE KEY"
-	PublicKeyType  = "PUBLIC KEY"
+	PrivateKeyType    = "PRIVATE KEY"     // PKCS#8（推荐）
+	RSAPrivateKeyType = "RSA PRIVATE KEY" // PKCS#1（兼容历史）
+	PublicKeyType     = "PUBLIC KEY"      // PKIX（推荐）
+	RSAPublicKeyType  = "RSA PUBLIC KEY"  // PKCS#1（兼容历史）
 )
 
 // RsaKeySize 定义了支持的RSA密钥大小
@@ -97,7 +99,10 @@ func GenerateRsaKeyPair(keySize RsaKeySize) (*RsaKeyPair, error) {
 
 // ExportRsaPrivateKeyToPEM 将 RSA 私钥导出为 PEM 格式
 func ExportRsaPrivateKeyToPEM(privateKey *rsa.PrivateKey) (string, error) {
-	privBytes := x509.MarshalPKCS1PrivateKey(privateKey)
+	privBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	if err != nil {
+		return "", errorx.WrapError("导出私钥失败", err)
+	}
 	return encodePEM(PrivateKeyType, privBytes), nil
 }
 
@@ -204,12 +209,21 @@ func ParsePrivateKey(content []byte) (*rsa.PrivateKey, error) {
 		return nil, ErrPrivateKey
 	}
 
-	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
-	if err != nil {
-		return nil, errorx.WrapError("解析私钥失败", err)
+	privateKeyAny, pkcs8Err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if pkcs8Err == nil {
+		privateKey, ok := privateKeyAny.(*rsa.PrivateKey)
+		if !ok {
+			return nil, ErrNotRsaPrivateKey
+		}
+		return privateKey, nil
 	}
 
-	return privateKey, nil
+	privateKey, pkcs1Err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if pkcs1Err == nil {
+		return privateKey, nil
+	}
+
+	return nil, errorx.WrapError("解析私钥失败", errors.Join(pkcs8Err, pkcs1Err))
 }
 
 // NewRsaCryptoFromPublicPEM 从 PEM 格式的公钥创建 RSA 加解密器
@@ -229,19 +243,23 @@ func ParsePublicKey(pemData []byte) (*rsa.PublicKey, error) {
 		return nil, ErrPublicKey
 	}
 
-	if block.Type != PublicKeyType {
+	if block.Type != PublicKeyType && block.Type != RSAPublicKeyType {
 		return nil, ErrPemBlockTypeFail
 	}
 
-	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
-	if err != nil {
-		return nil, errorx.WrapError("解析公钥失败", err)
+	pub, pkixErr := x509.ParsePKIXPublicKey(block.Bytes)
+	if pkixErr == nil {
+		rsaPub, ok := pub.(*rsa.PublicKey)
+		if !ok {
+			return nil, ErrNotRsaPublicKeyKey
+		}
+		return rsaPub, nil
 	}
 
-	rsaPub, ok := pub.(*rsa.PublicKey)
-	if !ok {
-		return nil, ErrNotRsaPublicKeyKey
+	rsaPub, pkcs1Err := x509.ParsePKCS1PublicKey(block.Bytes)
+	if pkcs1Err == nil {
+		return rsaPub, nil
 	}
 
-	return rsaPub, nil
+	return nil, errorx.WrapError("解析公钥失败", errors.Join(pkixErr, pkcs1Err))
 }

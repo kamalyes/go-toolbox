@@ -11,9 +11,11 @@
 package sign
 
 import (
+	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
 	"errors"
@@ -33,15 +35,41 @@ func generateAndAssertRsaKeyPair(size RsaKeySize, t *testing.T) *RsaKeyPair {
 	return keyPair
 }
 
+func decodeAndAssertPEMBlock(pemData string, t *testing.T) *pem.Block {
+	block, _ := pem.Decode([]byte(pemData))
+	if block == nil {
+		t.Fatalf("无法解析 PEM 块")
+	}
+	return block
+}
+
+func encodeLegacyPrivateKeyPEM(privateKey *rsa.PrivateKey, blockType string) string {
+	return encodePEM(blockType, x509.MarshalPKCS1PrivateKey(privateKey))
+}
+
+func encodeLegacyPublicKeyPEM(publicKey *rsa.PublicKey, blockType string) string {
+	return encodePEM(blockType, x509.MarshalPKCS1PublicKey(publicKey))
+}
+
+func assertSamePrivateKey(expected, actual *rsa.PrivateKey, t *testing.T) {
+	assert.Equal(t, x509.MarshalPKCS1PrivateKey(expected), x509.MarshalPKCS1PrivateKey(actual), "私钥内容应一致")
+}
+
+func assertSamePublicKey(expected, actual *rsa.PublicKey, t *testing.T) {
+	assert.Equal(t, x509.MarshalPKCS1PublicKey(expected), x509.MarshalPKCS1PublicKey(actual), "公钥内容应一致")
+}
+
 // 辅助函数：导出 RSA 密钥到 PEM 格式并进行有效性断言
 func exportAndAssertRsaKeysToPEM(keyPair *RsaKeyPair, t *testing.T) {
 	privPEM, err := ExportRsaPrivateKeyToPEM(keyPair.PrivateKey)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, privPEM, "导出的私钥 PEM 不应为空")
+	assert.Equal(t, PrivateKeyType, decodeAndAssertPEMBlock(privPEM, t).Type, "默认导出的私钥应为 PKCS#8 PRIVATE KEY")
 
 	pubPEM, err := ExportRsaPublicKeyToPEM(keyPair.PublicKey)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, pubPEM, "导出的公钥 PEM 不应为空")
+	assert.Equal(t, PublicKeyType, decodeAndAssertPEMBlock(pubPEM, t).Type, "默认导出的公钥应为 PKIX PUBLIC KEY")
 }
 
 // 辅助函数：测试 RSA 加密和解密功能，使用不同的哈希函数
@@ -213,7 +241,7 @@ func isValidPEM(pemData string) error {
 	if block == nil {
 		return errors.New("无法解析 PEM 块")
 	}
-	if block.Type != "PUBLIC KEY" {
+	if block.Type != PublicKeyType {
 		return errors.New("PEM 块类型不正确")
 	}
 	return nil
@@ -223,42 +251,75 @@ func isValidPEM(pemData string) error {
 func TestParsePublicKey(t *testing.T) {
 	keyPair := generateAndAssertRsaKeyPair(RsaKeySize2048, t)
 
-	pubPEM, err := ExportRsaPublicKeyToPEM(keyPair.PublicKey)
-	assert.NoError(t, err)
+	t.Run("recommended pkix public key", func(t *testing.T) {
+		pubPEM, err := ExportRsaPublicKeyToPEM(keyPair.PublicKey)
+		assert.NoError(t, err)
 
-	// 输出 PEM 格式公钥，便于调试
-	t.Logf("公钥 PEM:\n%s", pubPEM)
+		block := decodeAndAssertPEMBlock(pubPEM, t)
+		assert.Equal(t, PublicKeyType, block.Type, "导出的公钥应使用 PKIX PUBLIC KEY")
 
-	publicKey, err := ParsePublicKey([]byte(pubPEM))
-	if err != nil {
-		t.Fatalf("公钥解析错误: %v", err) // 输出详细错误信息
-	}
-	assert.NotNil(t, publicKey, "解析后的公钥应不为 nil")
+		publicKey, err := ParsePublicKey([]byte(pubPEM))
+		assert.NoError(t, err)
+		assert.NotNil(t, publicKey, "解析后的公钥应不为 nil")
+		assertSamePublicKey(keyPair.PublicKey, publicKey, t)
 
-	// 校验生成的公钥和解析的公钥是否一致
-	// 重新编码解析后的公钥为 PEM 格式
-	reEncodedPEM, err := ExportRsaPublicKeyToPEM(publicKey)
-	assert.NoError(t, err)
+		reEncodedPEM, err := ExportRsaPublicKeyToPEM(publicKey)
+		assert.NoError(t, err)
+		assert.Equal(t, pubPEM, reEncodedPEM, "推荐格式公钥应可稳定往返")
+	})
 
-	// 比较原始 PEM 和重新编码的 PEM 是否一致
-	assert.Equal(t, pubPEM, reEncodedPEM, "原始公钥 PEM 和重新编码的公钥 PEM 应该一致")
+	t.Run("legacy pkcs1 rsa public key", func(t *testing.T) {
+		legacyPEM := encodeLegacyPublicKeyPEM(keyPair.PublicKey, RSAPublicKeyType)
+
+		publicKey, err := ParsePublicKey([]byte(legacyPEM))
+		assert.NoError(t, err)
+		assert.NotNil(t, publicKey, "兼容解析后的公钥应不为 nil")
+		assertSamePublicKey(keyPair.PublicKey, publicKey, t)
+	})
 }
 
 // 测试解析 PEM 格式私钥
 func TestParsePrivateKey(t *testing.T) {
 	keyPair := generateAndAssertRsaKeyPair(RsaKeySize2048, t)
 
-	privPEM, err := ExportRsaPrivateKeyToPEM(keyPair.PrivateKey)
-	assert.NoError(t, err)
+	t.Run("recommended pkcs8 private key", func(t *testing.T) {
+		privPEM, err := ExportRsaPrivateKeyToPEM(keyPair.PrivateKey)
+		assert.NoError(t, err)
 
-	privateKey, err := ParsePrivateKey([]byte(privPEM))
-	assert.NoError(t, err)
-	assert.NotNil(t, privateKey, "解析后的私钥应不为 nil")
-	// 校验生成的私钥和解析的私钥是否一致
-	// 重新编码解析后的私钥为 PEM 格式
-	reEncodedPEM, err := ExportRsaPrivateKeyToPEM(privateKey)
-	assert.NoError(t, err)
+		block := decodeAndAssertPEMBlock(privPEM, t)
+		assert.Equal(t, PrivateKeyType, block.Type, "导出的私钥应使用 PKCS#8 PRIVATE KEY")
 
-	// 比较原始 PEM 和重新编码的 PEM 是否一致
-	assert.Equal(t, privPEM, reEncodedPEM, "原始私钥 PEM 和重新编码的私钥 PEM 应该一致")
+		privateKeyAny, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+		assert.NoError(t, err, "导出的私钥应可被标准库按 PKCS#8 解析")
+		privateKeyFromPKCS8, ok := privateKeyAny.(*rsa.PrivateKey)
+		assert.True(t, ok, "PKCS#8 私钥应为 RSA 类型")
+		assertSamePrivateKey(keyPair.PrivateKey, privateKeyFromPKCS8, t)
+
+		privateKey, err := ParsePrivateKey([]byte(privPEM))
+		assert.NoError(t, err)
+		assert.NotNil(t, privateKey, "解析后的私钥应不为 nil")
+		assertSamePrivateKey(keyPair.PrivateKey, privateKey, t)
+
+		reEncodedPEM, err := ExportRsaPrivateKeyToPEM(privateKey)
+		assert.NoError(t, err)
+		assert.Equal(t, privPEM, reEncodedPEM, "推荐格式私钥应可稳定往返")
+	})
+
+	t.Run("legacy pkcs1 rsa private key", func(t *testing.T) {
+		legacyPEM := encodeLegacyPrivateKeyPEM(keyPair.PrivateKey, RSAPrivateKeyType)
+
+		privateKey, err := ParsePrivateKey([]byte(legacyPEM))
+		assert.NoError(t, err)
+		assert.NotNil(t, privateKey, "兼容解析后的私钥应不为 nil")
+		assertSamePrivateKey(keyPair.PrivateKey, privateKey, t)
+	})
+
+	t.Run("legacy pkcs1 bytes with private key header", func(t *testing.T) {
+		legacyPEM := encodeLegacyPrivateKeyPEM(keyPair.PrivateKey, PrivateKeyType)
+
+		privateKey, err := ParsePrivateKey([]byte(legacyPEM))
+		assert.NoError(t, err)
+		assert.NotNil(t, privateKey, "历史遗留 PRIVATE KEY 头的 PKCS#1 私钥也应兼容")
+		assertSamePrivateKey(keyPair.PrivateKey, privateKey, t)
+	})
 }
