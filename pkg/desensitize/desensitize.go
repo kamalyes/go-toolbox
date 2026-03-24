@@ -13,6 +13,7 @@ package desensitize
 
 import (
 	"reflect"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/kamalyes/go-toolbox/pkg/stringx"
@@ -55,6 +56,8 @@ func Desensitize(str string, DesensitizeType DesensitizeType, options ...Desensi
 		newStr = SensitizeIpv4(str)
 	case IPV6:
 		newStr = SensitizeIpv6(str)
+	case PEMKey:
+		newStr = SensitizePEMKey(str, opt.PEMBodyPrefixVisibleLen, opt.PEMBodySuffixVisibleLen)
 	default:
 		newStr = str
 	}
@@ -160,4 +163,48 @@ func SensitizeIpv6(str string) string {
 	}
 	newIP := stringx.SubBefore(str, ":", false)
 	return newIP + ":*:*:*:*:*:*:*"
+}
+
+// PEM 密钥脱敏
+func SensitizePEMKey(str string, prefixVisibleLen, suffixVisibleLen int) string {
+	if validator.IsEmptyValue(reflect.ValueOf(str)) {
+		return str
+	}
+
+	normalized := strings.TrimSpace(strings.ReplaceAll(str, "\r\n", "\n"))
+	if normalized == "" {
+		return str
+	}
+
+	lines := strings.Split(normalized, "\n")
+	if len(lines) < 3 || !strings.HasPrefix(lines[0], "-----BEGIN ") || !strings.HasPrefix(lines[len(lines)-1], "-----END ") {
+		return sensitizeSecretSegment(normalized, prefixVisibleLen, suffixVisibleLen)
+	}
+
+	body := strings.Join(lines[1:len(lines)-1], "")
+	return strings.Join([]string{
+		lines[0],
+		sensitizeSecretSegment(body, prefixVisibleLen, suffixVisibleLen),
+		lines[len(lines)-1],
+	}, "\n")
+}
+
+func sensitizeSecretSegment(secret string, prefixVisibleLen, suffixVisibleLen int) string {
+	charCount := utf8.RuneCountInString(secret)
+	if charCount == 0 {
+		return secret
+	}
+
+	if prefixVisibleLen < 0 {
+		prefixVisibleLen = 0
+	}
+	if suffixVisibleLen < 0 {
+		suffixVisibleLen = 0
+	}
+
+	if prefixVisibleLen+suffixVisibleLen >= charCount {
+		return strings.Repeat("*", charCount)
+	}
+
+	return stringx.Hide(secret, prefixVisibleLen, charCount-suffixVisibleLen)
 }

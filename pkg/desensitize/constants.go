@@ -23,4 +23,5 @@ const (
 	BankCard                                   // 银行卡号
 	IPV4                                       // ipv4
 	IPV6                                       // ipv6
+	PEMKey                                     // PEM 密钥内容（私钥/证书等）
 )

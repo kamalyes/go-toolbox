@@ -11,6 +11,7 @@
 package desensitize
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -99,6 +100,20 @@ func TestDesensitizeAllTypes(t *testing.T) {
 			expected:        "2001:*:*:*:*:*:*:*",
 			desensitizeType: IPV6,
 		},
+		"TestPEMKey": {
+			input: strings.Join([]string{
+				"-----BEGIN PRIVATE KEY-----",
+				"1234567890abcdef1234567890abcdef12345678",
+				"-----END PRIVATE KEY-----",
+			}, "\r\n"),
+			expected: strings.Join([]string{
+				"-----BEGIN PRIVATE KEY-----",
+				"1234567890abcdef********90abcdef12345678",
+				"-----END PRIVATE KEY-----",
+			}, "\n"),
+			desensitizeType: PEMKey,
+			option:          desensitizeOptions,
+		},
 	}
 
 	for name, tc := range testCases {
@@ -130,4 +145,8 @@ func TestIPv4(t *testing.T) {
 func TestIPv6(t *testing.T) {
 	assert.Equal(t, "2001:*:*:*:*:*:*:*", SensitizeIpv6("2001:0db8:86a3:08d3:1319:8a2e:0370:7344"))
 	assert.Equal(t, "", SensitizeIpv6(""))
+}
+
+func TestSensitizePEMKey(t *testing.T) {
+	assert.Equal(t, strings.Repeat("*", len("short-secret")), SensitizePEMKey("short-secret", 16, 16))
 }

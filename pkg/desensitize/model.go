@@ -23,6 +23,8 @@ type DesensitizeOptions struct {
 	PhoneNumberEndIndex       int
 	MobilePhoneStartIndex     int
 	EmailStartIndex           int
+	PEMBodyPrefixVisibleLen   int
+	PEMBodySuffixVisibleLen   int
 }
 
 // NewDesensitizeOptions 创建带有默认值的 DesensitizeOptions
@@ -37,5 +39,7 @@ func NewDesensitizeOptions() DesensitizeOptions {
 		PhoneNumberEndIndex:       7,
 		MobilePhoneStartIndex:     3,
 		EmailStartIndex:           1,
+		PEMBodyPrefixVisibleLen:   16,
+		PEMBodySuffixVisibleLen:   16,
 	}
 }
