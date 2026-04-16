@@ -128,3 +128,13 @@ func ResetErrorMap() {
 		defaultErrorMap = make(ErrorMapType)       // 重置默认错误映射
 	})
 }
+
+// New 创建一个新的错误实例
+func New(message string) error {
+	return NewBaseError(message)
+}
+
+// Newf 创建一个新的错误实例
+func Newf(format string, args ...interface{}) error {
+	return NewBaseError(fmt.Sprintf(format, args...))
+}
