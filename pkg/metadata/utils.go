@@ -74,7 +74,7 @@ func ParseAcceptLanguage(acceptLang string) (language, region, fullTag string) {
 }
 
 // NormalizeLanguage 标准化语言代码
-// 例如: "zh-cn" -> "zh-CN", "zh_CN" -> "zh-CN", "EN" -> "en"
+// 例如: "zh-cn" -> "zh-CN", "zh_CN" -> "zh-CN", "EN" -> "en", "zh-hans-cn" -> "zh-Hans-CN"
 func NormalizeLanguage(lang string) string {
 	lang = strings.TrimSpace(lang)
 	if lang == "" {
@@ -84,15 +84,44 @@ func NormalizeLanguage(lang string) string {
 	// 替换下划线为连字符
 	lang = strings.ReplaceAll(lang, "_", "-")
 
-	// 处理常见的语言代码格式
+	// 处理语言代码格式
 	parts := strings.Split(lang, "-")
-	if len(parts) == 2 {
-		// 例如: zh-cn -> zh-CN, EN-us -> en-US
-		return strings.ToLower(parts[0]) + "-" + strings.ToUpper(parts[1])
+	switch len(parts) {
+	case 2:
+		// 检查第一部分是否为有效的语言代码（2-3个字母）
+		if len(parts[0]) >= 2 && len(parts[0]) <= 3 && isAllLetters(parts[0]) {
+			// 例如: zh-cn -> zh-CN, EN-us -> en-US
+			return strings.ToLower(parts[0]) + "-" + strings.ToUpper(parts[1])
+		}
+		// 非标准格式，不做处理
+		return lang
+	case 3:
+		// 检查第一部分是否为有效的语言代码
+		if len(parts[0]) >= 2 && len(parts[0]) <= 3 && isAllLetters(parts[0]) {
+			// 例如: zh-hans-cn -> zh-Hans-CN, en-us-va -> en-US-VA
+			// 脚本部分首字母大写，其余小写
+			script := parts[1]
+			if len(script) > 0 {
+				script = strings.ToUpper(script[:1]) + strings.ToLower(script[1:])
+			}
+			return strings.ToLower(parts[0]) + "-" + script + "-" + strings.ToUpper(parts[2])
+		}
+		// 非标准格式，不做处理
+		return lang
+	default:
+		// 单一语言代码，统一小写
+		return strings.ToLower(lang)
 	}
+}
 
-	// 单一语言代码，统一小写
-	return strings.ToLower(lang)
+// isAllLetters 检查字符串是否全部由字母组成
+func isAllLetters(s string) bool {
+	for _, c := range s {
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
+			return false
+		}
+	}
+	return true
 }
 
 // GetRemoteIP 从 RemoteAddr 中提取 IP 地址（去除端口）

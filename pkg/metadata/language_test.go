@@ -32,6 +32,9 @@ func TestNormalizeLanguage(t *testing.T) {
 		{"复杂格式", "zh_cn", "zh-CN"},
 		{"带空格", " en-US ", "en-US"},
 		{"空字符串", "", ""},
+		{"带脚本", "zh-hans-cn", "zh-Hans-CN"},
+		{"带脚本大写", "ZH-HANS-CN", "zh-Hans-CN"},
+		{"带脚本下划线", "zh_hans_cn", "zh-Hans-CN"},
 	}
 
 	for _, tt := range tests {
