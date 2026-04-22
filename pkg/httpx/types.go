@@ -25,6 +25,8 @@ const (
 	ContentTypeTextPlain                    = "text/plain"                        // 纯文本格式
 	ContentTypeTextPlainCharacterUTF8       = "text/plain; charset=utf-8"         // UTF-8 编码的纯文本
 	ContentTypeApplicationJSON              = "application/json"                  // JSON 格式
+	ContentTypeApplicationXNDJSON           = "application/x-ndjson"              // NDJSON 格式
+	ContentTypeApplicationXSnappyFramed     = "application/x-snappy-framed"       // Snappy 压缩格式的 JSON
 	ContentTypeApplicationJSONCharacterUTF8 = "application/json; charset=utf-8"   // UTF-8 编码的 JSON
 	ContentTypeApplicationXML               = "application/xml"                   // XML 格式
 	ContentTypeApplicationXMLCharacterUTF8  = "application/xml; charset=utf-8"    // UTF-8 编码的 XML
