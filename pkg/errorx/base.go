@@ -26,6 +26,14 @@ func WrapError(message string, err ...error) error {
 	return fmt.Errorf("%s: %w", message, err[0])
 }
 
+// NewTypedError 创建统一的类型化错误，支持模板格式化文案
+func NewTypedError(errType ErrorType, msg string, args ...interface{}) error {
+	if len(args) > 0 {
+		msg = fmt.Sprintf(msg, args...)
+	}
+	return NewBaseError(msg, errType)
+}
+
 // 定义 BaseError 结构体
 type BaseError struct {
 	Msg  string
