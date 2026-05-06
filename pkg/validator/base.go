@@ -18,6 +18,7 @@ import (
 	"unicode"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 // isEmptyValue checks if a reflect.Value is empty.
@@ -60,6 +61,11 @@ func IsEmptyPointer(v reflect.Value) bool {
 
 	// 检查特殊类型
 	if isEmpty, ok := CheckEmptyTimePointer(v); ok {
+		return isEmpty
+	}
+
+	// 检查 protobuf wrapper 类型
+	if isEmpty, ok := CheckEmptyWrapperPointer(v); ok {
 		return isEmpty
 	}
 
@@ -108,24 +114,74 @@ func CheckEmptyTimePointer(v reflect.Value) (isEmpty bool, handled bool) {
 	return false, false
 }
 
+// CheckEmptyWrapperPointer 检查 protobuf wrapper 类型是否为空
+func CheckEmptyWrapperPointer(v reflect.Value) (isEmpty bool, handled bool) {
+	if !v.CanInterface() {
+		return false, false
+	}
+
+	// 使用类型断言直接判断
+	switch val := v.Interface().(type) {
+	case *wrapperspb.StringValue:
+		// StringValue: nil 或空字符串（包括空白字符）视为空
+		if val == nil {
+			return true, true
+		}
+		str := strings.TrimSpace(val.Value)
+		return str == "" || IsUndefined(str) || IsNull(str), true
+
+	case *wrapperspb.Int32Value:
+		// Int32Value: nil 视为空，0 是有效值
+		return val == nil, true
+
+	case *wrapperspb.Int64Value:
+		// Int64Value: nil 视为空，0 是有效值
+		return val == nil, true
+
+	case *wrapperspb.UInt32Value:
+		// UInt32Value: nil 视为空，0 是有效值
+		return val == nil, true
+
+	case *wrapperspb.UInt64Value:
+		// UInt64Value: nil 视为空，0 是有效值
+		return val == nil, true
+
+	case *wrapperspb.BoolValue:
+		// BoolValue: nil 视为空，false 是有效值
+		return val == nil, true
+
+	case *wrapperspb.FloatValue:
+		// FloatValue: nil 视为空，0.0 是有效值
+		return val == nil, true
+
+	case *wrapperspb.DoubleValue:
+		// DoubleValue: nil 视为空，0.0 是有效值
+		return val == nil, true
+
+	case *wrapperspb.BytesValue:
+		// BytesValue: nil 或空字节数组视为空
+		return val == nil || len(val.Value) == 0, true
+
+	default:
+		return false, false
+	}
+}
+
 // CheckEmptyTimeStruct 检查结构体类型的时间是否为空
 func CheckEmptyTimeStruct(v reflect.Value) (isEmpty bool, handled bool) {
 	if !v.CanInterface() {
 		return false, false
 	}
 
-	// 检查 time.Time
-	if t, ok := v.Interface().(time.Time); ok {
-		return IsTimeEmpty(&t), true
+	// 使用类型断言直接判断
+	switch val := v.Interface().(type) {
+	case time.Time:
+		return IsTimeEmpty(&val), true
+	case timestamppb.Timestamp:
+		return val.GetSeconds() <= 0, true
+	default:
+		return false, false
 	}
-
-	// 检查 protobuf Timestamp（避免复制锁）
-	typeName := v.Type().String()
-	if typeName == "timestamppb.Timestamp" {
-		return IsProtobufTimestampEmpty(v), true
-	}
-
-	return false, false
 }
 
 // IsTimeEmpty 检查 time.Time 是否为空

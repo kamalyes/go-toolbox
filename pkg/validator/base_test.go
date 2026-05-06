@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 type TestStruct struct {
@@ -723,4 +724,205 @@ func TestIsEmptyValue_WithUnexportedFields(t *testing.T) {
 			assert.Equal(t, test.expected, result)
 		})
 	}
+}
+
+// TestIsEmptyValue_StringValue 测试 StringValue wrapper
+func TestIsEmptyValue_StringValue(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    *wrapperspb.StringValue
+		expected bool
+	}{
+		{"nil StringValue", nil, true},
+		{"empty StringValue", wrapperspb.String(""), true},
+		{"non-empty StringValue", wrapperspb.String("test"), false},
+		{"whitespace StringValue", wrapperspb.String("  "), true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsEmptyValue(reflect.ValueOf(tt.value))
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestIsEmptyValue_Int32Value 测试 Int32Value wrapper
+func TestIsEmptyValue_Int32Value(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    *wrapperspb.Int32Value
+		expected bool
+	}{
+		{"nil Int32Value", nil, true},
+		{"zero Int32Value", wrapperspb.Int32(0), false}, // 0 是有效值
+		{"positive Int32Value", wrapperspb.Int32(42), false},
+		{"negative Int32Value", wrapperspb.Int32(-1), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsEmptyValue(reflect.ValueOf(tt.value))
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestIsEmptyValue_Int64Value 测试 Int64Value wrapper
+func TestIsEmptyValue_Int64Value(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    *wrapperspb.Int64Value
+		expected bool
+	}{
+		{"nil Int64Value", nil, true},
+		{"zero Int64Value", wrapperspb.Int64(0), false}, // 0 是有效值
+		{"positive Int64Value", wrapperspb.Int64(12345), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsEmptyValue(reflect.ValueOf(tt.value))
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestIsEmptyValue_BoolValue 测试 BoolValue wrapper
+func TestIsEmptyValue_BoolValue(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    *wrapperspb.BoolValue
+		expected bool
+	}{
+		{"nil BoolValue", nil, true},
+		{"false BoolValue", wrapperspb.Bool(false), false}, // false 是有效值
+		{"true BoolValue", wrapperspb.Bool(true), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsEmptyValue(reflect.ValueOf(tt.value))
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestIsEmptyValue_UInt32Value 测试 UInt32Value wrapper
+func TestIsEmptyValue_UInt32Value(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    *wrapperspb.UInt32Value
+		expected bool
+	}{
+		{"nil UInt32Value", nil, true},
+		{"zero UInt32Value", wrapperspb.UInt32(0), false}, // 0 是有效值
+		{"positive UInt32Value", wrapperspb.UInt32(100), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsEmptyValue(reflect.ValueOf(tt.value))
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestIsEmptyValue_FloatValue 测试 FloatValue wrapper
+func TestIsEmptyValue_FloatValue(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    *wrapperspb.FloatValue
+		expected bool
+	}{
+		{"nil FloatValue", nil, true},
+		{"zero FloatValue", wrapperspb.Float(0.0), false}, // 0.0 是有效值
+		{"positive FloatValue", wrapperspb.Float(3.14), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsEmptyValue(reflect.ValueOf(tt.value))
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestIsEmptyValue_DoubleValue 测试 DoubleValue wrapper
+func TestIsEmptyValue_DoubleValue(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    *wrapperspb.DoubleValue
+		expected bool
+	}{
+		{"nil DoubleValue", nil, true},
+		{"zero DoubleValue", wrapperspb.Double(0.0), false}, // 0.0 是有效值
+		{"positive DoubleValue", wrapperspb.Double(1234.5678), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsEmptyValue(reflect.ValueOf(tt.value))
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestIsEmptyValue_BytesValue 测试 BytesValue wrapper
+func TestIsEmptyValue_BytesValue(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    *wrapperspb.BytesValue
+		expected bool
+	}{
+		{"nil BytesValue", nil, true},
+		{"empty BytesValue", wrapperspb.Bytes([]byte{}), true},
+		{"non-empty BytesValue", wrapperspb.Bytes([]byte{1, 2, 3}), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsEmptyValue(reflect.ValueOf(tt.value))
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestCheckEmptyWrapperPointer 测试 CheckEmptyWrapperPointer 函数
+func TestCheckEmptyWrapperPointer(t *testing.T) {
+	t.Run("StringValue", func(t *testing.T) {
+		sv := wrapperspb.String("test")
+
+		isEmpty, handled := CheckEmptyWrapperPointer(reflect.ValueOf(sv))
+
+		assert.True(t, handled)
+		assert.False(t, isEmpty)
+	})
+
+	t.Run("nil StringValue", func(t *testing.T) {
+		var nilSV *wrapperspb.StringValue
+
+		isEmpty, handled := CheckEmptyWrapperPointer(reflect.ValueOf(nilSV))
+
+		assert.True(t, handled)
+		assert.True(t, isEmpty)
+	})
+
+	t.Run("Int32Value with 0", func(t *testing.T) {
+		iv := wrapperspb.Int32(0)
+
+		isEmpty, handled := CheckEmptyWrapperPointer(reflect.ValueOf(iv))
+
+		assert.True(t, handled)
+		assert.False(t, isEmpty)
+	})
+
+	t.Run("normal int pointer", func(t *testing.T) {
+		normalInt := 42
+
+		isEmpty, handled := CheckEmptyWrapperPointer(reflect.ValueOf(&normalInt))
+
+		assert.False(t, handled)
+		assert.False(t, isEmpty)
+	})
 }
