@@ -84,13 +84,22 @@ func ValidateTOTPCode(secret, code string, config *TOTPConfig) bool {
 		return false
 	}
 
-	now := time.Now().Unix()
-	timeStep := int64(config.Period)
+	// 去除验证码中的空格（Google Authenticator 显示格式如 "123 456"）
+	cleanCode := strings.ReplaceAll(strings.TrimSpace(code), " ", "")
+	if cleanCode == "" {
+		return false
+	}
 
+	period := int64(config.Period)
+	if period <= 0 {
+		period = int64(DefaultTOTPConfig().Period)
+	}
+
+	now := time.Now().Unix()
 	for offset := int64(-int64(config.Skew)); offset <= int64(config.Skew); offset++ {
-		counter := (now + offset*timeStep) / timeStep
+		counter := (now + offset*period) / period
 		expected := generateTOTPCode(key, counter, config.Digits)
-		if expected == code {
+		if expected == cleanCode {
 			return true
 		}
 	}
@@ -109,8 +118,13 @@ func GenerateTOTPCode(secret string, config *TOTPConfig) (string, error) {
 		return "", fmt.Errorf("invalid base32 secret: %w", err)
 	}
 
+	period := int64(config.Period)
+	if period <= 0 {
+		period = int64(DefaultTOTPConfig().Period)
+	}
+
 	now := time.Now().Unix()
-	counter := now / int64(config.Period)
+	counter := now / period
 
 	return generateTOTPCode(key, counter, config.Digits), nil
 }

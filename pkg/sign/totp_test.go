@@ -268,6 +268,43 @@ func isHex(s string) bool {
 	return true
 }
 
+func TestValidateTOTPCodeWithSpaces(t *testing.T) {
+	secret := GenerateTOTPSecret(20)
+	config := DefaultTOTPConfig()
+
+	code, err := GenerateTOTPCode(secret, config)
+	assert.NoError(t, err)
+
+	// 模拟 Google Authenticator 显示格式 "123 456"
+	spacedCode := code[:3] + " " + code[3:]
+	valid := ValidateTOTPCode(secret, spacedCode, config)
+	assert.True(t, valid, "应该支持带空格的验证码格式")
+}
+
+func TestValidateTOTPCodeOnlySpaces(t *testing.T) {
+	secret := GenerateTOTPSecret(20)
+	valid := ValidateTOTPCode(secret, "   ", nil)
+	assert.False(t, valid)
+}
+
+func TestValidateTOTPCodePeriodZero(t *testing.T) {
+	secret := GenerateTOTPSecret(20)
+	config := &TOTPConfig{
+		Digits:    6,
+		Period:    0,
+		Skew:      1,
+		Algorithm: "SHA1",
+	}
+
+	// 不应 panic，应回退到默认 Period=30
+	code, err := GenerateTOTPCode(secret, config)
+	assert.NoError(t, err)
+	assert.Len(t, code, 6)
+
+	valid := ValidateTOTPCode(secret, code, config)
+	assert.True(t, valid)
+}
+
 func TestConsumeBackupCode(t *testing.T) {
 	codesJSON := `["ABCD1234","EFGH5678","IJKL9012"]`
 
