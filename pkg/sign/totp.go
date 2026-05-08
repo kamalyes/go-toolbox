@@ -22,6 +22,8 @@ import (
 	"math"
 	"strings"
 	"time"
+
+	"github.com/kamalyes/go-toolbox/pkg/convert"
 )
 
 // TOTPConfig TOTP配置参数
@@ -144,4 +146,28 @@ func GenerateBackupCodes(count int) []string {
 		}
 	}
 	return codes
+}
+
+// ConsumeBackupCode 从 JSON 格式的备份码数组中消耗一个码
+// backupCodesJSON: JSON数组字符串，如 ["ABCD1234","EFGH5678"]
+// code: 要消耗的备份码
+// 返回：是否消耗成功，剩余备份码的JSON字符串
+func ConsumeBackupCode(backupCodesJSON, code string) (bool, string) {
+	if backupCodesJSON == "" || code == "" {
+		return false, backupCodesJSON
+	}
+
+	codes, err := convert.StringsFromJSON(backupCodesJSON)
+	if err != nil {
+		return false, backupCodesJSON
+	}
+
+	trimmedCode := strings.TrimSpace(code)
+	for i, c := range codes {
+		if strings.EqualFold(strings.TrimSpace(c), trimmedCode) {
+			remaining := append(codes[:i], codes[i+1:]...)
+			return true, convert.StringsToJSON(remaining)
+		}
+	}
+	return false, backupCodesJSON
 }

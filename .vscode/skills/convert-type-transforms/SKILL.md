@@ -54,6 +54,8 @@ yamlBytes := convert.JSONToYAML(jsonBytes)
 
 | 导出名称 | 签名 | 说明 |
 |---|---|---|
+| `StringsToJSON` | `func(s []string) string` | 字符串切片序列化为JSON数组字符串 |
+| `StringsFromJSON` | `func(jsonStr string) ([]string, error)` | JSON数组字符串反序列化为字符串切片 |
 | `NumberSliceToStringSlice[T]` | `func(numbers []T) []string` | 数字切片转字符串切片 |
 | `StringSliceToNumberSlice[T]` | `func(input []string, mode) []T` | 字符串切片转数字切片 |
 | `StringSliceToFloatSlice[T]` | `func(input []string, mode) []T` | 字符串切片转浮点切片 |

@@ -71,6 +71,7 @@ sig := signer.Sign([]byte("data"))
 | `ValidateTOTPCode` | `func(secret, code string, config *TOTPConfig) bool` | 验证TOTP验证码 |
 | `GenerateTOTPCode` | `func(secret string, config *TOTPConfig) (string, error)` | 生成TOTP验证码 |
 | `GenerateBackupCodes` | `func(count int) []string` | 生成备份码 |
+| `ConsumeBackupCode` | `func(backupCodesJSON, code string) (bool, string)` | 从JSON备份码数组中消耗一个码 |
 
 #### Bcrypt
 

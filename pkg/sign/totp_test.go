@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2026-03-28 00:00:00
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2026-03-28 00:00:00
+ * @LastEditTime: 2026-05-08 15:15:24
  * @FilePath: \go-toolbox\pkg\sign\totp_test.go
  * @Description: TOTP 单元测试
  *
@@ -266,4 +266,49 @@ func isHex(s string) bool {
 		}
 	}
 	return true
+}
+
+func TestConsumeBackupCode(t *testing.T) {
+	codesJSON := `["ABCD1234","EFGH5678","IJKL9012"]`
+
+	t.Run("消耗存在的码", func(t *testing.T) {
+		ok, remaining := ConsumeBackupCode(codesJSON, "EFGH5678")
+		assert.True(t, ok)
+		assert.NotContains(t, remaining, "EFGH5678")
+		assert.Contains(t, remaining, "ABCD1234")
+		assert.Contains(t, remaining, "IJKL9012")
+	})
+
+	t.Run("消耗不存在的码", func(t *testing.T) {
+		ok, remaining := ConsumeBackupCode(codesJSON, "ZZZZ0000")
+		assert.False(t, ok)
+		assert.Equal(t, codesJSON, remaining)
+	})
+
+	t.Run("大小写不敏感", func(t *testing.T) {
+		ok, remaining := ConsumeBackupCode(codesJSON, "abcd1234")
+		assert.True(t, ok)
+		assert.NotContains(t, remaining, "ABCD1234")
+	})
+
+	t.Run("空码返回false", func(t *testing.T) {
+		ok, _ := ConsumeBackupCode(codesJSON, "")
+		assert.False(t, ok)
+	})
+
+	t.Run("空JSON返回false", func(t *testing.T) {
+		ok, _ := ConsumeBackupCode("", "ABCD1234")
+		assert.False(t, ok)
+	})
+
+	t.Run("非法JSON返回false", func(t *testing.T) {
+		ok, _ := ConsumeBackupCode("not-json", "ABCD1234")
+		assert.False(t, ok)
+	})
+
+	t.Run("消耗最后一个码返回空数组", func(t *testing.T) {
+		ok, remaining := ConsumeBackupCode(`["ONLY1234"]`, "ONLY1234")
+		assert.True(t, ok)
+		assert.Equal(t, "", remaining)
+	})
 }
