@@ -13,11 +13,13 @@ package sign
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
 	"errors"
 	"hash"
+	"math/big"
 	"os"
 
 	"github.com/kamalyes/go-toolbox/pkg/errorx"
@@ -52,6 +54,8 @@ const (
 	RsaKeySize2048 RsaKeySize = 2048
 	RsaKeySize4096 RsaKeySize = 4096
 )
+
+func defaultSHA256() hash.Hash { return sha256.New() }
 
 // RsaKeyPair 包含RSA密钥对
 type RsaKeyPair struct {
@@ -262,4 +266,29 @@ func ParsePublicKey(pemData []byte) (*rsa.PublicKey, error) {
 	}
 
 	return nil, errorx.WrapError("解析公钥失败", errors.Join(pkixErr, pkcs1Err))
+}
+
+// DecryptOAEPWithPrivateKey 使用 RSA 私钥进行 OAEP 解密（简易版本，无需创建 RsaCrypto 实例）
+func DecryptOAEPWithPrivateKey(privateKey *rsa.PrivateKey, ciphertext []byte, hashFunc func() hash.Hash) ([]byte, error) {
+	if hashFunc == nil {
+		hashFunc = defaultSHA256
+	}
+	return rsa.DecryptOAEP(hashFunc(), rand.Reader, privateKey, ciphertext, nil)
+}
+
+// EncryptOAEPWithPublicKey 使用 RSA 公钥进行 OAEP 加密（简易版本，无需创建 RsaCrypto 实例）
+func EncryptOAEPWithPublicKey(publicKey *rsa.PublicKey, plaintext []byte, hashFunc func() hash.Hash) ([]byte, error) {
+	if hashFunc == nil {
+		hashFunc = defaultSHA256
+	}
+	return rsa.EncryptOAEP(hashFunc(), rand.Reader, publicKey, plaintext, nil)
+}
+
+// RSAPublicKeyToJWK 将 RSA 公钥转换为 JWK 格式的模数(n)和指数(e)
+func RSAPublicKeyToJWK(publicKey *rsa.PublicKey) (n, e string) {
+	nBytes := publicKey.N.Bytes()
+	eBytes := big.NewInt(int64(publicKey.E)).Bytes()
+	n = base64.RawURLEncoding.EncodeToString(nBytes)
+	e = base64.RawURLEncoding.EncodeToString(eBytes)
+	return
 }

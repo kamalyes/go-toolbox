@@ -11,6 +11,7 @@
 package sign
 
 import (
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/sha256"
@@ -24,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // 辅助函数：生成 RSA 密钥对并进行有效性断言
@@ -247,7 +249,87 @@ func isValidPEM(pemData string) error {
 	return nil
 }
 
-// 测试解析 PEM 格式公钥
+func TestDecryptOAEPWithPrivateKey(t *testing.T) {
+	keyPair, err := GenerateRsaKeyPair(RsaKeySize2048)
+	require.NoError(t, err)
+
+	t.Run("默认SHA256", func(t *testing.T) {
+		plaintext := []byte("hello world")
+		ciphertext, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, keyPair.PublicKey, plaintext, nil)
+		require.NoError(t, err)
+
+		decrypted, err := DecryptOAEPWithPrivateKey(keyPair.PrivateKey, ciphertext, nil)
+		require.NoError(t, err)
+		assert.Equal(t, plaintext, decrypted)
+	})
+
+	t.Run("自定义哈希函数", func(t *testing.T) {
+		plaintext := []byte("custom hash test")
+		ciphertext, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, keyPair.PublicKey, plaintext, nil)
+		require.NoError(t, err)
+
+		decrypted, err := DecryptOAEPWithPrivateKey(keyPair.PrivateKey, ciphertext, sha256.New)
+		require.NoError(t, err)
+		assert.Equal(t, plaintext, decrypted)
+	})
+
+	t.Run("密文损坏应失败", func(t *testing.T) {
+		_, err := DecryptOAEPWithPrivateKey(keyPair.PrivateKey, []byte("corrupted"), nil)
+		assert.Error(t, err)
+	})
+}
+
+func TestEncryptOAEPWithPublicKey(t *testing.T) {
+	keyPair, err := GenerateRsaKeyPair(RsaKeySize2048)
+	require.NoError(t, err)
+
+	t.Run("默认SHA256加密解密", func(t *testing.T) {
+		plaintext := []byte("roundtrip test")
+		ciphertext, err := EncryptOAEPWithPublicKey(keyPair.PublicKey, plaintext, nil)
+		require.NoError(t, err)
+
+		decrypted, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, keyPair.PrivateKey, ciphertext, nil)
+		require.NoError(t, err)
+		assert.Equal(t, plaintext, decrypted)
+	})
+
+	t.Run("自定义哈希函数", func(t *testing.T) {
+		plaintext := []byte("custom hash encrypt")
+		ciphertext, err := EncryptOAEPWithPublicKey(keyPair.PublicKey, plaintext, sha256.New)
+		require.NoError(t, err)
+
+		decrypted, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, keyPair.PrivateKey, ciphertext, nil)
+		require.NoError(t, err)
+		assert.Equal(t, plaintext, decrypted)
+	})
+}
+
+func TestRSAPublicKeyToJWK(t *testing.T) {
+	keyPair, err := GenerateRsaKeyPair(RsaKeySize2048)
+	require.NoError(t, err)
+
+	t.Run("基本功能", func(t *testing.T) {
+		n, e := RSAPublicKeyToJWK(keyPair.PublicKey)
+		assert.NotEmpty(t, n)
+		assert.NotEmpty(t, e)
+	})
+
+	t.Run("结果可Base64URL解码", func(t *testing.T) {
+		n, e := RSAPublicKeyToJWK(keyPair.PublicKey)
+		_, err1 := base64.RawURLEncoding.DecodeString(n)
+		_, err2 := base64.RawURLEncoding.DecodeString(e)
+		assert.NoError(t, err1)
+		assert.NoError(t, err2)
+	})
+
+	t.Run("模数与公钥一致", func(t *testing.T) {
+		n, _ := RSAPublicKeyToJWK(keyPair.PublicKey)
+		decoded, err := base64.RawURLEncoding.DecodeString(n)
+		require.NoError(t, err)
+		assert.Equal(t, keyPair.PublicKey.N.Bytes(), decoded)
+	})
+}
+
 func TestParsePublicKey(t *testing.T) {
 	keyPair := generateAndAssertRsaKeyPair(RsaKeySize2048, t)
 
