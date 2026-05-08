@@ -15,6 +15,7 @@ import (
 	"math"
 	"math/big"
 	"strconv"
+	"strings"
 	"unsafe"
 
 	"github.com/kamalyes/go-toolbox/pkg/mathx"
@@ -492,4 +493,21 @@ func SafeAbs(n int64) (int64, error) {
 	}
 
 	return n, nil
+}
+
+// HashToInt64 将多个字符串拼接后哈希为非负 int64
+// 内部使用 FNV-1a 短哈希 + Base36 解码，保证确定性且跨平台一致
+//
+// 参数：
+//   - parts: 待哈希的字符串切片
+//   - separator: 拼接分隔符
+//
+// 返回：非负的 int64 哈希值
+func HashToInt64(parts []string, separator string) int64 {
+	h := ShortHash(strings.Join(parts, separator))
+	v, _ := strconv.ParseInt(h, 36, 64)
+	if v < 0 {
+		v = -v
+	}
+	return v
 }

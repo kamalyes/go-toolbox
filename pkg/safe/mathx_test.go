@@ -1499,3 +1499,46 @@ func BenchmarkSafeAccessTraditional(b *testing.B) {
 		safe.Field("app").Field("name").String("default")
 	}
 }
+
+func TestHashToInt64(t *testing.T) {
+	t.Run("基本功能", func(t *testing.T) {
+		result := HashToInt64([]string{"tenant", "123", "cn"}, ":")
+		assert.GreaterOrEqual(t, result, int64(0))
+	})
+
+	t.Run("确定性-相同输入相同输出", func(t *testing.T) {
+		parts := []string{"scope_version", "t100", "cn-east-1", "menu"}
+		r1 := HashToInt64(parts, "|")
+		r2 := HashToInt64(parts, "|")
+		assert.Equal(t, r1, r2)
+	})
+
+	t.Run("不同输入产生不同结果", func(t *testing.T) {
+		r1 := HashToInt64([]string{"a", "b"}, ":")
+		r2 := HashToInt64([]string{"c", "d"}, ":")
+		assert.NotEqual(t, r1, r2)
+	})
+
+	t.Run("结果始终非负", func(t *testing.T) {
+		inputs := [][]string{
+			{"tenant", "1", "region-a"},
+			{"scope_version", "t999", "cn-north-1", "menu"},
+			{"policy", "x"},
+			{""},
+		}
+		for _, parts := range inputs {
+			result := HashToInt64(parts, "|")
+			assert.GreaterOrEqual(t, result, int64(0))
+		}
+	})
+
+	t.Run("空切片", func(t *testing.T) {
+		result := HashToInt64([]string{}, "|")
+		assert.GreaterOrEqual(t, result, int64(0))
+	})
+
+	t.Run("空分隔符", func(t *testing.T) {
+		result := HashToInt64([]string{"a", "b"}, "")
+		assert.GreaterOrEqual(t, result, int64(0))
+	})
+}
