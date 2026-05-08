@@ -14,12 +14,14 @@ import "github.com/kamalyes/go-toolbox/pkg/sign"
 ```
 
 RSA密钥对：
+
 ```go
 keyPair, err := sign.GenerateRsaKeyPair(2048)
 pem := sign.ExportRsaPrivateKeyToPEM(keyPair.PrivateKey)
 ```
 
 HMAC签名：
+
 ```go
 signer := sign.NewHMACSigner(crypto.SHA256)
 sig := signer.Sign([]byte("data"))
@@ -41,6 +43,9 @@ sig := signer.Sign([]byte("data"))
 | `NewRsaCryptoFromPublicPEM` | `func(pem []byte) (RsaCrypto, error)` | 从公钥PEM创建RSA加密器 |
 | `ParsePrivateKey` | `func(data []byte) (*rsa.PrivateKey, error)` | 解析RSA私钥 |
 | `ParsePublicKey` | `func(data []byte) (*rsa.PublicKey, error)` | 解析RSA公钥 |
+| `DecryptOAEPWithPrivateKey` | `func(privateKey *rsa.PrivateKey, ciphertext []byte, hashFunc func() hash.Hash) ([]byte, error)` | RSA私钥OAEP解密（简易版，hashFunc传nil默认SHA256） |
+| `EncryptOAEPWithPublicKey` | `func(publicKey *rsa.PublicKey, plaintext []byte, hashFunc func() hash.Hash) ([]byte, error)` | RSA公钥OAEP加密（简易版，hashFunc传nil默认SHA256） |
+| `RSAPublicKeyToJWK` | `func(publicKey *rsa.PublicKey) (n, e string)` | RSA公钥转JWK格式（Base64URL编码的模数和指数） |
 
 #### HMAC
 
@@ -60,12 +65,19 @@ sig := signer.Sign([]byte("data"))
 
 | 导出名称 | 签名 | 说明 |
 |---|---|---|
-| `DefaultTOTPConfig` | `func() TOTPConfig` | 获取默认TOTP配置 |
-| `GenerateTOTPSecret` | `func() (string, error)` | 生成TOTP密钥 |
-| `GenerateTOTPURI` | `func(account, issuer, secret string) string` | 生成TOTP URI |
-| `ValidateTOTPCode` | `func(secret, code string) bool` | 验证TOTP验证码 |
-| `GenerateTOTPCode` | `func(secret string) (string, error)` | 生成TOTP验证码 |
-| `GenerateBackupCodes` | `func(count int) ([]string, error)` | 生成备份码 |
+| `DefaultTOTPConfig` | `func() *TOTPConfig` | 获取默认TOTP配置 |
+| `GenerateTOTPSecret` | `func(secretLength int) string` | 生成TOTP密钥（Base32编码） |
+| `GenerateTOTPURI` | `func(secret, account, issuer string, config *TOTPConfig) string` | 生成TOTP URI（otpauth://） |
+| `ValidateTOTPCode` | `func(secret, code string, config *TOTPConfig) bool` | 验证TOTP验证码 |
+| `GenerateTOTPCode` | `func(secret string, config *TOTPConfig) (string, error)` | 生成TOTP验证码 |
+| `GenerateBackupCodes` | `func(count int) []string` | 生成备份码 |
+
+#### Bcrypt
+
+| 导出名称 | 签名 | 说明 |
+|---|---|---|
+| `GenerateFromPassword` | `func(data []byte, cost ...int) ([]byte, error)` | bcrypt哈希，cost可选（默认10） |
+| `CompareHashAndPassword` | `func(hashed, data []byte) error` | 校验数据与bcrypt哈希是否匹配 |
 
 ### 类型
 
