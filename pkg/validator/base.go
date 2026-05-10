@@ -32,7 +32,7 @@ func IsEmptyValue(v reflect.Value) bool {
 		return v.Len() == 0
 	case reflect.String:
 		str := strings.TrimSpace(v.String())
-		return str == "" || IsUndefined(str) || IsNull(str)
+		return str == ""
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return v.Int() == 0
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
@@ -193,6 +193,29 @@ func IsTimeEmpty(t *time.Time) bool {
 	return t.IsZero() || t.Unix() <= 0
 }
 
+// IsTimeValid 检查时间值是否有效（非nil且非零值）
+// 支持 time.Time 和 *time.Time 类型
+// 其他类型始终返回 true（视为有效）
+// 适用场景: SQL 构建器中时间范围过滤条件的有效性判断
+func IsTimeValid(timeVal interface{}) bool {
+	if timeVal == nil {
+		return false
+	}
+
+	// 处理 *time.Time 类型
+	if ptr, ok := timeVal.(*time.Time); ok {
+		return ptr != nil && !ptr.IsZero() && ptr.After(time.Unix(0, 0))
+	}
+
+	// 处理 time.Time 类型
+	if t, ok := timeVal.(time.Time); ok {
+		return !t.IsZero() && t.After(time.Unix(0, 0))
+	}
+
+	// 其他类型认为有效
+	return true
+}
+
 // IsProtobufTimestampEmpty 检查 protobuf Timestamp 是否为空（使用反射避免复制锁）
 func IsProtobufTimestampEmpty(v reflect.Value) bool {
 	// 直接通过反射获取 Seconds 字段的值（避免调用方法可能的指针接收者问题）
@@ -336,4 +359,45 @@ func IsAllowedField(field string, allowedFields ...[]string) bool {
 	}
 	// 没有白名单，验证字段名是否安全
 	return IsSafeFieldName(field)
+}
+
+// DerefValue 解引用 interface{} 中的指针，返回底层值
+// 如果值为 nil 或指向 nil 指针，则返回 (nil, false)
+// 如果值是指针且非 nil，返回 (dereferencedValue, true)
+// 如果值不是指针，返回 (originalValue, true)
+func DerefValue(value interface{}) (interface{}, bool) {
+	if value == nil {
+		return nil, false
+	}
+	rv := reflect.ValueOf(value)
+	if rv.Kind() == reflect.Ptr {
+		if rv.IsNil() {
+			return nil, false
+		}
+		return rv.Elem().Interface(), true
+	}
+	return value, true
+}
+
+// IsEmptyAfterDeref 判断值是否为空（用于过滤条件场景）
+// 支持自动解引用指针：nil 指针为空，非 nil 指针检查其底层值
+// 内部复用 IsEmptyValue 进行统一的空值判断
+// 返回解引用后的值和是否为空的标志，避免调用方重复调用 DerefValue
+//
+// 适用场景: SQL 构建器中的 IfNotEmpty 系列方法
+func IsEmptyAfterDeref(value interface{}) (interface{}, bool) {
+	deref, ok := DerefValue(value)
+	if !ok {
+		return nil, true
+	}
+
+	// bool 的 false 是有效过滤值（例如 status=false），不应被当作空值跳过。
+	if _, isBool := deref.(bool); isBool {
+		return deref, false
+	}
+
+	if IsEmptyValue(reflect.ValueOf(deref)) {
+		return nil, true
+	}
+	return deref, false
 }

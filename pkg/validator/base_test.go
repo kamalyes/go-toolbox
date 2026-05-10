@@ -34,13 +34,13 @@ func TestIsEmptyValue(t *testing.T) {
 	}{
 		{"", true},                                // 空字符串
 		{"Hello", false},                          // 非空字符串
-		{"null", true},                            // "null" 字符串
-		{"NULL", true},                            // "NULL" 字符串（大写）
-		{"Null", true},                            // "Null" 字符串（混合）
-		{" null ", true},                          // 带空格的 "null"
-		{"undefined", true},                       // "undefined" 字符串
-		{"UNDEFINED", true},                       // "UNDEFINED" 字符串（大写）
-		{" undefined ", true},                     // 带空格的 "undefined"
+		{"null", false},                           // "null" 字符串
+		{"NULL", false},                           // "NULL" 字符串（大写）
+		{"Null", false},                           // "Null" 字符串（混合）
+		{" null ", false},                         // 带空格的 "null"
+		{"undefined", false},                      // "undefined" 字符串
+		{"UNDEFINED", false},                      // "UNDEFINED" 字符串（大写）
+		{" undefined ", false},                    // 带空格的 "undefined"
 		{nil, true},                               // nil 值
 		{0, true},                                 // 整数 0
 		{1, false},                                // 非零整数
@@ -925,4 +925,192 @@ func TestCheckEmptyWrapperPointer(t *testing.T) {
 		assert.False(t, handled)
 		assert.False(t, isEmpty)
 	})
+}
+
+// TestIsTimeValid 测试 IsTimeValid 函数
+func TestIsTimeValid(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    interface{}
+		expected bool
+	}{
+		{"nil", nil, false},
+		{"zero time.Time", time.Time{}, false},
+		{"unix zero (1970-01-01)", time.Unix(0, 0), false},
+		{"before unix zero", time.Unix(-1, 0), false},
+		{"after unix zero", time.Unix(1, 0), true},
+		{"now", time.Now(), true},
+		{"specific date", time.Date(2025, 12, 16, 0, 0, 0, 0, time.UTC), true},
+		{"nil *time.Time", (*time.Time)(nil), false},
+		{"zero *time.Time", func() *time.Time { t := time.Time{}; return &t }(), false},
+		{"unix zero *time.Time", func() *time.Time { t := time.Unix(0, 0); return &t }(), false},
+		{"before unix zero *time.Time", func() *time.Time { t := time.Unix(-1, 0); return &t }(), false},
+		{"valid *time.Time", func() *time.Time { t := time.Now(); return &t }(), true},
+		{"non-time type string", "2025-12-16", true},
+		{"non-time type int", 1234567890, true},
+		{"non-time type bool", true, true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := IsTimeValid(test.value)
+			assert.Equal(t, test.expected, result)
+		})
+	}
+}
+
+// TestDerefValue 测试 DerefValue 函数
+func TestDerefValue(t *testing.T) {
+	t.Run("nil", func(t *testing.T) {
+		deref, ok := DerefValue(nil)
+		assert.False(t, ok)
+		assert.Nil(t, deref)
+	})
+
+	t.Run("nil string pointer", func(t *testing.T) {
+		var p *string
+		deref, ok := DerefValue(p)
+		assert.False(t, ok)
+		assert.Nil(t, deref)
+	})
+
+	t.Run("valid string pointer", func(t *testing.T) {
+		s := "hello"
+		deref, ok := DerefValue(&s)
+		assert.True(t, ok)
+		assert.Equal(t, "hello", deref)
+	})
+
+	t.Run("nil int pointer", func(t *testing.T) {
+		var p *int
+		deref, ok := DerefValue(p)
+		assert.False(t, ok)
+		assert.Nil(t, deref)
+	})
+
+	t.Run("valid int pointer (non-zero)", func(t *testing.T) {
+		i := 42
+		deref, ok := DerefValue(&i)
+		assert.True(t, ok)
+		assert.Equal(t, 42, deref)
+	})
+
+	t.Run("valid int pointer (zero)", func(t *testing.T) {
+		i := 0
+		deref, ok := DerefValue(&i)
+		assert.True(t, ok)
+		assert.Equal(t, 0, deref)
+	})
+
+	t.Run("nil bool pointer", func(t *testing.T) {
+		var p *bool
+		deref, ok := DerefValue(p)
+		assert.False(t, ok)
+		assert.Nil(t, deref)
+	})
+
+	t.Run("valid bool pointer (false)", func(t *testing.T) {
+		b := false
+		deref, ok := DerefValue(&b)
+		assert.True(t, ok)
+		assert.Equal(t, false, deref)
+	})
+
+	t.Run("valid bool pointer (true)", func(t *testing.T) {
+		b := true
+		deref, ok := DerefValue(&b)
+		assert.True(t, ok)
+		assert.Equal(t, true, deref)
+	})
+
+	t.Run("non-pointer value", func(t *testing.T) {
+		deref, ok := DerefValue(42)
+		assert.True(t, ok)
+		assert.Equal(t, 42, deref)
+	})
+
+	t.Run("non-pointer string", func(t *testing.T) {
+		deref, ok := DerefValue("hello")
+		assert.True(t, ok)
+		assert.Equal(t, "hello", deref)
+	})
+
+	t.Run("non-pointer nil interface", func(t *testing.T) {
+		var x interface{}
+		deref, ok := DerefValue(x)
+		assert.False(t, ok)
+		assert.Nil(t, deref)
+	})
+}
+
+// TestIsEmptyAfterDeref 测试 IsEmptyAfterDeref 函数
+func TestIsEmptyAfterDeref(t *testing.T) {
+	tests := []struct {
+		name          string
+		value         interface{}
+		expectedEmpty bool
+		expectedDeref interface{}
+	}{
+		// nil
+		{"nil", nil, true, nil},
+
+		// string
+		{"empty string", "", true, nil},
+		{"whitespace string", "  ", true, nil},
+		{"null string", "null", false, "null"},
+		{"undefined string", "undefined", false, "undefined"},
+		{"valid string", "hello", false, "hello"},
+		{"string with spaces", " hello ", false, " hello "},
+
+		// string pointer
+		{"nil *string", (*string)(nil), true, nil},
+		{"empty *string", func() *string { s := ""; return &s }(), true, nil},
+		{"valid *string", func() *string { s := "hello"; return &s }(), false, "hello"},
+
+		// int (零值视为空，非零值视为非空)
+		{"zero int", 0, true, nil},
+		{"positive int", 42, false, 42},
+		{"negative int", -1, false, -1},
+
+		// int pointer
+		{"nil *int", (*int)(nil), true, nil},
+		{"zero *int", func() *int { i := 0; return &i }(), true, nil},
+		{"valid *int", func() *int { i := 42; return &i }(), false, 42},
+
+		// bool (false 和 true 都是有效值)
+		{"false bool", false, false, false},
+		{"true bool", true, false, true},
+
+		// bool pointer
+		{"nil *bool", (*bool)(nil), true, nil},
+		{"false *bool", func() *bool { b := false; return &b }(), false, false},
+		{"true *bool", func() *bool { b := true; return &b }(), false, true},
+
+		// float
+		{"zero float", 0.0, true, nil},
+		{"valid float", 3.14, false, 3.14},
+
+		// float pointer
+		{"nil *float64", (*float64)(nil), true, nil},
+		{"zero *float64", func() *float64 { f := 0.0; return &f }(), true, nil},
+		{"valid *float64", func() *float64 { f := 3.14; return &f }(), false, 3.14},
+
+		// slice
+		{"nil slice", ([]int)(nil), true, nil},
+		{"empty slice", []int{}, true, nil},
+		{"non-empty slice", []int{1, 2}, false, []int{1, 2}},
+
+		// map
+		{"nil map", (map[string]int)(nil), true, nil},
+		{"empty map", map[string]int{}, true, nil},
+		{"non-empty map", map[string]int{"a": 1}, false, map[string]int{"a": 1}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			deref, empty := IsEmptyAfterDeref(test.value)
+			assert.Equal(t, test.expectedEmpty, empty)
+			assert.Equal(t, test.expectedDeref, deref)
+		})
+	}
 }
