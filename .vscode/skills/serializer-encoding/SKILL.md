@@ -14,6 +14,7 @@ import "github.com/kamalyes/go-toolbox/pkg/serializer"
 ```
 
 基本序列化：
+
 ```go
 s := serializer.New[MyStruct]()
 data, err := s.Serialize(obj)
@@ -21,6 +22,7 @@ obj, err := s.Deserialize(data)
 ```
 
 JSON快捷方式：
+
 ```go
 data, err := serializer.ToJSON[MyStruct](obj)
 obj, err := serializer.FromJSON[MyStruct](data)
@@ -41,6 +43,8 @@ obj, err := serializer.FromJSON[MyStruct](data)
 | `NewUltraCompact[T]` | `func() *Serializer[T]` | 创建超紧凑序列化器 |
 | `ToJSON[T]` | `func(v T) ([]byte, error)` | 快捷JSON序列化 |
 | `FromJSON[T]` | `func(data []byte) (T, error)` | 快捷JSON反序列化 |
+| `ProtoJSONMarshal` | `func(m proto.Message) (string, error)` | 序列化 protobuf 消息为 JSON 字符串 |
+| `ProtoJSONUnmarshal` | `func(s string, m proto.Message) error` | 反序列化 JSON 字符串为 protobuf 消息 |
 
 ### 类型
 

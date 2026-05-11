@@ -300,6 +300,130 @@ func processBatch(items []LargeData) {
 }
 ```
 
+---
+
+## 📦 Protobuf JSON 序列化
+
+### ProtoJSONMarshal
+
+将 protobuf 消息序列化为 JSON 字符串。
+
+```go
+func ProtoJSONMarshal(m proto.Message) (string, error)
+```
+
+**参数：**
+
+- `m` - protobuf 消息，可以为 nil
+
+**返回：**
+
+- JSON 字符串
+- 错误信息
+
+**示例：**
+
+```go
+import "github.com/kamalyes/go-toolbox/pkg/serializer"
+
+// 序列化 protobuf 消息
+msg := wrapperspb.String("hello")
+jsonStr, err := serializer.ProtoJSONMarshal(msg)
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println(jsonStr) // 输出: "hello"
+
+// 处理 nil 消息
+emptyStr, _ := serializer.ProtoJSONMarshal(nil)
+fmt.Println(emptyStr) // 输出: ""
+```
+
+### ProtoJSONUnmarshal
+
+将 JSON 字符串反序列化为 protobuf 消息。
+
+```go
+func ProtoJSONUnmarshal(s string, m proto.Message) error
+```
+
+**参数：**
+
+- `s` - JSON 字符串，可以为空或 "null"
+- `m` - 目标 protobuf 消息指针
+
+**返回：**
+
+- 错误信息
+
+**特性：**
+
+- 自动处理空字符串和 "null"，不做任何操作
+- 自动去除字符串首尾空白
+
+**示例：**
+
+```go
+import "github.com/kamalyes/go-toolbox/pkg/serializer"
+
+// 反序列化 JSON 字符串
+var msg wrapperspb.StringValue
+err := serializer.ProtoJSONUnmarshal(`"hello"`, &msg)
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println(msg.GetValue()) // 输出: hello
+
+// 处理空字符串（不报错）
+var msg2 wrapperspb.StringValue
+serializer.ProtoJSONUnmarshal("", &msg2) // 不会报错
+
+// 处理 null（不报错）
+var msg3 wrapperspb.StringValue
+serializer.ProtoJSONUnmarshal("null", &msg3) // 不会报错
+```
+
+### 使用场景
+
+1. **数据库存储**：将 protobuf 消息存储为 JSON 字符串
+2. **API 响应**：将 protobuf 消息转换为 JSON 格式返回
+3. **配置文件**：读取 JSON 配置到 protobuf 消息
+4. **消息队列**：在消息队列中传输 protobuf 消息
+
+### 完整示例
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    
+    "github.com/kamalyes/go-toolbox/pkg/serializer"
+    "google.golang.org/protobuf/types/known/wrapperspb"
+)
+
+func main() {
+    // 创建 protobuf 消息
+    original := wrapperspb.String("test message")
+    
+    // 序列化为 JSON
+    jsonStr, err := serializer.ProtoJSONMarshal(original)
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Printf("序列化结果: %s\n", jsonStr)
+    
+    // 反序列化回 protobuf
+    var restored wrapperspb.StringValue
+    err = serializer.ProtoJSONUnmarshal(jsonStr, &restored)
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Printf("反序列化结果: %s\n", restored.GetValue())
+}
+```
+
 ## 📄 许可证
 
 Copyright (c) 2025 by kamalyes, All Rights Reserved.
@@ -310,4 +434,4 @@ Copyright (c) 2025 by kamalyes, All Rights Reserved.
 
 ## 📞 支持
 
-如有问题，请联系 kamalyes@qq.com
+如有问题，请联系 <501893067@qq.com>
