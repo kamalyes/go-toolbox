@@ -33,17 +33,25 @@ func NewNanoIDGenerator() *NanoIDGenerator {
 	}
 }
 
-// GenerateTraceID 生成跟踪ID
+// GenerateTraceID 生成跟踪ID（完整 NanoID，21字符）
+// 格式: URL 安全的 21 字符随机字符串
+// 示例: "V1StGXR8_Z5jdHi6B-myT"
 func (g *NanoIDGenerator) GenerateTraceID() string {
 	return g.generateNanoID()
 }
 
-// GenerateSpanID 生成跨度ID
+// GenerateSpanID 生成跨度ID（NanoID 前16字符）
+// 格式: 截取 NanoID 前16字符
+// 示例: "V1StGXR8_Z5jdHi6"
+// 与 TraceID 的区别: 更短，同一 Trace 内唯一即可
 func (g *NanoIDGenerator) GenerateSpanID() string {
 	return g.generateNanoID()[:16]
 }
 
-// GenerateRequestID 生成请求ID
+// GenerateRequestID 生成请求ID（NanoID前缀+计数器后缀）
+// 格式: NanoID前10字符-递增计数器
+// 示例: "V1StGXR8_Z-1"
+// 与 TraceID 的区别: 带计数器后缀，可按请求顺序排序
 func (g *NanoIDGenerator) GenerateRequestID() string {
 	counter := atomic.AddUint64(&g.counter, 1)
 	nanoID := g.generateNanoID()
@@ -57,7 +65,10 @@ func (g *NanoIDGenerator) GenerateRequestID() string {
 	return sb.String()
 }
 
-// GenerateCorrelationID 生成关联ID
+// GenerateCorrelationID 生成关联ID（完整 NanoID，21字符）
+// 格式: 与 TraceID 相同长度的 NanoID
+// 示例: "K9mPxR2vN4qL7wBjT5cYs"
+// 与 TraceID 的区别: 独立生成，用于跨系统关联
 func (g *NanoIDGenerator) GenerateCorrelationID() string {
 	return g.generateNanoID()
 }

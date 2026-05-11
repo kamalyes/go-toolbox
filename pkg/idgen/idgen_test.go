@@ -12,12 +12,32 @@
 package idgen
 
 import (
+	"fmt"
 	"regexp"
+	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/kamalyes/go-toolbox/pkg/assert"
 )
+
+type mockCounterStore struct {
+	data map[string]uint64
+	mu   sync.Mutex
+}
+
+func (m *mockCounterStore) Increment(key string, delta uint64, initValue uint64) (uint64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	v, ok := m.data[key]
+	if !ok {
+		v = initValue
+	}
+	v += delta
+	m.data[key] = v
+	return v, nil
+}
 
 // TestDefaultIDGenerator 测试默认 Hex 生成器
 func TestDefaultIDGenerator(t *testing.T) {
@@ -58,6 +78,20 @@ func TestDefaultIDGenerator(t *testing.T) {
 			ids[id] = true
 		}
 	})
+
+	t.Run("DifferentFormats", func(t *testing.T) {
+		traceID := gen.GenerateTraceID()
+		spanID := gen.GenerateSpanID()
+		requestID := gen.GenerateRequestID()
+		correlationID := gen.GenerateCorrelationID()
+
+		assert.NotEqual(traceID, spanID, "TraceID 和 SpanID 格式应不同")
+		assert.NotEqual(traceID, requestID, "TraceID 和 RequestID 格式应不同")
+		assert.NotEqual(traceID, correlationID, "TraceID 和 CorrelationID 格式应不同")
+		assert.NotEqual(spanID, requestID, "SpanID 和 RequestID 格式应不同")
+		assert.NotEqual(spanID, correlationID, "SpanID 和 CorrelationID 格式应不同")
+		assert.NotEqual(requestID, correlationID, "RequestID 和 CorrelationID 格式应不同")
+	})
 }
 
 // TestUUIDGenerator 测试 UUID 生成器
@@ -87,6 +121,17 @@ func TestUUIDGenerator(t *testing.T) {
 		correlationID := gen.GenerateCorrelationID()
 		assert.NotEmpty(correlationID, "CorrelationID 不应为空")
 		assert.Equal(36, len(correlationID), "CorrelationID 应为 36 字符")
+	})
+
+	t.Run("DifferentFormats", func(t *testing.T) {
+		traceID := gen.GenerateTraceID()
+		spanID := gen.GenerateSpanID()
+		requestID := gen.GenerateRequestID()
+		correlationID := gen.GenerateCorrelationID()
+
+		assert.NotEqual(traceID, spanID, "TraceID 和 SpanID 格式应不同")
+		assert.NotEqual(traceID, requestID, "TraceID 和 RequestID 格式应不同")
+		assert.NotEqual(traceID, correlationID, "TraceID 和 CorrelationID 格式应不同")
 	})
 }
 
@@ -118,6 +163,17 @@ func TestNanoIDGenerator(t *testing.T) {
 		assert.NotEmpty(correlationID, "CorrelationID 不应为空")
 		assert.Equal(21, len(correlationID), "CorrelationID 应为 21 字符")
 	})
+
+	t.Run("DifferentFormats", func(t *testing.T) {
+		traceID := gen.GenerateTraceID()
+		spanID := gen.GenerateSpanID()
+		requestID := gen.GenerateRequestID()
+		correlationID := gen.GenerateCorrelationID()
+
+		assert.NotEqual(traceID, spanID, "TraceID 和 SpanID 格式应不同")
+		assert.NotEqual(traceID, requestID, "TraceID 和 RequestID 格式应不同")
+		assert.NotEqual(traceID, correlationID, "TraceID 和 CorrelationID 格式应不同")
+	})
 }
 
 // TestSnowflakeGenerator 测试 Snowflake 生成器
@@ -127,25 +183,42 @@ func TestSnowflakeGenerator(t *testing.T) {
 	t.Run("GenerateTraceID", func(t *testing.T) {
 		traceID := gen.GenerateTraceID()
 		assert.NotEmpty(traceID, "TraceID 不应为空")
-		assert.True(regexp.MustCompile(`^\d+$`).MatchString(traceID), "TraceID 应为纯数字")
+		assert.Equal(16, len(traceID), "TraceID 应为 16 字符 hex")
+		assert.True(regexp.MustCompile(`^[0-9a-f]{16}$`).MatchString(traceID), "TraceID 应为 hex 格式")
 	})
 
 	t.Run("GenerateSpanID", func(t *testing.T) {
 		spanID := gen.GenerateSpanID()
 		assert.NotEmpty(spanID, "SpanID 不应为空")
-		assert.True(regexp.MustCompile(`^\d+$`).MatchString(spanID), "SpanID 应为纯数字")
+		assert.Equal(8, len(spanID), "SpanID 应为 8 字符 hex")
+		assert.True(regexp.MustCompile(`^[0-9a-f]{8}$`).MatchString(spanID), "SpanID 应为 hex 格式")
 	})
 
 	t.Run("GenerateRequestID", func(t *testing.T) {
 		requestID := gen.GenerateRequestID()
 		assert.NotEmpty(requestID, "RequestID 不应为空")
-		assert.True(regexp.MustCompile(`^\d+$`).MatchString(requestID), "RequestID 应为纯数字")
+		assert.True(regexp.MustCompile(`^\d+-\d+$`).MatchString(requestID), "RequestID 应为 数字-计数器 格式")
 	})
 
 	t.Run("GenerateCorrelationID", func(t *testing.T) {
 		correlationID := gen.GenerateCorrelationID()
 		assert.NotEmpty(correlationID, "CorrelationID 不应为空")
-		assert.True(regexp.MustCompile(`^\d+$`).MatchString(correlationID), "CorrelationID 应为纯数字")
+		assert.Equal(36, len(correlationID), "CorrelationID 应为 36 字符 UUID 格式")
+		assert.True(regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`).MatchString(correlationID), "CorrelationID 应为 UUID 格式")
+	})
+
+	t.Run("DifferentFormats", func(t *testing.T) {
+		traceID := gen.GenerateTraceID()
+		spanID := gen.GenerateSpanID()
+		requestID := gen.GenerateRequestID()
+		correlationID := gen.GenerateCorrelationID()
+
+		assert.NotEqual(traceID, spanID, "TraceID(hex 16字符) 和 SpanID(hex 8字符) 格式应不同")
+		assert.NotEqual(traceID, requestID, "TraceID 和 RequestID 格式应不同")
+		assert.NotEqual(traceID, correlationID, "TraceID 和 CorrelationID 格式应不同")
+		assert.NotEqual(spanID, requestID, "SpanID 和 RequestID 格式应不同")
+		assert.NotEqual(spanID, correlationID, "SpanID 和 CorrelationID 格式应不同")
+		assert.NotEqual(requestID, correlationID, "RequestID 和 CorrelationID 格式应不同")
 	})
 
 	t.Run("Monotonic", func(t *testing.T) {
@@ -155,6 +228,390 @@ func TestSnowflakeGenerator(t *testing.T) {
 			assert.True(id > lastID, "Snowflake ID 应单调递增")
 			lastID = id
 		}
+	})
+}
+
+// TestShortIDGenerator 测试短ID生成器
+func TestShortIDGenerator(t *testing.T) {
+	gen := NewShortIDGenerator()
+
+	t.Run("GenerateTraceID", func(t *testing.T) {
+		traceID := gen.GenerateTraceID()
+		assert.NotEmpty(traceID, "TraceID 不应为空")
+		assert.Equal(10, len(traceID), "TraceID 应为 10 字符")
+		assert.True(regexp.MustCompile(`^[0-9A-Za-z]{10}$`).MatchString(traceID), "TraceID 应为 Base62 格式")
+	})
+
+	t.Run("GenerateSpanID", func(t *testing.T) {
+		spanID := gen.GenerateSpanID()
+		assert.NotEmpty(spanID, "SpanID 不应为空")
+		assert.Equal(8, len(spanID), "SpanID 应为 8 字符")
+		assert.True(regexp.MustCompile(`^[0-9A-Za-z]{8}$`).MatchString(spanID), "SpanID 应为 Base62 格式")
+	})
+
+	t.Run("GenerateRequestID", func(t *testing.T) {
+		requestID := gen.GenerateRequestID()
+		assert.NotEmpty(requestID, "RequestID 不应为空")
+		assert.True(regexp.MustCompile(`^[0-9A-Za-z]{5}-\d+$`).MatchString(requestID), "RequestID 应为 Base62前缀-计数器 格式")
+	})
+
+	t.Run("GenerateCorrelationID", func(t *testing.T) {
+		correlationID := gen.GenerateCorrelationID()
+		assert.NotEmpty(correlationID, "CorrelationID 不应为空")
+		assert.Equal(10, len(correlationID), "CorrelationID 应为 10 字符")
+		assert.True(regexp.MustCompile(`^[0-9A-Za-z]{10}$`).MatchString(correlationID), "CorrelationID 应为 Base62 格式")
+	})
+
+	t.Run("DifferentFormats", func(t *testing.T) {
+		traceID := gen.GenerateTraceID()
+		spanID := gen.GenerateSpanID()
+		requestID := gen.GenerateRequestID()
+		correlationID := gen.GenerateCorrelationID()
+
+		assert.NotEqual(traceID, spanID, "TraceID(10字符) 和 SpanID(8字符) 格式应不同")
+		assert.NotEqual(traceID, requestID, "TraceID 和 RequestID 格式应不同")
+		assert.NotEqual(traceID, correlationID, "TraceID 和 CorrelationID 格式应不同")
+		assert.NotEqual(spanID, requestID, "SpanID 和 RequestID 格式应不同")
+		assert.NotEqual(spanID, correlationID, "SpanID 和 CorrelationID 格式应不同")
+		assert.NotEqual(requestID, correlationID, "RequestID 和 CorrelationID 格式应不同")
+	})
+
+	t.Run("TraceIDTimeSortable", func(t *testing.T) {
+		id1 := gen.GenerateTraceID()
+		id2 := gen.GenerateTraceID()
+		assert.True(id2 >= id1, "TraceID 应时间可排序（字典序=时间序）")
+	})
+
+	t.Run("Uniqueness", func(t *testing.T) {
+		ids := make(map[string]bool)
+		for i := 0; i < 1000; i++ {
+			id := gen.GenerateTraceID()
+			assert.False(ids[id], "生成的 ID 应唯一")
+			ids[id] = true
+		}
+	})
+}
+
+// TestNumericIDGenerator 测试8位纯数字ID生成器
+func TestNumericIDGenerator(t *testing.T) {
+	gen := NewNumericIDGenerator()
+
+	t.Run("GenerateUserID", func(t *testing.T) {
+		userID := gen.GenerateUserID()
+		assert.NotEmpty(userID, "UserID 不应为空")
+		assert.Equal(8, len(userID), "UserID 应为 8 位数字")
+		assert.True(regexp.MustCompile(`^[1-9]\d{7}$`).MatchString(userID), "UserID 应为 8 位数字（首位非0）")
+	})
+
+	t.Run("GenerateTraceID", func(t *testing.T) {
+		traceID := gen.GenerateTraceID()
+		assert.NotEmpty(traceID, "TraceID 不应为空")
+		assert.Equal(8, len(traceID), "TraceID 应为 8 位数字")
+		assert.True(regexp.MustCompile(`^[1-9]\d{7}$`).MatchString(traceID), "TraceID 应为 8 位数字（首位非0）")
+	})
+
+	t.Run("GenerateSpanID", func(t *testing.T) {
+		spanID := gen.GenerateSpanID()
+		assert.NotEmpty(spanID, "SpanID 不应为空")
+		assert.Equal(8, len(spanID), "SpanID 应为 8 位数字")
+		assert.True(regexp.MustCompile(`^[1-9]\d{7}$`).MatchString(spanID), "SpanID 应为 8 位数字（首位非0）")
+	})
+
+	t.Run("GenerateRequestID", func(t *testing.T) {
+		requestID := gen.GenerateRequestID()
+		assert.NotEmpty(requestID, "RequestID 不应为空")
+		assert.Equal(8, len(requestID), "RequestID 应为 8 位数字")
+		assert.True(regexp.MustCompile(`^[1-9]\d{7}$`).MatchString(requestID), "RequestID 应为 8 位数字（首位非0）")
+	})
+
+	t.Run("GenerateCorrelationID", func(t *testing.T) {
+		correlationID := gen.GenerateCorrelationID()
+		assert.NotEmpty(correlationID, "CorrelationID 不应为空")
+		assert.Equal(8, len(correlationID), "CorrelationID 应为 8 位数字")
+		assert.True(regexp.MustCompile(`^[1-9]\d{7}$`).MatchString(correlationID), "CorrelationID 应为 8 位数字（首位非0）")
+	})
+
+	t.Run("DifferentFormats", func(t *testing.T) {
+		traceID := gen.GenerateTraceID()
+		spanID := gen.GenerateSpanID()
+		requestID := gen.GenerateRequestID()
+		correlationID := gen.GenerateCorrelationID()
+		userID := gen.GenerateUserID()
+
+		assert.NotEqual(traceID, spanID, "TraceID 和 SpanID 应不同")
+		assert.NotEqual(traceID, requestID, "TraceID 和 RequestID 应不同")
+		assert.NotEqual(traceID, correlationID, "TraceID 和 CorrelationID 应不同")
+		assert.NotEqual(spanID, requestID, "SpanID 和 RequestID 应不同")
+		assert.NotEqual(spanID, correlationID, "SpanID 和 CorrelationID 应不同")
+		assert.NotEqual(requestID, correlationID, "RequestID 和 CorrelationID 应不同")
+		assert.NotEqual(userID, traceID, "UserID 和 TraceID 应不同")
+	})
+
+	t.Run("UserIDSequential", func(t *testing.T) {
+		freshGen := NewNumericIDGenerator()
+		id1 := freshGen.GenerateUserID()
+		id2 := freshGen.GenerateUserID()
+		id3 := freshGen.GenerateUserID()
+		assert.True(id2 > id1, "UserID 应严格递增")
+		assert.True(id3 > id2, "UserID 应严格递增")
+	})
+
+	t.Run("UserIDUniqueness", func(t *testing.T) {
+		ids := make(map[string]bool)
+		for i := 0; i < 10000; i++ {
+			id := gen.GenerateUserID()
+			assert.False(ids[id], "生成的 UserID 应唯一")
+			ids[id] = true
+		}
+	})
+
+	t.Run("AllDigitsInRange", func(t *testing.T) {
+		for i := 0; i < 100; i++ {
+			id := gen.GenerateUserID()
+			num, err := strconv.Atoi(id)
+			assert.Nil(err, "UserID 应为纯数字")
+			assert.True(num >= 10000000 && num <= 99999999, "UserID 应在 10000000-99999999 范围内")
+		}
+	})
+
+	t.Run("NoMutexNoTimeWheel", func(t *testing.T) {
+		var wg sync.WaitGroup
+		ids := make(chan string, 10000)
+		for i := 0; i < 10; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for j := 0; j < 1000; j++ {
+					ids <- gen.GenerateUserID()
+				}
+			}()
+		}
+		wg.Wait()
+		close(ids)
+
+		unique := make(map[string]bool)
+		for id := range ids {
+			assert.False(unique[id], "并发生成的 UserID 应唯一")
+			unique[id] = true
+		}
+		assert.Equal(10000, len(unique), "应生成 10000 个唯一 UserID")
+	})
+
+	t.Run("DistributedWorkerID", func(t *testing.T) {
+		gen0 := NewNumericIDGeneratorWithWorker(0)
+		gen1 := NewNumericIDGeneratorWithWorker(1)
+		gen9 := NewNumericIDGeneratorWithWorker(9)
+
+		id0 := gen0.GenerateUserID()
+		id1 := gen1.GenerateUserID()
+		id9 := gen9.GenerateUserID()
+
+		assert.NotEqual(id0, id1, "不同 Worker 的 UserID 应不同")
+		assert.NotEqual(id1, id9, "不同 Worker 的 UserID 应不同")
+
+		num0, _ := strconv.Atoi(id0)
+		num1, _ := strconv.Atoi(id1)
+		num9, _ := strconv.Atoi(id9)
+
+		assert.Equal(num1-num0, 10000, "Worker 1 与 Worker 0 偏移应为 10000")
+		assert.Equal(num9-num0, 90000, "Worker 9 与 Worker 0 偏移应为 90000")
+	})
+
+	t.Run("WorkerIDNoOverlap", func(t *testing.T) {
+		gen0 := NewNumericIDGeneratorWithWorker(0)
+		gen1 := NewNumericIDGeneratorWithWorker(1)
+
+		ids0 := make(map[string]bool)
+		ids1 := make(map[string]bool)
+
+		for i := 0; i < 9999; i++ {
+			ids0[gen0.GenerateUserID()] = true
+			ids1[gen1.GenerateUserID()] = true
+		}
+
+		for id := range ids0 {
+			assert.False(ids1[id], "Worker 0 和 Worker 1 不应生成相同 UserID")
+		}
+	})
+
+	t.Run("PerMachineDailyCapacity", func(t *testing.T) {
+		freshGen := NewNumericIDGeneratorWithWorker(0)
+		first := freshGen.GenerateUserID()
+		numFirst, _ := strconv.Atoi(first)
+
+		for i := 0; i < 9998; i++ {
+			freshGen.GenerateUserID()
+		}
+		last := freshGen.GenerateUserID()
+		numLast, _ := strconv.Atoi(last)
+
+		assert.Equal(numLast-numFirst, 9999, "每机每天应支持 10000 个 UserID（0-9999）")
+	})
+
+	t.Run("WorkerIDModulo", func(t *testing.T) {
+		gen := NewNumericIDGeneratorWithWorker(15)
+		assert.Equal(gen.WorkerID(), uint64(5), "WorkerID 15 %% 10 = 5")
+	})
+
+	t.Run("CustomConfig", func(t *testing.T) {
+		cfg := NumericIDConfig{
+			Epoch:        1704067200,
+			Base:         100000000,
+			WorkerSpace:  100000,
+			MaxWorkers:   5,
+			DaySpace:     500000,
+			RandomDigits: 9,
+			BatchSize:    1000,
+		}
+		gen := NewNumericIDGeneratorWithConfigAndWorker(cfg, 2)
+
+		userID := gen.GenerateUserID()
+		assert.Equal(9, len(userID), "9位配置应生成9位数字")
+
+		spanID := gen.GenerateSpanID()
+		assert.Equal(9, len(spanID), "9位配置的 SpanID 应为9位")
+
+		assert.Equal(uint64(2), gen.WorkerID(), "WorkerID 应为 2")
+		assert.Equal(uint64(5), gen.Config().MaxWorkers, "MaxWorkers 应为 5")
+	})
+
+	t.Run("CustomConfigWorkerOffset", func(t *testing.T) {
+		cfg := NumericIDConfig{
+			Epoch:        1704067200,
+			Base:         100000000,
+			WorkerSpace:  100000,
+			MaxWorkers:   5,
+			DaySpace:     500000,
+			RandomDigits: 9,
+			BatchSize:    1000,
+		}
+		gen0 := NewNumericIDGeneratorWithConfigAndWorker(cfg, 0)
+		gen1 := NewNumericIDGeneratorWithConfigAndWorker(cfg, 1)
+
+		id0 := gen0.GenerateUserID()
+		id1 := gen1.GenerateUserID()
+		num0, _ := strconv.Atoi(id0)
+		num1, _ := strconv.Atoi(id1)
+
+		assert.Equal(num1-num0, 100000, "自定义配置中 Worker 偏移应为 WorkerSpace=100000")
+	})
+
+	t.Run("ConfigValidateFail", func(t *testing.T) {
+		badCfg := NumericIDConfig{
+			Epoch:       0,
+			Base:        10000000,
+			WorkerSpace: 10000,
+			MaxWorkers:  10,
+			DaySpace:    100000,
+			BatchSize:   100,
+		}
+		assert.NotNil(badCfg.Validate(), "Epoch=0 应校验失败")
+
+		mismatchCfg := NumericIDConfig{
+			Epoch:       1704067200,
+			Base:        10000000,
+			WorkerSpace: 10000,
+			MaxWorkers:  10,
+			DaySpace:    99999,
+			BatchSize:   100,
+		}
+		assert.NotNil(mismatchCfg.Validate(), "DaySpace != WorkerSpace*MaxWorkers 应校验失败")
+
+		badBatch := NumericIDConfig{
+			Epoch:       1704067200,
+			Base:        10000000,
+			WorkerSpace: 10000,
+			MaxWorkers:  10,
+			DaySpace:    100000,
+			BatchSize:   0,
+		}
+		assert.NotNil(badBatch.Validate(), "BatchSize=0 应校验失败")
+
+		badBatch2 := NumericIDConfig{
+			Epoch:       1704067200,
+			Base:        10000000,
+			WorkerSpace: 10000,
+			MaxWorkers:  10,
+			DaySpace:    100000,
+			BatchSize:   20000,
+		}
+		assert.NotNil(badBatch2.Validate(), "BatchSize > WorkerSpace 应校验失败")
+	})
+
+	t.Run("CounterStoreBatchPrefetch", func(t *testing.T) {
+		store := &mockCounterStore{data: make(map[string]uint64)}
+
+		cfg := DefaultNumericIDConfig()
+		cfg.Store = store
+		cfg.BatchSize = 10
+
+		gen := NewNumericIDGeneratorWithConfigAndWorker(cfg, 0)
+
+		ids := make([]uint64, 0, 25)
+		for i := 0; i < 25; i++ {
+			idStr := gen.GenerateUserID()
+			id, _ := strconv.ParseUint(idStr, 10, 64)
+			ids = append(ids, id)
+		}
+
+		for i := 1; i < len(ids); i++ {
+			assert.Equal(ids[i]-ids[i-1], uint64(1), fmt.Sprintf("ID应连续递增，ids[%d]=%d ids[%d]=%d", i, ids[i], i-1, ids[i-1]))
+		}
+	})
+
+	t.Run("CounterStoreRecycle", func(t *testing.T) {
+		store := &mockCounterStore{data: make(map[string]uint64)}
+
+		cfg := DefaultNumericIDConfig()
+		cfg.Store = store
+		cfg.BatchSize = 10
+
+		gen1 := NewNumericIDGeneratorWithConfigAndWorker(cfg, 0)
+		id1 := gen1.GenerateUserID()
+		_ = gen1.GenerateUserID()
+		id3 := gen1.GenerateUserID()
+		num3, _ := strconv.Atoi(id3)
+		num1, _ := strconv.Atoi(id1)
+		assert.Equal(num3-num1, 2, "应连续递增")
+
+		gen2 := NewNumericIDGeneratorWithConfigAndWorker(cfg, 0)
+		id4 := gen2.GenerateUserID()
+		num4, _ := strconv.Atoi(id4)
+		assert.True(num4 > num3, fmt.Sprintf("重启后应从上次位置继续，num4=%d > num3=%d", num4, num3))
+	})
+
+	t.Run("CounterStoreDayKeyIsolation", func(t *testing.T) {
+		store := &mockCounterStore{data: make(map[string]uint64)}
+
+		cfg := DefaultNumericIDConfig()
+		cfg.Store = store
+		cfg.BatchSize = 10
+
+		gen := NewNumericIDGeneratorWithConfigAndWorker(cfg, 0)
+		_ = gen.GenerateUserID()
+
+		days := uint64((time.Now().Unix()-cfg.Epoch)/86400) + 1
+		key := fmt.Sprintf("numeric:0:%d", days-1)
+		_, exists := store.data[key]
+		assert.True(exists, fmt.Sprintf("应使用按天隔离的 key: %s", key))
+	})
+
+	t.Run("CounterStoreAtomicIncrement", func(t *testing.T) {
+		store := &mockCounterStore{data: make(map[string]uint64)}
+
+		cfg := DefaultNumericIDConfig()
+		cfg.Store = store
+		cfg.BatchSize = 5
+
+		gen0 := NewNumericIDGeneratorWithConfigAndWorker(cfg, 0)
+		gen1 := NewNumericIDGeneratorWithConfigAndWorker(cfg, 1)
+
+		id0 := gen0.GenerateUserID()
+		id1 := gen1.GenerateUserID()
+		num0, _ := strconv.Atoi(id0)
+		num1, _ := strconv.Atoi(id1)
+
+		assert.True(num1-num0 >= 10000, fmt.Sprintf("不同 Worker 的 ID 应有 WorkerSpace 偏移，num0=%d num1=%d", num0, num1))
 	})
 }
 
@@ -172,19 +629,34 @@ func TestULIDGenerator(t *testing.T) {
 	t.Run("GenerateSpanID", func(t *testing.T) {
 		spanID := gen.GenerateSpanID()
 		assert.NotEmpty(spanID, "SpanID 不应为空")
-		assert.Equal(16, len(spanID), "SpanID 应为 16 字符")
+		assert.Equal(16, len(spanID), "SpanID 应为 16 字符（ULID 随机部分）")
+		assert.True(regexp.MustCompile(`^[0-9A-HJKMNP-TV-Z]{16}$`).MatchString(spanID), "SpanID 应为 ULID 随机部分格式")
 	})
 
 	t.Run("GenerateRequestID", func(t *testing.T) {
 		requestID := gen.GenerateRequestID()
 		assert.NotEmpty(requestID, "RequestID 不应为空")
-		assert.True(regexp.MustCompile(`^[0-9A-HJKMNP-TV-Z]{10}-\d+$`).MatchString(requestID), "RequestID 应包含 ULID 前缀和计数器")
+		assert.True(regexp.MustCompile(`^[0-9A-HJKMNP-TV-Z]{10}-\d+$`).MatchString(requestID), "RequestID 应包含 ULID 时间戳前缀和计数器")
 	})
 
 	t.Run("GenerateCorrelationID", func(t *testing.T) {
 		correlationID := gen.GenerateCorrelationID()
 		assert.NotEmpty(correlationID, "CorrelationID 不应为空")
-		assert.Equal(26, len(correlationID), "CorrelationID 应为 26 字符")
+		assert.True(regexp.MustCompile(`^[0-9A-HJKMNP-TV-Z]{26}-[0-9A-HJKMNP-TV-Z]{26}$`).MatchString(correlationID), "CorrelationID 应为 ULID-ULID 格式")
+	})
+
+	t.Run("DifferentFormats", func(t *testing.T) {
+		traceID := gen.GenerateTraceID()
+		spanID := gen.GenerateSpanID()
+		requestID := gen.GenerateRequestID()
+		correlationID := gen.GenerateCorrelationID()
+
+		assert.NotEqual(traceID, spanID, "TraceID(26字符) 和 SpanID(16字符) 格式应不同")
+		assert.NotEqual(traceID, requestID, "TraceID 和 RequestID 格式应不同")
+		assert.NotEqual(traceID, correlationID, "TraceID 和 CorrelationID 格式应不同")
+		assert.NotEqual(spanID, requestID, "SpanID 和 RequestID 格式应不同")
+		assert.NotEqual(spanID, correlationID, "SpanID 和 CorrelationID 格式应不同")
+		assert.NotEqual(requestID, correlationID, "RequestID 和 CorrelationID 格式应不同")
 	})
 }
 
@@ -216,6 +688,53 @@ func TestFactory(t *testing.T) {
 		assert.NotNil(gen, "生成器不应为 nil")
 		id := gen.GenerateTraceID()
 		assert.Equal(26, len(id), "应生成 ULID")
+	})
+
+	t.Run("SnowflakeUsesDistributedWorkerID", func(t *testing.T) {
+		gen := NewIDGenerator("snowflake")
+		assert.NotNil(gen, "生成器不应为 nil")
+		traceID := gen.GenerateTraceID()
+		assert.NotEmpty(traceID, "Snowflake TraceID 不应为空")
+		assert.Equal(16, len(traceID), "Snowflake TraceID 应为 16 字符 hex")
+	})
+
+	t.Run("ShortFlakeUsesDistributedWorkerID", func(t *testing.T) {
+		gen := NewIDGenerator("shortflake")
+		assert.NotNil(gen, "生成器不应为 nil")
+		traceID := gen.GenerateTraceID()
+		assert.NotEmpty(traceID, "ShortFlake TraceID 不应为空")
+	})
+
+	t.Run("NumericUsesDistributedWorkerID", func(t *testing.T) {
+		gen := NewIDGenerator("numeric")
+		assert.NotNil(gen, "生成器不应为 nil")
+		userID := gen.(*NumericIDGenerator).GenerateUserID()
+		assert.NotEmpty(userID, "Numeric UserID 不应为空")
+		assert.Equal(8, len(userID), "Numeric UserID 应为 8 位数字")
+	})
+}
+
+// TestIDType 测试 IDType 枚举
+func TestIDType(t *testing.T) {
+	assert.Equal(string(IDTypeTraceID), "trace_id", "IDTypeTraceID 应为 trace_id")
+	assert.Equal(string(IDTypeSpanID), "span_id", "IDTypeSpanID 应为 span_id")
+	assert.Equal(string(IDTypeRequestID), "request_id", "IDTypeRequestID 应为 request_id")
+	assert.Equal(string(IDTypeCorrelationID), "correlation_id", "IDTypeCorrelationID 应为 correlation_id")
+}
+
+// TestIDSpec 测试 IDSpec 规格
+func TestIDSpec(t *testing.T) {
+	t.Run("GeneratorType Spec", func(t *testing.T) {
+		spec := GeneratorTypeDefault.Spec()
+		assert.Equal(spec.TraceLen, 32, "Default TraceLen 应为 32")
+		assert.Equal(spec.SpanLen, 16, "Default SpanLen 应为 16")
+		assert.True(spec.RequestCounter, "Default RequestCounter 应为 true")
+		assert.True(spec.CorrelationFmt, "Default CorrelationFmt 应为 true")
+	})
+
+	t.Run("Unknown GeneratorType", func(t *testing.T) {
+		spec := GeneratorType("unknown").Spec()
+		assert.Equal(spec.TraceLen, 32, "Unknown 应回退到 DefaultSpec")
 	})
 }
 
@@ -259,6 +778,26 @@ func BenchmarkSnowflakeGenerator(b *testing.B) {
 	})
 }
 
+// BenchmarkShortIDGenerator 基准测试 - ShortID 生成器
+func BenchmarkShortIDGenerator(b *testing.B) {
+	gen := NewShortIDGenerator()
+	b.Run("GenerateTraceID", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			gen.GenerateTraceID()
+		}
+	})
+}
+
+// BenchmarkNumericIDGenerator 基准测试 - NumericID 生成器
+func BenchmarkNumericIDGenerator(b *testing.B) {
+	gen := NewNumericIDGenerator()
+	b.Run("GenerateUserID", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			gen.GenerateUserID()
+		}
+	})
+}
+
 // BenchmarkULIDGenerator 基准测试 - ULID 生成器
 func BenchmarkULIDGenerator(b *testing.B) {
 	gen := NewULIDGenerator()
@@ -279,6 +818,8 @@ func TestConcurrentGeneration(t *testing.T) {
 		{"UUID", NewUUIDGenerator()},
 		{"NanoID", NewNanoIDGenerator()},
 		{"Snowflake", NewSnowflakeGenerator(1, 1)},
+		{"ShortID", NewShortIDGenerator()},
+		{"Numeric", NewNumericIDGenerator()},
 		{"ULID", NewULIDGenerator()},
 	}
 

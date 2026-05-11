@@ -13,7 +13,10 @@ package idgen
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -26,6 +29,7 @@ type ShortFlakeGenerator struct {
 	nodeID   int64  // 节点ID (0-63)
 	sequence uint64 // 序列号
 	lastTime int64  // 上次生成时间
+	counter  uint64
 	mu       sync.Mutex
 }
 
@@ -39,24 +43,66 @@ func NewShortFlakeGenerator(nodeID int64) *ShortFlakeGenerator {
 	}
 }
 
-// GenerateTraceID 生成跟踪ID
+// GenerateTraceID 生成跟踪ID（hex 编码，13字符）
+// 格式: hex(shortflake_id)
+// 示例: "018f5a3c7d2e4"
+// 与 RequestID 的区别: hex 编码更紧凑，适合 HTTP Header 传递
 func (g *ShortFlakeGenerator) GenerateTraceID() string {
-	return fmt.Sprintf("%d", g.generate())
+	id := g.generate()
+	return fmt.Sprintf("%013x", id)
 }
 
-// GenerateSpanID 生成跨度ID
+// GenerateSpanID 生成跨度ID（hex 低8字符）
+// 格式: hex(shortflake_id & 0xFFFFFFFF)
+// 示例: "7d2e4b10"
+// 与 TraceID 的区别: 更短，仅保留低位部分
 func (g *ShortFlakeGenerator) GenerateSpanID() string {
-	return fmt.Sprintf("%d", g.generate())
+	id := g.generate()
+	return fmt.Sprintf("%08x", id&0xFFFFFFFF)
 }
 
-// GenerateRequestID 生成请求ID
+// GenerateRequestID 生成请求ID（纯数字+计数器后缀）
+// 格式: shortflake数字-递增计数器
+// 示例: "3425234523452-1"
+// 与 TraceID 的区别: 纯数字+计数器，方便日志检索和排序
 func (g *ShortFlakeGenerator) GenerateRequestID() string {
-	return fmt.Sprintf("%d", g.generate())
+	counter := atomic.AddUint64(&g.counter, 1)
+	id := g.generate()
+
+	var sb strings.Builder
+	sb.Grow(24)
+	sb.WriteString(strconv.FormatInt(id, 10))
+	sb.WriteByte('-')
+	sb.WriteString(strconv.FormatUint(counter, 10))
+
+	return sb.String()
 }
 
-// GenerateCorrelationID 生成关联ID
+// GenerateCorrelationID 生成关联ID（UUID 风格的 hex 格式）
+// 格式: 8-4-4-4-4 hex（由 shortflake ID 拆分 + 计数器填充）
+// 示例: "018f5a3c-7d2e-4b10-a1c3-e5f67890"
+// 与 TraceID 的区别: UUID 格式，含连字符，适合跨系统传递
 func (g *ShortFlakeGenerator) GenerateCorrelationID() string {
-	return fmt.Sprintf("%d", g.generate())
+	id1 := g.generate()
+	id2 := g.generate()
+	h1 := fmt.Sprintf("%016x", id1)
+	h2 := fmt.Sprintf("%016x", id2)
+
+	h1 = h1[:12] + "4" + h1[13:]
+	h2 = "8" + h2[1:]
+
+	var buf [36]byte
+	copy(buf[0:8], h1[0:8])
+	buf[8] = '-'
+	copy(buf[9:13], h1[8:12])
+	buf[13] = '-'
+	copy(buf[14:18], h1[12:16])
+	buf[18] = '-'
+	copy(buf[19:23], h2[0:4])
+	buf[23] = '-'
+	copy(buf[24:36], h2[4:16])
+
+	return string(buf[:])
 }
 
 // Generate 生成 53 位整数 ID
@@ -112,24 +158,60 @@ func NewShortFlakeBase62Generator(nodeID int64) *ShortFlakeBase62Generator {
 
 const base62Chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
-// GenerateTraceID 生成 Base62 编码的 TraceID
+// GenerateTraceID 生成 Base62 编码的 TraceID（9-10字符）
+// 格式: base62(shortflake_id)
+// 示例: "aB3xK9mPqR"
+// 与 RequestID 的区别: Base62 编码更短，URL 安全
 func (g *ShortFlakeBase62Generator) GenerateTraceID() string {
 	return g.encodeBase62(g.generate())
 }
 
-// GenerateSpanID 生成 Base62 编码的 SpanID
+// GenerateSpanID 生成 Base62 编码的 SpanID（6字符）
+// 格式: base62(shortflake_id & 0x3FFFFFFFFF)，取低36位
+// 示例: "K9mPxR"
+// 与 TraceID 的区别: 更短，仅保留低位部分
 func (g *ShortFlakeBase62Generator) GenerateSpanID() string {
-	return g.encodeBase62(g.generate())
+	id := g.generate()
+	return g.encodeBase62(id & 0x3FFFFFFFFF)
 }
 
-// GenerateRequestID 生成 Base62 编码的 RequestID
+// GenerateRequestID 生成 Base62 编码的 RequestID（前缀+计数器）
+// 格式: base62前6字符-递增计数器
+// 示例: "aB3xK9-1"
+// 与 TraceID 的区别: 带计数器后缀，可排序
 func (g *ShortFlakeBase62Generator) GenerateRequestID() string {
-	return g.encodeBase62(g.generate())
+	counter := atomic.AddUint64(&g.counter, 1)
+	id := g.generate()
+	prefix := g.encodeBase62(id)
+
+	var sb strings.Builder
+	sb.Grow(16)
+	if len(prefix) >= 6 {
+		sb.WriteString(prefix[:6])
+	} else {
+		sb.WriteString(prefix)
+	}
+	sb.WriteByte('-')
+	sb.WriteString(strconv.FormatUint(counter, 10))
+
+	return sb.String()
 }
 
-// GenerateCorrelationID 生成 Base62 编码的 CorrelationID
+// GenerateCorrelationID 生成 Base62 编码的 CorrelationID（双段拼接）
+// 格式: base62(shortflake_id)-base62(shortflake_id)，18-22字符
+// 示例: "aB3xK9mPqR-xY7wN4qL2v"
+// 与 TraceID 的区别: 双段拼接，增强唯一性，适合跨系统关联
 func (g *ShortFlakeBase62Generator) GenerateCorrelationID() string {
-	return g.encodeBase62(g.generate())
+	id1 := g.generate()
+	id2 := g.generate()
+
+	var sb strings.Builder
+	sb.Grow(22)
+	sb.WriteString(g.encodeBase62(id1))
+	sb.WriteByte('-')
+	sb.WriteString(g.encodeBase62(id2))
+
+	return sb.String()
 }
 
 // encodeBase62 将整数编码为 Base62 字符串（9-10字符）
@@ -138,7 +220,7 @@ func (g *ShortFlakeBase62Generator) encodeBase62(num int64) string {
 		return "0"
 	}
 
-	var result [11]byte // 最多11字符
+	var result [11]byte
 	pos := len(result) - 1
 
 	for num > 0 {

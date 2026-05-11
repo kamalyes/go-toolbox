@@ -13,6 +13,7 @@ package idgen
 
 import (
 	"crypto/rand"
+	"fmt"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -28,18 +29,26 @@ func NewUUIDGenerator() *UUIDGenerator {
 	return &UUIDGenerator{}
 }
 
-// GenerateTraceID 生成跟踪ID
+// GenerateTraceID 生成跟踪ID（完整 UUID v4，36字符）
+// 格式: 8-4-4-4-12 hex（含版本位和变体位）
+// 示例: "550e8400-e29b-41d4-a716-446655440000"
 func (g *UUIDGenerator) GenerateTraceID() string {
 	return g.generateUUID()
 }
 
-// GenerateSpanID 生成跨度ID
+// GenerateSpanID 生成跨度ID（UUID 前16字符，去除连字符）
+// 格式: UUID 前8字节hex（16字符）
+// 示例: "550e8400e29b41d4"
+// 与 TraceID 的区别: 截取 UUID 时间戳部分，更短，同一 Trace 内唯一
 func (g *UUIDGenerator) GenerateSpanID() string {
 	uuid := g.generateUUID()
 	return uuid[:16]
 }
 
-// GenerateRequestID 生成请求ID
+// GenerateRequestID 生成请求ID（UUID前缀+计数器后缀）
+// 格式: UUID前8字符-递增计数器
+// 示例: "550e8400-1"
+// 与 TraceID 的区别: 带计数器后缀，可按请求顺序排序
 func (g *UUIDGenerator) GenerateRequestID() string {
 	counter := atomic.AddUint64(&g.counter, 1)
 	uuid := g.generateUUID()
@@ -53,7 +62,10 @@ func (g *UUIDGenerator) GenerateRequestID() string {
 	return sb.String()
 }
 
-// GenerateCorrelationID 生成关联ID
+// GenerateCorrelationID 生成关联ID（完整 UUID v4，36字符）
+// 格式: 与 TraceID 相同的 UUID v4 格式
+// 示例: "a1b2c3d4-e5f6-41d4-a716-446655440000"
+// 与 TraceID 的区别: 独立生成，不与 TraceID 共享，用于跨系统关联
 func (g *UUIDGenerator) GenerateCorrelationID() string {
 	return g.generateUUID()
 }
@@ -94,4 +106,19 @@ func (g *UUIDGenerator) generateUUID() string {
 	}
 
 	return string(buf[:])
+}
+
+// FormatTraceID 将标准 UUID 格式化为无连字符的 TraceID（32字符）
+// 用于兼容 OpenTelemetry 的 TraceID 格式
+func FormatTraceID(uuid string) string {
+	return strings.ReplaceAll(uuid, "-", "")
+}
+
+// FormatSpanID 从 UUID 中提取 SpanID（16字符）
+func FormatSpanID(uuid string) string {
+	clean := strings.ReplaceAll(uuid, "-", "")
+	if len(clean) >= 16 {
+		return clean[:16]
+	}
+	return fmt.Sprintf("%-16s", clean)
 }

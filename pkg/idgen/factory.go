@@ -11,6 +11,10 @@
 
 package idgen
 
+import (
+	"github.com/kamalyes/go-toolbox/pkg/osx"
+)
+
 // NewIDGenerator 创建 ID 生成器
 func NewIDGenerator(generatorType interface{}) IDGenerator {
 	var typeStr string
@@ -30,9 +34,13 @@ func NewIDGenerator(generatorType interface{}) IDGenerator {
 	case "nanoid":
 		return NewNanoIDGenerator()
 	case "snowflake":
-		return NewSnowflakeGenerator(1, 1)
+		return NewSnowflakeGenerator(osx.GetWorkerIdForSnowflake(), osx.GetDatacenterId())
 	case "shortflake", "short":
-		return NewShortFlakeGenerator(1)
+		return NewShortFlakeGenerator(osx.GetWorkerId() & 0x3F)
+	case "shortid":
+		return NewShortIDGenerator()
+	case "numeric":
+		return NewNumericIDGenerator()
 	case "ulid":
 		return NewULIDGenerator()
 	case "default", "hex", "logger", "":

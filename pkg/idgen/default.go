@@ -31,7 +31,9 @@ func NewDefaultIDGenerator() *DefaultIDGenerator {
 	return &DefaultIDGenerator{}
 }
 
-// GenerateTraceID 生成跟踪ID（零分配优化）
+// GenerateTraceID 生成跟踪ID（32字符 hex，时间戳+随机数，零分配优化）
+// 格式: 16字符时间戳hex + 16字符随机hex = 32字符
+// 示例: "000001234567abcd89ef0123456789ab"
 func (g *DefaultIDGenerator) GenerateTraceID() string {
 	// 使用 stack buffer 避免堆分配
 	var buf [32]byte
@@ -58,7 +60,10 @@ func (g *DefaultIDGenerator) GenerateTraceID() string {
 	return string(buf[:])
 }
 
-// GenerateSpanID 生成跨度ID（零分配优化）
+// GenerateSpanID 生成跨度ID（16字符 hex，纯随机，零分配优化）
+// 格式: 16字符随机hex
+// 示例: "0123456789abcdef"
+// 与 TraceID 的区别: 无时间戳前缀，纯随机，更短
 func (g *DefaultIDGenerator) GenerateSpanID() string {
 	var buf [16]byte
 	var randomBytes [8]byte
@@ -76,12 +81,14 @@ func (g *DefaultIDGenerator) GenerateSpanID() string {
 	return string(buf[:])
 }
 
-// GenerateRequestID 生成请求ID（使用 strings.Builder 优化）
+// GenerateRequestID 生成请求ID（时间戳-计数器格式，可排序）
+// 格式: unix时间戳-递增计数器
+// 示例: "1732184000-1"
+// 与 TraceID 的区别: 带计数器后缀，方便按请求顺序排序
 func (g *DefaultIDGenerator) GenerateRequestID() string {
 	counter := atomic.AddUint64(&g.counter, 1)
 	timestamp := time.Now().Unix()
 
-	// 预分配容量避免扩容
 	var sb strings.Builder
 	sb.Grow(32)
 	sb.WriteString(strconv.FormatInt(timestamp, 10))
@@ -91,17 +98,18 @@ func (g *DefaultIDGenerator) GenerateRequestID() string {
 	return sb.String()
 }
 
-// GenerateCorrelationID 生成关联ID（零分配优化）
+// GenerateCorrelationID 生成关联ID（UUID v4 格式，跨服务传递）
+// 格式: 8-4-4-4-12 hex（含版本位和变体位）
+// 示例: "550e8400-e29b-41d4-a716-446655440000"
+// 与 TraceID 的区别: 标准 UUID 格式，含连字符，适合跨系统关联
 func (g *DefaultIDGenerator) GenerateCorrelationID() string {
 	var buf [36]byte
 	var randomBytes [16]byte
 	rand.Read(randomBytes[:])
 
-	// 设置版本和变体位
 	randomBytes[6] = (randomBytes[6] & 0x0f) | 0x40
 	randomBytes[8] = (randomBytes[8] & 0x3f) | 0x80
 
-	// 快速 hex 编码（UUID 格式）
 	const hexDigits = "0123456789abcdef"
 	encodeHex := func(dst []byte, src []byte) {
 		for i := 0; i < len(src); i++ {

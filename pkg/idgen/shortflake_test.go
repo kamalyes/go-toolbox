@@ -13,7 +13,6 @@ package idgen
 
 import (
 	"regexp"
-	"strconv"
 	"sync"
 	"testing"
 
@@ -27,24 +26,42 @@ func TestShortFlakeGenerator(t *testing.T) {
 	t.Run("GenerateTraceID", func(t *testing.T) {
 		traceID := gen.GenerateTraceID()
 		assert.NotEmpty(traceID, "TraceID 不应为空")
-		assert.True(regexp.MustCompile(`^\d+$`).MatchString(traceID), "TraceID 应为纯数字")
-		
-		// 验证长度（53位最多16位数字）
-		id, _ := strconv.ParseInt(traceID, 10, 64)
-		assert.True(id > 0, "ID 应为正数")
-		assert.True(id < 9007199254740992, "ID 应小于 2^53")
+		assert.Equal(13, len(traceID), "TraceID 应为 13 字符 hex")
+		assert.True(regexp.MustCompile(`^[0-9a-f]{13}$`).MatchString(traceID), "TraceID 应为 hex 格式")
 	})
 
 	t.Run("GenerateSpanID", func(t *testing.T) {
 		spanID := gen.GenerateSpanID()
 		assert.NotEmpty(spanID, "SpanID 不应为空")
-		assert.True(regexp.MustCompile(`^\d+$`).MatchString(spanID), "SpanID 应为纯数字")
+		assert.Equal(8, len(spanID), "SpanID 应为 8 字符 hex")
+		assert.True(regexp.MustCompile(`^[0-9a-f]{8}$`).MatchString(spanID), "SpanID 应为 hex 格式")
 	})
 
 	t.Run("GenerateRequestID", func(t *testing.T) {
 		requestID := gen.GenerateRequestID()
 		assert.NotEmpty(requestID, "RequestID 不应为空")
-		assert.True(regexp.MustCompile(`^\d+$`).MatchString(requestID), "RequestID 应为纯数字")
+		assert.True(regexp.MustCompile(`^\d+-\d+$`).MatchString(requestID), "RequestID 应为 数字-计数器 格式")
+	})
+
+	t.Run("GenerateCorrelationID", func(t *testing.T) {
+		correlationID := gen.GenerateCorrelationID()
+		assert.NotEmpty(correlationID, "CorrelationID 不应为空")
+		assert.Equal(36, len(correlationID), "CorrelationID 应为 36 字符 UUID 格式")
+		assert.True(regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`).MatchString(correlationID), "CorrelationID 应为 UUID 格式")
+	})
+
+	t.Run("DifferentFormats", func(t *testing.T) {
+		traceID := gen.GenerateTraceID()
+		spanID := gen.GenerateSpanID()
+		requestID := gen.GenerateRequestID()
+		correlationID := gen.GenerateCorrelationID()
+
+		assert.NotEqual(traceID, spanID, "TraceID(hex 13字符) 和 SpanID(hex 8字符) 格式应不同")
+		assert.NotEqual(traceID, requestID, "TraceID 和 RequestID 格式应不同")
+		assert.NotEqual(traceID, correlationID, "TraceID 和 CorrelationID 格式应不同")
+		assert.NotEqual(spanID, requestID, "SpanID 和 RequestID 格式应不同")
+		assert.NotEqual(spanID, correlationID, "SpanID 和 CorrelationID 格式应不同")
+		assert.NotEqual(requestID, correlationID, "RequestID 和 CorrelationID 格式应不同")
 	})
 
 	t.Run("Monotonic", func(t *testing.T) {
@@ -66,7 +83,6 @@ func TestShortFlakeGenerator(t *testing.T) {
 	})
 }
 
-// TestShortFlakeBase62Generator 测试 Base62 编码生成器
 func TestShortFlakeBase62Generator(t *testing.T) {
 	gen := NewShortFlakeBase62Generator(1)
 
@@ -80,13 +96,34 @@ func TestShortFlakeBase62Generator(t *testing.T) {
 	t.Run("GenerateSpanID", func(t *testing.T) {
 		spanID := gen.GenerateSpanID()
 		assert.NotEmpty(spanID, "SpanID 不应为空")
-		assert.True(len(spanID) >= 9 && len(spanID) <= 10, "SpanID 应为 9-10 字符")
+		assert.True(len(spanID) >= 1 && len(spanID) <= 7, "SpanID 应为 1-7 字符 Base62")
+		assert.True(regexp.MustCompile(`^[0-9A-Za-z]+$`).MatchString(spanID), "SpanID 应为 Base62 格式")
 	})
 
 	t.Run("GenerateRequestID", func(t *testing.T) {
 		requestID := gen.GenerateRequestID()
 		assert.NotEmpty(requestID, "RequestID 不应为空")
-		assert.True(len(requestID) >= 9 && len(requestID) <= 10, "RequestID 应为 9-10 字符")
+		assert.True(regexp.MustCompile(`^[0-9A-Za-z]+-\d+$`).MatchString(requestID), "RequestID 应为 Base62前缀-计数器 格式")
+	})
+
+	t.Run("GenerateCorrelationID", func(t *testing.T) {
+		correlationID := gen.GenerateCorrelationID()
+		assert.NotEmpty(correlationID, "CorrelationID 不应为空")
+		assert.True(regexp.MustCompile(`^[0-9A-Za-z]+-[0-9A-Za-z]+$`).MatchString(correlationID), "CorrelationID 应为 Base62-Base62 格式")
+	})
+
+	t.Run("DifferentFormats", func(t *testing.T) {
+		traceID := gen.GenerateTraceID()
+		spanID := gen.GenerateSpanID()
+		requestID := gen.GenerateRequestID()
+		correlationID := gen.GenerateCorrelationID()
+
+		assert.NotEqual(traceID, spanID, "TraceID 和 SpanID 格式应不同")
+		assert.NotEqual(traceID, requestID, "TraceID 和 RequestID 格式应不同")
+		assert.NotEqual(traceID, correlationID, "TraceID 和 CorrelationID 格式应不同")
+		assert.NotEqual(spanID, requestID, "SpanID 和 RequestID 格式应不同")
+		assert.NotEqual(spanID, correlationID, "SpanID 和 CorrelationID 格式应不同")
+		assert.NotEqual(requestID, correlationID, "RequestID 和 CorrelationID 格式应不同")
 	})
 
 	t.Run("Uniqueness", func(t *testing.T) {
@@ -102,7 +139,7 @@ func TestShortFlakeBase62Generator(t *testing.T) {
 // TestShortFlakeConcurrent 测试并发生成
 func TestShortFlakeConcurrent(t *testing.T) {
 	gen := NewShortFlakeGenerator(1)
-	
+
 	var wg sync.WaitGroup
 	ids := make(map[int64]bool)
 	mu := sync.Mutex{}
