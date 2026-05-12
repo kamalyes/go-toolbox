@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kamalyes/go-toolbox/pkg/validator"
+	"github.com/kamalyes/go-toolbox/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -260,16 +260,16 @@ func testReturnIfErr[T any](t *testing.T, name string, val T, err error, wantVal
 		gotVal, gotErr := ReturnIfErr(val, err)
 
 		// 特殊处理函数类型，避免直接比较
-		if validator.IsFuncType[T]() {
+		if types.IsFuncType[T]() {
 			// 只判断是否为nil，且错误是否符合预期
 			if wantErr == nil {
 				assert.NoError(t, gotErr)
-				if validator.IsNil(gotVal) {
+				if types.IsNil(gotVal) {
 					t.Errorf("expected non-nil function, got nil")
 				}
 			} else {
 				assert.EqualError(t, gotErr, wantErr.Error())
-				if !validator.IsNil(gotVal) {
+				if !types.IsNil(gotVal) {
 					t.Errorf("expected nil function on error, got non-nil")
 				}
 			}
@@ -802,7 +802,7 @@ func TestIfNotEmptyValue(t *testing.T) {
 	}{
 		{"non-empty string", "hello", "default", "hello"},
 		{"empty string", "", "default", "default"},
-		{"whitespace", "  ", "default", "  "},
+		{"whitespace", "  ", "default", "default"},
 	}
 
 	for _, tt := range tests {

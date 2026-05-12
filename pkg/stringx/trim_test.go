@@ -18,6 +18,8 @@ import (
 
 func TestAllTrimFunctions(t *testing.T) {
 	t.Run("TestTrim", TestTrim)
+	t.Run("TestIsBlank", TestIsBlank)
+	t.Run("TestEqualsTrimIgnoreCase", TestEqualsTrimIgnoreCase)
 	t.Run("TestTrimStart", TestTrimStart)
 	t.Run("TestTrimEnd", TestTrimEnd)
 	t.Run("TestCleanEmpty", TestCleanEmpty)
@@ -37,6 +39,18 @@ func TestTrim(t *testing.T) {
 
 	// Test string with trailing spaces
 	assert.Equal(t, "hi", Trim("hi    "))
+}
+
+func TestIsBlank(t *testing.T) {
+	assert.True(t, IsBlank("  \t\n"))
+	assert.False(t, IsBlank(" value "))
+	assert.True(t, New("  \n").IsBlankChain())
+}
+
+func TestEqualsTrimIgnoreCase(t *testing.T) {
+	assert.True(t, EqualsTrimIgnoreCase("  NULL\n", "null"))
+	assert.False(t, EqualsTrimIgnoreCase(" nil ", "null"))
+	assert.True(t, New("  OK ").EqualsTrimIgnoreCaseChain("ok"))
 }
 
 // TestTrimStart tests the TrimStart function

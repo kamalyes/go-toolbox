@@ -11,7 +11,6 @@
 package validator
 
 import (
-	"reflect"
 	"regexp"
 	"sync"
 )
@@ -54,92 +53,4 @@ func ClearRegexCache() {
 	regexCacheMu.Lock()
 	defer regexCacheMu.Unlock()
 	regexCache = make(map[string]*regexp.Regexp)
-}
-
-// GetReflectKind 获取值的 reflect.Kind（带 nil 处理）
-func GetReflectKind(value interface{}) reflect.Kind {
-	if value == nil {
-		return reflect.Invalid
-	}
-	return reflect.ValueOf(value).Kind()
-}
-
-// IsNumericKind 判断是否为数值类型的 Kind
-func IsNumericKind(kind reflect.Kind) bool {
-	switch kind {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
-		reflect.Float32, reflect.Float64:
-		return true
-	default:
-		return false
-	}
-}
-
-// IsIntegerKind 判断是否为整数类型的 Kind
-func IsIntegerKind(kind reflect.Kind) bool {
-	switch kind {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return true
-	default:
-		return false
-	}
-}
-
-// ToFloat64 将数值类型转换为 float64
-func ToFloat64(value interface{}) (float64, bool) {
-	switch v := value.(type) {
-	case float64:
-		return v, true
-	case float32:
-		return float64(v), true
-	case int:
-		return float64(v), true
-	case int8:
-		return float64(v), true
-	case int16:
-		return float64(v), true
-	case int32:
-		return float64(v), true
-	case int64:
-		return float64(v), true
-	case uint:
-		return float64(v), true
-	case uint8:
-		return float64(v), true
-	case uint16:
-		return float64(v), true
-	case uint32:
-		return float64(v), true
-	case uint64:
-		return float64(v), true
-	default:
-		return 0, false
-	}
-}
-
-// IsWholeNumber 判断浮点数是否为整数（没有小数部分）
-func IsWholeNumber(f float64) bool {
-	return f == float64(int64(f))
-}
-
-// StringPtr 创建字符串指针（辅助函数）
-func StringPtr(s string) *string {
-	return &s
-}
-
-// IntPtr 创建整数指针（辅助函数）
-func IntPtr(i int) *int {
-	return &i
-}
-
-// Float64Ptr 创建 float64 指针（辅助函数）
-func Float64Ptr(f float64) *float64 {
-	return &f
-}
-
-// BoolPtr 创建布尔指针（辅助函数）
-func BoolPtr(b bool) *bool {
-	return &b
 }

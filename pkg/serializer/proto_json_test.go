@@ -154,3 +154,18 @@ func TestProtoJSONUnmarshal(t *testing.T) {
 		_ = ProtoJSONUnmarshal(msg1, msg2)
 	})
 }
+
+func BenchmarkProtoJSONUnmarshalStringValue(b *testing.B) {
+	data := `"benchmark"`
+	var warmup wrapperspb.StringValue
+	_ = ProtoJSONUnmarshal(data, &warmup)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var restored wrapperspb.StringValue
+		if err := ProtoJSONUnmarshal(data, &restored); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

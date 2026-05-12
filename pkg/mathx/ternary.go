@@ -1212,7 +1212,7 @@ func IfHasEmpty[T any](values []interface{}, trueVal, falseVal T) T {
 }
 
 // IfNil Nil检查三元运算
-// 使用 validator.IsNil 检查值是否为 nil
+// 使用 types.IsNil 检查值是否为 nil
 // 如果为 nil，返回 trueVal；否则返回 falseVal
 //
 // 示例：
@@ -1222,11 +1222,11 @@ func IfHasEmpty[T any](values []interface{}, trueVal, falseVal T) T {
 //	result := mathx.IfNil(&value, "is nil", "not nil")           // "not nil"
 //	result := mathx.IfNil([]int(nil), "is nil", "not nil")       // "is nil"
 func IfNil[T any](val interface{}, trueVal, falseVal T) T {
-	return IF(validator.IsNil(val), trueVal, falseVal)
+	return IF(types.IsNil(val), trueVal, falseVal)
 }
 
 // IfNotNilValue 非Nil检查三元运算
-// 使用 validator.IsNil 检查值是否非 nil
+// 使用 types.IsNil 检查值是否非 nil
 // 如果非 nil，返回 trueVal；否则返回 falseVal
 //
 // 示例：
@@ -1234,11 +1234,11 @@ func IfNil[T any](val interface{}, trueVal, falseVal T) T {
 //	result := mathx.IfNotNilValue(&value, "has value", "no value")  // "has value"
 //	result := mathx.IfNotNilValue(nil, "has value", "no value")     // "no value"
 func IfNotNilValue[T any](val interface{}, trueVal, falseVal T) T {
-	return IF(!validator.IsNil(val), trueVal, falseVal)
+	return IF(!types.IsNil(val), trueVal, falseVal)
 }
 
 // IfCEmpty 可比较类型零值检查三元运算
-// 使用 validator.IsCEmpty 检查可比较类型是否为零值
+// 使用 types.IsCEmpty 检查可比较类型是否为零值
 // 如果为零值，返回 trueVal；否则返回 falseVal
 //
 // 示例：
@@ -1247,11 +1247,11 @@ func IfNotNilValue[T any](val interface{}, trueVal, falseVal T) T {
 //	result := mathx.IfCEmpty("", "is empty", "not empty")        // "is empty"
 //	result := mathx.IfCEmpty(false, "is false", "is true")       // "is false"
 func IfCEmpty[T comparable, R any](val T, trueVal, falseVal R) R {
-	return IF(validator.IsCEmpty(val), trueVal, falseVal)
+	return IF(types.IsCEmpty(val), trueVal, falseVal)
 }
 
 // IfNotCEmpty 可比较类型非零值检查三元运算
-// 使用 validator.IsCEmpty 检查可比较类型是否非零值
+// 使用 types.IsCEmpty 检查可比较类型是否非零值
 // 如果非零值，返回 trueVal；否则返回 falseVal
 //
 // 示例：
@@ -1259,7 +1259,7 @@ func IfCEmpty[T comparable, R any](val T, trueVal, falseVal R) R {
 //	result := mathx.IfNotCEmpty("hello", "has text", "empty")    // "has text"
 //	result := mathx.IfNotCEmpty(0, "has value", "zero")          // "zero"
 func IfNotCEmpty[T comparable, R any](val T, trueVal, falseVal R) R {
-	return IF(!validator.IsCEmpty(val), trueVal, falseVal)
+	return IF(!types.IsCEmpty(val), trueVal, falseVal)
 }
 
 // IfIPAllowed IP白名单检查三元运算

@@ -12,13 +12,12 @@ package convert
 
 import (
 	"errors"
-	"fmt"
 	"reflect"
 	"sync"
 	"time"
 
-	"github.com/kamalyes/go-toolbox/pkg/mathx"
 	"github.com/kamalyes/go-toolbox/pkg/syncx"
+	"github.com/kamalyes/go-toolbox/pkg/types"
 )
 
 // 错误信息常量，方便统一维护和复用
@@ -123,13 +122,13 @@ func (t *Transformer) Transform() error {
 		// 默认转换选项
 		defaultOptions := &TransformFieldsOptions{}
 
-		// 如果未设置 opts，则使用默认选项
-		t.opts = mathx.IfDo(t.opts == nil, func() *TransformFieldsOptions {
-			return defaultOptions
-		}, t.opts)
+		if t.opts == nil {
+			t.opts = defaultOptions
+		}
 
-		// 如果未设置时间格式，则使用默认时间格式 time.DateTime
-		t.opts.TimeFormat = mathx.IF(t.opts.TimeFormat == "", time.DateTime, t.opts.TimeFormat)
+		if t.opts.TimeFormat == "" {
+			t.opts.TimeFormat = time.DateTime
+		}
 
 		dstVal := reflect.ValueOf(t.dst)
 		// 目标必须是非 nil 指针
@@ -355,83 +354,5 @@ func checkStrictTypeMatch(src, dst reflect.Value, opts *TransformFieldsOptions) 
 		return nil
 	}
 
-	return checkTypeCompatibility(src.Type(), dst.Type())
-}
-
-func checkTypeCompatibility(srcType, dstType reflect.Type) error {
-	// 保护：防止无效类型导致 panic
-	if srcType == nil || dstType == nil {
-		return fmt.Errorf(ErrTypeMismatchStrict, srcType, dstType)
-	}
-
-	// 自动解引用指针
-	for srcType.Kind() == reflect.Ptr {
-		srcType = srcType.Elem()
-	}
-	for dstType.Kind() == reflect.Ptr {
-		dstType = dstType.Elem()
-	}
-
-	// interface{} 兼容任何类型
-	if dstType.Kind() == reflect.Interface && dstType.NumMethod() == 0 {
-		return nil
-	}
-	if srcType.Kind() == reflect.Interface && srcType.NumMethod() == 0 {
-		return nil
-	}
-
-	// **这里加特殊判断 time.Time -> string 这里是关键，必须在 kind 不匹配前判断**
-	if srcType == reflect.TypeOf(time.Time{}) && dstType.Kind() == reflect.String {
-		return nil
-	}
-
-	if srcType.Kind() != dstType.Kind() {
-		return fmt.Errorf(ErrTypeMismatchStrict, srcType, dstType)
-	}
-
-	switch srcType.Kind() {
-	case reflect.Struct:
-		// 递归比较结构体字段，跳过不可访问字段
-		dstNum := dstType.NumField()
-		for i := 0; i < dstNum; i++ {
-			dstField := dstType.Field(i)
-			if dstField.PkgPath != "" {
-				// 私有字段跳过
-				continue
-			}
-			srcField, ok := srcType.FieldByName(dstField.Name)
-			if !ok {
-				// 源结构体没有对应字段，跳过检查
-				continue
-			}
-			if srcField.PkgPath != "" {
-				// 源结构体字段私有，跳过
-				continue
-			}
-			if err := checkTypeCompatibility(srcField.Type, dstField.Type); err != nil {
-				return err
-			}
-		}
-		return nil
-
-	case reflect.Slice, reflect.Array:
-		return checkTypeCompatibility(srcType.Elem(), dstType.Elem())
-
-	case reflect.Map:
-		if err := checkTypeCompatibility(srcType.Key(), dstType.Key()); err != nil {
-			return err
-		}
-		return checkTypeCompatibility(srcType.Elem(), dstType.Elem())
-
-	case reflect.Func, reflect.Chan, reflect.UnsafePointer:
-		// 不支持的类型，严格模式直接报错
-		return fmt.Errorf("unsupported type in strict mode: %s", srcType.Kind())
-
-	default:
-		// 基本类型必须完全相同
-		if srcType != dstType {
-			return fmt.Errorf(ErrTypeMismatchStrict, srcType, dstType)
-		}
-		return nil
-	}
+	return types.CheckTypeCompatibility(src.Type(), dst.Type())
 }

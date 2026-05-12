@@ -13,6 +13,7 @@ package validator
 import (
 	"testing"
 
+	"github.com/kamalyes/go-toolbox/pkg/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -798,9 +799,9 @@ func BenchmarkJSONSchemaDeepNested(b *testing.B) {
 
 // 辅助函数 - 使用公共辅助函数
 func intPtr(i int) *int {
-	return IntPtr(i)
+	return types.Ptr(i)
 }
 
 func floatPtr(f float64) *float64 {
-	return Float64Ptr(f)
+	return types.Ptr(f)
 }

@@ -540,7 +540,7 @@ func (sc *SliceChain[T]) RemoveEmpty() *SliceChain[T] {
 	return syncx.WithLockReturnValue(&sc.mu, func() *SliceChain[T] {
 		result := sc.data[:0]
 		for _, v := range sc.data {
-			if !validator.IsCEmpty(v) {
+			if !types.IsCEmpty(v) {
 				result = append(result, v)
 			}
 		}

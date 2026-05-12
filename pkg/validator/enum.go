@@ -3,13 +3,13 @@
  * @Date: 2025-12-28 00:00:00
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2025-12-28 00:00:00
- * @FilePath: \go-toolbox\pkg\types\enum.go
+ * @FilePath: \go-toolbox\pkg\validator\enum.go
  * @Description: 枚举类型验证器
  *
  * Copyright (c) 2025 by kamalyes, All Rights Reserved.
  */
 
-package types
+package validator
 
 import (
 	"fmt"

@@ -11,6 +11,7 @@
 package validator
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -21,6 +22,137 @@ import (
 func ValidateJSON(data []byte) error {
 	var v interface{}
 	return json.Unmarshal(data, &v)
+}
+
+// IsJSONNull 判断字节数据去除空白后是否为 JSON null
+func IsJSONNull(data []byte) bool {
+	return bytes.EqualFold(bytes.TrimSpace(data), []byte("null"))
+}
+
+// SkipJSONSpaces 跳过 JSON 字节流中的空白字符，并返回下一个非空白位置
+func SkipJSONSpaces(data []byte, i int) int {
+	for i < len(data) {
+		switch data[i] {
+		case ' ', '\n', '\r', '\t':
+			i++
+		default:
+			return i
+		}
+	}
+	return i
+}
+
+// ScanJSONString 扫描 JSON 字符串，并返回字符串结束后一位的位置
+func ScanJSONString(data []byte, start int) (int, error) {
+	if start >= len(data) || data[start] != '"' {
+		return 0, fmt.Errorf("expected JSON string")
+	}
+	for i := start + 1; i < len(data); i++ {
+		switch data[i] {
+		case '\\':
+			i++
+		case '"':
+			return i + 1, nil
+		}
+	}
+	return 0, fmt.Errorf("unterminated JSON string")
+}
+
+// ScanJSONValueEnd 扫描任意 JSON 值，并返回值结束后一位的位置
+func ScanJSONValueEnd(data []byte, start int) (int, error) {
+	if start >= len(data) {
+		return 0, fmt.Errorf("expected JSON value")
+	}
+
+	switch data[start] {
+	case '"':
+		return ScanJSONString(data, start)
+	case '{', '[':
+		return scanJSONCompositeEnd(data, start)
+	default:
+		return scanJSONScalarEnd(data, start)
+	}
+}
+
+// scanJSONCompositeEnd 扫描 JSON 对象或数组，并校验括号匹配
+func scanJSONCompositeEnd(data []byte, start int) (int, error) {
+	stack := make([]byte, 0, 4)
+	for i := start; i < len(data); i++ {
+		next, done, updated, err := scanJSONCompositeToken(data, i, stack)
+		if err != nil || done {
+			return next, err
+		}
+		stack = updated
+		i = next
+	}
+	return 0, fmt.Errorf("unterminated JSON composite value")
+}
+
+// scanJSONCompositeToken 处理对象或数组中的单个 token
+func scanJSONCompositeToken(data []byte, i int, stack []byte) (next int, done bool, updated []byte, err error) {
+	switch data[i] {
+	case '"':
+		return scanJSONCompositeString(data, i, stack)
+	case '{':
+		return i, false, append(stack, '}'), nil
+	case '[':
+		return i, false, append(stack, ']'), nil
+	case '}', ']':
+		return scanJSONCompositeClose(data[i], i, stack)
+	default:
+		return i, false, stack, nil
+	}
+}
+
+// scanJSONCompositeString 跳过复合 JSON 值中的字符串内容
+func scanJSONCompositeString(data []byte, i int, stack []byte) (next int, done bool, updated []byte, err error) {
+	end, err := ScanJSONString(data, i)
+	if err != nil {
+		return 0, false, stack, err
+	}
+	return end - 1, false, stack, nil
+}
+
+// scanJSONCompositeClose 处理复合 JSON 值中的闭合括号
+func scanJSONCompositeClose(token byte, i int, stack []byte) (next int, done bool, updated []byte, err error) {
+	last := len(stack) - 1
+	if last < 0 || stack[last] != token {
+		return 0, false, stack, fmt.Errorf("mismatched JSON delimiter")
+	}
+	stack = stack[:last]
+	if len(stack) == 0 {
+		return i + 1, true, stack, nil
+	}
+	return i, false, stack, nil
+}
+
+// scanJSONScalarEnd 扫描 JSON 标量值，并返回值结束后一位的位置
+func scanJSONScalarEnd(data []byte, start int) (int, error) {
+	for i := start; i < len(data); i++ {
+		switch data[i] {
+		case ',', '}', ']':
+			return i, nil
+		case ' ', '\n', '\r', '\t':
+			return skipJSONScalarSpaces(data, i), nil
+		}
+	}
+	return len(data), nil
+}
+
+// skipJSONScalarSpaces 跳过标量值末尾空白，并确保空白后是合法分隔符
+func skipJSONScalarSpaces(data []byte, i int) int {
+	end := i
+	for i < len(data) {
+		switch data[i] {
+		case ' ', '\n', '\r', '\t':
+			i++
+		case ',', '}', ']':
+			return end
+		default:
+			return i
+		}
+	}
+	return end
 }
 
 // ValidateJSONWithData 验证JSON并返回解析后的数据

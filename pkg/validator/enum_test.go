@@ -2,14 +2,14 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-12-28 00:00:00
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-12-28 00:00:00
- * @FilePath: \go-toolbox\pkg\types\enum_test.go
+ * @LastEditTime: 2026-05-13 12:25:13
+ * @FilePath: \go-toolbox\pkg\validator\enum_test.go
  * @Description: 枚举验证器测试
  *
  * Copyright (c) 2025 by kamalyes, All Rights Reserved.
  */
 
-package types
+package validator
 
 import (
 	"testing"

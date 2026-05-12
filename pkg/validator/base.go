@@ -17,6 +17,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/kamalyes/go-toolbox/pkg/types"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
@@ -114,57 +115,30 @@ func CheckEmptyTimePointer(v reflect.Value) (isEmpty bool, handled bool) {
 	return false, false
 }
 
+// isWrapperStringValueEmpty 检查 *wrapperspb.StringValue 是否为空
+func isWrapperStringValueEmpty(val *wrapperspb.StringValue) bool {
+	str := strings.TrimSpace(val.Value)
+	return str == ""
+}
+
 // CheckEmptyWrapperPointer 检查 protobuf wrapper 类型是否为空
 func CheckEmptyWrapperPointer(v reflect.Value) (isEmpty bool, handled bool) {
-	if !v.CanInterface() {
+	if !v.CanInterface() || !isProtobufWrapperType(v.Type()) {
 		return false, false
 	}
-
 	// 使用类型断言直接判断
-	switch val := v.Interface().(type) {
-	case *wrapperspb.StringValue:
-		// StringValue: nil 或空字符串（包括空白字符）视为空
+	if val, ok := v.Interface().(*wrapperspb.StringValue); ok {
 		if val == nil {
 			return true, true
 		}
-		str := strings.TrimSpace(val.Value)
-		return str == "" || IsUndefined(str) || IsNull(str), true
-
-	case *wrapperspb.Int32Value:
-		// Int32Value: nil 视为空，0 是有效值
-		return val == nil, true
-
-	case *wrapperspb.Int64Value:
-		// Int64Value: nil 视为空，0 是有效值
-		return val == nil, true
-
-	case *wrapperspb.UInt32Value:
-		// UInt32Value: nil 视为空，0 是有效值
-		return val == nil, true
-
-	case *wrapperspb.UInt64Value:
-		// UInt64Value: nil 视为空，0 是有效值
-		return val == nil, true
-
-	case *wrapperspb.BoolValue:
-		// BoolValue: nil 视为空，false 是有效值
-		return val == nil, true
-
-	case *wrapperspb.FloatValue:
-		// FloatValue: nil 视为空，0.0 是有效值
-		return val == nil, true
-
-	case *wrapperspb.DoubleValue:
-		// DoubleValue: nil 视为空，0.0 是有效值
-		return val == nil, true
-
-	case *wrapperspb.BytesValue:
-		// BytesValue: nil 或空字节数组视为空
-		return val == nil || len(val.Value) == 0, true
-
-	default:
-		return false, false
+		return isWrapperStringValueEmpty(val), true
 	}
+
+	if val, ok := v.Interface().(*wrapperspb.BytesValue); ok {
+		return val == nil || len(val.Value) == 0, true
+	}
+
+	return v.IsNil(), true
 }
 
 // CheckEmptyTimeStruct 检查结构体类型的时间是否为空
@@ -229,14 +203,9 @@ func IsProtobufTimestampEmpty(v reflect.Value) bool {
 }
 
 // IsCEmpty 判断元素是否为类型零值
-// Params：
-//   - v: 需要判断的元素，类型为 T
-//
-// Returns:
-//   - 返回布尔值，true 表示 v 是类型的零值，false 表示非零值
+// Deprecated: 请使用 types.IsCEmpty 替代
 func IsCEmpty[T comparable](v T) bool {
-	var zero T
-	return v == zero
+	return types.IsCEmpty(v)
 }
 
 // HasEmpty checks if any element in the slice is empty.
@@ -299,28 +268,15 @@ func EmptyToDefault(str string, defaultStr string) string {
 }
 
 // IsNil 判断传入的接口值是否为 nil
-// 先判断接口本身是否为 nil，若不是 nil，则通过反射检查其底层值是否为 nil
-// 适用于指针、切片、映射、通道、函数和接口类型的 nil 判断
+// Deprecated: 请使用 types.IsNil 替代
 func IsNil(x interface{}) bool {
-	if x == nil {
-		return true
-	}
-	v := reflect.ValueOf(x)
-	switch v.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
-		return v.IsNil()
-	}
-	return false
+	return types.IsNil(x)
 }
 
-// IsFuncType 判断T是否为函数类型，利用反射
+// IsFuncType 判断传入的类型是否为函数类型
+// Deprecated: 请使用 types.IsFuncType 替代
 func IsFuncType[T any]() bool {
-	var zero T
-	tp := reflect.TypeOf(zero)
-	if tp == nil {
-		return false
-	}
-	return tp.Kind() == reflect.Func
+	return types.IsFuncType[T]()
 }
 
 // IsSafeFieldName 检查字段名是否安全(仅包含字母、数字、下划线、点号)
@@ -362,21 +318,103 @@ func IsAllowedField(field string, allowedFields ...[]string) bool {
 }
 
 // DerefValue 解引用 interface{} 中的指针，返回底层值
-// 如果值为 nil 或指向 nil 指针，则返回 (nil, false)
+// Deprecated: 请使用 types.DerefValue 替代
+func DerefValue(value interface{}) (interface{}, bool) {
+	return types.DerefValue(value)
+}
+
+// protobufWrapperTypes 存储所有 protobuf wrapper 类型的反射类型
+var protobufWrapperTypes = map[reflect.Type]bool{
+	reflect.TypeOf((*wrapperspb.StringValue)(nil)).Elem(): true,
+	reflect.TypeOf((*wrapperspb.Int32Value)(nil)).Elem():  true,
+	reflect.TypeOf((*wrapperspb.Int64Value)(nil)).Elem():  true,
+	reflect.TypeOf((*wrapperspb.UInt32Value)(nil)).Elem(): true,
+	reflect.TypeOf((*wrapperspb.UInt64Value)(nil)).Elem(): true,
+	reflect.TypeOf((*wrapperspb.BoolValue)(nil)).Elem():   true,
+	reflect.TypeOf((*wrapperspb.FloatValue)(nil)).Elem():  true,
+	reflect.TypeOf((*wrapperspb.DoubleValue)(nil)).Elem(): true,
+	reflect.TypeOf((*wrapperspb.BytesValue)(nil)).Elem():  true,
+}
+
+// isProtobufWrapperType 检查类型是否为 protobuf wrapper 类型
+func isProtobufWrapperType(t reflect.Type) bool {
+	// 处理指针类型
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	return protobufWrapperTypes[t]
+}
+
+// invokeGetValue 调用 protobuf wrapper 的 GetValue 方法
+func invokeGetValue(v reflect.Value) (interface{}, bool) {
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil, true
+		}
+		method := v.MethodByName("GetValue")
+		if method.IsValid() {
+			results := method.Call(nil)
+			if len(results) > 0 {
+				return results[0].Interface(), true
+			}
+		}
+		return nil, false
+	}
+
+	ptr := reflect.New(v.Type())
+	ptr.Elem().Set(v)
+	method := ptr.MethodByName("GetValue")
+	if !method.IsValid() {
+		return nil, false
+	}
+	results := method.Call(nil)
+	if len(results) == 0 {
+		return nil, false
+	}
+	return results[0].Interface(), true
+}
+
+// UnwrapProtobufWrapper 解包 protobuf 包装器，返回底层值
+// 如果值为 nil 或指向 nil 指针，则返回 (nil, true)
 // 如果值是指针且非 nil，返回 (dereferencedValue, true)
 // 如果值不是指针，返回 (originalValue, true)
-func DerefValue(value interface{}) (interface{}, bool) {
+func UnwrapProtobufWrapper(value interface{}) (interface{}, bool) {
 	if value == nil {
 		return nil, false
 	}
 	rv := reflect.ValueOf(value)
-	if rv.Kind() == reflect.Ptr {
-		if rv.IsNil() {
-			return nil, false
-		}
-		return rv.Elem().Interface(), true
+	if !isProtobufWrapperType(rv.Type()) {
+		return nil, false
 	}
-	return value, true
+	return invokeGetValue(rv)
+}
+
+// isEmptyUnwrappedProtobufWrapper 判断解包后的 protobuf 包装器是否为空
+// 支持字符串、字节数组、空值、未定义值、空字符串
+// 返回 true 表示为空，false 表示不为空
+func isEmptyUnwrappedProtobufWrapper(value interface{}) bool {
+	switch val := value.(type) {
+	case nil:
+		return true
+	case string:
+		str := strings.TrimSpace(val)
+		return str == ""
+	case []byte:
+		return len(val) == 0
+	default:
+		return false
+	}
+}
+
+// tryUnwrapAndCheckEmpty 尝试解包 protobuf wrapper 并检查是否为空
+// 如果成功解包，返回 (value, true, isEmpty)
+// 如果不是 wrapper 类型，返回 (nil, false, false)
+func tryUnwrapAndCheckEmpty(value interface{}) (interface{}, bool, bool) {
+	unwrapped, ok := UnwrapProtobufWrapper(value)
+	if !ok {
+		return nil, false, false
+	}
+	return unwrapped, true, isEmptyUnwrappedProtobufWrapper(unwrapped)
 }
 
 // IsEmptyAfterDeref 判断值是否为空（用于过滤条件场景）
@@ -386,9 +424,23 @@ func DerefValue(value interface{}) (interface{}, bool) {
 //
 // 适用场景: SQL 构建器中的 IfNotEmpty 系列方法
 func IsEmptyAfterDeref(value interface{}) (interface{}, bool) {
+	if unwrapped, handled, empty := tryUnwrapAndCheckEmpty(value); handled {
+		if empty {
+			return nil, true
+		}
+		return unwrapped, false
+	}
+
 	deref, ok := DerefValue(value)
 	if !ok {
 		return nil, true
+	}
+
+	if unwrapped, handled, empty := tryUnwrapAndCheckEmpty(deref); handled {
+		if empty {
+			return nil, true
+		}
+		return unwrapped, false
 	}
 
 	// bool 的 false 是有效过滤值（例如 status=false），不应被当作空值跳过。

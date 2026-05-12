@@ -15,6 +15,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+
+	"github.com/kamalyes/go-toolbox/pkg/types"
 )
 
 // JSONSchema JSON Schema 定义
@@ -158,7 +160,7 @@ func validateType(value interface{}, expectedType string, path string) error {
 	}
 
 	// 使用公共函数获取类型
-	kind := GetReflectKind(value)
+	kind := types.GetReflectKind(value)
 
 	switch expectedType {
 	case "null":
@@ -175,12 +177,12 @@ func validateType(value interface{}, expectedType string, path string) error {
 		}
 
 	case "integer":
-		if IsIntegerKind(kind) {
+		if types.IsIntegerKind(kind) {
 			return nil
 		}
 		// 允许 float64 但必须是整数
 		if kind == reflect.Float32 || kind == reflect.Float64 {
-			if f, ok := ToFloat64(value); ok && IsWholeNumber(f) {
+			if f, ok := types.ToFloat64OK(value); ok && types.IsWholeNumber(f) {
 				return nil
 			}
 			return fmt.Errorf("%s: 期望整数，实际: %v", path, value)
@@ -188,7 +190,7 @@ func validateType(value interface{}, expectedType string, path string) error {
 		return fmt.Errorf("%s: 期望类型 integer，实际类型 %v", path, kind)
 
 	case "number":
-		if !IsNumericKind(kind) {
+		if !types.IsNumericKind(kind) {
 			return fmt.Errorf("%s: 期望类型 number，实际类型 %v", path, kind)
 		}
 
@@ -237,7 +239,7 @@ func validateString(value interface{}, schema JSONSchema, path string) error {
 
 // validateNumber 验证数字 - 使用公共辅助函数
 func validateNumber(value interface{}, schema JSONSchema, path string) error {
-	num, ok := ToFloat64(value)
+	num, ok := types.ToFloat64OK(value)
 	if !ok {
 		return fmt.Errorf("%s: 不是数字类型", path)
 	}

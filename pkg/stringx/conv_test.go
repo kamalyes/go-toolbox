@@ -2,14 +2,14 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2026-02-28 00:00:00
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2026-02-28 00:00:00
- * @FilePath: \go-toolbox\pkg\convert\fast_format_test.go
- * @Description: 快速格式化函数测试和性能对比
+ * @LastEditTime: 2026-05-13 13:19:57
+ * @FilePath: \go-toolbox\pkg\stringx\conv_test.go
+ * @Description: 字符串转换函数测试和性能对比
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.
  */
 
-package convert
+package stringx
 
 import (
 	"strconv"

@@ -1043,8 +1043,41 @@ func TestDerefValue(t *testing.T) {
 	})
 }
 
+// TestUnwrapProtobufWrapper 测试 protobuf wrapper 解包
+func TestUnwrapProtobufWrapper(t *testing.T) {
+	tests := []struct {
+		name      string
+		value     interface{}
+		expected  interface{}
+		unwrapped bool
+	}{
+		{"string wrapper", wrapperspb.String("hello"), "hello", true},
+		{"string wrapper value", wrapperspb.StringValue{Value: "hello"}, "hello", true},
+		{"int32 wrapper", wrapperspb.Int32(42), int32(42), true},
+		{"int64 wrapper", wrapperspb.Int64(42), int64(42), true},
+		{"uint32 wrapper", wrapperspb.UInt32(42), uint32(42), true},
+		{"uint64 wrapper", wrapperspb.UInt64(42), uint64(42), true},
+		{"bool wrapper false", wrapperspb.Bool(false), false, true},
+		{"float wrapper", wrapperspb.Float(3.14), float32(3.14), true},
+		{"double wrapper", wrapperspb.Double(3.14), 3.14, true},
+		{"bytes wrapper", wrapperspb.Bytes([]byte{1, 2}), []byte{1, 2}, true},
+		{"non wrapper", "hello", nil, false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actual, ok := UnwrapProtobufWrapper(test.value)
+			assert.Equal(t, test.unwrapped, ok)
+			assert.Equal(t, test.expected, actual)
+		})
+	}
+}
+
 // TestIsEmptyAfterDeref 测试 IsEmptyAfterDeref 函数
 func TestIsEmptyAfterDeref(t *testing.T) {
+	var nilStringValue *wrapperspb.StringValue
+	var nilBoolValue *wrapperspb.BoolValue
+
 	tests := []struct {
 		name          string
 		value         interface{}
@@ -1085,6 +1118,23 @@ func TestIsEmptyAfterDeref(t *testing.T) {
 		{"nil *bool", (*bool)(nil), true, nil},
 		{"false *bool", func() *bool { b := false; return &b }(), false, false},
 		{"true *bool", func() *bool { b := true; return &b }(), false, true},
+
+		// protobuf wrapper
+		{"nil StringValue", nilStringValue, true, nil},
+		{"empty StringValue", wrapperspb.String(""), true, nil},
+		{"whitespace StringValue", wrapperspb.String("  "), true, nil},
+		{"null StringValue", wrapperspb.String("null"), false, "null"},
+		{name: "undefined StringValue", value: wrapperspb.String("undefined"), expectedEmpty: false, expectedDeref: "undefined"},
+		{"valid StringValue", wrapperspb.String("hello"), false, "hello"},
+		{"false BoolValue", wrapperspb.Bool(false), false, false},
+		{"true BoolValue", wrapperspb.Bool(true), false, true},
+		{"nil BoolValue", nilBoolValue, true, nil},
+		{"zero Int32Value", wrapperspb.Int32(0), false, int32(0)},
+		{"valid Int64Value", wrapperspb.Int64(42), false, int64(42)},
+		{"zero FloatValue", wrapperspb.Float(0), false, float32(0)},
+		{"zero DoubleValue", wrapperspb.Double(0), false, float64(0)},
+		{"empty BytesValue", wrapperspb.Bytes([]byte{}), true, nil},
+		{"valid BytesValue", wrapperspb.Bytes([]byte{1, 2}), false, []byte{1, 2}},
 
 		// float
 		{"zero float", 0.0, true, nil},

@@ -1,11 +1,11 @@
 ---
 name: validator-validation
-description: 校验器工具，提供JSON Schema校验、结构体校验、字符串/数值比较、IP黑白名单、路径匹配、正则缓存、空值检测。当需要校验JSON数据/结构体、做IP访问控制、或匹配路径与正则时使用。
+description: 校验器工具，提供JSON Schema校验、结构体校验、JSON字节扫描、protobuf wrapper 解包、字符串/数值比较、IP黑白名单、路径匹配、正则缓存、空值检测。当需要校验JSON数据/结构体、扫描 JSON 字段、做IP访问控制、或匹配路径与正则时使用。
 ---
 
 # validator - 校验器
 
-提供JSON Schema校验、结构体校验、IP黑白名单、路径匹配、正则缓存与空值检测。
+提供JSON Schema校验、结构体校验、JSON 字节扫描、protobuf wrapper 解包、IP黑白名单、路径匹配、正则缓存与空值检测。
 
 ## 快速开始
 
@@ -37,6 +37,10 @@ matched := validator.MatchPathInList("/api/v1/users", patterns)
 | `IsEmptyStruct` | `func(v interface{}) bool` | 检测结构体是否为零值 |
 | `IsUndefined` | `func(v interface{}) bool` | 检测值是否未定义 |
 | `IsNull` | `func(v interface{}) bool` | 检测值是否为null |
+| `UnwrapProtobufWrapper` | `func(value interface{}) (interface{}, bool)` | 解包 protobuf wrapper，返回底层值 |
+| `IsEmptyAfterDeref` | `func(value interface{}) (interface{}, bool)` | 解引用并判断过滤条件是否为空，支持 protobuf wrapper |
+
+> `IsNil`、`IsCEmpty`、`IsFuncType`、`DerefValue` 已保留为兼容入口，新代码优先使用 `types` 包同名能力。
 
 #### 字符串比较
 
@@ -62,6 +66,15 @@ matched := validator.MatchPathInList("/api/v1/users", patterns)
 | `NewSchemaBuilder` | `func() *SchemaBuilder` | 创建Schema构建器 |
 | `QuickSchema` | `func(properties, required ...) string` | 快捷创建Schema |
 | `FormatSchemaError` | `func(result interface{}) string` | 格式化Schema校验错误 |
+
+#### JSON字节扫描
+
+| 导出名称 | 签名 | 说明 |
+|---|---|---|
+| `IsJSONNull` | `func(data []byte) bool` | 判断去空白后是否为 JSON null，忽略大小写 |
+| `SkipJSONSpaces` | `func(data []byte, i int) int` | 跳过 JSON 空白字符并返回下一个位置 |
+| `ScanJSONString` | `func(data []byte, start int) (int, error)` | 扫描 JSON 字符串并返回结束后一位 |
+| `ScanJSONValueEnd` | `func(data []byte, start int) (int, error)` | 扫描任意 JSON 值并返回结束后一位 |
 
 #### 数值比较
 
@@ -98,14 +111,14 @@ matched := validator.MatchPathInList("/api/v1/users", patterns)
 | `GetCompiledRegex` | `func(pattern string) *regexp.Regexp` | 获取编译缓存的正则 |
 | `ClearRegexCache` | `func()` | 清除正则缓存 |
 
-#### 辅助函数
+#### 辅助函数（迁移说明）
 
 | 导出名称 | 签名 | 说明 |
 |---|---|---|
-| `StringPtr` | `func(s string) *string` | 字符串指针工具 |
-| `IntPtr` | `func(i int) *int` | 整数指针工具 |
-| `Float64Ptr` | `func(f float64) *float64` | 浮点指针工具 |
-| `BoolPtr` | `func(b bool) *bool` | 布尔指针工具 |
+| `types.Ptr` | `func(v T) *T` | 通用指针工具，替代旧的 `StringPtr`/`IntPtr`/`Float64Ptr`/`BoolPtr` |
+| `types.GetReflectKind` | `func(value interface{}) reflect.Kind` | 获取反射 Kind |
+| `types.IsNumericKind` | `func(kind reflect.Kind) bool` | 判断数值 Kind |
+| `types.ToFloat64OK` | `func(value interface{}) (float64, bool)` | 数值转 float64 |
 
 ### 类型
 
@@ -122,3 +135,5 @@ matched := validator.MatchPathInList("/api/v1/users", patterns)
 - `GetCompiledRegex` 内部有缓存，相同正则只编译一次
 - `ValidateJSONSchema` 仅校验schema格式，不校验数据
 - `IsIPAllowed` 同时支持IPv4和IPv6格式
+- JSON scanner 只负责定位 JSON 值边界，不替代完整 schema 校验
+- 通用类型判断和反射工具已下沉到 `types`，validator 仅保留校验语义和兼容入口

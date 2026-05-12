@@ -1,11 +1,11 @@
 ---
 name: stringx-string-operations
-description: 字符串操作链式工具，提供链式调用、子串提取、隐藏脱敏、填充对齐、显示宽度计算、前后缀判断、替换等。当需要对字符串做链式变换、截取前后子串、脱敏或格式化对齐时使用。
+description: 字符串操作链式工具，提供链式调用、子串提取、隐藏脱敏、填充对齐、显示宽度计算、前后缀判断、替换、快速数字/时间格式化、JSON 字符串引用等。当需要对字符串做链式变换、截取前后子串、脱敏、格式化对齐、快速追加整数或构造 JSON 字段名时使用。
 ---
 
 # stringx - 字符串操作链式工具
 
-提供链式字符串变换、子串提取、脱敏隐藏、填充对齐、显示宽度计算与前后缀匹配。
+提供链式字符串变换、子串提取、脱敏隐藏、填充对齐、显示宽度计算、前后缀匹配、快速格式化与 JSON 字符串引用。
 
 ## 快速开始
 
@@ -47,6 +47,8 @@ hidden := stringx.Hide("13812345678", 3, 7)
 | 导出名称 | 签名 | 说明 |
 |---|---|---|
 | `Trim` | `func(s string) string` | 去除两端空白 |
+| `IsBlank` | `func(s string) bool` | 去除首尾空白后判断是否为空 |
+| `EqualsTrimIgnoreCase` | `func(s1, s2 string) bool` | 去除首尾空白后忽略大小写比较 |
 | `TrimStart` | `func(s string) string` | 去除前导空白 |
 | `TrimEnd` | `func(s string) string` | 去除尾部空白 |
 | `CleanEmpty` | `func(s string) string` | 清理空白字符 |
@@ -102,6 +104,18 @@ hidden := stringx.Hide("13812345678", 3, 7)
 | `Length` | `func(s string) int` | 计算rune长度 |
 | `IndexOf` | `func(s, substr string) int` | 查找子串位置 |
 | `NormalizeFieldName` | `func(s string) string` | 规范化字段名 |
+| `QuoteJSONBytes` | `func(s string) []byte` | 按 JSON 字符串规则转义并返回带双引号的字节 |
+
+#### 快速格式化
+
+| 导出名称 | 签名 | 说明 |
+|---|---|---|
+| `FastItoa` | `func(val int) string` | 快速整数转字符串，小整数使用缓存 |
+| `FastFloat` | `func(val float64, prec int) string` | 浮点数转字符串 |
+| `FastAppendInt` | `func(buf []byte, val int) []byte` | 将整数快速追加到 byte buffer |
+| `FastFormatTime` | `func(buf []byte, t time.Time) []byte` | 格式化时间为 `YYYY/M/D H:MM:SS ` |
+| `FastFormatTimeISO` | `func(buf []byte, t time.Time) []byte` | 格式化时间为 ISO 样式 |
+| `FastFormatTimeCompact` | `func(buf []byte, t time.Time) []byte` | 格式化时间为紧凑数字样式 |
 
 ### 类型
 
@@ -122,7 +136,7 @@ hidden := stringx.Hide("13812345678", 3, 7)
 
 `StringX` 支持以下链式方法（每个方法返回新的 `StringX`）：
 
-`ToLowerChain`, `ToUpperChain`, `ToTitleChain`, `TrimChain`, `TrimStartChain`, `TrimEndChain`, `CleanEmptyChain`, `TrimProtocolChain`, `TrimAllChain`, `TrimAnyChain`, `TrimAllLineBreaksChain`, `TrimPrefixChain`, `TrimPrefixIgnoreCaseChain`, `TrimSuffixChain`, `TrimSuffixIgnoreCaseChain`, `TrimSymbolsChain`, `ReplaceChain`, `ReplaceAllChain`, `HideChain`, `PadChain`, `SubBeforeChain`, `SubAfterChain`, `SubBetweenChain`, `String()`
+`ToLowerChain`, `ToUpperChain`, `ToTitleChain`, `TrimChain`, `IsBlankChain`, `EqualsTrimIgnoreCaseChain`, `TrimStartChain`, `TrimEndChain`, `CleanEmptyChain`, `TrimProtocolChain`, `TrimAllChain`, `TrimAnyChain`, `TrimAllLineBreaksChain`, `TrimPrefixChain`, `TrimPrefixIgnoreCaseChain`, `TrimSuffixChain`, `TrimSuffixIgnoreCaseChain`, `TrimSymbolsChain`, `ReplaceChain`, `ReplaceAllChain`, `HideChain`, `PadChain`, `SubBeforeChain`, `SubAfterChain`, `SubBetweenChain`, `String()`
 
 ## 常用示例
 
@@ -134,3 +148,5 @@ hidden := stringx.Hide("13812345678", 3, 7)
 - `DisplayWidth` 对CJK字符计宽为2，ASCII计1，用于终端对齐
 - `Hide` 的 start/end 参数为rune索引，非字节偏移
 - `SubBetweenAll` 返回所有匹配，若无匹配返回空切片
+- 快速数字/时间格式化能力已从 `convert` 迁移到 `stringx`
+- 构造 JSON 对象字段名时优先使用 `QuoteJSONBytes`，避免手写转义

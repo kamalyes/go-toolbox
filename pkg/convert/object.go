@@ -14,6 +14,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+
+	"github.com/kamalyes/go-toolbox/pkg/stringx"
 )
 
 // ParseObjectToMap 解析对象为 key-value map
@@ -124,25 +126,25 @@ func AppendValue(buf []byte, v any) []byte {
 	case []byte:
 		return append(buf, val...)
 	case int:
-		return FastAppendInt(buf, val)
+		return stringx.FastAppendInt(buf, val)
 	case int8:
-		return FastAppendInt(buf, int(val))
+		return stringx.FastAppendInt(buf, int(val))
 	case int16:
-		return FastAppendInt(buf, int(val))
+		return stringx.FastAppendInt(buf, int(val))
 	case int32:
-		return FastAppendInt(buf, int(val))
+		return stringx.FastAppendInt(buf, int(val))
 	case int64:
-		return FastAppendInt(buf, int(val))
+		return stringx.FastAppendInt(buf, int(val))
 	case uint:
-		return FastAppendInt(buf, int(val))
+		return stringx.FastAppendInt(buf, int(val))
 	case uint8:
-		return FastAppendInt(buf, int(val))
+		return stringx.FastAppendInt(buf, int(val))
 	case uint16:
-		return FastAppendInt(buf, int(val))
+		return stringx.FastAppendInt(buf, int(val))
 	case uint32:
-		return FastAppendInt(buf, int(val))
+		return stringx.FastAppendInt(buf, int(val))
 	case uint64:
-		return FastAppendInt(buf, int(val))
+		return stringx.FastAppendInt(buf, int(val))
 	case uintptr:
 		return append(buf, fmt.Sprintf("0x%x", val)...)
 	case bool:
@@ -151,9 +153,9 @@ func AppendValue(buf []byte, v any) []byte {
 		}
 		return append(buf, "false"...)
 	case float32:
-		return append(buf, FastFloat(float64(val), 2)...)
+		return append(buf, stringx.FastFloat(float64(val), 2)...)
 	case float64:
-		return append(buf, FastFloat(val, 2)...)
+		return append(buf, stringx.FastFloat(val, 2)...)
 	case complex64:
 		return append(buf, fmt.Sprint(val)...)
 	case complex128:

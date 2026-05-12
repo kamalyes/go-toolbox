@@ -15,7 +15,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/gob"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -282,7 +281,7 @@ func (s *Serializer[T]) encodeGob(obj T) ([]byte, error) {
 
 // encodeJSON JSON编码
 func (s *Serializer[T]) encodeJSON(obj T) ([]byte, error) {
-	return json.Marshal(obj)
+	return JSONMarshal(obj)
 }
 
 // decodeWithFallback 带回退的解码
@@ -328,7 +327,7 @@ func (s *Serializer[T]) decodeGob(data []byte, obj *T) error {
 
 // decodeJSON JSON解码
 func (s *Serializer[T]) decodeJSON(data []byte, obj *T) error {
-	return json.Unmarshal(data, obj)
+	return JSONUnmarshal(data, obj)
 }
 
 // compress 压缩数据（使用zipx优化池化实现）
@@ -461,7 +460,7 @@ func NewUltraCompact[T any]() *Serializer[T] {
 
 // ToJSON 将任意类型转换为 JSON 字符串（兼容 nil 和零值）
 func ToJSON[T any](v T) string {
-	data, err := json.Marshal(v)
+	data, err := JSONMarshal(v)
 	if err != nil {
 		return ""
 	}
@@ -475,7 +474,7 @@ func FromJSON[T any](jsonStr string) T {
 		return zero
 	}
 	var result T
-	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
+	if err := JSONUnmarshal([]byte(jsonStr), &result); err != nil {
 		return zero
 	}
 	return result

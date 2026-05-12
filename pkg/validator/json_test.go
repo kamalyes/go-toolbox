@@ -47,6 +47,30 @@ func TestValidateJSON(t *testing.T) {
 	}
 }
 
+func TestIsJSONNull(t *testing.T) {
+	a := assert.New(t)
+	a.True(IsJSONNull([]byte("null")))
+	a.True(IsJSONNull([]byte("  NULL\n")))
+	a.False(IsJSONNull([]byte("\"null\"")))
+	a.False(IsJSONNull([]byte("")))
+}
+
+func TestJSONScannerHelpers(t *testing.T) {
+	data := []byte(`  {"nested":[1,{"name":"test"}]} ,`)
+	start := SkipJSONSpaces(data, 0)
+	end, err := ScanJSONValueEnd(data, start)
+	assert.NoError(t, err)
+	assert.Equal(t, `{"nested":[1,{"name":"test"}]}`, string(data[start:end]))
+
+	strEnd, err := ScanJSONString([]byte(`"a\\b"`), 0)
+	assert.NoError(t, err)
+	assert.Equal(t, len(`"a\\b"`), strEnd)
+
+	valueEnd, err := ScanJSONValueEnd([]byte(`null]`), 0)
+	assert.NoError(t, err)
+	assert.Equal(t, len("null"), valueEnd)
+}
+
 func TestValidateJSONWithData(t *testing.T) {
 	a := assert.New(t)
 	data := []byte(`{"name":"test","value":123}`)

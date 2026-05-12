@@ -23,10 +23,30 @@ func Trim(str string) string {
 	return strings.TrimSpace(str)
 }
 
+// IsBlank 判断字符串去除首尾空白后是否为空
+func IsBlank(str string) bool {
+	return Trim(str) == ""
+}
+
+// EqualsTrimIgnoreCase 去除首尾空白后忽略大小写比较字符串
+func EqualsTrimIgnoreCase(str1 string, str2 string) bool {
+	return EqualsIgnoreCase(Trim(str1), Trim(str2))
+}
+
 // TrimChain 除去字符串头尾部的空白（链式调用）
 func (s *StringX) TrimChain() *StringX {
 	s.value = Trim(s.value)
 	return s
+}
+
+// IsBlankChain 判断字符串去除首尾空白后是否为空（链式调用）
+func (s *StringX) IsBlankChain() bool {
+	return IsBlank(s.value)
+}
+
+// EqualsTrimIgnoreCaseChain 去除首尾空白后忽略大小写比较字符串（链式调用）
+func (s *StringX) EqualsTrimIgnoreCaseChain(str2 string) bool {
+	return EqualsTrimIgnoreCase(s.value, str2)
 }
 
 // TrimStart 除去字符串头部的空白
