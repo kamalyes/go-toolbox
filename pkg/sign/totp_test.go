@@ -222,6 +222,73 @@ func TestGenerateBackupCodesSingle(t *testing.T) {
 	assert.NotEmpty(t, codes[0])
 }
 
+func TestGenerateTOTPBindingDefaultConfig(t *testing.T) {
+	binding := GenerateTOTPBinding("device-1", "user@example.com", "TestApp", 20, 3, nil)
+
+	assert.NotNil(t, binding)
+	assert.Equal(t, "device-1", binding.DeviceID)
+	assert.NotEmpty(t, binding.Secret)
+	assert.Len(t, binding.BackupCodes, 3)
+	assert.Equal(t, *DefaultTOTPConfig(), binding.TOTPConfig)
+
+	assert.True(t, strings.HasPrefix(binding.QRCodeURI, "otpauth://totp/"))
+	assert.Contains(t, binding.QRCodeURI, "TestApp:user@example.com")
+	assert.Contains(t, binding.QRCodeURI, "secret="+binding.Secret)
+	assert.Contains(t, binding.QRCodeURI, "issuer=TestApp")
+	assert.Contains(t, binding.QRCodeURI, "algorithm=SHA1")
+	assert.Contains(t, binding.QRCodeURI, "digits=6")
+	assert.Contains(t, binding.QRCodeURI, "period=30")
+
+	for _, code := range binding.BackupCodes {
+		assert.True(t, isHex(code))
+		assert.Len(t, code, 8)
+	}
+
+	totpCode, err := GenerateTOTPCode(binding.Secret, &binding.TOTPConfig)
+	assert.NoError(t, err)
+	assert.True(t, ValidateTOTPCode(binding.Secret, totpCode, &binding.TOTPConfig))
+}
+
+func TestGenerateTOTPBindingCustomConfig(t *testing.T) {
+	config := &TOTPConfig{
+		Digits:    8,
+		Period:    60,
+		Skew:      2,
+		Algorithm: "SHA1",
+	}
+
+	binding := GenerateTOTPBinding("device-2", "ops@example.com", "OpsApp", 32, 2, config)
+
+	assert.NotNil(t, binding)
+	assert.Equal(t, "device-2", binding.DeviceID)
+	assert.NotEmpty(t, binding.Secret)
+	assert.Len(t, binding.BackupCodes, 2)
+	assert.Equal(t, *config, binding.TOTPConfig)
+	assert.Contains(t, binding.QRCodeURI, "OpsApp:ops@example.com")
+	assert.Contains(t, binding.QRCodeURI, "secret="+binding.Secret)
+	assert.Contains(t, binding.QRCodeURI, "issuer=OpsApp")
+	assert.Contains(t, binding.QRCodeURI, "digits=8")
+	assert.Contains(t, binding.QRCodeURI, "period=60")
+
+	config.Digits = 6
+	assert.Equal(t, 8, binding.TOTPConfig.Digits)
+
+	totpCode, err := GenerateTOTPCode(binding.Secret, &binding.TOTPConfig)
+	assert.NoError(t, err)
+	assert.Len(t, totpCode, 8)
+	assert.True(t, ValidateTOTPCode(binding.Secret, totpCode, &binding.TOTPConfig))
+}
+
+func TestGenerateTOTPBindingZeroBackupCodes(t *testing.T) {
+	binding := GenerateTOTPBinding("device-3", "user@example.com", "TestApp", 0, 0, nil)
+
+	assert.NotNil(t, binding)
+	assert.NotEmpty(t, binding.Secret)
+	assert.Empty(t, binding.BackupCodes)
+	assert.Equal(t, *DefaultTOTPConfig(), binding.TOTPConfig)
+	assert.Contains(t, binding.QRCodeURI, "secret="+binding.Secret)
+}
+
 func TestGenerateAndValidateFlow(t *testing.T) {
 	secret := GenerateTOTPSecret(20)
 	config := DefaultTOTPConfig()

@@ -34,6 +34,23 @@ type TOTPConfig struct {
 	Algorithm string // 哈希算法，默认SHA1
 }
 
+// TOTPBinding 包含待绑定的TOTP设备信息
+type TOTPBinding struct {
+	DeviceID    string     `json:"device_id"`
+	Secret      string     `json:"secret"`
+	QRCodeURI   string     `json:"qr_code_uri"`
+	BackupCodes []string   `json:"backup_codes"`
+	TOTPConfig  TOTPConfig `json:"totp_config"`
+}
+
+// TOTPBindingResult 包含TOTP绑定结果信息
+type TOTPBindingResult struct {
+	DeviceID    string
+	Secret      string
+	QRCodeURI   string
+	BackupCodes []string
+}
+
 // DefaultTOTPConfig 返回默认TOTP配置
 func DefaultTOTPConfig() *TOTPConfig {
 	return &TOTPConfig{
@@ -184,4 +201,21 @@ func ConsumeBackupCode(backupCodesJSON, code string) (bool, string) {
 		}
 	}
 	return false, backupCodesJSON
+}
+
+// ValidateTOTPCode 验证TOTP验证码
+// 基于RFC 6238算法，允许前后Skew个时间窗口
+// GenerateTOTPBinding generates a TOTP secret, backup codes, and QR URI for a device.
+func GenerateTOTPBinding(deviceID, account, issuer string, secretLength, backupCodeCount int, config *TOTPConfig) *TOTPBinding {
+	if config == nil {
+		config = DefaultTOTPConfig()
+	}
+	secret := GenerateTOTPSecret(secretLength)
+	return &TOTPBinding{
+		DeviceID:    deviceID,
+		Secret:      secret,
+		QRCodeURI:   GenerateTOTPURI(secret, account, issuer, config),
+		BackupCodes: GenerateBackupCodes(backupCodeCount),
+		TOTPConfig:  *config,
+	}
 }
