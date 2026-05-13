@@ -1164,3 +1164,45 @@ func TestIsEmptyAfterDeref(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeFilterValue(t *testing.T) {
+	t.Run("protobuf wrapper", func(t *testing.T) {
+		assert.Equal(t, "group-1", NormalizeFilterValue(wrapperspb.String("group-1")))
+		assert.Equal(t, false, NormalizeFilterValue(wrapperspb.Bool(false)))
+		assert.Equal(t, int32(0), NormalizeFilterValue(wrapperspb.Int32(0)))
+	})
+
+	t.Run("slice and array", func(t *testing.T) {
+		assert.Equal(t, []interface{}{"a", "b"}, NormalizeFilterValue([]*wrapperspb.StringValue{wrapperspb.String("a"), wrapperspb.String("b")}))
+		assert.Equal(t, []interface{}{int32(1), int32(2)}, NormalizeFilterValue([2]*wrapperspb.Int32Value{wrapperspb.Int32(1), wrapperspb.Int32(2)}))
+		assert.Equal(t, []interface{}{"x", []interface{}{"y"}}, NormalizeFilterValue([]interface{}{wrapperspb.String("x"), []interface{}{wrapperspb.String("y")}}))
+	})
+
+	t.Run("nil slice", func(t *testing.T) {
+		var values []*wrapperspb.StringValue
+		assert.Nil(t, NormalizeFilterValue(values))
+	})
+}
+
+func TestNormalizeFilterValueIfNotEmpty(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    interface{}
+		expected interface{}
+		empty    bool
+	}{
+		{"empty string wrapper", wrapperspb.String(""), nil, true},
+		{"valid string wrapper", wrapperspb.String("TENANT"), "TENANT", false},
+		{"false bool wrapper", wrapperspb.Bool(false), false, false},
+		{"zero int wrapper", wrapperspb.Int32(0), int32(0), false},
+		{"wrapper slice", []*wrapperspb.StringValue{wrapperspb.String("a"), wrapperspb.String("b")}, []interface{}{"a", "b"}, false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actual, empty := NormalizeFilterValueIfNotEmpty(test.value)
+			assert.Equal(t, test.empty, empty)
+			assert.Equal(t, test.expected, actual)
+		})
+	}
+}

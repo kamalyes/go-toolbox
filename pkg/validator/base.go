@@ -453,3 +453,60 @@ func IsEmptyAfterDeref(value interface{}) (interface{}, bool) {
 	}
 	return deref, false
 }
+
+// NormalizeFilterValue 归一化过滤条件值。
+// 支持 protobuf wrapper 解包，并将切片/数组递归转换为 []interface{}。
+func NormalizeFilterValue(value interface{}) interface{} {
+	if normalized, ok := UnwrapProtobufWrapper(value); ok {
+		return normalized
+	}
+
+	if values, ok := value.([]interface{}); ok {
+		return NormalizeFilterValueSlice(values)
+	}
+
+	rv := reflect.ValueOf(value)
+	if !rv.IsValid() {
+		return value
+	}
+	if rv.Kind() == reflect.Slice || rv.Kind() == reflect.Array {
+		if rv.Kind() == reflect.Slice && rv.IsNil() {
+			return nil
+		}
+		return normalizeReflectFilterValueSlice(rv)
+	}
+
+	return value
+}
+
+// NormalizeFilterValueSlice 递归归一化过滤条件值切片。
+func NormalizeFilterValueSlice(values []interface{}) []interface{} {
+	if values == nil {
+		return nil
+	}
+
+	normalized := make([]interface{}, len(values))
+	for i, value := range values {
+		normalized[i] = NormalizeFilterValue(value)
+	}
+	return normalized
+}
+
+// NormalizeFilterValueIfNotEmpty 先按过滤条件规则判断空值，再返回归一化后的值。
+func NormalizeFilterValueIfNotEmpty(value interface{}) (interface{}, bool) {
+	deref, empty := IsEmptyAfterDeref(value)
+	if empty {
+		return nil, true
+	}
+	return NormalizeFilterValue(deref), false
+}
+
+// normalizeReflectFilterValueSlice 递归归一化反射值切片。
+// 支持 protobuf wrapper 解包，并将切片/数组递归转换为 []interface{}。
+func normalizeReflectFilterValueSlice(values reflect.Value) []interface{} {
+	normalized := make([]interface{}, values.Len())
+	for i := 0; i < values.Len(); i++ {
+		normalized[i] = NormalizeFilterValue(values.Index(i).Interface())
+	}
+	return normalized
+}
