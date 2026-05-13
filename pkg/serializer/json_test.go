@@ -225,6 +225,15 @@ func TestJSONUnmarshalNilTargetError(t *testing.T) {
 	assert.True(t, IsJSONNilTargetError(err))
 }
 
+func TestNormalizeJSONText(t *testing.T) {
+	assert.Equal(t, "{}", NormalizeJSONText(""))
+	assert.Equal(t, "{}", NormalizeJSONText(" \n\t "))
+	assert.Equal(t, "[]", NormalizeJSONText("", "[]"))
+	assert.Equal(t, `{"name":"test"}`, NormalizeJSONText(` {"name":"test"} `))
+	assert.Equal(t, `{name:"test"}`, NormalizeJSONText(` {name:"test"} `))
+	assert.Equal(t, "{}", NormalizeJSONText("", "not-json"))
+}
+
 func TestJSONUnmarshalExpectedObjectError(t *testing.T) {
 	var payload jsonProtoPayload
 	err := JSONUnmarshal([]byte(`[]`), &payload)

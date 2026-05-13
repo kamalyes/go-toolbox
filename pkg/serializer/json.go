@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/kamalyes/go-toolbox/pkg/stringx"
@@ -23,6 +24,8 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
+
+const DefaultJSONText = "{}"
 
 type jsonFieldMeta struct {
 	name       string
@@ -59,6 +62,27 @@ func JSONUnmarshal[T any](data []byte, target *T) error {
 		return json.Unmarshal(data, target)
 	}
 	return scanJSONReflect(data, v)
+}
+
+// NormalizeJSONText 在 JSON 字符串前添加默认值，确保 JSON 格式正确
+func NormalizeJSONText(value string, defaultValue ...string) string {
+	value = strings.TrimSpace(value)
+	if value != "" {
+		return value
+	}
+	return NormalizeJSONDefault(defaultValue...)
+}
+
+// NormalizeJSONDefault 返回默认 JSON 字符串，确保 JSON 格式正确
+func NormalizeJSONDefault(defaultValue ...string) string {
+	if len(defaultValue) == 0 {
+		return DefaultJSONText
+	}
+	value := strings.TrimSpace(defaultValue[0])
+	if value == "" || validator.ValidateJSON([]byte(value)) != nil {
+		return DefaultJSONText
+	}
+	return value
 }
 
 // scanJSONReflect 根据反射类型递归扫描 JSON，遇到 protobuf 消息时使用 protojson

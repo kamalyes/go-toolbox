@@ -14,6 +14,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/kamalyes/go-jsonpath"
 )
@@ -27,6 +28,15 @@ func ValidateJSON(data []byte) error {
 // IsJSONNull 判断字节数据去除空白后是否为 JSON null
 func IsJSONNull(data []byte) bool {
 	return bytes.EqualFold(bytes.TrimSpace(data), []byte("null"))
+}
+
+// IsJSONColumnType 判断数据库类型是否为 JSON 类型
+func IsJSONColumnType(dbType string) bool {
+	dbType = strings.TrimSpace(strings.ToLower(dbType))
+	if idx := strings.IndexByte(dbType, '('); idx >= 0 {
+		dbType = strings.TrimSpace(dbType[:idx])
+	}
+	return dbType == "json" || dbType == "jsonb"
 }
 
 // SkipJSONSpaces 跳过 JSON 字节流中的空白字符，并返回下一个非空白位置

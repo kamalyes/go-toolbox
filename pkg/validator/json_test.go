@@ -55,6 +55,14 @@ func TestIsJSONNull(t *testing.T) {
 	a.False(IsJSONNull([]byte("")))
 }
 
+func TestIsJSONColumnType(t *testing.T) {
+	assert.True(t, IsJSONColumnType("json"))
+	assert.True(t, IsJSONColumnType(" JSONB "))
+	assert.True(t, IsJSONColumnType("json(1024)"))
+	assert.False(t, IsJSONColumnType("text"))
+	assert.False(t, IsJSONColumnType(""))
+}
+
 func TestJSONScannerHelpers(t *testing.T) {
 	data := []byte(`  {"nested":[1,{"name":"test"}]} ,`)
 	start := SkipJSONSpaces(data, 0)
