@@ -13,11 +13,11 @@ package httpx
 import "github.com/kamalyes/go-toolbox/pkg/errorx"
 
 const (
-	ErrUnsupportedContentType  errorx.ErrorType = iota // 不支持的内容类型
-	ErrInvalidMethod                                   // 无效的请求方法
-	ErrBodyEncodeFuncNotSet                            // 请求体编码函数未设置
-	ErrExpectedDestinationType                         // 期望的目标类型不匹配
-	ErrRequestStatusCode                               // 请求状态码错误
+	ErrUnsupportedContentType  errorx.ErrorType = 30000 + iota // 不支持的内容类型
+	ErrInvalidMethod                                           // 无效的请求方法
+	ErrBodyEncodeFuncNotSet                                    // 请求体编码函数未设置
+	ErrExpectedDestinationType                                 // 期望的目标类型不匹配
+	ErrRequestStatusCode                                       // 请求状态码错误
 )
 
 // 注册所有错误类型和消息

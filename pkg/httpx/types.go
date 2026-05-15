@@ -30,8 +30,16 @@ const (
 	ContentTypeApplicationJSONCharacterUTF8 = "application/json; charset=utf-8"   // UTF-8 编码的 JSON
 	ContentTypeApplicationXML               = "application/xml"                   // XML 格式
 	ContentTypeApplicationXMLCharacterUTF8  = "application/xml; charset=utf-8"    // UTF-8 编码的 XML
+	ContentTypeTextHTML                     = "text/html"                         // HTML 文本格式
+	ContentTypeTextHTMLCharacterUTF8        = "text/html; charset=utf-8"          // UTF-8 编码的 HTML 文本
 	ContentTypeTextXML                      = "text/xml"                          // XML 文本格式
 	ContentTypeTextXMLCharacterUTF8         = "text/xml; charset=utf-8"           // UTF-8 编码的 XML 文本
+	ContentTypeTextCSV                      = "text/csv"                          // CSV 文本格式
+	ContentTypeTextCSVCharacterUTF8         = "text/csv; charset=utf-8"           // UTF-8 编码的 CSV 文本
+	ContentTypeImageJPEG                    = "image/jpeg"                        // JPEG 图片格式
+	ContentTypeImagePNG                     = "image/png"                         // PNG 图片格式
+	ContentTypeImageGIF                     = "image/gif"                         // GIF 图片格式
+	ContentTypeImageWebP                    = "image/webp"                        // WebP 图片格式
 	ContentTypeApplicationOctetStream       = "application/octet-stream"          // 二进制流格式
 	ContentTypeMultipartFormData            = "multipart/form-data"               // 表单数据格式
 	ContentTypeWWWFormURLEncoded            = "application/x-www-form-urlencoded" // URL 编码的表单数据
