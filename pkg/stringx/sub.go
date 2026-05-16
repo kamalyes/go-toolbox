@@ -13,7 +13,7 @@ package stringx
 import (
 	"strings"
 
-	"github.com/kamalyes/go-toolbox/pkg/validator"
+	"github.com/kamalyes/go-argus"
 )
 
 // SubBefore 截取分隔字符串之前的字符串，不包括分隔字符串

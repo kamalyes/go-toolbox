@@ -17,7 +17,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/kamalyes/go-toolbox/pkg/stringx"
-	"github.com/kamalyes/go-toolbox/pkg/validator"
+	"github.com/kamalyes/go-argus"
 )
 
 // Desensitize 数据脱敏

@@ -19,7 +19,7 @@ import (
 	"unicode"
 	"unsafe"
 
-	"github.com/kamalyes/go-toolbox/pkg/validator"
+	"github.com/kamalyes/go-argus"
 )
 
 // StringX 是一个结构体，用于封装字符串值并提供操作方法。

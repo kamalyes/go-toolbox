@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/kamalyes/go-toolbox/pkg/types"
-	"github.com/kamalyes/go-toolbox/pkg/validator"
+	"github.com/kamalyes/go-argus"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 

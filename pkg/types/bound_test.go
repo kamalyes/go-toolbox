@@ -13,7 +13,7 @@ package types
 import (
 	"testing"
 
-	"github.com/kamalyes/go-toolbox/pkg/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 // TestBounds 测试 Bounds 结构体
@@ -23,9 +23,9 @@ func TestBounds(t *testing.T) {
 			Min: 0,
 			Max: 59,
 		}
-		assert.Equal(0, bounds.Min)
-		assert.Equal(59, bounds.Max)
-		assert.Nil(bounds.Names)
+		assert.Equal(t, 0, bounds.Min)
+		assert.Equal(t, 59, bounds.Max)
+		assert.Nil(t, bounds.Names)
 	})
 
 	t.Run("带名称映射的范围", func(t *testing.T) {
@@ -38,11 +38,11 @@ func TestBounds(t *testing.T) {
 				"dec": 12,
 			},
 		}
-		assert.Equal(1, bounds.Min)
-		assert.Equal(12, bounds.Max)
-		assert.NotNil(bounds.Names)
-		assert.Equal(1, bounds.Names["jan"])
-		assert.Equal(12, bounds.Names["dec"])
+		assert.Equal(t, 1, bounds.Min)
+		assert.Equal(t, 12, bounds.Max)
+		assert.NotNil(t, bounds.Names)
+		assert.Equal(t, 1, bounds.Names["jan"])
+		assert.Equal(t, 12, bounds.Names["dec"])
 	})
 
 	t.Run("uint 类型范围", func(t *testing.T) {
@@ -50,8 +50,8 @@ func TestBounds(t *testing.T) {
 			Min: 0,
 			Max: 100,
 		}
-		assert.Equal(uint(0), bounds.Min)
-		assert.Equal(uint(100), bounds.Max)
+		assert.Equal(t, uint(0), bounds.Min)
+		assert.Equal(t, uint(100), bounds.Max)
 	})
 
 	t.Run("int8 类型范围", func(t *testing.T) {
@@ -59,8 +59,8 @@ func TestBounds(t *testing.T) {
 			Min: -128,
 			Max: 127,
 		}
-		assert.Equal(int8(-128), bounds.Min)
-		assert.Equal(int8(127), bounds.Max)
+		assert.Equal(t, int8(-128), bounds.Min)
+		assert.Equal(t, int8(127), bounds.Max)
 	})
 }
 
@@ -82,7 +82,7 @@ func TestBoundType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(tt.expected, int(tt.boundType))
+			assert.Equal(t, tt.expected, int(tt.boundType))
 		})
 	}
 }
@@ -102,7 +102,7 @@ func TestRangeMode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(tt.expected, int(tt.mode))
+			assert.Equal(t, tt.expected, int(tt.mode))
 		})
 	}
 }
@@ -124,7 +124,7 @@ func TestBoundError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(tt.expected, int(tt.err))
+			assert.Equal(t, tt.expected, int(tt.err))
 		})
 	}
 }
@@ -147,15 +147,15 @@ func TestRangeValidator(t *testing.T) {
 
 		// 测试正常值
 		err := normalValidator(50, bounds)
-		assert.Equal(BoundErrorNone, err)
+		assert.Equal(t, BoundErrorNone, err)
 
 		// 测试低于最小值
 		err = normalValidator(-1, bounds)
-		assert.Equal(BoundErrorBelowMin, err)
+		assert.Equal(t, BoundErrorBelowMin, err)
 
 		// 测试超过最大值
 		err = normalValidator(101, bounds)
-		assert.Equal(BoundErrorAboveMax, err)
+		assert.Equal(t, BoundErrorAboveMax, err)
 	})
 }
 
@@ -181,12 +181,12 @@ func TestRangeParser(t *testing.T) {
 
 		// 测试名称解析
 		result, err := simpleParser("jan", bounds)
-		assert.Nil(err)
-		assert.Equal(1, result)
+		assert.Nil(t, err)
+		assert.Equal(t, 1, result)
 
 		result, err = simpleParser("feb", bounds)
-		assert.Nil(err)
-		assert.Equal(2, result)
+		assert.Nil(t, err)
+		assert.Equal(t, 2, result)
 	})
 }
 
@@ -203,8 +203,8 @@ func TestRangeTransformer(t *testing.T) {
 
 		// 测试转换
 		result, err := percentTransformer(50, bounds)
-		assert.Nil(err)
-		assert.NotEmpty(result)
+		assert.Nil(t, err)
+		assert.NotEmpty(t, result)
 	})
 
 	t.Run("位掩码转换器", func(t *testing.T) {
@@ -217,12 +217,12 @@ func TestRangeTransformer(t *testing.T) {
 
 		// 测试转换
 		result, err := bitTransformer(5, bounds)
-		assert.Nil(err)
-		assert.Equal(uint64(1<<5), result)
+		assert.Nil(t, err)
+		assert.Equal(t, uint64(1<<5), result)
 
 		result, err = bitTransformer(10, bounds)
-		assert.Nil(err)
-		assert.Equal(uint64(1<<10), result)
+		assert.Nil(t, err)
+		assert.Equal(t, uint64(1<<10), result)
 	})
 }
 
@@ -233,8 +233,8 @@ func TestBoundsWithDifferentTypes(t *testing.T) {
 			Min: -1000,
 			Max: 1000,
 		}
-		assert.Equal(int16(-1000), bounds.Min)
-		assert.Equal(int16(1000), bounds.Max)
+		assert.Equal(t, int16(-1000), bounds.Min)
+		assert.Equal(t, int16(1000), bounds.Max)
 	})
 
 	t.Run("uint32 类型", func(t *testing.T) {
@@ -242,8 +242,8 @@ func TestBoundsWithDifferentTypes(t *testing.T) {
 			Min: 0,
 			Max: 4294967295,
 		}
-		assert.Equal(uint32(0), bounds.Min)
-		assert.Equal(uint32(4294967295), bounds.Max)
+		assert.Equal(t, uint32(0), bounds.Min)
+		assert.Equal(t, uint32(4294967295), bounds.Max)
 	})
 
 	t.Run("int64 类型", func(t *testing.T) {
@@ -251,8 +251,8 @@ func TestBoundsWithDifferentTypes(t *testing.T) {
 			Min: -9223372036854775808,
 			Max: 9223372036854775807,
 		}
-		assert.Equal(int64(-9223372036854775808), bounds.Min)
-		assert.Equal(int64(9223372036854775807), bounds.Max)
+		assert.Equal(t, int64(-9223372036854775808), bounds.Min)
+		assert.Equal(t, int64(9223372036854775807), bounds.Max)
 	})
 }
 

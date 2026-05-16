@@ -13,7 +13,7 @@ package stringx
 import (
 	"strings"
 
-	"github.com/kamalyes/go-toolbox/pkg/validator"
+	"github.com/kamalyes/go-argus"
 )
 
 // Split 分割字符串

@@ -14,7 +14,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/kamalyes/go-toolbox/pkg/validator"
+	"github.com/kamalyes/go-argus"
 )
 
 // Repeat 重复字符串

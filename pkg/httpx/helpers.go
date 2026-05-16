@@ -17,7 +17,7 @@ import (
 	"reflect"
 
 	"github.com/kamalyes/go-toolbox/pkg/mathx"
-	"github.com/kamalyes/go-toolbox/pkg/validator"
+	"github.com/kamalyes/go-argus"
 )
 
 // BuildParams 构建请求参数的辅助方法

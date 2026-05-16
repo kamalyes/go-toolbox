@@ -15,7 +15,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/kamalyes/go-toolbox/pkg/validator"
+	"github.com/kamalyes/go-argus"
 )
 
 // Trim 除去字符串头尾部的空白
