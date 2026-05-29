@@ -14,72 +14,109 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 )
 
-type decodeTestPayload struct {
-	ID     string `json:"id"`
-	Status string `json:"status"`
+type decodeBuildCallbackPayload struct {
+	BuildID    string            `json:"buildId"`
+	ExternalID string            `json:"externalId"`
+	Status     string            `json:"status"`
+	Message    string            `json:"message"`
+	Artifact   decodeArtifact    `json:"artifact"`
+	Steps      []decodeBuildStep `json:"steps"`
+	Metadata   map[string]string `json:"metadata"`
+}
+
+type decodeArtifact struct {
+	URL    string `json:"url"`
+	SHA256 string `json:"sha256"`
+	Size   int64  `json:"size"`
+}
+
+type decodeBuildStep struct {
+	Name     string `json:"name"`
+	Status   string `json:"status"`
+	Duration int64  `json:"duration"`
 }
 
 func TestDecodeJSON(t *testing.T) {
 	key := []byte("12345678901234567890123456789012")
-	plainText := `{"id":"job_001","status":"success"}`
+	plainText := `{"buildId":"build_001","externalId":"easycli_job_001","status":"success","message":"build completed","artifact":{"url":"https://cdn.example.com/app.tar.gz","sha256":"abc123","size":2048},"steps":[{"name":"install","status":"success","duration":12},{"name":"compile","status":"success","duration":31}],"metadata":{"commit":"abcdef","branch":"main"}}`
 	ciphertext, err := AesEncrypt(plainText, key)
 	require.NoError(t, err)
 
 	decoder := NewEncryptedDecoder(WithAESKey(key))
-	decoded, err := DecodeJSON[decodeTestPayload](decoder, []byte(ciphertext))
+	decoded, err := DecodeJSON[decodeBuildCallbackPayload](decoder, []byte(ciphertext))
 	require.NoError(t, err)
 	require.Equal(t, []byte(ciphertext), decoded.Ciphertext)
 	require.Equal(t, []byte(plainText), decoded.Plaintext)
-	require.Equal(t, "job_001", decoded.Payload.ID)
+	require.Equal(t, "build_001", decoded.Payload.BuildID)
+	require.Equal(t, "easycli_job_001", decoded.Payload.ExternalID)
 	require.Equal(t, "success", decoded.Payload.Status)
+	require.Equal(t, "https://cdn.example.com/app.tar.gz", decoded.Payload.Artifact.URL)
+	require.Equal(t, int64(2048), decoded.Payload.Artifact.Size)
+	require.Len(t, decoded.Payload.Steps, 2)
+	require.Equal(t, "compile", decoded.Payload.Steps[1].Name)
+	require.Equal(t, "abcdef", decoded.Payload.Metadata["commit"])
 }
 
 func TestDecodeJSONTo(t *testing.T) {
 	key := []byte("12345678901234567890123456789012")
-	plainText := `{"id":"job_002","status":"running"}`
+	plainText := `{"buildId":"build_002","externalId":"easycli_job_002","status":"running","message":"build is running","artifact":{"url":"","sha256":"","size":0},"steps":[{"name":"compile","status":"running","duration":8}],"metadata":{"commit":"fedcba","branch":"release"}}`
 	ciphertext, err := AesEncrypt(plainText, key)
 	require.NoError(t, err)
 
-	var payload decodeTestPayload
+	var payload decodeBuildCallbackPayload
 	decoder := NewEncryptedDecoder(WithAESKey(key))
 	decodedPlainText, err := decoder.DecodeJSONTo([]byte(ciphertext), &payload)
 	require.NoError(t, err)
 	require.Equal(t, []byte(plainText), decodedPlainText)
-	require.Equal(t, "job_002", payload.ID)
+	require.Equal(t, "build_002", payload.BuildID)
 	require.Equal(t, "running", payload.Status)
+	require.Equal(t, "release", payload.Metadata["branch"])
+}
+
+func TestDecodeJSONWithAESPassword(t *testing.T) {
+	password := "webhook-callback-secret"
+	key := GenerateByteKey(password, 32)
+	plainText := `{"buildId":"build_003","externalId":"easycli_job_003","status":"failed","message":"compile failed","artifact":{"url":"","sha256":"","size":0},"steps":[{"name":"compile","status":"failed","duration":19}],"metadata":{"commit":"badc0de","error":"syntax"}}`
+	ciphertext, err := AesEncrypt(plainText, key)
+	require.NoError(t, err)
+
+	decoder := NewEncryptedDecoder(WithAESPassword(password))
+	decoded, err := DecodeJSON[decodeBuildCallbackPayload](decoder, []byte(ciphertext))
+	require.NoError(t, err)
+	require.Equal(t, "build_003", decoded.Payload.BuildID)
+	require.Equal(t, "failed", decoded.Payload.Status)
+	require.Equal(t, "syntax", decoded.Payload.Metadata["error"])
 }
 
 func TestDecodeProtoJSON(t *testing.T) {
 	key := []byte("12345678901234567890123456789012")
-	plainText := `{"id":"job_001","status":"success"}`
+	plainText := `"buildId,status,artifact.url,metadata.commit"`
 	ciphertext, err := AesEncrypt(plainText, key)
 	require.NoError(t, err)
 
 	decoder := NewEncryptedDecoder(WithAESKey(key))
-	decoded, err := DecodeProtoJSON(decoder, []byte(ciphertext), func() *structpb.Struct {
-		return &structpb.Struct{}
+	decoded, err := DecodeProtoJSON(decoder, []byte(ciphertext), func() *fieldmaskpb.FieldMask {
+		return &fieldmaskpb.FieldMask{}
 	})
 	require.NoError(t, err)
-	require.Equal(t, "job_001", decoded.Payload.GetFields()["id"].GetStringValue())
-	require.Equal(t, "success", decoded.Payload.GetFields()["status"].GetStringValue())
+	require.Equal(t, []string{"build_id", "status", "artifact.url", "metadata.commit"}, decoded.Payload.Paths)
 }
 
 func TestDecodeProtoJSONTo(t *testing.T) {
 	key := []byte("12345678901234567890123456789012")
-	plainText := `{"id":"job_004","status":"proto"}`
+	plainText := `"buildId,status,steps.name"`
 	ciphertext, err := AesEncrypt(plainText, key)
 	require.NoError(t, err)
 
-	payload := &structpb.Struct{}
+	payload := &fieldmaskpb.FieldMask{}
 	decoder := NewEncryptedDecoder(WithAESKey(key))
 	decodedPlainText, err := decoder.DecodeProtoJSONTo([]byte(ciphertext), payload)
 	require.NoError(t, err)
 	require.Equal(t, []byte(plainText), decodedPlainText)
-	require.Equal(t, "job_004", payload.GetFields()["id"].GetStringValue())
-	require.Equal(t, "proto", payload.GetFields()["status"].GetStringValue())
+	require.Equal(t, []string{"build_id", "status", "steps.name"}, payload.Paths)
 }
 
 func TestEncryptedDecoderRejectsMissingKey(t *testing.T) {
