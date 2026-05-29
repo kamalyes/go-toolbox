@@ -52,8 +52,6 @@ jobs:
               bump_level="major"
             elif (( new_major == old_major && new_minor > old_minor )); then
               bump_level="minor"
-            else
-              bump_level="patch"
             fi
           fi
           echo "bump-level=${bump_level}" >> "$GITHUB_OUTPUT"
@@ -61,6 +59,8 @@ jobs:
       - name: Commit and push
         id: commit
         shell: bash
+        env:
+          COMMIT_MESSAGE: ${{ github.event.client_payload.commit_message }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -70,11 +70,17 @@ jobs:
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          git commit \
-            -m "📦 deps: 同步上游依赖 ${{ github.event.client_payload.version }}" \
-            -m "- 📦 更新 ${{ github.event.client_payload.module }} 到 ${{ github.event.client_payload.version }} (go.mod, go.sum)" \
-            -m "- 🔄 自动联动下游版本标签 (bump-upstream.yml)" \
-            -m "sync upstream ${{ github.event.client_payload.version }}"
+
+          if [ -n "${COMMIT_MESSAGE}" ]; then
+            printf '%s\n' "${COMMIT_MESSAGE}" > commit_message.txt
+            git commit -F commit_message.txt
+          else
+            git commit \
+              -m "📦 deps: 同步上游依赖 ${{ github.event.client_payload.version }}" \
+              -m "- 📦 更新 ${{ github.event.client_payload.module }} 到 ${{ github.event.client_payload.version }} (go.mod, go.sum)" \
+              -m "- 🔄 自动联动下游版本标签 (bump-upstream.yml)" \
+              -m "sync upstream ${{ github.event.client_payload.version }}"
+          fi
           git push
 
           echo "changed=true" >> "$GITHUB_OUTPUT"
