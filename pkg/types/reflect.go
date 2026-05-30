@@ -3,7 +3,7 @@
  * @Date: 2026-05-09 00:00:00
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2026-05-11 13:17:27
- * @FilePath: \apex\go-toolbox\pkg\types\reflect.go
+ * @FilePath: \go-toolbox\pkg\types\reflect.go
  * @Description: 反射工具函数
  */
 package types
@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 // ProtoMessageType protobuf 消息类型
@@ -131,4 +132,126 @@ func DerefValue(value interface{}) (interface{}, bool) {
 		return rv.Elem().Interface(), true
 	}
 	return value, true
+}
+
+// UnwrapPBValue 解包 protobuf wrapper 类型，返回底层值
+// 支持 wrapperspb 全部 9 种类型：String, Bool, Int32, Int64, UInt32, UInt64, Float, Double, Bytes
+// 如果 wrapper 为 nil 或 typed nil，返回 nil
+// 如果不是 wrapper 类型，返回原始值
+func UnwrapPBValue(iface interface{}) interface{} {
+	switch v := iface.(type) {
+	case *wrapperspb.StringValue:
+		if !IsNil(v) {
+			return v.Value
+		}
+		return nil
+	case *wrapperspb.BoolValue:
+		if !IsNil(v) {
+			return v.Value
+		}
+		return nil
+	case *wrapperspb.Int32Value:
+		if !IsNil(v) {
+			return v.Value
+		}
+		return nil
+	case *wrapperspb.Int64Value:
+		if !IsNil(v) {
+			return v.Value
+		}
+		return nil
+	case *wrapperspb.UInt32Value:
+		if !IsNil(v) {
+			return v.Value
+		}
+		return nil
+	case *wrapperspb.UInt64Value:
+		if !IsNil(v) {
+			return v.Value
+		}
+		return nil
+	case *wrapperspb.FloatValue:
+		if !IsNil(v) {
+			return v.Value
+		}
+		return nil
+	case *wrapperspb.DoubleValue:
+		if !IsNil(v) {
+			return v.Value
+		}
+		return nil
+	case *wrapperspb.BytesValue:
+		if !IsNil(v) {
+			return v.Value
+		}
+		return nil
+	default:
+		return iface
+	}
+}
+
+// ResolveModelKey 解析 Model 结构体字段的 key
+// 优先使用 gorm column tag，其次 json tag，最后使用字段名
+func ResolveModelKey(fieldType reflect.StructField) string {
+	if tag, ok := fieldType.Tag.Lookup("gorm"); ok {
+		if col := ExtractGormColumn(tag); col != "" {
+			return col
+		}
+	}
+	if jsonTag := fieldType.Tag.Get("json"); jsonTag == "-" {
+		return "-"
+	}
+	if name := ExtractJSONKey(fieldType); name != "" {
+		return name
+	}
+	return fieldType.Name
+}
+
+// ExtractGormColumn 从 gorm tag 中提取 column 名
+func ExtractGormColumn(tag string) string {
+	for _, part := range strings.Split(tag, ";") {
+		part = strings.TrimSpace(part)
+		if strings.HasPrefix(part, "column:") {
+			return strings.TrimPrefix(part, "column:")
+		}
+	}
+	return ""
+}
+
+// ResolvePBKey 解析 PB 结构体字段的 key
+// 优先使用 protobuf tag 的 name，其次 json tag，最后使用字段名
+func ResolvePBKey(fieldType reflect.StructField) string {
+	if tag, ok := fieldType.Tag.Lookup("protobuf"); ok {
+		if name := ExtractPBTagValue(tag, "name"); name != "" {
+			return name
+		}
+	}
+	if jsonTag := fieldType.Tag.Get("json"); jsonTag == "-" {
+		return "-"
+	}
+	if name := ExtractJSONKey(fieldType); name != "" {
+		return name
+	}
+	return fieldType.Name
+}
+
+// ExtractPBTagValue 从 protobuf tag 中提取指定键的值
+func ExtractPBTagValue(tag string, key string) string {
+	for _, part := range strings.Split(tag, ",") {
+		part = strings.TrimSpace(part)
+		if strings.HasPrefix(part, key+"=") {
+			return strings.TrimPrefix(part, key+"=")
+		}
+	}
+	return ""
+}
+
+// UnwrapModelValue 解引用指针类型，返回底层值
+// 如果不是指针或指针为 nil，返回原始值
+func UnwrapModelValue(iface interface{}) interface{} {
+	v := reflect.ValueOf(iface)
+	if v.Kind() == reflect.Ptr && !v.IsNil() {
+		return v.Elem().Interface()
+	}
+	return iface
 }

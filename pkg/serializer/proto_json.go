@@ -2,8 +2,8 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2026-05-11 13:20:41
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2026-05-11 15:26:57
- * @FilePath: \apex\go-toolbox\pkg\serializer\proto_json.go
+ * @LastEditTime: 2026-05-30 20:15:55
+ * @FilePath: \go-toolbox\pkg\serializer\proto_json.go
  * @Description: 序列化 protobuf 消息为 JSON 字符串
  */
 package serializer
