@@ -11,6 +11,7 @@
 package sign
 
 import (
+	"encoding/base64"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -122,4 +123,41 @@ func TestDecodeProtoJSONTo(t *testing.T) {
 func TestEncryptedDecoderRejectsMissingKey(t *testing.T) {
 	_, err := NewEncryptedDecoder().Decrypt([]byte("ciphertext"))
 	require.ErrorIs(t, err, ErrMissingAESKey)
+}
+
+func TestDecryptWithRawCiphertext(t *testing.T) {
+	key := []byte("12345678901234567890123456789012")
+	plainText := `{"buildId":"build_raw","status":"success"}`
+
+	// 加密得到 base64 字符串
+	ciphertext, err := AesEncrypt(plainText, key)
+	require.NoError(t, err)
+
+	// 模拟 grpc-gateway 的行为：对 bytes 字段做 base64 解码
+	cipherBytes, err := base64.StdEncoding.DecodeString(ciphertext)
+	require.NoError(t, err)
+
+	// 使用 WithRawCiphertext 选项，直接传入原始字节
+	decoder := NewEncryptedDecoder(WithAESKey(key), WithRawCiphertext())
+	decoded, err := DecodeJSON[decodeBuildCallbackPayload](decoder, cipherBytes)
+	require.NoError(t, err)
+	require.Equal(t, "build_raw", decoded.Payload.BuildID)
+	require.Equal(t, "success", decoded.Payload.Status)
+}
+
+func TestAesDecryptRaw(t *testing.T) {
+	key := []byte("12345678901234567890123456789012")
+	plainText := "hello raw decrypt"
+
+	ciphertext, err := AesEncrypt(plainText, key)
+	require.NoError(t, err)
+
+	// base64 解码得到原始字节
+	cipherBytes, err := base64.StdEncoding.DecodeString(ciphertext)
+	require.NoError(t, err)
+
+	// AesDecryptRaw 直接解密原始字节
+	decrypted, err := AesDecryptRaw(cipherBytes, key)
+	require.NoError(t, err)
+	require.Equal(t, plainText, decrypted)
 }

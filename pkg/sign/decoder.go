@@ -28,7 +28,8 @@ var (
 
 // EncryptedDecoder 解密器
 type EncryptedDecoder struct {
-	aesKey []byte
+	aesKey        []byte
+	rawCiphertext bool
 }
 
 // DecodeOption 解密器选项
@@ -65,6 +66,15 @@ func WithAESPassword(password string) DecodeOption {
 	}
 }
 
+// WithRawCiphertext 设置密文为原始字节模式
+// 启用后 Decrypt 直接接收 iv+ciphertext 原始字节，不再做 base64 解码
+// 适用于 grpc-gateway 等 JSON marshaler 已对 bytes 字段做 base64 解码的场景
+func WithRawCiphertext() DecodeOption {
+	return func(d *EncryptedDecoder) {
+		d.rawCiphertext = true
+	}
+}
+
 // Decrypt 解密
 func (d *EncryptedDecoder) Decrypt(ciphertext []byte) ([]byte, error) {
 	if len(ciphertext) == 0 {
@@ -72,6 +82,14 @@ func (d *EncryptedDecoder) Decrypt(ciphertext []byte) ([]byte, error) {
 	}
 	if d == nil || len(d.aesKey) == 0 {
 		return nil, ErrMissingAESKey
+	}
+
+	if d.rawCiphertext {
+		plainText, err := AesDecryptRaw(ciphertext, d.aesKey)
+		if err != nil {
+			return nil, fmt.Errorf("decrypt ciphertext: %w", err)
+		}
+		return []byte(plainText), nil
 	}
 
 	plainText, err := AesDecrypt(strings.TrimSpace(string(ciphertext)), d.aesKey)

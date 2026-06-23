@@ -55,6 +55,41 @@ func AesEncrypt(plainText string, key []byte) (string, error) {
 	return base64.StdEncoding.EncodeToString(cipherText), nil
 }
 
+// AesDecryptRaw 解密函数（直接接收原始字节，不经过 base64 解码）
+// 适用于上层已通过 JSON/protojson 对 bytes 字段做 base64 解码的场景（如 grpc-gateway 的 body 绑定）
+// cipherBytes 格式：iv(16字节) + aes-cbc-pkcs7-ciphertext
+func AesDecryptRaw(cipherBytes []byte, key []byte) (string, error) {
+	if len(key) == 0 {
+		return "", errors.New("key cannot be empty")
+	}
+	if len(cipherBytes) < aes.BlockSize {
+		return "", errors.New("ciphertext too short")
+	}
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", err
+	}
+
+	iv := cipherBytes[:aes.BlockSize]
+	encrypted := cipherBytes[aes.BlockSize:]
+
+	if len(encrypted)%aes.BlockSize != 0 {
+		return "", errors.New("ciphertext is not a multiple of the block size")
+	}
+
+	plainTextBytes := make([]byte, len(encrypted))
+	mode := cipher.NewCBCDecrypter(block, iv)
+	mode.CryptBlocks(plainTextBytes, encrypted)
+
+	plainTextBytes, err = pkcs7Unpadding(plainTextBytes)
+	if err != nil {
+		return "", err
+	}
+
+	return string(plainTextBytes), nil
+}
+
 // AesDecrypt 解密函数
 func AesDecrypt(cipherText string, key []byte) (string, error) {
 	if len(key) == 0 {
