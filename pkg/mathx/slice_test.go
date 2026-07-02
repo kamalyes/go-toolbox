@@ -1235,3 +1235,97 @@ func BenchmarkSeparateTransformAndFilter(b *testing.B) {
 		})
 	}
 }
+
+func TestDedupeValues(t *testing.T) {
+	t.Run("nil切片返回nil", func(t *testing.T) {
+		var items []int
+
+		result := DedupeValues(items, func(item int) (int, bool) {
+			return item, true
+		})
+
+		assert.Nil(t, result)
+	})
+
+	t.Run("空切片返回nil", func(t *testing.T) {
+		items := []int{}
+
+		result := DedupeValues(items, func(item int) (int, bool) {
+			return item, true
+		})
+
+		assert.Nil(t, result)
+	})
+
+	t.Run("正常去重并保持原始顺序", func(t *testing.T) {
+		items := []int{1, 2, 1, 3, 2, 4}
+
+		result := DedupeValues(items, func(item int) (int, bool) {
+			return item, true
+		})
+
+		assert.Equal(t, []int{1, 2, 3, 4}, result)
+	})
+
+	t.Run("ok为false时跳过对应元素", func(t *testing.T) {
+		items := []int{0, 1, 2, 0, 2, 3}
+
+		result := DedupeValues(items, func(item int) (int, bool) {
+			if item == 0 {
+				return 0, false
+			}
+			return item, true
+		})
+
+		assert.Equal(t, []int{1, 2, 3}, result)
+	})
+
+	t.Run("所有元素都被过滤时返回空切片", func(t *testing.T) {
+		items := []int{0, 0, 0}
+
+		result := DedupeValues(items, func(item int) (int, bool) {
+			return item, false
+		})
+
+		assert.NotNil(t, result)
+		assert.Empty(t, result)
+	})
+
+	t.Run("支持从结构体中提取字段去重", func(t *testing.T) {
+		type User struct {
+			ID   int
+			Name string
+		}
+
+		items := []User{
+			{ID: 1, Name: "张三"},
+			{ID: 2, Name: "李四"},
+			{ID: 1, Name: "张三重复"},
+			{ID: 0, Name: "无效用户"},
+			{ID: 3, Name: "王五"},
+			{ID: 2, Name: "李四重复"},
+		}
+
+		result := DedupeValues(items, func(item User) (int, bool) {
+			if item.ID == 0 {
+				return 0, false
+			}
+			return item.ID, true
+		})
+
+		assert.Equal(t, []int{1, 2, 3}, result)
+	})
+
+	t.Run("支持字符串类型键", func(t *testing.T) {
+		items := []string{"go", "", "java", "go", "python", "", "java"}
+
+		result := DedupeValues(items, func(item string) (string, bool) {
+			if item == "" {
+				return "", false
+			}
+			return item, true
+		})
+
+		assert.Equal(t, []string{"go", "java", "python"}, result)
+	})
+}

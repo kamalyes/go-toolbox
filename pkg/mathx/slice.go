@@ -19,9 +19,9 @@ import (
 	"sort"
 	"sync"
 
+	validator "github.com/kamalyes/go-argus"
 	"github.com/kamalyes/go-toolbox/pkg/syncx"
 	"github.com/kamalyes/go-toolbox/pkg/types"
-	"github.com/kamalyes/go-argus"
 )
 
 // MinSlice 返回切片中的最小值
@@ -995,4 +995,26 @@ func EqualUnorderedSlice[T comparable](a, b []T) bool {
 	}
 
 	return true
+}
+
+// DedupeValues 从切片中按键提取去重后的值列表
+// key 函数返回 (值, 是否包含)；ok=false 时跳过该项（常用于过滤零值）
+func DedupeValues[T any, K comparable](items []T, key func(T) (K, bool)) []K {
+	if len(items) == 0 {
+		return nil
+	}
+	set := make(map[K]struct{}, len(items))
+	result := make([]K, 0, len(items))
+	for _, item := range items {
+		k, ok := key(item)
+		if !ok {
+			continue
+		}
+		if _, exists := set[k]; exists {
+			continue
+		}
+		set[k] = struct{}{}
+		result = append(result, k)
+	}
+	return result
 }
