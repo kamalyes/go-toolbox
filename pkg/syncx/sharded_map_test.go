@@ -20,7 +20,7 @@ import (
 
 // TestShardedMapStoreLoad 测试基本存储和加载
 func TestShardedMapStoreLoad(t *testing.T) {
-	m := NewStringShardedMap[int](64)
+	m := NewShardedMap[string, int](64)
 
 	m.Store("a", 1)
 	m.Store("b", 2)
@@ -39,7 +39,7 @@ func TestShardedMapStoreLoad(t *testing.T) {
 
 // TestShardedMapDelete 测试删除
 func TestShardedMapDelete(t *testing.T) {
-	m := NewStringShardedMap[int](32)
+	m := NewShardedMap[string, int](32)
 
 	m.Store("key1", 100)
 	m.Store("key2", 200)
@@ -65,7 +65,7 @@ func TestShardedMapDelete(t *testing.T) {
 
 // TestShardedMapLoadAndDelete 测试加载并删除
 func TestShardedMapLoadAndDelete(t *testing.T) {
-	m := NewStringShardedMap[string](16)
+	m := NewShardedMap[string, string](16)
 
 	m.Store("test", "value")
 
@@ -86,7 +86,7 @@ func TestShardedMapLoadAndDelete(t *testing.T) {
 
 // TestShardedMapLoadOrStore 测试加载或存储
 func TestShardedMapLoadOrStore(t *testing.T) {
-	m := NewStringShardedMap[int](16)
+	m := NewShardedMap[string, int](16)
 
 	// 第一次存储
 	v, loaded := m.LoadOrStore("k", 42)
@@ -109,7 +109,7 @@ func TestShardedMapLoadOrStore(t *testing.T) {
 
 // TestShardedMapRange 测试遍历
 func TestShardedMapRange(t *testing.T) {
-	m := NewStringShardedMap[int](8)
+	m := NewShardedMap[string, int](8)
 
 	for i := 0; i < 100; i++ {
 		m.Store(fmt.Sprintf("key%d", i), i)
@@ -137,7 +137,7 @@ func TestShardedMapRange(t *testing.T) {
 
 // TestShardedMapKeysValues 测试获取所有 key 和 value
 func TestShardedMapKeysValues(t *testing.T) {
-	m := NewStringShardedMap[int](16)
+	m := NewShardedMap[string, int](16)
 
 	m.Store("a", 1)
 	m.Store("b", 2)
@@ -156,7 +156,7 @@ func TestShardedMapKeysValues(t *testing.T) {
 
 // TestShardedMapClear 测试清空
 func TestShardedMapClear(t *testing.T) {
-	m := NewStringShardedMap[int](16)
+	m := NewShardedMap[string, int](16)
 
 	for i := 0; i < 50; i++ {
 		m.Store(fmt.Sprintf("k%d", i), i)
@@ -173,7 +173,7 @@ func TestShardedMapClear(t *testing.T) {
 
 // TestShardedMapCount 测试条件计数
 func TestShardedMapCount(t *testing.T) {
-	m := NewStringShardedMap[int](16)
+	m := NewShardedMap[string, int](16)
 
 	for i := 0; i < 20; i++ {
 		m.Store(fmt.Sprintf("k%d", i), i)
@@ -195,7 +195,7 @@ func TestShardedMapCount(t *testing.T) {
 
 // TestShardedMapConcurrentWrite 并发写入测试
 func TestShardedMapConcurrentWrite(t *testing.T) {
-	m := NewStringShardedMap[int](64)
+	m := NewShardedMap[string, int](64)
 	var wg sync.WaitGroup
 	goroutines := 100
 	writesPerGoroutine := 100
@@ -241,7 +241,7 @@ func TestShardedMapConcurrentWrite(t *testing.T) {
 
 // TestShardedMapConcurrentMixed 并发混合读写删测试
 func TestShardedMapConcurrentMixed(t *testing.T) {
-	m := NewStringShardedMap[int](32)
+	m := NewShardedMap[string, int](32)
 	var wg sync.WaitGroup
 
 	// 预填充
@@ -276,7 +276,7 @@ func TestShardedMapConcurrentMixed(t *testing.T) {
 
 // TestShardedMapWithShardLock 测试分片级锁
 func TestShardedMapWithShardLock(t *testing.T) {
-	m := NewStringShardedMap[int](16)
+	m := NewShardedMap[string, int](16)
 	m.Store("test", 10)
 
 	// 使用 WithShardLock 原子修改
@@ -300,19 +300,19 @@ func TestShardedMapWithShardLock(t *testing.T) {
 // TestShardedMapShardCount 验证非 2 的幂的 shardCount 自动调整
 func TestShardedMapShardCount(t *testing.T) {
 	// shardCount=100（非 2 的幂），应自动调整为 128
-	m := NewStringShardedMap[int](100)
+	m := NewShardedMap[string, int](100)
 	if m.shardCount != 128 {
 		t.Errorf("shardCount = %d, want 128 (100 向上取 2 的幂)", m.shardCount)
 	}
 
 	// shardCount=0，应使用默认值 64
-	m2 := NewStringShardedMap[int](0)
+	m2 := NewShardedMap[string, int](0)
 	if m2.shardCount != 64 {
 		t.Errorf("shardCount = %d, want 64 (默认值)", m2.shardCount)
 	}
 
 	// shardCount=64（已是 2 的幂），保持不变
-	m3 := NewStringShardedMap[int](64)
+	m3 := NewShardedMap[string, int](64)
 	if m3.shardCount != 64 {
 		t.Errorf("shardCount = %d, want 64", m3.shardCount)
 	}
@@ -320,23 +320,19 @@ func TestShardedMapShardCount(t *testing.T) {
 
 // TestNewShardedMapCustomHasher 测试自定义 hash 函数
 func TestNewShardedMapCustomHasher(t *testing.T) {
-	// 使用 int 作为 key，自定义 hash 函数
-	hasher := func(key int) uint32 {
-		return uint32(key)
-	}
-	m := NewShardedMap[int, string](16, hasher)
+	m := NewShardedMap[string, int](16)
 
-	m.Store(1, "one")
-	m.Store(2, "two")
+	m.Store("1", 1)
+	m.Store("2", 2)
 
-	if v, _ := m.Load(1); v != "one" {
+	if v, _ := m.Load("1"); v != 1 {
 		t.Errorf("Load(1) = %s, want one", v)
 	}
 }
 
 // BenchmarkShardedMapWrite 分片 map 写入基准测试
 func BenchmarkShardedMapWrite(b *testing.B) {
-	m := NewStringShardedMap[int](64)
+	m := NewShardedMap[string, int](64)
 	b.RunParallel(func(pb *testing.PB) {
 		i := 0
 		for pb.Next() {
@@ -360,7 +356,7 @@ func BenchmarkSyncMapWrite(b *testing.B) {
 
 // BenchmarkShardedMapRead 分片 map 读取基准测试
 func BenchmarkShardedMapRead(b *testing.B) {
-	m := NewStringShardedMap[int](64)
+	m := NewShardedMap[string, int](64)
 	for i := 0; i < 10000; i++ {
 		m.Store(fmt.Sprintf("k%d", i), i)
 	}

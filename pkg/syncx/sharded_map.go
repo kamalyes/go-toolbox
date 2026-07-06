@@ -15,6 +15,7 @@
 package syncx
 
 import (
+	"fmt"
 	"hash/fnv"
 	"sync"
 	"sync/atomic"
@@ -48,10 +49,9 @@ type shardEntry[K comparable, V any] struct {
 //
 // 参数：
 //   - shardCount: 分片数量，必须是 2 的幂（如 32/64/128）
-//   - hasher: key 的 hash 函数（用于定位 shard）
 //
 // 返回：*ShardedMap[K, V]
-func NewShardedMap[K comparable, V any](shardCount int, hasher func(K) uint32) *ShardedMap[K, V] {
+func NewShardedMap[K comparable, V any](shardCount int) *ShardedMap[K, V] {
 	// 确保 shardCount 是 2 的幂
 	if shardCount <= 0 {
 		shardCount = 64
@@ -72,18 +72,8 @@ func NewShardedMap[K comparable, V any](shardCount int, hasher func(K) uint32) *
 		shards:     shards,
 		shardCount: shardCount,
 		mask:       shardCount - 1,
-		hasher:     hasher,
+		hasher:     KvHasher[K](),
 	}
-}
-
-// NewStringShardedMap 创建以 string 为 key 的分片映射表（使用 FNV-1a hash）
-//
-// 参数：
-//   - shardCount: 分片数量，必须是 2 的幂（如 32/64/128）
-//
-// 返回：*ShardedMap[string, V]
-func NewStringShardedMap[V any](shardCount int) *ShardedMap[string, V] {
-	return NewShardedMap[string, V](shardCount, FNVHashString32)
 }
 
 // ============================================================================
@@ -295,4 +285,26 @@ func FNVHashString32(s string) uint32 {
 	h := fnv.New32a()
 	_, _ = h.Write([]byte(s))
 	return h.Sum32()
+}
+
+// KvHasher 为 ShardedMap 的 K 类型选择最优的 hash 函数
+// 通过类型断言为常见 K 类型（string/int/int64 等）选择专用 hasher，避免反射开销
+func KvHasher[K comparable]() func(K) uint32 {
+	switch any(*new(K)).(type) {
+	case string:
+		return func(k K) uint32 { return FNVHashString32(any(k).(string)) }
+	case int:
+		return func(k K) uint32 { return uint32(any(k).(int)) }
+	case int64:
+		return func(k K) uint32 { return uint32(any(k).(int64)) }
+	case int32:
+		return func(k K) uint32 { return uint32(any(k).(int32)) }
+	case uint:
+		return func(k K) uint32 { return uint32(any(k).(uint)) }
+	case uint64:
+		return func(k K) uint32 { return uint32(any(k).(uint64)) }
+	default:
+		// 其他类型用 fmt.Sprintf 转 string 再 FNV-1a hash
+		return func(k K) uint32 { return FNVHashString32(fmt.Sprintf("%v", k)) }
+	}
 }
