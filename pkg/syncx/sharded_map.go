@@ -45,13 +45,58 @@ type shardEntry[K comparable, V any] struct {
 	data map[K]V
 }
 
-// NewShardedMap 创建分片映射表
+// NewShardedMap 创建分片映射表（无预分配容量）
 //
 // 参数：
 //   - shardCount: 分片数量，必须是 2 的幂（如 32/64/128）
 //
 // 返回：*ShardedMap[K, V]
+//
+// 注意：每个 shard 内部 map 不预分配容量，适用于容量未知或较小的场景
+// 已知总容量的大数据场景请使用 NewShardedMapWithOptions 配合 WithPerShardHint
 func NewShardedMap[K comparable, V any](shardCount int) *ShardedMap[K, V] {
+	return NewShardedMapWithOptions[K, V](shardCount)
+}
+
+// ShardedMapOption ShardedMap 配置选项（修改内部 config）
+type ShardedMapOption[K comparable, V any] func(*shardedMapConfig)
+
+// shardedMapConfig ShardedMap 初始化配置（私有，避免外部直接修改）
+type shardedMapConfig struct {
+	// perShardHint 每个 shard 内部 map 的预分配容量提示
+	// 用于已知总容量场景，减少 map 扩容次数，提升写入性能
+	perShardHint int
+}
+
+// WithPerShardHint 设置每个 shard 内部 map 的预分配容量提示
+//
+// 用于已知总容量的场景，减少 shard 内部 map 扩容次数，提升写入性能
+// 建议值：预估总元素数 / shardCount（向上取整）
+//
+// 示例：总容量 10000，分 64 个 shard，每 shard 提示 = 10000/64 ≈ 157
+func WithPerShardHint[K comparable, V any](perShardHint int) ShardedMapOption[K, V] {
+	if perShardHint < 0 {
+		perShardHint = 0
+	}
+	return func(cfg *shardedMapConfig) {
+		cfg.perShardHint = perShardHint
+	}
+}
+
+// NewShardedMapWithOptions 创建分片映射表（支持配置选项）
+//
+// 参数：
+//   - shardCount: 分片数量，必须是 2 的幂（如 32/64/128）
+//   - opts: 配置选项（如 WithPerShardHint）
+//
+// 返回：*ShardedMap[K, V]
+func NewShardedMapWithOptions[K comparable, V any](shardCount int, opts ...ShardedMapOption[K, V]) *ShardedMap[K, V] {
+	// 解析选项
+	cfg := shardedMapConfig{}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+
 	// 确保 shardCount 是 2 的幂
 	if shardCount <= 0 {
 		shardCount = 64
@@ -63,8 +108,14 @@ func NewShardedMap[K comparable, V any](shardCount int) *ShardedMap[K, V] {
 
 	shards := make([]*shardEntry[K, V], shardCount)
 	for i := range shards {
-		shards[i] = &shardEntry[K, V]{
-			data: make(map[K]V),
+		if cfg.perShardHint > 0 {
+			shards[i] = &shardEntry[K, V]{
+				data: make(map[K]V, cfg.perShardHint),
+			}
+		} else {
+			shards[i] = &shardEntry[K, V]{
+				data: make(map[K]V),
+			}
 		}
 	}
 
