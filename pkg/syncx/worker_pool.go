@@ -14,8 +14,6 @@ import (
 	"context"
 	"errors"
 	"sync"
-	"sync/atomic"
-	"time"
 )
 
 // WorkerTask 任务接口
@@ -45,13 +43,13 @@ type WorkerTask func()
 type WorkerPool struct {
 	workers int             // worker 数量
 	queue   chan WorkerTask // 任务队列
-	wg      sync.WaitGroup
+	wg      sync.WaitGroup  // worker goroutine 等待
+	taskWg  sync.WaitGroup  // 任务完成等待（提交时 +1，执行完 -1）
 	ctx     context.Context
 	cancel  context.CancelFunc
 	once    sync.Once
 	closed  bool
 	mu      sync.Mutex
-	active  int32 // 活跃任务计数
 }
 
 var (
@@ -112,10 +110,11 @@ func (p *WorkerPool) worker() {
 				return
 			}
 			if task != nil {
-				atomic.AddInt32(&p.active, 1)
 				task()
-				atomic.AddInt32(&p.active, -1)
 			}
+			// 任务执行完成（或为 nil），标记完成
+			// 注意：Submit/SubmitNonBlocking 在入队前已 Add(1)，此处必须 Done
+			p.taskWg.Done()
 		}
 	}
 }
@@ -155,12 +154,16 @@ func (p *WorkerPool) Submit(ctx context.Context, task WorkerTask) error {
 	}
 	p.mu.Unlock()
 
+	// 先计数再入队，避免 Wait 在「已出队但未执行」的间隙误判为完成
+	p.taskWg.Add(1)
 	select {
 	case p.queue <- task:
 		return nil
 	case <-ctx.Done():
+		p.taskWg.Done()
 		return ctx.Err()
 	case <-p.ctx.Done():
+		p.taskWg.Done()
 		return ErrClosed
 	}
 }
@@ -196,10 +199,12 @@ func (p *WorkerPool) SubmitNonBlocking(task WorkerTask) error {
 	}
 	p.mu.Unlock()
 
+	p.taskWg.Add(1)
 	select {
 	case p.queue <- task:
 		return nil
 	default:
+		p.taskWg.Done()
 		return ErrQueueFull
 	}
 }
@@ -214,15 +219,7 @@ func (p *WorkerPool) SubmitNonBlocking(task WorkerTask) error {
 //	pool.Wait()  // 等待所有任务完成
 //	继续提交任务 ...
 func (p *WorkerPool) Wait() {
-	for {
-		queueLen := len(p.queue)
-		activeCount := atomic.LoadInt32(&p.active)
-
-		if queueLen == 0 && activeCount == 0 {
-			break
-		}
-		time.Sleep(1 * time.Millisecond)
-	}
+	p.taskWg.Wait()
 }
 
 // Close 关闭 Worker 池，等待所有任务完成
@@ -245,8 +242,13 @@ func (p *WorkerPool) Close() error {
 		// 取消 context，通知所有 worker 退出
 		p.cancel()
 
-		// 等待所有 worker 完成
+		// 等待所有 worker 完成（in-flight 任务也会执行完）
 		p.wg.Wait()
+
+		// 排空队列中未被 worker 取走的任务，保持 taskWg 计数一致
+		for range p.queue {
+			p.taskWg.Done()
+		}
 	})
 
 	return nil
