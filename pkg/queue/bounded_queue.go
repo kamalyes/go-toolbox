@@ -116,22 +116,12 @@ func (q *BoundedQueue[T]) Enqueue(ctx context.Context, item T) error {
 func (q *BoundedQueue[T]) Dequeue(ctx context.Context) (T, error) {
 	var zero T
 
-	// 使用channel来处理上下文取消,避免在持有锁时阻塞
-	done := make(chan struct{})
-	defer close(done)
-
-	go func() {
-		select {
-		case <-ctx.Done():
-			q.mu.Lock()
-			q.notEmpty.Broadcast() // 唤醒等待者检查上下文
-			q.mu.Unlock()
-		case <-done:
-		}
-	}()
-
 	q.mu.Lock()
 	defer q.mu.Unlock()
+
+	// 取消监听 goroutine 采用懒启动：仅在确实需要阻塞等待时才创建
+	// 避免在常见的「有元素可取」快速路径上每次 Dequeue 都创建 goroutine
+	var watcherStarted bool
 
 	for {
 		// 检查上下文是否已取消
@@ -149,6 +139,23 @@ func (q *BoundedQueue[T]) Dequeue(ctx context.Context) (T, error) {
 		// 队列已关闭
 		if atomic.LoadInt32(&q.closed) == 1 {
 			return zero, ErrQueueClosed
+		}
+
+		// 即将进入阻塞等待，启动 ctx 取消监听 goroutine（仅启动一次）
+		if !watcherStarted {
+			watcherStarted = true
+			done := make(chan struct{})
+			// Dequeue 返回时通知 watcher 退出，避免 goroutine 泄漏
+			defer close(done)
+			go func() {
+				select {
+				case <-ctx.Done():
+					q.mu.Lock()
+					q.notEmpty.Broadcast() // 唤醒等待者检查上下文
+					q.mu.Unlock()
+				case <-done:
+				}
+			}()
 		}
 
 		// 等待新元素或关闭信号
