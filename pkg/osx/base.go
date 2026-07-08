@@ -247,6 +247,32 @@ func GetWorkerIdForSnowflake() int64 {
 	return GetWorkerId() % maxSnowflakeID
 }
 
+// GetServerNode 获取当前服务节点标识（K8s 环境下为 Pod 名称）
+// 用于 HTTP 响应头 X-Server-Node 和 gRPC metadata x-server-node 透传，
+// 便于在分布式环境下定位处理请求的具体节点
+//
+// 优先级: POD_NAME 环境变量 > HOSTNAME 环境变量 > os.Hostname() > 随机生成的标识
+//
+// 与 GetWorkerId 的区别：
+//   - GetWorkerId 返回数字 ID（提取序号或哈希取模），用于雪花算法
+//   - GetServerNode 返回原始节点名称（保留 Pod 名称原文），用于链路追踪和流量定位
+func GetServerNode() string {
+	// 1. K8s Downward API 注入的 POD_NAME（最准确）
+	if node := os.Getenv("POD_NAME"); node != "" {
+		return node
+	}
+	// 2. K8s 默认注入的 HOSTNAME（通常等于 Pod 名称）
+	if node := os.Getenv("HOSTNAME"); node != "" {
+		return node
+	}
+	// 3. 回退到系统主机名（K8s 环境下与 Pod 名称一致）
+	if host, err := os.Hostname(); err == nil && host != "" {
+		return host
+	}
+	// 4. 兜底：基于时间戳和主机名哈希生成短标识，避免空值
+	return "node-" + HashUnixMicroCipherText()[:8]
+}
+
 // StableHashSlot 根据输入字符串 s 和范围 [minNum, maxNum]，返回一个稳定且范围内的整数
 // 使用加密哈希 sha256，抗碰撞更强
 // 如果 maxNum < minNum，会 panic
