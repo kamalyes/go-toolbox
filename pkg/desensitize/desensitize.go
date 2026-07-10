@@ -16,8 +16,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	validator "github.com/kamalyes/go-argus"
 	"github.com/kamalyes/go-toolbox/pkg/stringx"
-	"github.com/kamalyes/go-argus"
 )
 
 // Desensitize 数据脱敏
@@ -58,6 +58,10 @@ func Desensitize(str string, DesensitizeType DesensitizeType, options ...Desensi
 		newStr = SensitizeIpv6(str)
 	case PEMKey:
 		newStr = SensitizePEMKey(str, opt.PEMBodyPrefixVisibleLen, opt.PEMBodySuffixVisibleLen)
+	case APIKey:
+		newStr = sensitizeSecretSegment(str, opt.APIKeyPrefixVisibleLen, opt.APIKeySuffixVisibleLen)
+	case Secret:
+		newStr = sensitizeSecretSegment(str, opt.SecretPrefixVisibleLen, opt.SecretSuffixVisibleLen)
 	default:
 		newStr = str
 	}

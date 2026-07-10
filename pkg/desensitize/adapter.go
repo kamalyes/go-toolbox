@@ -161,4 +161,8 @@ func init() {
 	RegisterDesensitizer("bankCard", &DefaultDesensitizer{BankCard})
 	RegisterDesensitizer("ipv4", &DefaultDesensitizer{IPV4})
 	RegisterDesensitizer("ipv6", &DefaultDesensitizer{IPV6})
+	RegisterDesensitizer("apiKey", &DefaultDesensitizer{APIKey})
+	RegisterDesensitizer("apikey", &DefaultDesensitizer{APIKey})
+	RegisterDesensitizer("secret", &DefaultDesensitizer{Secret})
+	RegisterDesensitizer("secretKey", &DefaultDesensitizer{Secret})
 }

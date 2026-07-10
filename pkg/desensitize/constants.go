@@ -24,4 +24,6 @@ const (
 	IPV4                                       // ipv4
 	IPV6                                       // ipv6
 	PEMKey                                     // PEM 密钥内容（私钥/证书等）
+	APIKey                                     // API Key（保留首尾各若干位）
+	Secret                                     // Secret Key（保留首尾各若干位）
 )

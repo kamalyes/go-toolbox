@@ -25,6 +25,10 @@ type DesensitizeOptions struct {
 	EmailStartIndex           int
 	PEMBodyPrefixVisibleLen   int
 	PEMBodySuffixVisibleLen   int
+	APIKeyPrefixVisibleLen    int
+	APIKeySuffixVisibleLen    int
+	SecretPrefixVisibleLen    int
+	SecretSuffixVisibleLen    int
 }
 
 // NewDesensitizeOptions 创建带有默认值的 DesensitizeOptions
@@ -41,5 +45,9 @@ func NewDesensitizeOptions() DesensitizeOptions {
 		EmailStartIndex:           1,
 		PEMBodyPrefixVisibleLen:   16,
 		PEMBodySuffixVisibleLen:   16,
+		APIKeyPrefixVisibleLen:    4,
+		APIKeySuffixVisibleLen:    4,
+		SecretPrefixVisibleLen:    4,
+		SecretSuffixVisibleLen:    4,
 	}
 }
