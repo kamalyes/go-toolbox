@@ -1,11 +1,11 @@
 module github.com/kamalyes/go-toolbox
 
-go 1.23
+go 1.23.0
 
 require (
 	github.com/disintegration/imaging v1.6.2
 	github.com/google/uuid v1.6.0
-	github.com/kamalyes/go-argus v0.2.1
+	github.com/kamalyes/go-argus v0.2.2-0.20250706162640-cc4ca426836d
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/protobuf v1.36.10
 )
@@ -13,11 +13,10 @@ require (
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
-	github.com/kr/pretty v0.2.0 // indirect
-	github.com/kr/text v0.2.0 // indirect
+	github.com/kr/pretty v0.3.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	golang.org/x/image v0.23.0 // indirect
-	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
+	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 )
 
 require (
@@ -33,7 +32,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	golang.org/x/arch v0.8.0 // indirect
-	golang.org/x/crypto v0.23.0
-	golang.org/x/sys v0.25.0 // indirect
+	golang.org/x/crypto v0.39.0
+	golang.org/x/sys v0.33.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1
 )

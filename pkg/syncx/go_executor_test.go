@@ -14,6 +14,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -1147,4 +1148,86 @@ func TestBatchExecutorRefund_ContinueOnErrorMode(t *testing.T) {
 
 	t.Logf("🔄 继续执行模式 - 总数:30, 实际处理:%d, 成功:%d, 失败:%d, 跳过:%d",
 		totalProcessed, mock.successCount.Load(), mock.failedCount.Load(), mock.skippedCount.Load())
+}
+
+// TestGo_WithWaitGroup_Exec 测试 Exec 绑定 WaitGroup
+func TestGo_WithWaitGroup_Exec(t *testing.T) {
+	var wg sync.WaitGroup
+	executed := int32(0)
+
+	Go().WithWaitGroup(&wg).Exec(func() {
+		atomic.AddInt32(&executed, 1)
+	})
+
+	wg.Wait()
+	assert.Equal(t, int32(1), atomic.LoadInt32(&executed))
+}
+
+// TestGo_WithWaitGroup_ExecWithContext 测试 ExecWithContext 绑定 WaitGroup
+func TestGo_WithWaitGroup_ExecWithContext(t *testing.T) {
+	var wg sync.WaitGroup
+	executed := int32(0)
+
+	Go().
+		WithWaitGroup(&wg).
+		WithTimeout(1 * time.Second).
+		ExecWithContext(func(ctx context.Context) error {
+			atomic.AddInt32(&executed, 1)
+			return nil
+		})
+
+	wg.Wait()
+	assert.Equal(t, int32(1), atomic.LoadInt32(&executed))
+}
+
+// TestGo_WithWaitGroup_MultipleGoroutines 测试多个 goroutine 绑定同一 WaitGroup
+func TestGo_WithWaitGroup_MultipleGoroutines(t *testing.T) {
+	var wg sync.WaitGroup
+	var counter atomic.Int32
+	const n = 10
+
+	for i := 0; i < n; i++ {
+		Go().
+			WithWaitGroup(&wg).
+			WithTimeout(2 * time.Second).
+			ExecWithContext(func(ctx context.Context) error {
+				time.Sleep(10 * time.Millisecond)
+				counter.Add(1)
+				return nil
+			})
+	}
+
+	wg.Wait()
+	assert.Equal(t, int32(n), counter.Load())
+}
+
+// TestGo_WithWaitGroup_WithPanic 测试 panic 时 WaitGroup 也能正确 Done
+func TestGo_WithWaitGroup_WithPanic(t *testing.T) {
+	var wg sync.WaitGroup
+	panicCaught := int32(0)
+
+	Go().
+		WithWaitGroup(&wg).
+		OnPanic(func(r interface{}) {
+			atomic.AddInt32(&panicCaught, 1)
+		}).
+		Exec(func() {
+			panic("test panic")
+		})
+
+	// wg.Wait() 不应死锁，即使 goroutine 内部 panic
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// 正常完成
+	case <-time.After(1 * time.Second):
+		t.Fatal("wg.Wait() 超时，panic 时 WaitGroup 未 Done")
+	}
+
+	assert.Equal(t, int32(1), atomic.LoadInt32(&panicCaught))
 }

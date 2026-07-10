@@ -193,6 +193,23 @@ func (g *GoExecutor) OnCancel(fn GoExecutorCancelHandler) *GoExecutor {
 	return g
 }
 
+// WithWaitGroup 绑定外部 WaitGroup，goroutine 启动前 Add(1)，完成后 Done()
+// 用于需要等待异步任务完成的场景（如优雅关闭时等待所有写入完成）
+//
+// 注意：调用方无需手动 Add(1)，Exec 系列方法会自动管理计数
+//
+// 示例:
+//
+//	var wg sync.WaitGroup
+//	Go().WithWaitGroup(&wg).WithTimeout(5*time.Second).ExecWithContext(func(ctx context.Context) error {
+//	    return repo.Save(ctx, data)
+//	})
+//	wg.Wait() // 等待所有绑定的 goroutine 完成
+func (g *GoExecutor) WithWaitGroup(wg *sync.WaitGroup) *GoExecutor {
+	g.wg = wg
+	return g
+}
+
 // Exec 执行无参数的函数
 //
 // 示例:
@@ -201,7 +218,13 @@ func (g *GoExecutor) OnCancel(fn GoExecutorCancelHandler) *GoExecutor {
 //	    doSomething()
 //	})
 func (g *GoExecutor) Exec(fn GoExecutorFunc) {
+	if g.wg != nil {
+		g.wg.Add(1)
+	}
 	go func() {
+		if g.wg != nil {
+			defer g.wg.Done()
+		}
 		defer RecoverWithHandler(g.onPanic)
 
 		// 延迟执行
@@ -280,7 +303,13 @@ func (g *GoExecutor) SubWithError(fn GoExecutorWaitFunc) *GoExecutor {
 //	    SubWithError(func() error { return task3() }).
 //	    ExecSubs()
 func (g *GoExecutor) ExecSubs() {
+	if g.wg != nil {
+		g.wg.Add(1)
+	}
 	go func() {
+		if g.wg != nil {
+			defer g.wg.Done()
+		}
 		defer RecoverWithHandler(g.onPanic)
 
 		// 延迟执行
@@ -318,7 +347,13 @@ func (g *GoExecutor) ExecSubs() {
 //	    children.Go(func() { subscribe2() })
 //	})
 func (g *GoExecutor) ExecWithChildren(fn func(*ChildRunner)) {
+	if g.wg != nil {
+		g.wg.Add(1)
+	}
 	go func() {
+		if g.wg != nil {
+			defer g.wg.Done()
+		}
 		defer RecoverWithHandler(g.onPanic)
 
 		// 延迟执行
@@ -348,7 +383,13 @@ func (g *GoExecutor) ExecWithChildren(fn func(*ChildRunner)) {
 //	    return repo.Save(ctx, data)
 //	})
 func (g *GoExecutor) ExecWithContext(fn GoExecutorContextFunc) {
+	if g.wg != nil {
+		g.wg.Add(1)
+	}
 	go func() {
+		if g.wg != nil {
+			defer g.wg.Done()
+		}
 		defer RecoverWithHandler(g.onPanic)
 
 		// 创建 context
@@ -395,7 +436,13 @@ func (g *GoExecutor) ExecWithResult(fn GoExecutorResultFunc) <-chan struct {
 		Err   error
 	}, 1)
 
+	if g.wg != nil {
+		g.wg.Add(1)
+	}
 	go func() {
+		if g.wg != nil {
+			defer g.wg.Done()
+		}
 		defer close(resultChan)
 		defer RecoverWithHandler(g.onPanic)
 
@@ -428,7 +475,13 @@ func (g *GoExecutor) ExecWithResult(fn GoExecutorResultFunc) <-chan struct {
 func (g *GoExecutor) Wait(fn GoExecutorWaitFunc) error {
 	errChan := make(chan error, 1)
 
+	if g.wg != nil {
+		g.wg.Add(1)
+	}
 	go func() {
+		if g.wg != nil {
+			defer g.wg.Done()
+		}
 		defer close(errChan)
 		defer RecoverWithHandler(g.onPanic)
 
