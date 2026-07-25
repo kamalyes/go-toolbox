@@ -270,3 +270,31 @@ func TestParseUrlPath(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildObjectURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		domain   string
+		key      string
+		expected string
+	}{
+		{name: "bare domain and key", domain: "cdn.example.com", key: "icons/app.png", expected: "https://cdn.example.com/icons/app.png"},
+		{name: "trailing slash on domain", domain: "cdn.example.com/", key: "icons/app.png", expected: "https://cdn.example.com/icons/app.png"},
+		{name: "leading slash on key", domain: "cdn.example.com", key: "/icons/app.png", expected: "https://cdn.example.com/icons/app.png"},
+		{name: "slashes on both sides", domain: "cdn.example.com/", key: "/icons/app.png", expected: "https://cdn.example.com/icons/app.png"},
+		{name: "domain already https", domain: "https://cdn.example.com", key: "icons/app.png", expected: "https://cdn.example.com/icons/app.png"},
+		{name: "domain already http", domain: "http://cdn.example.com", key: "icons/app.png", expected: "http://cdn.example.com/icons/app.png"},
+		{name: "https domain with trailing slash", domain: "https://cdn.example.com/", key: "/a/b.png", expected: "https://cdn.example.com/a/b.png"},
+		{name: "empty domain returns empty", domain: "", key: "icon.png", expected: ""},
+		{name: "empty key returns empty", domain: "cdn.example.com", key: "", expected: ""},
+		{name: "both empty returns empty", domain: "", key: "", expected: ""},
+		{name: "deep key path", domain: "cdn.example.com", key: "tenant/123/icons/app.png", expected: "https://cdn.example.com/tenant/123/icons/app.png"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := BuildObjectURL(tt.domain, tt.key)
+			assert.Equal(t, tt.expected, result, "domain=%q key=%q", tt.domain, tt.key)
+		})
+	}
+}

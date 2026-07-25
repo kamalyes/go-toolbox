@@ -17,6 +17,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 )
 
 // MkdirIfNotExist 如果目录不存在则创建它
@@ -117,4 +118,28 @@ func ParseUrlPath(urlString string) (path string) {
 		return path
 	}
 	return u.Path
+}
+
+// BuildObjectURL 根据存储域名和对象键构造完整访问 URL，统一处理 scheme、斜杠与空值。
+//
+// 行为：
+//   - domain 或 key 为空时返回空字符串，避免拼出 "https:///key" 这类残缺 URL
+//   - domain 已带 http:// 或 https:// 时不再补 scheme，否则默认追加 https://
+//   - domain 末尾与 key 开头的斜杠会被规范化，绝不出现重复斜杠
+//
+// 示例：
+//
+//	BuildObjectURL("cdn.example.com", "icons/app.png")        // "https://cdn.example.com/icons/app.png"
+//	BuildObjectURL("https://cdn.example.com/", "/a/b.png")   // "https://cdn.example.com/a/b.png"
+//	BuildObjectURL("", "icon.png")                           // ""
+//	BuildObjectURL("cdn.example.com", "")                    // ""
+func BuildObjectURL(domain, key string) string {
+	if domain == "" || key == "" {
+		return ""
+	}
+	scheme := "https://"
+	if strings.HasPrefix(domain, "http://") || strings.HasPrefix(domain, "https://") {
+		scheme = ""
+	}
+	return scheme + strings.TrimRight(domain, "/") + "/" + strings.TrimLeft(key, "/")
 }
