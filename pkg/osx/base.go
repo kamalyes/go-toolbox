@@ -292,7 +292,8 @@ func StableHashSlot(s string, minNum, maxNum int) int {
 		rangeSize = maxNum - minNum + 1
 		result    = int(hashVal%uint64(rangeSize)) + minNum
 	)
-	return mathx.IfGtZero(result, 1)
+	// 防御 int 转换溢出导致负值，确保结果至少为 1
+	return mathx.IfLeZero(result, 1)
 }
 
 // GetRuntimeCaller 获取调用栈信息，调用者使用完需调用 Release() 归还对象

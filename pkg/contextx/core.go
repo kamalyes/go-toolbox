@@ -40,9 +40,22 @@ func NewContext() *Context {
 }
 
 // WithParent 设置父上下文
+// 若已设置 deadline 或 cancel，会在新父上下文上重新应用，避免覆盖超时/取消行为
 func (c *Context) WithParent(parent context.Context) *Context {
 	if parent != nil {
-		c.Context = parent
+		if dl := c.deadline.Load(); dl > 0 {
+			// 已设置 deadline，在新父上下文上重新应用以保留超时行为
+			ctx, cancel := context.WithDeadline(parent, time.Unix(0, dl))
+			c.Context = ctx
+			c.cancelFunc = cancel
+		} else if c.cancelFunc != nil {
+			// 已设置 cancel，在新父上下文上重新应用
+			ctx, cancel := context.WithCancel(parent)
+			c.Context = ctx
+			c.cancelFunc = cancel
+		} else {
+			c.Context = parent
+		}
 	}
 	return c
 }

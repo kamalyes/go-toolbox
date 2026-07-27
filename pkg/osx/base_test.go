@@ -41,6 +41,11 @@ func TestHashUnixMicroCipherText(t *testing.T) {
 }
 
 func TestGetWorkerId(t *testing.T) {
+	// 确保使用默认 maxWorkerID，避免受其他测试影响
+	origMaxWorkerID := GetMaxWorkerID()
+	defer SetMaxWorkerID(origMaxWorkerID)
+	SetMaxWorkerID(1024)
+
 	// 场景1：默认配置（0-1023）
 	workerID := GetWorkerId()
 	assert.GreaterOrEqual(t, workerID, int64(0))
@@ -57,6 +62,11 @@ func TestGetWorkerId(t *testing.T) {
 }
 
 func TestGetWorkerId_WithEnv(t *testing.T) {
+	// 确保使用默认 maxWorkerID，避免受其他测试影响
+	origMaxWorkerID := GetMaxWorkerID()
+	defer SetMaxWorkerID(origMaxWorkerID)
+	SetMaxWorkerID(1024)
+
 	tests := []struct {
 		name   string
 		envKey string
@@ -107,6 +117,11 @@ func TestExtractOrdinalFromName(t *testing.T) {
 }
 
 func TestGetDatacenterId(t *testing.T) {
+	// 确保使用默认 maxDatacenterID，避免受其他测试影响
+	origMaxDCID := GetMaxDatacenterID()
+	defer SetMaxDatacenterID(origMaxDCID)
+	SetMaxDatacenterID(32)
+
 	// 场景1：默认配置（0-31）
 	dcID := GetDatacenterId()
 	assert.GreaterOrEqual(t, dcID, int64(0))
@@ -123,6 +138,11 @@ func TestGetDatacenterId(t *testing.T) {
 }
 
 func TestGetDatacenterId_WithEnv(t *testing.T) {
+	// 确保使用默认 maxDatacenterID，避免受其他测试影响
+	origMaxDCID := GetMaxDatacenterID()
+	defer SetMaxDatacenterID(origMaxDCID)
+	SetMaxDatacenterID(32)
+
 	tests := []struct {
 		name   string
 		envKey string
@@ -209,6 +229,11 @@ func TestGetDatacenterId_WithEnv(t *testing.T) {
 }
 
 func TestGetWorkerIdForSnowflake(t *testing.T) {
+	// 确保使用默认 maxSnowflakeWorkerID，避免受其他测试影响
+	origMaxSnowflakeID := GetMaxSnowflakeWorkerID()
+	defer SetMaxSnowflakeWorkerID(origMaxSnowflakeID)
+	SetMaxSnowflakeWorkerID(32)
+
 	// 场景1：默认配置（0-31）
 	snowflakeID := GetWorkerIdForSnowflake()
 	assert.GreaterOrEqual(t, snowflakeID, int64(0))
@@ -361,6 +386,16 @@ func TestCommand(t *testing.T) {
 
 func TestWorkerIDConfig_Concurrent(t *testing.T) {
 	// 并发测试配置的线程安全性
+	// 保存并恢复全局配置，避免影响其他测试
+	origMaxWorkerID := GetMaxWorkerID()
+	origMaxDCID := GetMaxDatacenterID()
+	origMaxSnowflakeID := GetMaxSnowflakeWorkerID()
+	defer func() {
+		SetMaxWorkerID(origMaxWorkerID)
+		SetMaxDatacenterID(origMaxDCID)
+		SetMaxSnowflakeWorkerID(origMaxSnowflakeID)
+	}()
+
 	done := make(chan bool, 10)
 
 	for i := 0; i < 10; i++ {

@@ -25,44 +25,65 @@ const (
 	ZlibPrefixLen = len(ZlibPrefix)
 )
 
-// 创建一个 sync.Pool 来复用 bytes.Buffer
 var (
 	zlibBuffer = sync.Pool{
 		New: func() interface{} {
-			return new(bytes.Buffer) // 创建新的 bytes.Buffer
+			return new(bytes.Buffer)
 		},
 	}
-	// 添加读取缓冲区池用于解压缩优化
 	zlibReadBuffer = sync.Pool{
 		New: func() interface{} {
 			return new(bytes.Buffer)
 		},
 	}
+	// zlibWriterPool 复用 zlib.Writer，避免每次压缩都分配新对象
+	zlibWriterPool = sync.Pool{
+		New: func() interface{} {
+			return zlib.NewWriter(nil)
+		},
+	}
+	// zlibReaderPool 复用 zlib 解压 reader（通过 zlib.Resetter 接口），避免每次解压都分配新对象
+	// zlib.Reader 未导出，但 NewReader 返回的 io.ReadCloser 实现了 zlib.Resetter 接口
+	zlibReaderPool = sync.Pool{
+		New: func() interface{} {
+			var b bytes.Buffer
+			w := zlib.NewWriter(&b)
+			w.Close()
+			reader, err := zlib.NewReader(bytes.NewReader(b.Bytes()))
+			if err != nil {
+				panic("zipx: failed to initialize zlib reader pool: " + err.Error())
+			}
+			return reader
+		},
+	}
 )
 
-// ZlibCompress 压缩数据（修复版本）
+// ZlibCompress 压缩数据
 func ZlibCompress(data []byte) ([]byte, error) {
-	// 从池中获取一个缓冲区
 	buf := zlibBuffer.Get().(*bytes.Buffer)
-	defer zlibBuffer.Put(buf) // 使用后放回池中
-
-	// 清空缓冲区
+	defer zlibBuffer.Put(buf)
 	buf.Reset()
 
-	// 创建新的 zlib.Writer（不要重用，因为 zlib.Writer 没有有效的 Reset 方法）
-	writer := zlib.NewWriter(buf)
-	defer writer.Close()
+	writer := zlibWriterPool.Get().(*zlib.Writer)
+	writer.Reset(buf) // zlib.Writer 支持 Reset，可安全复用
+	closed := false
+	defer func() {
+		if !closed {
+			writer.Close()
+		}
+		zlibWriterPool.Put(writer)
+	}()
 
 	if _, err := writer.Write(data); err != nil {
-		return nil, err // 写入数据时出错
+		return nil, err
 	}
 
 	if err := writer.Close(); err != nil {
-		return nil, err // 关闭 writer 时出错
+		return nil, err
 	}
+	closed = true
 
-	// 必须返回副本!不能返回buf.Bytes(),因为buf会被放回Pool重用
-	// 直接返回buf.Bytes()会导致并发竞争,其他goroutine可能修改同一buffer
+	// 返回副本，避免 buf 被放回 Pool 后产生数据竞争
 	result := make([]byte, buf.Len())
 	copy(result, buf.Bytes())
 	return result, nil
@@ -77,28 +98,28 @@ func ZlibCompressWithInfo(data []byte) (*CompressResult, error) {
 	return newCompressResult(data, compressed), nil
 }
 
-// ZlibDecompress 解压缩数据（优化版本，使用对象池）
+// ZlibDecompress 解压缩数据（使用对象池优化）
 func ZlibDecompress(compressedData []byte) ([]byte, error) {
-	// 创建一个新的读取器
-	reader, err := zlib.NewReader(bytes.NewReader(compressedData))
-	if err != nil {
-		return nil, err // 创建读取器时出错
-	}
-	defer reader.Close() // 使用完后关闭读取器
+	reader := zlibReaderPool.Get().(io.ReadCloser)
+	defer zlibReaderPool.Put(reader)
 
-	// 从对象池获取缓冲区以减少分配
+	if err := reader.(zlib.Resetter).Reset(bytes.NewReader(compressedData), nil); err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+
 	buf := zlibReadBuffer.Get().(*bytes.Buffer)
 	buf.Reset()
 	defer zlibReadBuffer.Put(buf)
 
 	if _, err := io.Copy(buf, reader); err != nil {
-		return nil, err // 复制数据时出错
+		return nil, err
 	}
 
-	// 创建副本以避免对象池重用时的数据污染
+	// 返回副本，避免 buf 被放回 Pool 后产生数据竞争
 	result := make([]byte, buf.Len())
 	copy(result, buf.Bytes())
-	return result, nil // 返回解压后的字节切片副本
+	return result, nil
 }
 
 // MultiZlibCompress 支持多次压缩

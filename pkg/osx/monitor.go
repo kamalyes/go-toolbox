@@ -14,6 +14,7 @@ import (
 	"context"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/kamalyes/go-toolbox/pkg/syncx"
@@ -96,10 +97,11 @@ type Monitor struct {
 	historyLock sync.RWMutex
 
 	// 统计信息
-	checkCount    uint64
-	exceedCount   uint64
+	checkCount    atomic.Uint64
+	exceedCount   atomic.Uint64
 	lastSnapshot  *Snapshot
 	lastCheckTime time.Time
+	statsLock     sync.RWMutex
 }
 
 // NewMonitor 创建内存监控器（简化版，使用单一阈值）
@@ -235,16 +237,23 @@ func (m *Monitor) addToHistory(snapshot Snapshot) {
 
 // checkGrowthRate 检查增长率
 func (m *Monitor) checkGrowthRate(current Snapshot) {
-	if !m.enableGrowthCheck || m.lastSnapshot == nil {
+	if !m.enableGrowthCheck {
 		return
 	}
 
-	elapsed := current.Timestamp.Sub(m.lastSnapshot.Timestamp)
+	m.statsLock.RLock()
+	lastSnap := m.lastSnapshot
+	m.statsLock.RUnlock()
+	if lastSnap == nil {
+		return
+	}
+
+	elapsed := current.Timestamp.Sub(lastSnap.Timestamp)
 	if elapsed < m.growthWindow {
 		return
 	}
 
-	oldValue := float64(m.getMetricValue(*m.lastSnapshot))
+	oldValue := float64(m.getMetricValue(*lastSnap))
 	newValue := float64(m.getMetricValue(current))
 
 	if oldValue == 0 {
@@ -278,8 +287,10 @@ func (m *Monitor) Start(ctx context.Context, interval time.Duration) {
 			return
 		case <-ticker.C:
 			snapshot := m.takeSnapshot()
-			m.checkCount++
+			m.checkCount.Add(1)
+			m.statsLock.Lock()
 			m.lastCheckTime = time.Now()
+			m.statsLock.Unlock()
 
 			// 添加到历史记录
 			m.addToHistory(snapshot)
@@ -299,7 +310,7 @@ func (m *Monitor) Start(ctx context.Context, interval time.Duration) {
 			for _, threshold := range m.thresholds {
 				if current >= threshold.Value {
 					exceeded = true
-					m.exceedCount++
+					m.exceedCount.Add(1)
 
 					switch threshold.Level {
 					case LevelWarning:
@@ -321,7 +332,9 @@ func (m *Monitor) Start(ctx context.Context, interval time.Duration) {
 
 			// 更新最后快照（用于增长率计算）
 			if !exceeded || !m.checkOnce {
+				m.statsLock.Lock()
 				m.lastSnapshot = &snapshot
+				m.statsLock.Unlock()
 			}
 		}
 	}
@@ -353,6 +366,8 @@ func (m *Monitor) GetHistory() []Snapshot {
 
 // GetLastSnapshot 获取最后一次快照
 func (m *Monitor) GetLastSnapshot() *Snapshot {
+	m.statsLock.RLock()
+	defer m.statsLock.RUnlock()
 	if m.lastSnapshot == nil {
 		return nil
 	}
@@ -366,10 +381,14 @@ func (m *Monitor) GetStats() MonitorStats {
 		return len(m.history)
 	})
 
+	m.statsLock.RLock()
+	lastCheckTime := m.lastCheckTime
+	m.statsLock.RUnlock()
+
 	return MonitorStats{
-		CheckCount:    m.checkCount,
-		ExceedCount:   m.exceedCount,
-		LastCheckTime: m.lastCheckTime,
+		CheckCount:    m.checkCount.Load(),
+		ExceedCount:   m.exceedCount.Load(),
+		LastCheckTime: lastCheckTime,
 		HistoryCount:  historyCount,
 	}
 }

@@ -24,6 +24,20 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// nowStripped 返回去除了单调时钟的当前时间（截断到秒，统一 UTC 时区）
+// time.Now() 包含单调时钟读数且使用 time.Local 时区，
+// JSON 反序列化后变为 time.UTC 时区且无单调时钟，
+// 导致 reflect.DeepEqual 比较失败（loc 指针不同）
+func nowStripped() time.Time {
+	t := time.Now().UTC()
+	return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), 0, time.UTC)
+}
+
+// stripMono 去除 time.Time 的单调时钟读数，统一使用 UTC 时区
+func stripMono(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), time.UTC)
+}
+
 // TestGzipCompress 测试基本 Gzip 压缩功能
 func TestGzipCompress(t *testing.T) {
 	testData := []byte("Hello, World! This is a test string for gzip compression.")
@@ -67,7 +81,7 @@ func TestGzipCompressObjectSingleMessage(t *testing.T) {
 	testMsg := TestMessage{
 		ID:        "gzip_msg_123456",
 		Content:   "这是一条用于Gzip压缩测试的消息，包含中文内容！",
-		Timestamp: time.Now().Truncate(time.Second),
+		Timestamp: nowStripped(),
 		UserID:    "gzip_user_789",
 		Type:      1,
 	}
@@ -93,7 +107,7 @@ func TestGzipCompressObjectWithSize(t *testing.T) {
 	testMsg := TestMessage{
 		ID:        "msg_123456",
 		Content:   "这是一条测试消息，包含中文内容！",
-		Timestamp: time.Now().Truncate(time.Second),
+		Timestamp: nowStripped(),
 		UserID:    "user_789",
 		Type:      1,
 	}
@@ -120,7 +134,7 @@ func TestGzipCompressObjectWithSize(t *testing.T) {
 // TestGzipCompressObject_MessageSlice 测试消息数组 Gzip 压缩
 func TestGzipCompressObjectMessageSlice(t *testing.T) {
 	// 创建多条测试消息（截断时间以移除单调时钟）
-	baseTime := time.Now().Truncate(time.Second)
+	baseTime := nowStripped()
 	messages := []TestMessage{
 		{
 			ID:        "gzip_msg_001",
@@ -191,7 +205,7 @@ func TestGzipConcurrency(t *testing.T) {
 	errors := make(chan error, numGoroutines*numOperations)
 
 	// 创建测试数据（截断时间以移除单调时钟）
-	baseTime := time.Now().Truncate(time.Second)
+	baseTime := nowStripped()
 	messages := make([]TestMessage, 5)
 	for i := 0; i < 5; i++ {
 		messages[i] = TestMessage{
@@ -286,7 +300,7 @@ func TestGzipVsZlibComparison(t *testing.T) {
 func TestGzipLargeObjectArray(t *testing.T) {
 	// 创建大量复杂对象（截断时间以移除单调时钟）
 	const objectCount = 500
-	baseTime := time.Now().Truncate(time.Second)
+	baseTime := nowStripped()
 	complexObjects := make([]TestComplexObject, objectCount)
 
 	for i := 0; i < objectCount; i++ {
@@ -353,7 +367,7 @@ func BenchmarkGzipCompressObject(b *testing.B) {
 	testMsg := TestMessage{
 		ID:        "gzip_bench_msg_123",
 		Content:   "这是一条用于Gzip性能测试的消息",
-		Timestamp: time.Now().Truncate(time.Second),
+		Timestamp: nowStripped(),
 		UserID:    "gzip_bench_user",
 		Type:      1,
 	}
@@ -368,7 +382,7 @@ func BenchmarkGzipCompressObject(b *testing.B) {
 // BenchmarkGzipVsZlibPerformance 性能对比基准测试
 func BenchmarkGzipVsZlibPerformance(b *testing.B) {
 	// 准备测试数据（截断时间以移除单调时钟）
-	baseTime := time.Now().Truncate(time.Second)
+	baseTime := nowStripped()
 	messages := make([]TestMessage, 50)
 	for i := 0; i < 50; i++ {
 		messages[i] = TestMessage{
@@ -455,7 +469,7 @@ func TestMultiGzipCompressObject(t *testing.T) {
 	testMsg := TestMessage{
 		ID:        "multi_gzip_msg_123",
 		Content:   "这是一条用于多次Gzip压缩测试的消息",
-		Timestamp: time.Now().Truncate(time.Second),
+		Timestamp: nowStripped(),
 		UserID:    "multi_gzip_user",
 		Type:      1,
 	}
@@ -622,7 +636,7 @@ func TestGzipSmartDecompressObject(t *testing.T) {
 	testMsg := TestMessage{
 		ID:        "smart_msg_123",
 		Content:   "这是一条用于智能解压缩测试的消息",
-		Timestamp: time.Now().Truncate(time.Second),
+		Timestamp: nowStripped(),
 		UserID:    "smart_user_789",
 		Type:      1,
 	}
@@ -673,7 +687,7 @@ func TestGzipSmartDecompressBackwardCompatibility(t *testing.T) {
 	testMsg := TestMessage{
 		ID:        "compat_msg_123",
 		Content:   "向后兼容性测试消息",
-		Timestamp: time.Now().Truncate(time.Second),
+		Timestamp: nowStripped(),
 		UserID:    "compat_user",
 		Type:      1,
 	}
@@ -711,7 +725,7 @@ func TestGzipSmartDecompressBackwardCompatibility(t *testing.T) {
 			{
 				ID:        "compat_msg_456",
 				Content:   "第二条消息",
-				Timestamp: time.Now().Truncate(time.Second),
+				Timestamp: nowStripped(),
 				UserID:    "compat_user_2",
 				Type:      2,
 			},
@@ -739,7 +753,7 @@ func TestGzipSmartDecompressThresholdChange(t *testing.T) {
 	smallMsg := TestMessage{
 		ID:        "small_msg",
 		Content:   "小消息",
-		Timestamp: time.Now().Truncate(time.Second),
+		Timestamp: nowStripped(),
 		UserID:    "user_1",
 		Type:      1,
 	}
@@ -747,7 +761,7 @@ func TestGzipSmartDecompressThresholdChange(t *testing.T) {
 	largeMsg := TestMessage{
 		ID:        "large_msg",
 		Content:   string(bytes.Repeat([]byte("这是一条很长的消息内容，用于测试压缩阈值变化场景。"), 50)),
-		Timestamp: time.Now().Truncate(time.Second),
+		Timestamp: nowStripped(),
 		UserID:    "user_2",
 		Type:      2,
 	}
@@ -817,7 +831,7 @@ func TestGzipSmartDecompressConcurrency(t *testing.T) {
 	errors := make(chan error, numGoroutines*numOperations)
 
 	// 准备测试数据（混合压缩和未压缩）
-	baseTime := time.Now().Truncate(time.Second)
+	baseTime := nowStripped()
 	compressedData := make([][]byte, 5)
 	uncompressedData := make([][]byte, 5)
 
@@ -955,7 +969,7 @@ func BenchmarkGzipSmartDecompressObject(b *testing.B) {
 	testMsg := TestMessage{
 		ID:        "bench_msg",
 		Content:   "性能测试消息",
-		Timestamp: time.Now().Truncate(time.Second),
+		Timestamp: nowStripped(),
 		UserID:    "bench_user",
 		Type:      1,
 	}
@@ -1016,7 +1030,7 @@ func TestGzipCompressObjectWithInfo(t *testing.T) {
 	obj := TestMessage{
 		ID:        "test_123",
 		Content:   "test content",
-		Timestamp: time.Now().Truncate(time.Second),
+		Timestamp: nowStripped(),
 		UserID:    "user_456",
 		Type:      1,
 	}
@@ -1042,7 +1056,7 @@ func TestMultiGZipCompressObjectWithInfo(t *testing.T) {
 	obj := TestMessage{
 		ID:        "multi_gzip_789",
 		Content:   "multi compress content",
-		Timestamp: time.Now().Truncate(time.Second),
+		Timestamp: nowStripped(),
 		UserID:    "user_multi",
 		Type:      2,
 	}

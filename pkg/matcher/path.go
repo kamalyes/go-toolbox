@@ -12,7 +12,6 @@
 package matcher
 
 import (
-	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -49,9 +48,30 @@ func NewPathMatcher(matchType PathMatcherType, pattern string) (*PathMatcher, er
 		pattern:   pattern,
 	}
 
-	// 如果是正则表达式，预编译
-	if matchType == PathMatchRegex {
+	// 如果是正则表达式或 Glob 模式，预编译
+	switch matchType {
+	case PathMatchRegex:
 		regex, err := regexp.Compile(pattern)
+		if err != nil {
+			return nil, err
+		}
+		pm.regex = regex
+	case PathMatchGlob:
+		// 将 glob 模式转换为正则：* 匹配任意字符（包括 /），? 匹配单个字符
+		var sb strings.Builder
+		sb.WriteString("^")
+		for _, r := range pattern {
+			switch r {
+			case '*':
+				sb.WriteString(".*")
+			case '?':
+				sb.WriteString(".")
+			default:
+				sb.WriteString(regexp.QuoteMeta(string(r)))
+			}
+		}
+		sb.WriteString("$")
+		regex, err := regexp.Compile(sb.String())
 		if err != nil {
 			return nil, err
 		}
@@ -71,8 +91,10 @@ func (pm *PathMatcher) Match(path string) bool {
 	case PathMatchSuffix:
 		return strings.HasSuffix(path, pm.pattern)
 	case PathMatchGlob:
-		matched, _ := filepath.Match(pm.pattern, path)
-		return matched
+		if pm.regex != nil {
+			return pm.regex.MatchString(path)
+		}
+		return false
 	case PathMatchRegex:
 		if pm.regex != nil {
 			return pm.regex.MatchString(path)
@@ -85,11 +107,17 @@ func (pm *PathMatcher) Match(path string) bool {
 	}
 }
 
-// MatchPathGlob Glob 模式匹配路径（支持 * 和 ? 通配符）
-// 示例: MatchPathGlob("/api/users", "/api/*") => true
+// MatchPathGlob Glob 模式匹配路径（支持 * 和 ? 通配符，* 可匹配 /）
+// 示例: MatchPathGlob("/api/v1/resource", "/api/*") => true
 func MatchPathGlob(path, pattern string) bool {
-	matched, _ := filepath.Match(pattern, path)
-	return matched || pattern == path
+	if pattern == path {
+		return true
+	}
+	pm, err := NewPathMatcher(PathMatchGlob, pattern)
+	if err != nil {
+		return false
+	}
+	return pm.Match(path)
 }
 
 // MatchPathWithMethod 匹配路径和 HTTP 方法

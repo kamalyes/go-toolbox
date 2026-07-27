@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kamalyes/go-argus"
+	validator "github.com/kamalyes/go-argus"
 	"github.com/kamalyes/go-toolbox/pkg/types"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -216,6 +216,14 @@ func ToFloat64(value any) (float64, error) {
 func Float64ToInt[T types.Numerical](value float64, mode RoundMode) (T, error) {
 	var zero T
 	convertedValue := applyRoundMode[float64](value, mode)
+
+	// 无符号类型不允许负值
+	switch any(zero).(type) {
+	case uint, uint8, uint16, uint32, uint64:
+		if convertedValue < 0 {
+			return zero, fmt.Errorf("value %f is negative, cannot convert to unsigned type %T", convertedValue, zero)
+		}
+	}
 
 	// 检查范围（仅对 int64 类型检查，其他类型由 Go 自动处理）
 	if convertedValue < float64(math.MinInt64) || convertedValue > float64(math.MaxInt64) {

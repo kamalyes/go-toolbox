@@ -92,10 +92,11 @@ func TestGenericPool(t *testing.T) {
 	v := pool.Get()
 	assert.Equal(t, 42, v)
 
-	// Put 一个新值，再次 Get 应该能拿到刚放进去的值
+	// Put 一个新值，再次 Get
+	// 注意：sync.Pool 不保证 LIFO/FIFO 顺序，Get 可能返回 New() 创建的新值或之前 Put 的值
 	pool.Put(100)
 	v2 := pool.Get()
-	assert.Equal(t, 100, v2)
+	assert.Contains(t, []int{42, 100}, v2)
 
 	// Put nil 值（对于 int 类型无意义，但测试泛型池的健壮性）
 	// 对于非指针类型，nil 不适用，这里仅做类型安全性验证
@@ -107,5 +108,5 @@ func TestGenericPool(t *testing.T) {
 	assert.Equal(t, "hello", s)
 	strPool.Put("world")
 	s2 := strPool.Get()
-	assert.Equal(t, "world", s2)
+	assert.Contains(t, []string{"hello", "world"}, s2)
 }

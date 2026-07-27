@@ -288,22 +288,16 @@ func TestLimiterConcurrentWait(t *testing.T) {
 func TestLimiterHighRate(t *testing.T) {
 	limiter := NewLimiter(1000, 1000)
 
-	// 初始应该能快速消耗所有令牌
-	count := 0
-	for i := 0; i < 1000; i++ {
-		if limiter.Allow() {
-			count++
-		}
-	}
-	assert.Equal(t, 1000, count)
+	// 一次性消耗所有令牌（避免逐次循环期间触发 refill 补充）
+	assert.True(t, limiter.AllowN(1000))
 
 	// 令牌耗尽
 	assert.False(t, limiter.Allow())
 
-	// 等待1秒应该补充1000个
+	// 等待1秒应该补充接近1000个
 	time.Sleep(1100 * time.Millisecond)
 
-	count = 0
+	count := 0
 	for i := 0; i < 1000; i++ {
 		if limiter.Allow() {
 			count++

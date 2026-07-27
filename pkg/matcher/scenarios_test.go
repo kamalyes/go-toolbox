@@ -13,6 +13,7 @@ package matcher
 
 import (
 	"fmt"
+	"hash/fnv"
 	"strconv"
 	"strings"
 	"sync"
@@ -654,12 +655,10 @@ func TestScenario_OrderSharding(t *testing.T) {
 					if orderID == "" {
 						return false
 					}
-					// 根据订单 ID 计算分片
-					hash := 0
-					for _, c := range orderID {
-						hash += int(c)
-					}
-					return hash%shardCount == shardID
+					// 使用 FNV-1a 哈希计算分片，保证分布均匀
+					h := fnv.New32a()
+					h.Write([]byte(orderID))
+					return int(h.Sum32()%uint32(shardCount)) == shardID
 				}).
 				WithPriority(10),
 		)

@@ -54,12 +54,19 @@ func TestWorkerPoolQueueFull(t *testing.T) {
 
 	// 提交会阻塞的任务
 	blockChan := make(chan struct{})
+	started := make(chan struct{})
 	err := pool.Submit(context.Background(), func() {
+		close(started)
 		<-blockChan
 	})
 	assert.NoError(t, err)
 
-	// 提交第二个任务（填满队列）
+	// 等待 worker 开始执行阻塞任务，确保后续提交进入队列
+	<-started
+
+	// 提交任务填满队列（队列大小为 2）
+	err = pool.Submit(context.Background(), func() {})
+	assert.NoError(t, err)
 	err = pool.Submit(context.Background(), func() {})
 	assert.NoError(t, err)
 

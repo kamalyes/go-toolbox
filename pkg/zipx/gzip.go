@@ -53,18 +53,23 @@ func GzipCompress(data []byte) ([]byte, error) {
 
 	writer := gzipWriter.Get().(*gzip.Writer) // 从对象池获取 gzip.Writer
 	writer.Reset(buf)                         // 将 writer 绑定到缓冲区
+	closed := false                           // 标记是否已关闭，避免 double-Close
 	defer func() {
-		writer.Close()         // 关闭 writer 以刷新剩余数据
-		gzipWriter.Put(writer) // 使用完后将 writer 放回池中
+		if !closed {
+			writer.Close() // 确保异常路径下 writer 也被关闭
+		}
+		gzipWriter.Put(writer)
 	}()
 
 	if _, err := writer.Write(data); err != nil {
-		return nil, err // 写入数据时出错
+		return nil, err // defer 会负责 Close
 	}
 
+	// Close 刷新 gzip footer 到 buf，仅调用一次
 	if err := writer.Close(); err != nil {
-		return nil, err // 关闭 writer 时出错
+		return nil, err
 	}
+	closed = true
 
 	// 创建副本以避免对象池重用时的数据污染
 	result := make([]byte, buf.Len())
@@ -83,21 +88,26 @@ func GzipCompressWithInfo(data []byte) (*CompressResult, error) {
 
 // GzipDecompress 解压缩 gzip 压缩的数据
 func GzipDecompress(compressedData []byte) ([]byte, error) {
-	buf := bytes.NewBuffer(compressedData) // 创建一个新的缓冲区，读取压缩数据
-
 	reader := gzipReader.Get().(*gzip.Reader) // 从对象池获取 gzip.Reader
 	defer gzipReader.Put(reader)              // 使用完后将 reader 放回池中
 
-	if err := reader.Reset(buf); err != nil {
+	if err := reader.Reset(bytes.NewReader(compressedData)); err != nil {
 		return nil, err // 重置 reader 时出错
 	}
 	defer reader.Close() // 使用完后关闭 reader
 
-	data, err := io.ReadAll(reader) // 读取解压后的数据
-	if err != nil {
-		return nil, err // 读取数据时出错
+	buf := gzipBuffer.Get().(*bytes.Buffer) // 复用压缩时同一池，减少分配
+	buf.Reset()
+	defer gzipBuffer.Put(buf)
+
+	if _, err := io.Copy(buf, reader); err != nil {
+		return nil, err // 复制数据时出错
 	}
-	return data, nil // 返回解压后的字节切片
+
+	// 返回副本，避免 buf 被放回 Pool 后产生数据竞争
+	result := make([]byte, buf.Len())
+	copy(result, buf.Bytes())
+	return result, nil
 }
 
 // MultiGZipCompress 支持多次压缩
