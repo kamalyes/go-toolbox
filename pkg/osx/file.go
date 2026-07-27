@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/kamalyes/go-toolbox/pkg/mathx"
 	"github.com/kamalyes/go-toolbox/pkg/sign"
 )
 
@@ -224,9 +225,7 @@ func FindFilesRecursive(pattern string) ([]string, error) {
 	}
 
 	baseDir := parts[0]
-	if baseDir == "" {
-		baseDir = "."
-	}
+	baseDir = mathx.IfNotEmpty(baseDir, ".")
 	filePattern := strings.TrimPrefix(parts[1], string(filepath.Separator))
 
 	// 递归遍历目录

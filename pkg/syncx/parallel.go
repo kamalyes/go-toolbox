@@ -187,7 +187,7 @@ func (p *ParallelExecutor[K, V, R]) Execute(fn ParallelExecuteFunc[K, V, R]) {
 
 	var (
 		wg      sync.WaitGroup
-		mu      sync.Mutex
+		mu      sync.Mutex // 仅保护 map 写入（map 不支持并发写）
 		results = make(map[K]R, len(p.data))
 		errors  = make(map[K]error)
 	)
@@ -195,6 +195,7 @@ func (p *ParallelExecutor[K, V, R]) Execute(fn ParallelExecuteFunc[K, V, R]) {
 	for k, v := range p.data {
 		wg.Add(1)
 		go func(key K, val V) {
+			// panic 恢复 + map 写入在 defer 中保证 panic 也能记录
 			defer func() {
 				if r := recover(); r != nil {
 					mu.Lock()
@@ -210,14 +211,21 @@ func (p *ParallelExecutor[K, V, R]) Execute(fn ParallelExecuteFunc[K, V, R]) {
 
 			result, err := fn(key, val)
 
+			// 临界区：仅保护 map 写入，回调在锁外并发执行
 			mu.Lock()
 			if err != nil {
 				errors[key] = err
+			} else {
+				results[key] = result
+			}
+			mu.Unlock()
+
+			// 回调并发执行（无锁，调用方需保证线程安全）
+			if err != nil {
 				if p.onError != nil {
 					p.onError(key, val, err)
 				}
 			} else {
-				results[key] = result
 				if p.onSuccess != nil {
 					p.onSuccess(key, val, result)
 				}
@@ -226,7 +234,6 @@ func (p *ParallelExecutor[K, V, R]) Execute(fn ParallelExecuteFunc[K, V, R]) {
 			if p.onEachComplete != nil {
 				p.onEachComplete(key)
 			}
-			mu.Unlock()
 		}(k, v)
 	}
 
@@ -302,33 +309,29 @@ func (p *ParallelSliceExecutor[T, R]) Execute(fn ParallelSliceExecuteFunc[T, R])
 		return
 	}
 
-	var (
-		wg      sync.WaitGroup
-		mu      sync.Mutex
-		results = make([]R, len(p.data))
-		errors  = make([]error, len(p.data))
-	)
+	// 预分配 results/errors 切片，每个 goroutine 写入唯一 idx，无需 mutex
+	results := make([]R, len(p.data))
+	errors := make([]error, len(p.data))
+
+	var wg sync.WaitGroup
 
 	// 处理单个任务的公共逻辑
+	// 零 mutex：切片 idx 写入天然安全，回调并发执行（调用方需保证线程安全）
 	processTask := func(idx int, val T) {
+		// panic 错误通过 defer 写入对应索引，wg.Done 在 defer 链最后调用
+		// 确保 panic 也能正确记录到 errors[idx] 并触发 onPanic 回调
 		defer func() {
 			if r := recover(); r != nil {
-				mu.Lock()
 				errors[idx] = fmt.Errorf("panic: %v", r)
-				mu.Unlock()
-
 				if p.onPanic != nil {
 					p.onPanic(idx, val, r)
 				}
 			}
-			wg.Done()
 		}()
 
 		result, err := fn(idx, val)
 
-		mu.Lock()
-		defer mu.Unlock()
-
+		// 直接索引写入（不同 idx 落不同内存位置，无 data race）
 		if err != nil {
 			errors[idx] = err
 			if p.onError != nil {
@@ -357,6 +360,7 @@ func (p *ParallelSliceExecutor[T, R]) Execute(fn ParallelSliceExecuteFunc[T, R])
 
 			go func(idx int, val T) {
 				defer func() { <-semaphore }() // 释放信号量，让下一个任务可以启动
+				defer wg.Done()
 				processTask(idx, val)
 			}(i, v)
 		}
@@ -364,7 +368,10 @@ func (p *ParallelSliceExecutor[T, R]) Execute(fn ParallelSliceExecuteFunc[T, R])
 		// 无并发限制，直接启动所有 goroutine
 		for i, v := range p.data {
 			wg.Add(1)
-			go processTask(i, v)
+			go func(idx int, val T) {
+				defer wg.Done()
+				processTask(idx, val)
+			}(i, v)
 		}
 	}
 

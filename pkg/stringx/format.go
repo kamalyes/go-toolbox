@@ -12,6 +12,7 @@ package stringx
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -54,12 +55,9 @@ func Fill(str string, char string, length int, isPre bool) string {
 // Format 通过map中的参数 格式化字符串
 // map = {a: "aValue", b: "bValue"} format("{a} and {b}", map) ---=》 aValue and bValue
 func Format(template string, params map[string]interface{}) string {
-	// 遍历map中的键值对
 	for key, value := range params {
-		// 构造占位符，例如 "{a}"
-		placeholder := fmt.Sprintf("{%s}", key)
-		// 将占位符替换为对应的值
-		template = strings.ReplaceAll(template, placeholder, fmt.Sprintf("%v", value))
+		placeholder := "{" + key + "}"
+		template = strings.ReplaceAll(template, placeholder, fmt.Sprint(value))
 	}
 	return template
 }
@@ -72,12 +70,14 @@ func (s *StringX) FormatChain(params map[string]interface{}) *StringX {
 
 // IndexedFormat 有序的格式化文本，使用{number}做为占位符
 // 通常使用：format("this is {0} for {1}", "a", "b") =》 this is a for b
+//
+// 性能：使用 strconv.Itoa + 字符串拼接构造占位符，避免 fmt.Sprintf 反射开销
 func IndexedFormat(template string, params []interface{}) string {
-	// 遍历所有参数
 	for i, param := range params {
-		placeholder := fmt.Sprintf("{%d}", i)
-		// 将占位符替换为对应的值
-		template = strings.ReplaceAll(template, placeholder, fmt.Sprintf("%v", param))
+		// 拼接占位符 "{" + strconv.Itoa(i) + "}"
+		placeholder := "{" + strconv.Itoa(i) + "}"
+		// fmt.Sprint 比 fmt.Sprintf("%v", v) 快：跳过格式字符串解析
+		template = strings.ReplaceAll(template, placeholder, fmt.Sprint(param))
 	}
 	return template
 }

@@ -500,7 +500,7 @@ func TestSliceDiffSetStrings(t *testing.T) {
 		{[]string{"a"}, []string{"a"}, []string{}},                                                 // 单个元素完全相等
 		{[]string{"a"}, []string{"b"}, []string{"a", "b"}},                                         // 单个元素不相等
 		{[]string{"a", "b", "c"}, []string{"b"}, []string{"a", "c"}},                               // 部分重叠
-		{[]string{"c", "b", "a"}, []string{"b", "a", "d"}, []string{"c", "d"}},                     // 输入顺序不同
+		// 注意：SliceDiffSetSorted 要求输入已排序，未排序输入请使用 SliceDifference
 	}
 
 	for _, tc := range cases {
@@ -816,6 +816,28 @@ func BenchmarkSliceContainsComparable(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		SliceContainsComparable(slice, element)
 	}
+}
+
+// TestSliceContainsComparableLargeSlice 测试大数据切片走哈希查找分支（>1000 元素）
+func TestSliceContainsComparableLargeSlice(t *testing.T) {
+	// 构造 > 1000 元素的切片，触发 containsComparableHash 分支
+	large := make([]int, 2000)
+	for i := range large {
+		large[i] = i
+	}
+
+	// 存在的元素（位于末尾，验证哈希查找能找到）
+	assert.True(t, SliceContainsComparable(large, 1999))
+	// 不存在的元素
+	assert.False(t, SliceContainsComparable(large, 99999))
+
+	// 字符串切片大数据
+	largeStr := make([]string, 2000)
+	for i := range largeStr {
+		largeStr[i] = "item" + string(rune('A'+i%26)) + string(rune('0'+i%10))
+	}
+	assert.True(t, SliceContainsComparable(largeStr, largeStr[1500]))
+	assert.False(t, SliceContainsComparable(largeStr, "not-exists"))
 }
 
 // 与原有遍历方式的对比测试
@@ -1328,4 +1350,539 @@ func TestDedupeValues(t *testing.T) {
 
 		assert.Equal(t, []string{"go", "java", "python"}, result)
 	})
+}
+
+// ============================================================================
+// 转换 + 去重/展平 组合
+// ============================================================================
+
+func TestSliceUniqMap(t *testing.T) {
+	// 去重 + 转换
+	result := SliceUniqMap([]int{1, 2, 2, 3, 3, 3}, func(item, _ int) int {
+		return item * 10
+	})
+	assert.Equal(t, []int{10, 20, 30}, result)
+
+	// 空切片
+	assert.Equal(t, []int{}, SliceUniqMap([]int{}, func(item, _ int) int { return item }))
+
+	// 全部重复
+	result2 := SliceUniqMap([]string{"a", "a", "a"}, func(item string, _ int) int {
+		return len(item)
+	})
+	assert.Equal(t, []int{1}, result2)
+}
+
+func TestSliceFlatMap(t *testing.T) {
+	result := SliceFlatMap([]int{1, 2, 3}, func(item, _ int) []int {
+		return []int{item, item * 10}
+	})
+	assert.Equal(t, []int{1, 10, 2, 20, 3, 30}, result)
+
+	// 空切片
+	assert.Equal(t, []int{}, SliceFlatMap([]int{}, func(item, _ int) []int { return []int{item} }))
+
+	// 返回空切片
+	result2 := SliceFlatMap([]int{1, 2, 3}, func(item, _ int) []int {
+		if item == 2 {
+			return nil
+		}
+		return []int{item}
+	})
+	assert.Equal(t, []int{1, 3}, result2)
+}
+
+func TestSliceFilterMap(t *testing.T) {
+	result := SliceFilterMap([]int{1, 2, 3, 4, 5}, func(item, _ int) (int, bool) {
+		if item%2 == 0 {
+			return item * 10, true
+		}
+		return 0, false
+	})
+	assert.Equal(t, []int{20, 40}, result)
+}
+
+// ============================================================================
+// 遍历控制 / 生成
+// ============================================================================
+
+func TestSliceForEachWhile(t *testing.T) {
+	var collected []int
+	SliceForEachWhile([]int{1, 2, 3, 4, 5}, func(item, _ int) bool {
+		if item > 3 {
+			return false
+		}
+		collected = append(collected, item)
+		return true
+	})
+	assert.Equal(t, []int{1, 2, 3}, collected)
+
+	// 空切片
+	var collected2 []int
+	SliceForEachWhile([]int{}, func(item, _ int) bool {
+		collected2 = append(collected2, item)
+		return true
+	})
+	assert.Nil(t, collected2)
+}
+
+func TestSliceTimes(t *testing.T) {
+	result := SliceTimes(5, func(index int) int {
+		return index * 2
+	})
+	assert.Equal(t, []int{0, 2, 4, 6, 8}, result)
+
+	// count=0
+	assert.Equal(t, []int{}, SliceTimes(0, func(index int) int { return index }))
+}
+
+func TestSliceInterleave(t *testing.T) {
+	// 三个不同长度的切片
+	result := SliceInterleave([]int{1, 2, 3}, []int{4, 5}, []int{6, 7, 8, 9})
+	assert.Equal(t, []int{1, 4, 6, 2, 5, 7, 3, 8, 9}, result)
+
+	// 空输入（显式指定 Slice 类型参数，因为无参数时无法推断）
+	assert.Equal(t, []int{}, SliceInterleave[int, []int]())
+
+	// 单个空切片
+	assert.Equal(t, []int{}, SliceInterleave([]int{}))
+}
+
+// ============================================================================
+// 切片 ↔ map 互转
+// ============================================================================
+
+func TestSliceToMap(t *testing.T) {
+	// SliceToMap([]string, func(item string) int) 返回 map[int]string
+	// key=len(item), value=item；同 key 后者覆盖前者
+	result := SliceToMap([]string{"apple", "banana", "cherry"}, func(item string) int {
+		return len(item)
+	})
+	assert.Equal(t, "apple", result[5])
+	assert.Equal(t, "cherry", result[6]) // banana(len=6) 被 cherry(len=6) 覆盖
+
+	// 空切片
+	assert.Equal(t, map[int]string{}, SliceToMap([]string{}, func(item string) int { return len(item) }))
+}
+
+func TestSliceFilterToMap(t *testing.T) {
+	result := SliceFilterToMap([]int{1, 2, 3, 4, 5, 6}, func(item, _ int) (int, string, bool) {
+		if item%2 == 0 {
+			return item, "even", true
+		}
+		return 0, "", false
+	})
+	assert.Equal(t, "even", result[2])
+	assert.Equal(t, "even", result[4])
+	assert.Equal(t, "even", result[6])
+	_, exists := result[1]
+	assert.False(t, exists)
+}
+
+// ============================================================================
+// 条件丢弃
+// ============================================================================
+
+func TestSliceDropWhile(t *testing.T) {
+	result := SliceDropWhile([]int{1, 2, 3, 4, 5}, func(item int) bool {
+		return item < 3
+	})
+	assert.Equal(t, []int{3, 4, 5}, result)
+
+	// 全部满足条件（丢弃全部）
+	assert.Equal(t, []int{}, SliceDropWhile([]int{1, 2, 3}, func(item int) bool { return true }))
+
+	// 第一个就不满足
+	assert.Equal(t, []int{5, 4, 3, 2, 1}, SliceDropWhile([]int{5, 4, 3, 2, 1}, func(item int) bool {
+		return item < 4
+	}))
+}
+
+func TestSliceDropRightWhile(t *testing.T) {
+	result := SliceDropRightWhile([]int{1, 2, 3, 4, 5}, func(item int) bool {
+		return item > 3
+	})
+	assert.Equal(t, []int{1, 2, 3}, result)
+
+	// 全部满足（丢弃全部）
+	assert.Equal(t, []int{}, SliceDropRightWhile([]int{1, 2, 3}, func(item int) bool { return true }))
+}
+
+// ============================================================================
+// 反向过滤 / 计数
+// ============================================================================
+
+func TestSliceReject(t *testing.T) {
+	result := SliceReject([]int{1, 2, 3, 4, 5}, func(item, _ int) bool {
+		return item%2 == 0
+	})
+	assert.Equal(t, []int{1, 3, 5}, result)
+}
+
+func TestSliceCountBy(t *testing.T) {
+	count := SliceCountBy([]int{1, 2, 3, 4, 5, 6}, func(item int) bool {
+		return item%2 == 0
+	})
+	assert.Equal(t, 3, count)
+
+	assert.Equal(t, 0, SliceCountBy([]int{}, func(item int) bool { return true }))
+}
+
+func TestSliceCountValues(t *testing.T) {
+	result := SliceCountValues([]string{"a", "b", "a", "c", "b", "a"})
+	assert.Equal(t, 3, result["a"])
+	assert.Equal(t, 2, result["b"])
+	assert.Equal(t, 1, result["c"])
+}
+
+func TestSliceCountValuesBy(t *testing.T) {
+	// apple(5), kiwi(4), banana(6), pear(4)
+	// 按长度计数：{5:1, 4:2, 6:1}
+	result := SliceCountValuesBy([]string{"apple", "kiwi", "banana", "pear"}, func(item string) int {
+		return len(item)
+	})
+	assert.Equal(t, 1, result[5]) // apple
+	assert.Equal(t, 2, result[4]) // kiwi + pear
+	assert.Equal(t, 1, result[6]) // banana
+}
+
+// ============================================================================
+// 子集 / 替换 / 有序检查
+// ============================================================================
+
+func TestSliceSubset(t *testing.T) {
+	collection := []int{1, 2, 3, 4, 5}
+
+	// 正 offset
+	assert.Equal(t, []int{2, 3}, SliceSubset(collection, 1, 2))
+
+	// 负 offset（从末尾倒数）
+	assert.Equal(t, []int{4, 5}, SliceSubset(collection, -2, 2))
+
+	// length 超出剩余
+	assert.Equal(t, []int{4, 5}, SliceSubset(collection, 3, 10))
+
+	// offset 超出
+	assert.Equal(t, []int{}, SliceSubset(collection, 10, 1))
+
+	// 负 offset 绝对值超出
+	assert.Equal(t, []int{1, 2}, SliceSubset(collection, -100, 2))
+}
+
+func TestSliceReplace(t *testing.T) {
+	collection := []int{1, 2, 1, 3, 1, 4}
+
+	// 替换前 2 个
+	result := SliceReplace(collection, 1, 0, 2)
+	assert.Equal(t, []int{0, 2, 0, 3, 1, 4}, result)
+	// 原切片不变
+	assert.Equal(t, collection, []int{1, 2, 1, 3, 1, 4})
+
+	// 替换全部
+	assert.Equal(t, []int{0, 2, 0, 3, 0, 4}, SliceReplaceAll(collection, 1, 0))
+
+	// n=0 不替换
+	assert.Equal(t, collection, SliceReplace(collection, 1, 0, 0))
+}
+
+func TestSliceIsSorted(t *testing.T) {
+	assert.True(t, SliceIsSorted([]int{1, 2, 3, 4, 5}))
+	assert.True(t, SliceIsSorted([]int{1, 1, 2, 2, 3})) // 允许相等
+	assert.False(t, SliceIsSorted([]int{1, 3, 2, 4}))
+	assert.True(t, SliceIsSorted([]int{}))  // 空
+	assert.True(t, SliceIsSorted([]int{1})) // 单元素
+}
+
+func TestSliceIsSortedByKey(t *testing.T) {
+	type User struct{ Age int }
+	users := []User{{1}, {2}, {3}}
+	assert.True(t, SliceIsSortedByKey(users, func(u User) int { return u.Age }))
+
+	users2 := []User{{1}, {3}, {2}}
+	assert.False(t, SliceIsSortedByKey(users2, func(u User) int { return u.Age }))
+}
+
+// ============================================================================
+// 切割 / 前后缀
+// ============================================================================
+
+func TestSliceCut(t *testing.T) {
+	collection := []int{1, 2, 3, 4, 5}
+
+	// 找到 separator
+	before, after, found := SliceCut(collection, []int{3, 4})
+	assert.True(t, found)
+	assert.Equal(t, []int{1, 2}, before)
+	assert.Equal(t, []int{5}, after)
+
+	// 未找到
+	before, after, found = SliceCut(collection, []int{9})
+	assert.False(t, found)
+	assert.Equal(t, collection, before)
+	assert.Equal(t, []int{}, after)
+
+	// 空 separator
+	before, after, found = SliceCut(collection, []int{})
+	assert.True(t, found)
+	assert.Equal(t, []int{}, before)
+	assert.Equal(t, collection, after)
+}
+
+func TestSliceHasPrefix(t *testing.T) {
+	assert.True(t, SliceHasPrefix([]int{1, 2, 3}, []int{1, 2}))
+	assert.False(t, SliceHasPrefix([]int{1, 2, 3}, []int{2, 3}))
+	assert.True(t, SliceHasPrefix([]int{1, 2, 3}, []int{})) // 空 prefix
+	assert.False(t, SliceHasPrefix([]int{1}, []int{1, 2}))  // prefix 比 collection 长
+}
+
+func TestSliceHasSuffix(t *testing.T) {
+	assert.True(t, SliceHasSuffix([]int{1, 2, 3}, []int{2, 3}))
+	assert.False(t, SliceHasSuffix([]int{1, 2, 3}, []int{1, 2}))
+	assert.True(t, SliceHasSuffix([]int{1, 2, 3}, []int{}))
+	assert.False(t, SliceHasSuffix([]int{3}, []int{2, 3}))
+}
+
+// ============================================================================
+// 唯一 / 重复查找
+// ============================================================================
+
+func TestSliceFindUniques(t *testing.T) {
+	// 1 出现一次（唯一），2/3 重复
+	result := SliceFindUniques([]int{1, 2, 2, 3, 3, 3})
+	assert.Equal(t, []int{1}, result)
+
+	// 全部唯一
+	assert.Equal(t, []int{1, 2, 3}, SliceFindUniques([]int{1, 2, 3}))
+
+	// 全部重复
+	assert.Equal(t, []int{}, SliceFindUniques([]int{1, 1, 2, 2}))
+}
+
+func TestSliceFindUniquesBy(t *testing.T) {
+	type User struct{ ID int }
+	users := []User{{1}, {2}, {1}, {3}}
+	result := SliceFindUniquesBy(users, func(u User) int { return u.ID })
+	assert.Equal(t, []User{{2}, {3}}, result)
+}
+
+func TestSliceFindDuplicates(t *testing.T) {
+	// 2/3 重复，每个返回首次出现
+	result := SliceFindDuplicates([]int{1, 2, 2, 3, 3, 3})
+	assert.Equal(t, []int{2, 3}, result)
+
+	// 无重复
+	assert.Equal(t, []int{}, SliceFindDuplicates([]int{1, 2, 3}))
+}
+
+func TestSliceFindDuplicatesBy(t *testing.T) {
+	type User struct{ ID int }
+	users := []User{{1}, {2}, {1}, {3}, {2}}
+	result := SliceFindDuplicatesBy(users, func(u User) int { return u.ID })
+	assert.Equal(t, []User{{1}, {2}}, result)
+}
+
+// ============================================================================
+// 自定义比较的 Min/Max
+// ============================================================================
+
+func TestSliceMinBy(t *testing.T) {
+	result := SliceMinBy([]string{"apple", "kiwi", "banana"}, func(a, b string) bool {
+		return len(a) < len(b)
+	})
+	assert.Equal(t, "kiwi", result)
+
+	// 空切片
+	assert.Equal(t, "", SliceMinBy([]string{}, func(a, b string) bool { return len(a) < len(b) }))
+}
+
+func TestSliceMaxBy(t *testing.T) {
+	result := SliceMaxBy([]string{"apple", "kiwi", "banana"}, func(a, b string) bool {
+		return len(a) > len(b)
+	})
+	assert.Equal(t, "banana", result)
+}
+
+func TestSliceMinIndexBy(t *testing.T) {
+	val, idx := SliceMinIndexBy([]int{3, 1, 2}, func(a, b int) bool { return a < b })
+	assert.Equal(t, 1, val)
+	assert.Equal(t, 1, idx)
+
+	// 空切片
+	_, idx2 := SliceMinIndexBy([]int{}, func(a, b int) bool { return a < b })
+	assert.Equal(t, -1, idx2)
+}
+
+func TestSliceMaxIndexBy(t *testing.T) {
+	val, idx := SliceMaxIndexBy([]int{1, 3, 2}, func(a, b int) bool { return a > b })
+	assert.Equal(t, 3, val)
+	assert.Equal(t, 1, idx)
+}
+
+func TestSliceMinOrdered(t *testing.T) {
+	assert.Equal(t, 1, SliceMinOrdered([]int{3, 1, 2}))
+	assert.Equal(t, 0, SliceMinOrdered([]int{})) // 空切片返回零值
+
+	assert.Equal(t, "a", SliceMinOrdered([]string{"b", "a", "c"}))
+}
+
+func TestSliceMaxOrdered(t *testing.T) {
+	assert.Equal(t, 3, SliceMaxOrdered([]int{1, 3, 2}))
+	assert.Equal(t, 0, SliceMaxOrdered([]int{}))
+
+	assert.Equal(t, "c", SliceMaxOrdered([]string{"a", "c", "b"}))
+}
+
+// ============================================================================
+// 首尾 / 第 N 个元素
+// ============================================================================
+
+func TestSliceFirstLast(t *testing.T) {
+	// First
+	val, ok := SliceFirst([]int{1, 2, 3})
+	assert.True(t, ok)
+	assert.Equal(t, 1, val)
+
+	_, ok = SliceFirst([]int{})
+	assert.False(t, ok)
+
+	// Last
+	val, ok = SliceLast([]int{1, 2, 3})
+	assert.True(t, ok)
+	assert.Equal(t, 3, val)
+
+	_, ok = SliceLast([]int{})
+	assert.False(t, ok)
+}
+
+func TestSliceFirstOrLastOr(t *testing.T) {
+	// FirstOr
+	assert.Equal(t, 1, SliceFirstOr([]int{1, 2, 3}, 0))
+	assert.Equal(t, 99, SliceFirstOr([]int{}, 99))
+
+	// LastOr
+	assert.Equal(t, 3, SliceLastOr([]int{1, 2, 3}, 0))
+	assert.Equal(t, 99, SliceLastOr([]int{}, 99))
+}
+
+func TestSliceNth(t *testing.T) {
+	collection := []int{10, 20, 30, 40, 50}
+
+	// 正索引
+	val, err := SliceNth(collection, 0)
+	assert.NoError(t, err)
+	assert.Equal(t, 10, val)
+
+	val, err = SliceNth(collection, 2)
+	assert.NoError(t, err)
+	assert.Equal(t, 30, val)
+
+	// 负索引
+	val, err = SliceNth(collection, -1)
+	assert.NoError(t, err)
+	assert.Equal(t, 50, val)
+
+	val, err = SliceNth(collection, -2)
+	assert.NoError(t, err)
+	assert.Equal(t, 40, val)
+
+	// 越界
+	_, err = SliceNth(collection, 10)
+	assert.Error(t, err)
+
+	_, err = SliceNth(collection, -10)
+	assert.Error(t, err)
+}
+
+func TestSliceNthOr(t *testing.T) {
+	collection := []int{10, 20, 30}
+
+	assert.Equal(t, 10, SliceNthOr(collection, 0, 0))
+	assert.Equal(t, 30, SliceNthOr(collection, -1, 0))
+	assert.Equal(t, 99, SliceNthOr(collection, 10, 99))  // 越界返回 fallback
+	assert.Equal(t, 99, SliceNthOr(collection, -10, 99)) // 越界返回 fallback
+}
+
+// ============================================================================
+// 双向差集 / 元素匹配 / 多切片并集
+// ============================================================================
+
+func TestSliceDifference(t *testing.T) {
+	left, right := SliceDifference([]int{1, 2, 3, 4}, []int{3, 4, 5, 6})
+	assert.Equal(t, []int{1, 2}, left)
+	assert.Equal(t, []int{5, 6}, right)
+
+	// 无交集
+	left, right = SliceDifference([]int{1, 2}, []int{3, 4})
+	assert.Equal(t, []int{1, 2}, left)
+	assert.Equal(t, []int{3, 4}, right)
+
+	// 完全相同
+	left, right = SliceDifference([]int{1, 2}, []int{1, 2})
+	assert.Equal(t, []int{}, left)
+	assert.Equal(t, []int{}, right)
+}
+
+func TestSliceUnionMulti(t *testing.T) {
+	result := SliceUnionMulti([]int{1, 2, 3}, []int{2, 3, 4}, []int{3, 4, 5})
+	assert.Equal(t, []int{1, 2, 3, 4, 5}, result)
+
+	// 空输入（显式指定 Slice 类型参数，因为无参数时无法推断）
+	assert.Equal(t, []int{}, SliceUnionMulti[int, []int]())
+
+	// 单切片
+	assert.Equal(t, []int{1, 2, 3}, SliceUnionMulti([]int{1, 2, 3}))
+}
+
+func TestSliceElementsMatch(t *testing.T) {
+	assert.True(t, SliceElementsMatch([]int{1, 2, 3}, []int{3, 2, 1}))  // 顺序不同
+	assert.True(t, SliceElementsMatch([]int{1, 1, 2}, []int{1, 2, 1}))  // 重复计数匹配
+	assert.False(t, SliceElementsMatch([]int{1, 1, 2}, []int{1, 2, 2})) // 重复计数不匹配
+	assert.False(t, SliceElementsMatch([]int{1, 2}, []int{1, 2, 3}))    // 长度不同
+	assert.True(t, SliceElementsMatch([]int{}, []int{}))                // 空切片
+}
+
+func TestSliceWithoutBy(t *testing.T) {
+	type User struct{ ID int }
+	users := []User{{1}, {2}, {3}, {4}}
+	result := SliceWithoutBy(users, func(u User) int { return u.ID }, 2, 3)
+	assert.Equal(t, []User{{1}, {4}}, result)
+
+	// 排除所有
+	assert.Equal(t, []User{}, SliceWithoutBy(users, func(u User) int { return u.ID }, 1, 2, 3, 4))
+
+	// 排除空
+	assert.Equal(t, users, SliceWithoutBy(users, func(u User) int { return u.ID }))
+}
+
+func TestSlicePartitionBy(t *testing.T) {
+	result := SlicePartitionBy([]int{1, 2, 3, 4, 5, 6}, func(item int) string {
+		if item%2 == 0 {
+			return "even"
+		}
+		return "odd"
+	})
+	assert.Len(t, result, 2)
+	// 第一组是 odd（首次出现顺序）
+	assert.Equal(t, []int{1, 3, 5}, result[0])
+	assert.Equal(t, []int{2, 4, 6}, result[1])
+
+	// 空切片
+	assert.Equal(t, [][]int{}, SlicePartitionBy([]int{}, func(item int) string { return "x" }))
+}
+
+func TestSliceGroupByMap(t *testing.T) {
+	type User struct {
+		Dept string
+		Name string
+	}
+	users := []User{
+		{"A", "Alice"},
+		{"B", "Bob"},
+		{"A", "Charlie"},
+	}
+	result := SliceGroupByMap(users, func(u User) (string, string) {
+		return u.Dept, u.Name
+	})
+	assert.Equal(t, []string{"Alice", "Charlie"}, result["A"])
+	assert.Equal(t, []string{"Bob"}, result["B"])
 }

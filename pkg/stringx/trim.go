@@ -15,17 +15,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/kamalyes/go-argus"
+	validator "github.com/kamalyes/go-argus"
 )
 
 // Trim 除去字符串头尾部的空白
 func Trim(str string) string {
 	return strings.TrimSpace(str)
-}
-
-// IsBlank 判断字符串去除首尾空白后是否为空
-func IsBlank(str string) bool {
-	return Trim(str) == ""
 }
 
 // EqualsTrimIgnoreCase 去除首尾空白后忽略大小写比较字符串
@@ -40,8 +35,9 @@ func (s *StringX) TrimChain() *StringX {
 }
 
 // IsBlankChain 判断字符串去除首尾空白后是否为空（链式调用）
+// 已迁移至 go-argus：validate.IsBlankString
 func (s *StringX) IsBlankChain() bool {
-	return IsBlank(s.value)
+	return Trim(s.value) == ""
 }
 
 // EqualsTrimIgnoreCaseChain 去除首尾空白后忽略大小写比较字符串（链式调用）
@@ -258,10 +254,12 @@ func (s *StringX) TrimSuffixIgnoreCaseChain(suffix string) *StringX {
 	return s
 }
 
+// trimSymbolsRegex 预编译正则，去掉字符串中的所有符号（包级变量，仅编译一次）
+var trimSymbolsRegex = regexp.MustCompile(`[^\w]+`)
+
 // TrimSymbols 使用正则表达式去掉字符串中的所有符号
 func TrimSymbols(str string) string {
-	reg := regexp.MustCompile(`[^\w]+`)
-	return reg.ReplaceAllString(str, "")
+	return trimSymbolsRegex.ReplaceAllString(str, "")
 }
 
 // TrimSymbolsChain 使用正则表达式去掉字符串中的所有符号（链式调用）

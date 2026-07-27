@@ -76,8 +76,8 @@ func NewTemporalHasher(opts ...TemporalHasherOption) *TemporalHasher {
 	}
 
 	// 若为空则使用默认值
-	config.window = mathx.IfEmpty(config.window, 5*time.Minute)
-	config.length = mathx.IfEmpty(config.length, 12)
+	config.window = mathx.IfLeZero(config.window, 5*time.Minute)
+	config.length = mathx.IfLeZero(config.length, 12)
 	config.separator = mathx.IfEmpty(config.separator, "|")
 
 	return &TemporalHasher{config: config}

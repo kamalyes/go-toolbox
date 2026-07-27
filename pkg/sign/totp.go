@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/kamalyes/go-toolbox/pkg/convert"
+	"github.com/kamalyes/go-toolbox/pkg/mathx"
 )
 
 // TOTPConfig TOTP配置参数
@@ -64,9 +65,7 @@ func DefaultTOTPConfig() *TOTPConfig {
 // GenerateTOTPSecret 生成TOTP密钥（Base32编码的随机字节）
 // secretLength: 密钥字节长度，推荐20
 func GenerateTOTPSecret(secretLength int) string {
-	if secretLength <= 0 {
-		secretLength = 20
-	}
+	secretLength = mathx.IfLeZero(secretLength, 20)
 	secret := make([]byte, secretLength)
 	if _, err := rand.Read(secret); err != nil {
 		secret = []byte(fmt.Sprintf("%d.%d", time.Now().UnixNano(), secretLength))
@@ -108,9 +107,7 @@ func ValidateTOTPCode(secret, code string, config *TOTPConfig) bool {
 	}
 
 	period := int64(config.Period)
-	if period <= 0 {
-		period = int64(DefaultTOTPConfig().Period)
-	}
+	period = mathx.IfLeZero(period, int64(DefaultTOTPConfig().Period))
 
 	now := time.Now().Unix()
 	for offset := int64(-int64(config.Skew)); offset <= int64(config.Skew); offset++ {
@@ -136,9 +133,7 @@ func GenerateTOTPCode(secret string, config *TOTPConfig) (string, error) {
 	}
 
 	period := int64(config.Period)
-	if period <= 0 {
-		period = int64(DefaultTOTPConfig().Period)
-	}
+	period = mathx.IfLeZero(period, int64(DefaultTOTPConfig().Period))
 
 	now := time.Now().Unix()
 	counter := now / period

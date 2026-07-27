@@ -20,6 +20,7 @@ import (
 
 	"github.com/disintegration/imaging"
 	"github.com/fogleman/gg"
+	"github.com/kamalyes/go-toolbox/pkg/mathx"
 	"github.com/kamalyes/go-toolbox/pkg/syncx"
 )
 
@@ -49,15 +50,9 @@ const (
 // 如果提供了自定义的段长度和间隔长度，则使用它们；否则使用默认值
 func NewDashOptions(dashLength, gapLength, lineWidth DashStyle) DashOptions {
 	// 默认值
-	if dashLength <= 0 {
-		dashLength = defaultDashLength // 默认虚线段长度
-	}
-	if gapLength <= 0 {
-		gapLength = defaultGapLength // 默认虚线间隔长度
-	}
-	if lineWidth <= 0 {
-		lineWidth = defaultLineWidth // 默认线条宽度
-	}
+	dashLength = mathx.IfLeZero(dashLength, defaultDashLength)
+	gapLength = mathx.IfLeZero(gapLength, defaultGapLength)
+	lineWidth = mathx.IfLeZero(lineWidth, defaultLineWidth)
 
 	return DashOptions{
 		dashLength: dashLength,

@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kamalyes/go-toolbox/pkg/stringx"
+	"github.com/kamalyes/go-argus"
 	"github.com/kamalyes/go-toolbox/pkg/types"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -245,7 +245,7 @@ func MustBool[T any](v T) bool {
 	case reflect.Bool:
 		return val.Bool()
 	case reflect.String:
-		return stringx.IsTrueString(val.String())
+		return validator.IsTrueString(val.String())
 	default:
 		flag, err := MustIntT[int](v, nil)
 		return err == nil && flag != 0
@@ -264,7 +264,25 @@ func MustJSON(v any) ([]byte, error) {
 
 // NumberSliceToStringSlice Number切片转String
 func NumberSliceToStringSlice[T types.Numerical](numbers []T) []string {
-	return sliceMap(numbers, func(n T) string { return fmt.Sprintf("%v", n) })
+	if len(numbers) == 0 {
+		return []string{}
+	}
+	result := make([]string, len(numbers))
+	for i, n := range numbers {
+		v := reflect.ValueOf(n)
+		switch v.Kind() {
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			result[i] = strconv.FormatInt(v.Int(), 10)
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			result[i] = strconv.FormatUint(v.Uint(), 10)
+		case reflect.Float32, reflect.Float64:
+			result[i] = strconv.FormatFloat(v.Float(), 'f', -1, 64)
+		default:
+			// 兜底，理论上 types.Numerical 约束不会进入此分支
+			result[i] = fmt.Sprintf("%v", n)
+		}
+	}
+	return result
 }
 
 // StringSliceToNumberSlice 将字符串切片转换为数字切片
@@ -279,18 +297,6 @@ func StringSliceToFloatSlice[T types.Float](input []string, mode RoundMode) ([]T
 	return sliceMapErr(input, func(s string) (T, error) {
 		return MustFloatT[T](s, mode)
 	})
-}
-
-// sliceMap 切片映射转换（无错误版本）
-func sliceMap[T any, R any](slice []T, fn func(T) R) []R {
-	if len(slice) == 0 {
-		return []R{}
-	}
-	result := make([]R, len(slice))
-	for i, v := range slice {
-		result[i] = fn(v)
-	}
-	return result
 }
 
 // sliceMapErr 切片映射转换（带错误处理）

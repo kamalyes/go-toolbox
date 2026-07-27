@@ -100,40 +100,6 @@ func NewProtoMessage[T proto.Message]() T {
 	return reflect.New(t).Interface().(T)
 }
 
-// IsNil 判断是否为 nil
-func IsNil(x interface{}) bool {
-	if x == nil {
-		return true
-	}
-	v := reflect.ValueOf(x)
-	switch v.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
-		return v.IsNil()
-	}
-	return false
-}
-
-// IsCEmpty 判断是否为空
-func IsCEmpty[T comparable](v T) bool {
-	var zero T
-	return v == zero
-}
-
-// DerefValue 解引用指针，返回解引用后的值和是否成功
-func DerefValue(value interface{}) (interface{}, bool) {
-	if value == nil {
-		return nil, false
-	}
-	rv := reflect.ValueOf(value)
-	if rv.Kind() == reflect.Ptr {
-		if rv.IsNil() {
-			return nil, false
-		}
-		return rv.Elem().Interface(), true
-	}
-	return value, true
-}
-
 // UnwrapPBValue 解包 protobuf wrapper 类型，返回底层值
 // 支持 wrapperspb 全部 9 种类型：String, Bool, Int32, Int64, UInt32, UInt64, Float, Double, Bytes
 // 如果 wrapper 为 nil 或 typed nil，返回 nil
@@ -141,47 +107,47 @@ func DerefValue(value interface{}) (interface{}, bool) {
 func UnwrapPBValue(iface interface{}) interface{} {
 	switch v := iface.(type) {
 	case *wrapperspb.StringValue:
-		if !IsNil(v) {
+		if v != nil {
 			return v.Value
 		}
 		return nil
 	case *wrapperspb.BoolValue:
-		if !IsNil(v) {
+		if v != nil {
 			return v.Value
 		}
 		return nil
 	case *wrapperspb.Int32Value:
-		if !IsNil(v) {
+		if v != nil {
 			return v.Value
 		}
 		return nil
 	case *wrapperspb.Int64Value:
-		if !IsNil(v) {
+		if v != nil {
 			return v.Value
 		}
 		return nil
 	case *wrapperspb.UInt32Value:
-		if !IsNil(v) {
+		if v != nil {
 			return v.Value
 		}
 		return nil
 	case *wrapperspb.UInt64Value:
-		if !IsNil(v) {
+		if v != nil {
 			return v.Value
 		}
 		return nil
 	case *wrapperspb.FloatValue:
-		if !IsNil(v) {
+		if v != nil {
 			return v.Value
 		}
 		return nil
 	case *wrapperspb.DoubleValue:
-		if !IsNil(v) {
+		if v != nil {
 			return v.Value
 		}
 		return nil
 	case *wrapperspb.BytesValue:
-		if !IsNil(v) {
+		if v != nil {
 			return v.Value
 		}
 		return nil

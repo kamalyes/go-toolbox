@@ -16,7 +16,28 @@ import (
 	"reflect"
 )
 
+// isPrimitiveKind 判断是否为基本类型（不可变，无需深拷贝）
+// string/bool/数值类型直接赋值即可，不存在引用共享问题
+func isPrimitiveKind(k reflect.Kind) bool {
+	switch k {
+	case reflect.Bool,
+		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
+		reflect.Float32, reflect.Float64,
+		reflect.Complex64, reflect.Complex128,
+		reflect.String:
+		return true
+	}
+	return false
+}
+
 // deepCopy 递归地复制值
+//
+// 性能优化要点：
+//  1. Struct 先整体值拷贝（dst.Set(src)，memcpy 级别），只对引用类型字段递归
+//     原实现逐字段递归反射，N 个字段 = N 次递归；优化后 1 次 Set + 引用类型字段递归
+//  2. Map 的 key 若为基本类型（如 string）直接复用，跳过递归
+//  3. Slice 元素若为基本类型，用 reflect.Copy 一次性拷贝，跳过逐元素递归
 func deepCopy(dst, src reflect.Value) {
 	if !src.IsValid() {
 		return // 如果源值无效，直接返回
@@ -26,6 +47,12 @@ func deepCopy(dst, src reflect.Value) {
 	case reflect.Interface: // 处理接口类型
 		if src.IsNil() {
 			dst.Set(reflect.Zero(dst.Type())) // 如果接口为nil，设置目标为该类型的零值
+			return
+		}
+		// 快速路径：基本类型的 interface{}（如 map[string]interface{} 的 string/int 值）
+		// 直接赋值，跳过 reflect.New + 递归反射开销
+		if isPrimitiveKind(src.Elem().Kind()) {
+			dst.Set(src)
 			return
 		}
 		value := src.Elem()                          // 获取接口内部的值
@@ -47,17 +74,27 @@ func deepCopy(dst, src reflect.Value) {
 			dst.Set(reflect.Zero(dst.Type())) // 如果映射为nil，设置目标为该类型的零值
 			return
 		}
-		dst.Set(reflect.MakeMap(src.Type())) // 创建新的映射
-		for _, key := range src.MapKeys() {  // 遍历源映射的键
+		dst.Set(reflect.MakeMapWithSize(src.Type(), src.Len())) // 预分配容量，减少扩容
+		for _, key := range src.MapKeys() {                     // 遍历源映射的键
 			value := src.MapIndex(key) // 获取键对应的值
 
-			// 深拷贝 key（对于复杂类型的key很重要）
-			newKey := reflect.New(key.Type()).Elem()
-			deepCopy(newKey, key)
+			// key 快速路径：基本类型直接复用，跳过递归（map[string]X 的 key 是 string 最常见）
+			var newKey reflect.Value
+			if isPrimitiveKind(key.Kind()) {
+				newKey = key
+			} else {
+				newKey = reflect.New(key.Type()).Elem()
+				deepCopy(newKey, key)
+			}
 
-			// 深拷贝 value
-			newValue := reflect.New(value.Type()).Elem()
-			deepCopy(newValue, value)
+			// value 快速路径：基本类型直接 Set，跳过递归
+			var newValue reflect.Value
+			if isPrimitiveKind(value.Kind()) {
+				newValue = value
+			} else {
+				newValue = reflect.New(value.Type()).Elem()
+				deepCopy(newValue, value)
+			}
 
 			dst.SetMapIndex(newKey, newValue) // 设置目标映射的值
 		}
@@ -67,6 +104,13 @@ func deepCopy(dst, src reflect.Value) {
 			dst.Set(reflect.Zero(dst.Type())) // 如果切片为nil，设置目标为该类型的零值
 			return
 		}
+		// 快速路径：元素为基本类型（如 []string/[]int），用 Copy 一次性拷贝，跳过逐元素递归
+		if isPrimitiveKind(src.Type().Elem().Kind()) {
+			dst.Set(reflect.MakeSlice(src.Type(), src.Len(), src.Cap()))
+			reflect.Copy(dst, src)
+			return
+		}
+		// 通用路径：逐元素深拷贝
 		dst.Set(reflect.MakeSlice(src.Type(), src.Len(), src.Cap())) // 创建新的切片
 		for i := 0; i < src.Len(); i++ {                             // 遍历源切片
 			deepCopy(dst.Index(i), src.Index(i)) // 递归复制每个元素
@@ -83,13 +127,18 @@ func deepCopy(dst, src reflect.Value) {
 			}
 		}
 		if !hasExportedField {
-			dst.Set(src)
+			dst.Set(src) // 无导出字段，直接值拷贝
 			return
 		}
 
-		for i := 0; i < src.NumField(); i++ { // 遍历源结构体的字段
-			srcField := src.Field(i)             // 获取源字段值
-			dstField := dst.Field(i)             // 获取目标字段
+		// ⚡ 性能优化：先整体值拷贝（memcpy 级别），值类型字段（string/int/bool/time.Time 等）一次性完成
+		// 原实现逐字段递归反射调用，N 个字段 = N 次递归 + N 次 SetMapIndex
+		// 优化后：1 次 Set + 仅引用类型字段递归
+		dst.Set(src)
+
+		// 只对引用类型字段和含导出字段的 struct 字段递归深拷贝
+		// 值类型字段（string/int/bool/Array/Chan/Func 等）已在 dst.Set(src) 中完成
+		for i := 0; i < src.NumField(); i++ {
 			fieldType := src.Type().Field(i)     // 获取字段类型信息
 			tag := fieldType.Tag.Get("deepcopy") // 获取字段的deepcopy标签
 
@@ -98,13 +147,38 @@ func deepCopy(dst, src reflect.Value) {
 				continue
 			}
 
-			// 只复制可设置且导出的字段
-			if dstField.CanSet() && fieldType.IsExported() {
-				deepCopy(dstField, srcField) // 递归复制字段
+			// 只处理可设置且导出的字段
+			dstField := dst.Field(i)
+			if !dstField.CanSet() || !fieldType.IsExported() {
+				continue
 			}
+
+			srcField := src.Field(i)
+			kind := fieldType.Type.Kind()
+
+			switch kind {
+			case reflect.Map, reflect.Slice, reflect.Ptr, reflect.Interface:
+				// 引用类型：先清零（消除 Set 留下的共享引用），再深拷贝
+				// nil 引用已被 dst.Set(src) 正确拷贝为 nil，跳过
+				if !srcField.IsNil() {
+					dstField.Set(reflect.Zero(dstField.Type()))
+					deepCopy(dstField, srcField)
+				}
+			case reflect.Struct:
+				// 含导出字段的 struct 字段：递归处理其引用类型子字段
+				// dst.Set(src) 已值拷贝，但内部引用类型子字段可能共享，需要递归
+				// （无导出字段的 struct 如 time.Time 已被 Set 完成，递归内部会直接 Set 返回）
+				deepCopy(dstField, srcField)
+			}
+			// 值类型字段（string/int/bool/Array 等）已在 dst.Set(src) 中完成，跳过
 		}
 
 	case reflect.Array: // 处理数组类型
+		// 快速路径：元素为基本类型，直接 Copy
+		if isPrimitiveKind(src.Type().Elem().Kind()) {
+			reflect.Copy(dst, src)
+			return
+		}
 		for i := 0; i < src.Len(); i++ { // 遍历源数组
 			deepCopy(dst.Index(i), src.Index(i)) // 递归复制每个元素
 		}

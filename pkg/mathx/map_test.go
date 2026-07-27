@@ -12,6 +12,7 @@
 package mathx
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -244,6 +245,33 @@ func TestCloneMap(t *testing.T) {
 
 	cloned["a"] = 2
 	assert.Equal(1, original["a"])
+}
+
+func TestMapClone(t *testing.T) {
+	assert := assert.New(t)
+
+	// 正常 map
+	original := map[string]int{"a": 1, "b": 2}
+	cloned := MapClone(original)
+	assert.Equal(original, cloned)
+
+	// 修改克隆不影响原 map
+	cloned["a"] = 999
+	assert.Equal(1, original["a"])
+
+	// 新增键
+	cloned["c"] = 3
+	_, exists := original["c"]
+	assert.False(exists)
+
+	// nil map
+	var nilMap map[string]int
+	assert.Nil(MapClone(nilMap))
+
+	// 空 map
+	emptyClone := MapClone(map[string]int{})
+	assert.NotNil(emptyClone)
+	assert.Len(emptyClone, 0)
 }
 
 func TestGetNestedMapValue(t *testing.T) {
@@ -497,4 +525,274 @@ func TestMergeLayeredKeyValues(t *testing.T) {
 		assert.Equal(1, len(result))
 		assert.Equal("Hello", result[0].Value)
 	})
+}
+
+// ============================================================================
+// 键/值提取
+// ============================================================================
+
+func TestMapKeys(t *testing.T) {
+	m := map[string]int{"a": 1, "b": 2, "c": 3}
+	keys := MapKeys(m)
+	sort.Strings(keys) // map 遍历顺序不保证
+	assert.Equal(t, []string{"a", "b", "c"}, keys)
+
+	// 多个 map
+	m2 := map[string]int{"d": 4}
+	keys = MapKeys(m, m2)
+	sort.Strings(keys)
+	assert.Equal(t, []string{"a", "b", "c", "d"}, keys)
+
+	// 空 map
+	assert.Equal(t, []string{}, MapKeys(map[string]int{}))
+}
+
+func TestMapUniqKeys(t *testing.T) {
+	m1 := map[string]int{"a": 1, "b": 2}
+	m2 := map[string]int{"b": 3, "c": 4} // b 重复
+	keys := MapUniqKeys(m1, m2)
+	sort.Strings(keys)
+	assert.Equal(t, []string{"a", "b", "c"}, keys)
+}
+
+func TestMapValues(t *testing.T) {
+	m := map[string]int{"a": 1, "b": 2, "c": 3}
+	values := MapValues(m)
+	sort.Ints(values)
+	assert.Equal(t, []int{1, 2, 3}, values)
+}
+
+func TestMapUniqValues(t *testing.T) {
+	m1 := map[string]int{"a": 1, "b": 2}
+	m2 := map[string]int{"c": 1, "d": 3} // 1 重复
+	values := MapUniqValues(m1, m2)
+	sort.Ints(values)
+	assert.Equal(t, []int{1, 2, 3}, values)
+}
+
+// ============================================================================
+// 键检查 / 值获取
+// ============================================================================
+
+func TestMapHasKey(t *testing.T) {
+	m := map[string]int{"a": 1, "b": 2}
+	assert.True(t, MapHasKey(m, "a"))
+	assert.False(t, MapHasKey(m, "c"))
+}
+
+func TestMapValueOr(t *testing.T) {
+	m := map[string]int{"a": 1, "b": 2}
+	assert.Equal(t, 1, MapValueOr(m, "a", 0))
+	assert.Equal(t, 99, MapValueOr(m, "c", 99))
+}
+
+// ============================================================================
+// 选择 / 移除（PickBy / OmitBy）
+// ============================================================================
+
+func TestMapPickBy(t *testing.T) {
+	m := map[string]int{"a": 1, "b": 2, "c": 3, "d": 4}
+	result := MapPickBy(m, func(key string, value int) bool {
+		return value%2 == 0
+	})
+	assert.Equal(t, map[string]int{"b": 2, "d": 4}, result)
+}
+
+func TestMapOmitBy(t *testing.T) {
+	m := map[string]int{"a": 1, "b": 2, "c": 3, "d": 4}
+	result := MapOmitBy(m, func(key string, value int) bool {
+		return value%2 == 0
+	})
+	assert.Equal(t, map[string]int{"a": 1, "c": 3}, result)
+}
+
+func TestMapPickByKeys(t *testing.T) {
+	m := map[string]int{"a": 1, "b": 2, "c": 3, "d": 4}
+	result := MapPickByKeys(m, []string{"a", "c", "x"}) // x 不存在
+	assert.Equal(t, map[string]int{"a": 1, "c": 3}, result)
+}
+
+func TestMapOmitByKeys(t *testing.T) {
+	m := map[string]int{"a": 1, "b": 2, "c": 3, "d": 4}
+	result := MapOmitByKeys(m, []string{"a", "c", "x"})
+	assert.Equal(t, map[string]int{"b": 2, "d": 4}, result)
+}
+
+func TestMapPickByValues(t *testing.T) {
+	m := map[string]int{"a": 1, "b": 2, "c": 3, "d": 4}
+	result := MapPickByValues(m, []int{2, 4})
+	assert.Equal(t, map[string]int{"b": 2, "d": 4}, result)
+}
+
+func TestMapOmitByValues(t *testing.T) {
+	m := map[string]int{"a": 1, "b": 2, "c": 3, "d": 4}
+	result := MapOmitByValues(m, []int{2, 4})
+	assert.Equal(t, map[string]int{"a": 1, "c": 3}, result)
+}
+
+// ============================================================================
+// map <-> 键值对切片互转
+// ============================================================================
+
+func TestMapEntriesAndFromEntries(t *testing.T) {
+	m := map[string]int{"a": 1, "b": 2, "c": 3}
+
+	// map -> entries
+	entries := MapEntries(m)
+	assert.Len(t, entries, 3)
+
+	// entries -> map
+	m2 := MapFromEntries(entries)
+	assert.Equal(t, m, m2)
+}
+
+func TestMapFromEntriesOverwrite(t *testing.T) {
+	// 同 key 后者覆盖前者
+	entries := []MapEntry[string, int]{
+		{"a", 1},
+		{"a", 2},
+		{"b", 3},
+	}
+	result := MapFromEntries(entries)
+	assert.Equal(t, 2, result["a"]) // 后者覆盖
+	assert.Equal(t, 3, result["b"])
+}
+
+// ============================================================================
+// 反转 / 合并
+// ============================================================================
+
+func TestMapInvert(t *testing.T) {
+	m := map[string]int{"a": 1, "b": 2, "c": 3}
+	inverted := MapInvert(m)
+	assert.Equal(t, "a", inverted[1])
+	assert.Equal(t, "b", inverted[2])
+	assert.Equal(t, "c", inverted[3])
+}
+
+func TestMapInvertDuplicate(t *testing.T) {
+	// 重复值，后者覆盖前者
+	m := map[string]int{"a": 1, "b": 1}
+	inverted := MapInvert(m)
+	assert.Len(t, inverted, 1)
+	assert.True(t, inverted[1] == "a" || inverted[1] == "b")
+}
+
+func TestMapAssign(t *testing.T) {
+	m1 := map[string]int{"a": 1, "b": 2}
+	m2 := map[string]int{"b": 3, "c": 4} // b 覆盖
+	m3 := map[string]int{"d": 5}
+
+	result := MapAssign(m1, m2, m3)
+	assert.Equal(t, 1, result["a"])
+	assert.Equal(t, 3, result["b"]) // m2 覆盖 m1
+	assert.Equal(t, 4, result["c"])
+	assert.Equal(t, 5, result["d"])
+}
+
+// ============================================================================
+// map 转切片
+// ============================================================================
+
+func TestMapToSlice(t *testing.T) {
+	m := map[string]int{"a": 1, "b": 2, "c": 3}
+	result := MapToSlice(m, func(key string, value int) string {
+		return key + ":" + string(rune('0'+value))
+	})
+	assert.Len(t, result, 3)
+	// map 遍历顺序不保证，用 contains 检查
+	assert.Contains(t, result, "a:1")
+	assert.Contains(t, result, "b:2")
+	assert.Contains(t, result, "c:3")
+}
+
+func TestMapFilterToSlice(t *testing.T) {
+	m := map[string]int{"a": 1, "b": 2, "c": 3, "d": 4}
+	result := MapFilterToSlice(m, func(key string, value int) (string, bool) {
+		if value%2 == 0 {
+			return key, true
+		}
+		return "", false
+	})
+	assert.Len(t, result, 2)
+	assert.Contains(t, result, "b")
+	assert.Contains(t, result, "d")
+}
+
+func TestMapFilterKeys(t *testing.T) {
+	m := map[string]int{"a": 1, "bb": 2, "ccc": 3}
+	keys := MapFilterKeys(m, func(key string, value int) bool {
+		return len(key) > 1
+	})
+	sort.Strings(keys)
+	assert.Equal(t, []string{"bb", "ccc"}, keys)
+}
+
+func TestMapFilterValues(t *testing.T) {
+	m := map[string]int{"a": 1, "b": 2, "c": 3, "d": 4}
+	values := MapFilterValues(m, func(key string, value int) bool {
+		return value > 2
+	})
+	sort.Ints(values)
+	assert.Equal(t, []int{3, 4}, values)
+}
+
+// ============================================================================
+// map 键/值/键值对转换
+// ============================================================================
+
+func TestMapMapEntries(t *testing.T) {
+	m := map[string]int{"a": 1, "b": 2}
+	result := MapMapEntries(m, func(key string, value int) (int, string) {
+		return value, key
+	})
+	assert.Equal(t, "a", result[1])
+	assert.Equal(t, "b", result[2])
+}
+
+func TestMapMapKeys(t *testing.T) {
+	m := map[string]int{"a": 1, "b": 2}
+	result := MapMapKeys(m, func(value int, key string) string {
+		return key + key
+	})
+	assert.Equal(t, 1, result["aa"])
+	assert.Equal(t, 2, result["bb"])
+}
+
+func TestMapMapValues(t *testing.T) {
+	m := map[string]int{"a": 1, "b": 2}
+	result := MapMapValues(m, func(value int, key string) string {
+		return key + ":" + string(rune('0'+value))
+	})
+	assert.Equal(t, "a:1", result["a"])
+	assert.Equal(t, "b:2", result["b"])
+}
+
+// ============================================================================
+// 边界情况：空 map / nil map
+// ============================================================================
+
+func TestMapExtEmptyMap(t *testing.T) {
+	empty := map[string]int{}
+
+	assert.Equal(t, []string{}, MapKeys(empty))
+	assert.Equal(t, []int{}, MapValues(empty))
+	assert.False(t, MapHasKey(empty, "x"))
+	assert.Equal(t, 99, MapValueOr(empty, "x", 99))
+	assert.Equal(t, map[string]int{}, MapPickBy(empty, func(k string, v int) bool { return true }))
+	assert.Equal(t, map[string]int{}, MapOmitBy(empty, func(k string, v int) bool { return true }))
+	assert.Equal(t, []MapEntry[string, int]{}, MapEntries(empty))
+	assert.Equal(t, map[string]int{}, MapFromEntries([]MapEntry[string, int]{}))
+}
+
+func TestMapExtNilMap(t *testing.T) {
+	var nilMap map[string]int
+
+	// nil map 应安全处理（不 panic）
+	assert.Equal(t, []string{}, MapKeys(nilMap))
+	assert.Equal(t, []int{}, MapValues(nilMap))
+	assert.False(t, MapHasKey(nilMap, "x"))
+	assert.Equal(t, 99, MapValueOr(nilMap, "x", 99))
+	assert.Equal(t, map[string]int{}, MapPickBy(nilMap, func(k string, v int) bool { return true }))
+	assert.Equal(t, []MapEntry[string, int]{}, MapEntries(nilMap))
 }

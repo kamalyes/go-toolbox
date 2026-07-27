@@ -15,6 +15,44 @@ import (
 	"strings"
 )
 
+// mustCompile 预编译正则，空 pattern 返回 nil
+func mustCompile(pat string) *regexp.Regexp {
+	if pat == "" {
+		return nil
+	}
+	return regexp.MustCompile(pat)
+}
+
+// osRules 操作系统识别规则（预编译正则，避免循环内重复编译）
+var osRules = []struct {
+	kw, os string
+	re     *regexp.Regexp
+}{
+	{"iphone", IOS, mustCompile(`os (\d+[._]\d+)`)},
+	{"ipad", IOS, mustCompile(`os (\d+[._]\d+)`)},
+	{"mac os x", MacOS, mustCompile(`mac os x (\d+[._]\d+)`)},
+	{"android", Android, mustCompile(`android[ /](\d+(?:\.\d+)?)`)},
+	{"harmonyos", OpenHarmony, mustCompile(`harmonyos[ /]?(\d+)`)},
+	{"linux", Linux, nil},
+	{"windows phone", WindowsPhone, mustCompile(`windows phone (?:os )?(\d+)`)},
+	{"cros", ChromeOS, nil},
+	{"freebsd", FreeBSD, nil},
+}
+
+// browserRules 浏览器识别规则（预编译正则，避免循环内重复编译）
+var browserRules = []struct {
+	kw, name string
+	re       *regexp.Regexp
+}{
+	{"edg", Edge, mustCompile(`edg[e]?/(\d+)`)},
+	{"opr", Opera, mustCompile(`opr/(\d+)`)},
+	{"yabrowser", YandexBrowser, mustCompile(`yabrowser/(\d+)`)},
+	{"samsungbrowser", SamsungBrowser, mustCompile(`samsungbrowser/(\d+)`)},
+	{"chrome", Chrome, mustCompile(`chrome/(\d+)`)},
+	{"firefox", Firefox, mustCompile(`firefox/(\d+)`)},
+	{"safari", Safari, mustCompile(`version/(\d+)`)},
+}
+
 // ParsedUserAgent 解析后的 User-Agent 信息
 type ParsedUserAgent struct {
 	Raw            string `json:"raw"`                // 原始 User-Agent 字符串
@@ -105,26 +143,14 @@ func (p *ParsedUserAgent) parseOS(s string) {
 
 	// 其他操作系统规则: 关键词, 系统名称, 版本提取正则
 	// 注意: iOS 设备的 UA 中包含 "Mac OS X", 所以必须先检测 iPhone/iPad
-	rules := []struct {
-		kw, os, pat string
-	}{
-		{"iphone", IOS, `os (\d+[._]\d+)`},                             // iOS (iPhone) - 必须在 macOS 之前
-		{"ipad", IOS, `os (\d+[._]\d+)`},                               // iOS (iPad) - 必须在 macOS 之前
-		{"mac os x", MacOS, `mac os x (\d+[._]\d+)`},                   // macOS
-		{"android", Android, `android[ /](\d+(?:\.\d+)?)`},             // Android
-		{"harmonyos", OpenHarmony, `harmonyos[ /]?(\d+)`},              // HarmonyOS
-		{"linux", Linux, ""},                                           // Linux
-		{"windows phone", WindowsPhone, `windows phone (?:os )?(\d+)`}, // Windows Phone
-		{"cros", ChromeOS, ""},                                         // ChromeOS
-		{"freebsd", FreeBSD, ""},                                       // FreeBSD
-	}
+	rules := osRules
 
 	for _, r := range rules {
 		if strings.Contains(s, r.kw) {
 			p.OS = r.os
 			// 提取版本号
-			if r.pat != "" {
-				if m := regexp.MustCompile(r.pat).FindStringSubmatch(s); len(m) > 1 {
+			if r.re != nil {
+				if m := r.re.FindStringSubmatch(s); len(m) > 1 {
 					p.OSVersion = strings.ReplaceAll(m[1], "_", ".")
 				}
 			}
@@ -136,25 +162,14 @@ func (p *ParsedUserAgent) parseOS(s string) {
 // parseBrowser 解析浏览器信息
 // 识别主流浏览器: Chrome, Firefox, Safari, Edge, Opera 等
 func (p *ParsedUserAgent) parseBrowser(s string) {
-	// 浏览器规则: 关键词, 浏览器名称, 版本提取正则
-	browsers := []struct {
-		kw, name, pat string
-	}{
-		{"edg", Edge, `edg[e]?/(\d+)`},                             // Microsoft Edge
-		{"opr", Opera, `opr/(\d+)`},                                // Opera
-		{"yabrowser", YandexBrowser, `yabrowser/(\d+)`},            // Yandex Browser
-		{"samsungbrowser", SamsungBrowser, `samsungbrowser/(\d+)`}, // Samsung Browser
-		{"chrome", Chrome, `chrome/(\d+)`},                         // Google Chrome
-		{"firefox", Firefox, `firefox/(\d+)`},                      // Mozilla Firefox
-		{"safari", Safari, `version/(\d+)`},                        // Apple Safari
-	}
-
-	for _, b := range browsers {
+	for _, b := range browserRules {
 		if strings.Contains(s, b.kw) {
 			p.Browser = b.name
 			// 提取版本号(主版本号)
-			if m := regexp.MustCompile(b.pat).FindStringSubmatch(s); len(m) > 1 {
-				p.BrowserVersion = m[1]
+			if b.re != nil {
+				if m := b.re.FindStringSubmatch(s); len(m) > 1 {
+					p.BrowserVersion = m[1]
+				}
 			}
 			return
 		}

@@ -13,6 +13,8 @@ package metadata
 import (
 	"context"
 	"net/http"
+
+	"github.com/kamalyes/go-toolbox/pkg/mathx"
 )
 
 // LanguageExtractor 语言提取器配置
@@ -27,9 +29,7 @@ type LanguageExtractor struct {
 
 // NewLanguageExtractor 创建默认的语言提取器
 func NewLanguageExtractor(defaultLang string) *LanguageExtractor {
-	if defaultLang == "" {
-		defaultLang = "en"
-	}
+	defaultLang = mathx.IfNotEmpty(defaultLang, "en")
 	return &LanguageExtractor{
 		DefaultLanguage: defaultLang,
 		QueryKeys:       []string{"lang", "language"},

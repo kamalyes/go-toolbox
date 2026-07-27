@@ -18,7 +18,6 @@ import (
 
 func TestAllTrimFunctions(t *testing.T) {
 	t.Run("TestTrim", TestTrim)
-	t.Run("TestIsBlank", TestIsBlank)
 	t.Run("TestEqualsTrimIgnoreCase", TestEqualsTrimIgnoreCase)
 	t.Run("TestTrimStart", TestTrimStart)
 	t.Run("TestTrimEnd", TestTrimEnd)
@@ -41,10 +40,9 @@ func TestTrim(t *testing.T) {
 	assert.Equal(t, "hi", Trim("hi    "))
 }
 
-func TestIsBlank(t *testing.T) {
-	assert.True(t, IsBlank("  \t\n"))
-	assert.False(t, IsBlank(" value "))
+func TestIsBlankChain(t *testing.T) {
 	assert.True(t, New("  \n").IsBlankChain())
+	assert.False(t, New("value").IsBlankChain())
 }
 
 func TestEqualsTrimIgnoreCase(t *testing.T) {

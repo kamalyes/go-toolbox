@@ -13,13 +13,11 @@ package stringx
 import (
 	"crypto/md5"
 	"encoding/hex"
-	"reflect"
 	"strconv"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 	"unsafe"
-
-	"github.com/kamalyes/go-argus"
 )
 
 // StringX 是一个结构体，用于封装字符串值并提供操作方法。
@@ -38,17 +36,9 @@ func (s *StringX) Value() string {
 }
 
 // ToLower 将字符串转换为小写
+// 直接委托标准库 strings.ToLower：标准库已做极致优化（ASCII 快速路径 + SIMD），
 func ToLower(str string) string {
-	// 预分配结果切片，避免多次内存分配
-	result := make([]rune, len(str))
-	resultIndex := 0 // 结果切片的索引
-
-	for _, r := range str {
-		result[resultIndex] = unicode.ToLower(r)
-		resultIndex++
-	}
-
-	return string(result[:resultIndex]) // 返回有效部分
+	return strings.ToLower(str)
 }
 
 // ToLowerChain 将字符串转换为小写（链式调用）
@@ -58,17 +48,9 @@ func (s *StringX) ToLowerChain() *StringX {
 }
 
 // ToUpper 将字符串转换为大写
+// 直接委托标准库 strings.ToUpper：标准库已做极致优化（ASCII 快速路径 + SIMD）
 func ToUpper(str string) string {
-	// 预分配结果切片，避免多次内存分配
-	result := make([]rune, len(str))
-	resultIndex := 0
-
-	for _, r := range str {
-		result[resultIndex] = unicode.ToUpper(r)
-		resultIndex++
-	}
-
-	return string(result[:resultIndex])
+	return strings.ToUpper(str)
 }
 
 // ToUpperChain 将字符串转换为大写（链式调用）
@@ -80,25 +62,23 @@ func (s *StringX) ToUpperChain() *StringX {
 // ToTitle 将字符串转换为标题格式（每个单词首字母大写）
 func ToTitle(str string) string {
 	// 预分配结果切片，避免多次内存分配
-	result := make([]rune, len(str))
-	resultIndex := 0
+	result := make([]rune, 0, len(str))
 	space := true // 用于标记是否在单词的开头
 
 	for _, r := range str {
 		if space {
-			result[resultIndex] = unicode.ToUpper(r) // 首字母大写
+			result = append(result, unicode.ToUpper(r)) // 首字母大写
 			space = false
 		} else {
-			result[resultIndex] = unicode.ToLower(r) // 其他字符小写
+			result = append(result, unicode.ToLower(r)) // 其他字符小写
 		}
-		resultIndex++
 
 		if unicode.IsSpace(r) {
 			space = true // 遇到空格，标记为下一个单词的开头
 		}
 	}
 
-	return string(result[:resultIndex]) // 返回有效部分
+	return string(result)
 }
 
 // ToTitleChain 将字符串转换为标题格式（链式调用）
@@ -107,10 +87,10 @@ func (s *StringX) ToTitleChain() *StringX {
 	return s
 }
 
-// Length 计算长度
+// Length 计算字符（rune）长度
+// 使用 utf8.RuneCountInString 零分配遍历，替代 []rune(str) 的堆分配
 func Length(str string) int {
-	strRune := []rune(str)
-	return len(strRune)
+	return utf8.RuneCountInString(str)
 }
 
 // LengthChain 计算长度（链式调用）
@@ -220,7 +200,7 @@ func (s *StringX) EqualsAnyIgnoreCaseChain(strs []string) bool {
 
 // EqualsAt 字符串指定位置的字符是否与给定字符相同
 func EqualsAt(value string, position int, subStr string) bool {
-	if validator.IsEmptyValue(reflect.ValueOf(value)) || position < 0 {
+	if value == "" || position < 0 {
 		return false
 	}
 	return len(value) > position && Equals(subStr, string(value[position]))
@@ -233,8 +213,7 @@ func (s *StringX) EqualsAtChain(position int, subStr string) bool {
 
 // Count 统计指定内容中包含指定字符串的数量
 func Count(str string, searchStr string) int {
-	hasEmpty, _ := validator.HasEmpty([]interface{}{str, searchStr})
-	if hasEmpty || len(searchStr) > len(str) {
+	if str == "" || searchStr == "" || len(searchStr) > len(str) {
 		return 0
 	}
 	return strings.Count(str, searchStr)
@@ -278,13 +257,19 @@ func CalculateMD5Hash(input string) string {
 // Coalesce 高性能字符串拼接
 func Coalesce(s ...string) string {
 	if len(s) == 0 {
-		return "" // 如果没有输入，则返回空字符串
+		return ""
 	}
-	var str strings.Builder
+	// 预计算总长度，一次分配
+	total := 0
 	for _, v := range s {
-		str.WriteString(v)
+		total += len(v)
 	}
-	return str.String() // 返回拼接后的字符串
+	var b strings.Builder
+	b.Grow(total)
+	for _, v := range s {
+		b.WriteString(v)
+	}
+	return b.String()
 }
 
 // CoalesceChain 高性能字符串拼接（链式调用）
@@ -373,14 +358,18 @@ func ToSnakeCase(s string) string {
 		return s
 	}
 
-	var result strings.Builder
+	// 预分配：最坏情况每个字符前加一个下划线
+	result := make([]byte, 0, len(s)*2)
+	lastIsUnderscore := false
 
-	for i, r := range s {
+	for i := 0; i < len(s); i++ {
+		r := rune(s[i])
 		// 将连字符和空格都转换为下划线
 		if r == '-' || r == ' ' {
 			// 避免连续的下划线
-			if result.Len() > 0 && result.String()[result.Len()-1] != '_' {
-				result.WriteRune('_')
+			if len(result) > 0 && !lastIsUnderscore {
+				result = append(result, '_')
+				lastIsUnderscore = true
 			}
 			continue
 		}
@@ -390,16 +379,21 @@ func ToSnakeCase(s string) string {
 			if i > 0 {
 				prevRune := rune(s[i-1])
 				if !unicode.IsUpper(prevRune) && prevRune != '_' && prevRune != ' ' && prevRune != '-' {
-					result.WriteRune('_')
+					if len(result) > 0 && !lastIsUnderscore {
+						result = append(result, '_')
+						lastIsUnderscore = true
+					}
 				}
 			}
-			result.WriteRune(unicode.ToLower(r))
+			result = append(result, byte(unicode.ToLower(r)))
+			lastIsUnderscore = false
 		} else {
-			result.WriteRune(r)
+			result = append(result, s[i])
+			lastIsUnderscore = false
 		}
 	}
 
-	return result.String()
+	return string(result)
 }
 
 // ToCamelCase 将字符串转换为驼峰命名法（首字母小写，例如：userName）
@@ -494,12 +488,7 @@ func TruncateMessage(content string, maxLen int) string {
 	if len(content) <= maxLen {
 		return content
 	}
-
-	var builder strings.Builder
-	builder.WriteString(content[:maxLen])
-	builder.WriteString("...")
-
-	return builder.String()
+	return content[:maxLen] + "..."
 }
 
 // NormalizeSQLDirection 规范化排序方向，仅允许 "ASC" 或 "DESC"（不区分大小写）

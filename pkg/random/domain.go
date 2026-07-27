@@ -49,7 +49,7 @@ func NewDomainKeywordBuilder(baseKeyword string) *DomainKeywordBuilder {
 
 // WithCount 设置生成的关键词数量
 func (b *DomainKeywordBuilder) WithCount(count int) *DomainKeywordBuilder {
-	b.count = mathx.IF(count > 0, count, b.count)
+	b.count = mathx.IfLeZero(count, b.count)
 	return b
 }
 

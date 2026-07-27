@@ -19,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kamalyes/go-toolbox/pkg/mathx"
 	"github.com/kamalyes/go-toolbox/pkg/zipx"
 )
 
@@ -360,9 +361,7 @@ func (s *Serializer[T]) decompress(data []byte) ([]byte, error) {
 
 // Benchmark 性能基准测试
 func (s *Serializer[T]) Benchmark(obj T, iterations int) (*BenchmarkResult, error) {
-	if iterations <= 0 {
-		iterations = 1000
-	}
+	iterations = mathx.IfLeZero(iterations, 1000)
 
 	// 编码测试
 	start := time.Now()
