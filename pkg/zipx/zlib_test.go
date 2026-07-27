@@ -83,7 +83,7 @@ func TestZlibCompressObjectSingleMessage(t *testing.T) {
 	testMsg := TestMessage{
 		ID:        "msg_123456",
 		Content:   "这是一条测试消息，包含中文内容！",
-		Timestamp: time.Now().Truncate(time.Second),
+		Timestamp: nowStripped(),
 		UserID:    "user_789",
 		Type:      1,
 	}
@@ -108,7 +108,7 @@ func TestZlibCompressObjectWithSize(t *testing.T) {
 	testMsg := TestMessage{
 		ID:        "msg_123456",
 		Content:   "这是一条测试消息，包含中文内容！",
-		Timestamp: time.Now().Truncate(time.Second),
+		Timestamp: nowStripped(),
 		UserID:    "user_789",
 		Type:      1,
 	}
@@ -135,7 +135,7 @@ func TestZlibCompressObjectWithSize(t *testing.T) {
 // TestZlibCompressObjectMessageSlice 测试消息数组压缩
 func TestZlibCompressObjectMessageSlice(t *testing.T) {
 	// 创建多条测试消息（截断时间以移除单调时钟）
-	baseTime := time.Now().Truncate(time.Second)
+	baseTime := nowStripped()
 	messages := []TestMessage{
 		{
 			ID:        "msg_001",
@@ -198,14 +198,14 @@ func TestZlibCompressObjectComplexObject(t *testing.T) {
 			{
 				ID:        "msg_complex_001",
 				Content:   "复杂对象中的消息1",
-				Timestamp: time.Now(),
+				Timestamp: nowStripped(),
 				UserID:    "complex_user",
 				Type:      1,
 			},
 			{
 				ID:        "msg_complex_002",
 				Content:   "复杂对象中的消息2",
-				Timestamp: time.Now().Add(30 * time.Second),
+				Timestamp: stripMono(time.Now().Add(30 * time.Second)),
 				UserID:    "complex_user",
 				Type:      2,
 			},
@@ -264,7 +264,7 @@ func TestZlibConcurrency(t *testing.T) {
 		messages[i] = TestMessage{
 			ID:        "msg_" + string(rune('A'+i)),
 			Content:   "并发测试消息内容",
-			Timestamp: time.Now(),
+			Timestamp: nowStripped(),
 			UserID:    "concurrent_user",
 			Type:      rand.Intn(3) + 1,
 		}
@@ -351,7 +351,7 @@ func TestZlibLargeData(t *testing.T) {
 		messages[i] = TestMessage{
 			ID:        "large_msg_" + string(rune(i)),
 			Content:   "这是一条用于测试大数据压缩的消息，内容比较长，重复文本可以提高压缩效率。",
-			Timestamp: time.Now().Add(time.Duration(i) * time.Second),
+			Timestamp: stripMono(time.Now().Add(time.Duration(i) * time.Second)),
 			UserID:    "large_test_user",
 			Type:      i%3 + 1,
 		}
@@ -396,7 +396,7 @@ func BenchmarkZlibCompressObject(b *testing.B) {
 	testMsg := TestMessage{
 		ID:        "bench_msg_123",
 		Content:   "这是一条用于性能测试的消息",
-		Timestamp: time.Now(),
+		Timestamp: nowStripped(),
 		UserID:    "bench_user",
 		Type:      1,
 	}
@@ -415,7 +415,7 @@ func BenchmarkZlibCompressObjectSlice(b *testing.B) {
 		messages[i] = TestMessage{
 			ID:        "bench_slice_msg_" + string(rune(i)),
 			Content:   "性能测试消息内容",
-			Timestamp: time.Now(),
+			Timestamp: nowStripped(),
 			UserID:    "bench_slice_user",
 			Type:      i%3 + 1,
 		}
@@ -473,7 +473,7 @@ func TestMultiZlibCompressObject(t *testing.T) {
 	testMsg := TestMessage{
 		ID:        "multi_zlib_msg_123",
 		Content:   "这是一条用于多次Zlib压缩测试的消息",
-		Timestamp: time.Now().Truncate(time.Second),
+		Timestamp: nowStripped(),
 		UserID:    "multi_zlib_user",
 		Type:      1,
 	}
@@ -640,7 +640,7 @@ func TestZlibSmartDecompressObject(t *testing.T) {
 	testMsg := TestMessage{
 		ID:        "smart_msg_123",
 		Content:   "这是一条用于智能解压缩测试的消息",
-		Timestamp: time.Now().Truncate(time.Second),
+		Timestamp: nowStripped(),
 		UserID:    "smart_user_789",
 		Type:      1,
 	}
@@ -691,7 +691,7 @@ func TestZlibSmartDecompressBackwardCompatibility(t *testing.T) {
 	testMsg := TestMessage{
 		ID:        "compat_msg_123",
 		Content:   "向后兼容性测试消息",
-		Timestamp: time.Now().Truncate(time.Second),
+		Timestamp: nowStripped(),
 		UserID:    "compat_user",
 		Type:      1,
 	}
@@ -729,7 +729,7 @@ func TestZlibSmartDecompressBackwardCompatibility(t *testing.T) {
 			{
 				ID:        "compat_msg_456",
 				Content:   "第二条消息",
-				Timestamp: time.Now().Truncate(time.Second),
+				Timestamp: nowStripped(),
 				UserID:    "compat_user_2",
 				Type:      2,
 			},
@@ -757,7 +757,7 @@ func TestZlibSmartDecompressThresholdChange(t *testing.T) {
 	smallMsg := TestMessage{
 		ID:        "small_msg",
 		Content:   "小消息",
-		Timestamp: time.Now().Truncate(time.Second),
+		Timestamp: nowStripped(),
 		UserID:    "user_1",
 		Type:      1,
 	}
@@ -765,7 +765,7 @@ func TestZlibSmartDecompressThresholdChange(t *testing.T) {
 	largeMsg := TestMessage{
 		ID:        "large_msg",
 		Content:   string(bytes.Repeat([]byte("这是一条很长的消息内容，用于测试压缩阈值变化场景。"), 50)),
-		Timestamp: time.Now().Truncate(time.Second),
+		Timestamp: nowStripped(),
 		UserID:    "user_2",
 		Type:      2,
 	}
@@ -835,7 +835,7 @@ func TestZlibSmartDecompressConcurrency(t *testing.T) {
 	errors := make(chan error, numGoroutines*numOperations)
 
 	// 准备测试数据（混合压缩和未压缩）
-	baseTime := time.Now().Truncate(time.Second)
+	baseTime := nowStripped()
 	compressedData := make([][]byte, 5)
 	uncompressedData := make([][]byte, 5)
 
@@ -973,7 +973,7 @@ func BenchmarkZlibSmartDecompressObject(b *testing.B) {
 	testMsg := TestMessage{
 		ID:        "bench_msg",
 		Content:   "性能测试消息",
-		Timestamp: time.Now().Truncate(time.Second),
+		Timestamp: nowStripped(),
 		UserID:    "bench_user",
 		Type:      1,
 	}
@@ -1033,7 +1033,7 @@ func TestZlibCompressObjectWithInfo(t *testing.T) {
 	obj := TestMessage{
 		ID:        "zlib_test_456",
 		Content:   "zlib test content",
-		Timestamp: time.Now().Truncate(time.Second),
+		Timestamp: nowStripped(),
 		UserID:    "user_zlib",
 		Type:      1,
 	}
@@ -1058,7 +1058,7 @@ func TestMultiZlibCompressObjectWithInfo(t *testing.T) {
 	obj := TestMessage{
 		ID:        "multi_zlib_999",
 		Content:   "multi zlib content",
-		Timestamp: time.Now().Truncate(time.Second),
+		Timestamp: nowStripped(),
 		UserID:    "user_multi_zlib",
 		Type:      3,
 	}

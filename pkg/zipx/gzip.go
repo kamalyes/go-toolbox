@@ -53,18 +53,23 @@ func GzipCompress(data []byte) ([]byte, error) {
 
 	writer := gzipWriter.Get().(*gzip.Writer) // 从对象池获取 gzip.Writer
 	writer.Reset(buf)                         // 将 writer 绑定到缓冲区
+	closed := false                           // 标记是否已关闭，避免 double-Close
 	defer func() {
-		writer.Close()         // 关闭 writer 以刷新剩余数据
-		gzipWriter.Put(writer) // 使用完后将 writer 放回池中
+		if !closed {
+			writer.Close() // 确保异常路径下 writer 也被关闭
+		}
+		gzipWriter.Put(writer)
 	}()
 
 	if _, err := writer.Write(data); err != nil {
-		return nil, err // 写入数据时出错
+		return nil, err // defer 会负责 Close
 	}
 
+	// Close 刷新 gzip footer 到 buf，仅调用一次
 	if err := writer.Close(); err != nil {
-		return nil, err // 关闭 writer 时出错
+		return nil, err
 	}
+	closed = true
 
 	// 创建副本以避免对象池重用时的数据污染
 	result := make([]byte, buf.Len())

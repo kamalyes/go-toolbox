@@ -51,14 +51,15 @@ func ZlibCompress(data []byte) ([]byte, error) {
 
 	// 创建新的 zlib.Writer（不要重用，因为 zlib.Writer 没有有效的 Reset 方法）
 	writer := zlib.NewWriter(buf)
-	defer writer.Close()
 
 	if _, err := writer.Write(data); err != nil {
-		return nil, err // 写入数据时出错
+		writer.Close() // 写入失败时仍需关闭以释放资源
+		return nil, err
 	}
 
+	// Close 刷新 zlib footer 到 buf，仅需调用一次
 	if err := writer.Close(); err != nil {
-		return nil, err // 关闭 writer 时出错
+		return nil, err
 	}
 
 	// 必须返回副本!不能返回buf.Bytes(),因为buf会被放回Pool重用

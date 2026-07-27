@@ -63,9 +63,10 @@ type NumericIDConfig struct {
 }
 
 // DefaultNumericIDConfig 返回默认配置（8位纯数字，10台机器，每机每天10000个）
+// 注意：Epoch 决定 8 位容量的起算点，约 899 天（~2.46 年）后会溢出至 9 位
 func DefaultNumericIDConfig() NumericIDConfig {
 	return NumericIDConfig{
-		Epoch:        1704067200,
+		Epoch:        1767225600, // 2026-01-01 00:00:00 UTC
 		Base:         10000000,
 		WorkerSpace:  10000,
 		MaxWorkers:   10,

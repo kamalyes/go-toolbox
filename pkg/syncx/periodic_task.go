@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -40,10 +41,33 @@ type PeriodicTask struct {
 	// 内部字段（重叠保护和取消控制）
 	executeMutex sync.Mutex         // 执行保护锁
 	isExecuting  bool               // 是否正在执行
+	ctxMu        sync.RWMutex       // 保护 cancelFunc/taskCtx 的并发访问
 	cancelFunc   context.CancelFunc // 任务取消函数
 	taskCtx      context.Context    // 任务专用上下文
-	executed     bool               // 是否已执行过
+	executed     atomic.Bool        // 是否已执行过
 	executedOnce sync.Once          // 确保只标记一次
+}
+
+// getTaskCtx 线程安全地读取任务专用上下文
+func (t *PeriodicTask) getTaskCtx() context.Context {
+	t.ctxMu.RLock()
+	defer t.ctxMu.RUnlock()
+	return t.taskCtx
+}
+
+// getCancelFunc 线程安全地读取任务取消函数
+func (t *PeriodicTask) getCancelFunc() context.CancelFunc {
+	t.ctxMu.RLock()
+	defer t.ctxMu.RUnlock()
+	return t.cancelFunc
+}
+
+// setTaskCtx 线程安全地写入任务专用上下文和取消函数
+func (t *PeriodicTask) setTaskCtx(ctx context.Context, cancel context.CancelFunc) {
+	t.ctxMu.Lock()
+	defer t.ctxMu.Unlock()
+	t.taskCtx = ctx
+	t.cancelFunc = cancel
 }
 
 // PeriodicTaskManager 周期性任务管理器
@@ -147,8 +171,8 @@ func (m *PeriodicTaskManager) RemoveTask(name string) bool {
 	}
 
 	// 如果任务正在运行，先取消它
-	if task.cancelFunc != nil {
-		task.cancelFunc() // 取消任务上下文
+	if cf := task.getCancelFunc(); cf != nil {
+		cf() // 取消任务上下文
 	}
 
 	// 等待正在执行的任务完成（带超时）
@@ -200,8 +224,8 @@ func (m *PeriodicTaskManager) RemoveTaskWithTimeout(name string, timeout time.Du
 	}
 
 	// 如果任务正在运行，先取消它
-	if task.cancelFunc != nil {
-		task.cancelFunc()
+	if cf := task.getCancelFunc(); cf != nil {
+		cf()
 	}
 
 	m.mu.Unlock()
@@ -392,7 +416,8 @@ func (m *PeriodicTaskManager) runTask(task *PeriodicTask) {
 	defer m.wg.Done()
 
 	// 为任务创建独立的上下文，支持单独取消
-	task.taskCtx, task.cancelFunc = context.WithCancel(m.ctx)
+	taskCtx, cancelFunc := context.WithCancel(m.ctx)
+	task.setTaskCtx(taskCtx, cancelFunc)
 
 	// 调用启动回调
 	if task.onStart != nil {
@@ -423,7 +448,7 @@ func (m *PeriodicTaskManager) runTask(task *PeriodicTask) {
 				task.onStop(task.name)
 			}
 			return
-		case <-task.taskCtx.Done():
+		case <-taskCtx.Done():
 			// 单个任务被取消
 			if task.onStop != nil {
 				task.onStop(task.name)
@@ -431,7 +456,12 @@ func (m *PeriodicTaskManager) runTask(task *PeriodicTask) {
 			return
 		case <-ticker.C:
 			// 每次 tick 都尝试执行任务，在 executeTask 中处理重叠保护
-			go m.executeTask(task) // 使用 goroutine 避免阻塞 ticker
+			// 加入 WaitGroup 以确保 Stop() 能等待所有在途的 executeTask 协程
+			m.wg.Add(1)
+			go func() {
+				defer m.wg.Done()
+				m.executeTask(task)
+			}()
 		}
 	}
 }
@@ -439,7 +469,8 @@ func (m *PeriodicTaskManager) runTask(task *PeriodicTask) {
 // executeTask 执行单个任务
 func (m *PeriodicTaskManager) executeTask(task *PeriodicTask) {
 	// 检查任务上下文是否已被取消
-	if task.taskCtx != nil && task.taskCtx.Err() != nil {
+	taskCtx := task.getTaskCtx()
+	if taskCtx != nil && taskCtx.Err() != nil {
 		return // 任务已被取消，直接返回
 	}
 
@@ -477,8 +508,8 @@ func (m *PeriodicTaskManager) executeTask(task *PeriodicTask) {
 
 	// 使用任务专用的上下文执行任务
 	ctx := m.ctx
-	if task.taskCtx != nil {
-		ctx = task.taskCtx
+	if taskCtx != nil {
+		ctx = taskCtx
 	}
 
 	if err := task.executeFunc(ctx); err != nil {
@@ -489,7 +520,7 @@ func (m *PeriodicTaskManager) executeTask(task *PeriodicTask) {
 
 	// 标记任务已执行过
 	task.executedOnce.Do(func() {
-		task.executed = true
+		task.executed.Store(true)
 	})
 }
 
@@ -554,7 +585,7 @@ func (m *PeriodicTaskManager) WaitForExecution(timeout time.Duration) error {
 		m.mu.RLock()
 		allExecuted := true
 		for _, task := range m.tasks {
-			if !task.executed {
+			if !task.executed.Load() {
 				allExecuted = false
 				break
 			}

@@ -222,13 +222,16 @@ func TestPeriodicTaskManagerImmediateStart(t *testing.T) {
 func TestPeriodicTaskManagerErrorHandling(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var errorCount int32
+	var mu sync.Mutex
 	var errorName string
 	var errorMessage string
 
 	manager.SetDefaultErrorHandler(func(name string, err error) {
 		atomic.AddInt32(&errorCount, 1)
+		mu.Lock()
 		errorName = name
 		errorMessage = err.Error()
+		mu.Unlock()
 	})
 
 	manager.AddSimpleTask("error_task", time.Millisecond*50, func(ctx context.Context) error {
@@ -240,24 +243,31 @@ func TestPeriodicTaskManagerErrorHandling(t *testing.T) {
 	manager.Stop()
 
 	assert.Greater(t, atomic.LoadInt32(&errorCount), int32(0), "error handler should have been called")
+	mu.Lock()
 	assert.Equal(t, "error_task", errorName, "error name should match task name")
 	assert.Equal(t, "test error", errorMessage, "error message should match")
+	mu.Unlock()
 }
 
 // TestPeriodicTaskManagerStartStopCallbacks 测试启动停止回调
 func TestPeriodicTaskManagerStartStopCallbacks(t *testing.T) {
 	manager := NewPeriodicTaskManager()
-	var startCalled, stopCalled bool
+	var startCalled, stopCalled atomic.Bool
+	var mu sync.Mutex
 	var startTaskName, stopTaskName string
 
 	manager.SetDefaultCallbacks(
 		func(name string) {
-			startCalled = true
+			startCalled.Store(true)
+			mu.Lock()
 			startTaskName = name
+			mu.Unlock()
 		},
 		func(name string) {
-			stopCalled = true
+			stopCalled.Store(true)
+			mu.Lock()
 			stopTaskName = name
+			mu.Unlock()
 		},
 	)
 
@@ -267,10 +277,12 @@ func TestPeriodicTaskManagerStartStopCallbacks(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 	manager.Stop()
 
-	assert.True(t, startCalled, "start callback should have been called")
-	assert.True(t, stopCalled, "stop callback should have been called")
+	assert.True(t, startCalled.Load(), "start callback should have been called")
+	assert.True(t, stopCalled.Load(), "stop callback should have been called")
+	mu.Lock()
 	assert.Equal(t, "callback_task", startTaskName, "start callback should receive correct task name")
 	assert.Equal(t, "callback_task", stopTaskName, "stop callback should receive correct task name")
+	mu.Unlock()
 }
 
 // TestPeriodicTaskManagerMultipleTasksExecution 测试多个任务执行
@@ -487,19 +499,19 @@ func TestPeriodicTaskManagerConcurrentAccess(t *testing.T) {
 // TestPeriodicTaskManagerTaskWithCustomCallbacks 测试带自定义回调的任务
 func TestPeriodicTaskManagerTaskWithCustomCallbacks(t *testing.T) {
 	manager := NewPeriodicTaskManager()
-	var customStartCalled, customStopCalled, customErrorCalled bool
+	var customStartCalled, customStopCalled, customErrorCalled atomic.Bool
 
 	task := NewPeriodicTask("custom_task", time.Millisecond*50, func(ctx context.Context) error {
 		return fmt.Errorf("custom error")
 	}).
 		SetOnStart(func(name string) {
-			customStartCalled = true
+			customStartCalled.Store(true)
 		}).
 		SetOnStop(func(name string) {
-			customStopCalled = true
+			customStopCalled.Store(true)
 		}).
 		SetOnError(func(name string, err error) {
-			customErrorCalled = true
+			customErrorCalled.Store(true)
 		})
 
 	manager.AddTask(task)
@@ -518,9 +530,9 @@ func TestPeriodicTaskManagerTaskWithCustomCallbacks(t *testing.T) {
 	time.Sleep(time.Millisecond * 200)
 	manager.Stop()
 
-	assert.True(t, customStartCalled, "custom start callback should have been called")
-	assert.True(t, customStopCalled, "custom stop callback should have been called")
-	assert.True(t, customErrorCalled, "custom error callback should have been called")
+	assert.True(t, customStartCalled.Load(), "custom start callback should have been called")
+	assert.True(t, customStopCalled.Load(), "custom stop callback should have been called")
+	assert.True(t, customErrorCalled.Load(), "custom error callback should have been called")
 }
 
 // TestPeriodicTaskManagerEmptyManager 测试空管理器
@@ -593,12 +605,12 @@ func TestPeriodicTaskManagerLongRunningTask(t *testing.T) {
 // TestPeriodicTaskManagerPanicRecovery 测试panic恢复
 func TestPeriodicTaskManagerPanicRecovery(t *testing.T) {
 	manager := NewPeriodicTaskManager()
-	var panicHandled bool
+	var panicHandled atomic.Bool
 
 	// 设置错误处理器来捕获panic
 	manager.SetDefaultErrorHandler(func(name string, err error) {
 		if name == "panic_task" {
-			panicHandled = true
+			panicHandled.Store(true)
 			assert.Contains(t, err.Error(), "panic", "error should contain panic information")
 		}
 	})
@@ -617,7 +629,7 @@ func TestPeriodicTaskManagerPanicRecovery(t *testing.T) {
 	time.Sleep(time.Millisecond * 200)
 	manager.Stop()
 
-	assert.True(t, panicHandled, "panic should have been handled by error handler")
+	assert.True(t, panicHandled.Load(), "panic should have been handled by error handler")
 } // TestPeriodicTaskManagerHighFrequencyTasks 测试高频任务
 func TestPeriodicTaskManagerHighFrequencyTasks(t *testing.T) {
 	manager := NewPeriodicTaskManager()
@@ -1190,7 +1202,7 @@ func TestPeriodicTaskManagerRemoveTask_Basic(t *testing.T) {
 func TestPeriodicTaskManagerRemoveRunningTask(t *testing.T) {
 	manager := NewPeriodicTaskManager()
 	var executionCount int32
-	var taskCancelled bool
+	var taskCancelled atomic.Bool
 
 	// 添加一个长时间运行的任务
 	manager.AddTaskWithOverlapPrevention("long_running", time.Millisecond*50, func(ctx context.Context) error {
@@ -1203,7 +1215,7 @@ func TestPeriodicTaskManagerRemoveRunningTask(t *testing.T) {
 			t.Log("任务正常完成")
 		case <-ctx.Done():
 			t.Log("任务被取消")
-			taskCancelled = true
+			taskCancelled.Store(true)
 		}
 
 		return nil
@@ -1239,7 +1251,7 @@ func TestPeriodicTaskManagerRemoveRunningTask(t *testing.T) {
 	executions := atomic.LoadInt32(&executionCount)
 	assert.Greater(t, executions, int32(0), "task should have executed at least once")
 
-	if taskCancelled {
+	if taskCancelled.Load() {
 		t.Log("✅ 任务成功被取消")
 	} else {
 		t.Log("⚠️ 任务可能在取消前已完成")

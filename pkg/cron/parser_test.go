@@ -1,4 +1,4 @@
-﻿/*
+/*
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2025-12-25 10:30:00
  * @LastEditors: kamalyes 501893067@qq.com
@@ -1235,8 +1235,8 @@ func TestCronParser_StepValidation(t *testing.T) {
 		},
 		"negative_step": {
 			spec:      "*/-5 * * * *",
-			expectErr: false,
-			desc:      "负步长(会被解析为绝对值，这是当前的行为)",
+			expectErr: true,
+			desc:      "负步长(无效，步长必须大于零)",
 		},
 		"step_larger_than_range": {
 			spec:      "0-10/20 * * * *",
