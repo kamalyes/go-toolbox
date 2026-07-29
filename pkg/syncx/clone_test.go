@@ -11,6 +11,9 @@
 package syncx
 
 import (
+	"fmt"
+	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -577,4 +580,557 @@ func TestDeepCopySliceWithTimeTime(t *testing.T) {
 	// 验证目标未受影响
 	assert.False(t, src[0].Equal(dst[0]))
 	assert.Equal(t, 3, len(dst))
+}
+
+// ============================================================================
+// 测试类型定义
+// ============================================================================
+
+// clonerTestType 实现 Cloner 接口的测试类型
+type clonerTestType struct {
+	Name     string
+	Age      int
+	Tags     []string
+	Settings map[string]interface{}
+	inner    string // 未导出字段
+}
+
+// CloneDeep 实现 Cloner 接口 — 手动深拷贝，零反射
+func (c *clonerTestType) CloneDeep() any {
+	cp := &clonerTestType{
+		Name: c.Name,
+		Age:  c.Age,
+	}
+	if c.Tags != nil {
+		cp.Tags = make([]string, len(c.Tags))
+		copy(cp.Tags, c.Tags)
+	}
+	if c.Settings != nil {
+		cp.Settings = make(map[string]interface{}, len(c.Settings))
+		for k, v := range c.Settings {
+			cp.Settings[k] = v
+		}
+	}
+	return cp
+}
+
+// tagSkipType 测试 deepcopy:"-" 标签跳过（仅对引用类型字段有效，值类型被 dst.Set 拷贝）
+type tagSkipType struct {
+	Name     string
+	KeepName string
+	Data     map[string]int `deepcopy:"-"`
+}
+
+// noExportType 仅含未导出字段
+type noExportType struct {
+	x int
+	y string
+}
+
+// largeStruct 模拟真实业务结构体（多字段、混合类型）
+type largeStruct struct {
+	ID        string
+	UserID    string
+	Title     string
+	Content   string
+	Status    int
+	Priority  int
+	Tags      []string
+	Metadata  map[string]interface{}
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	Inner     *nestedData
+}
+
+type nestedData struct {
+	A string
+	B int
+	C map[string]string
+}
+
+// ============================================================================
+// 1. Cloner 接口测试
+// ============================================================================
+
+// 测试 Cloner 接口快速路径正确性
+func TestClonerFastPath(t *testing.T) {
+	src := &clonerTestType{
+		Name:     "Alice",
+		Age:      30,
+		Tags:     []string{"go", "rust"},
+		Settings: map[string]interface{}{"theme": "dark", "count": 42},
+		inner:    "private",
+	}
+	var dst clonerTestType
+	err := DeepCopy(&dst, src)
+	assert.NoError(t, err)
+
+	assert.Equal(t, src.Name, dst.Name)
+	assert.Equal(t, src.Age, dst.Age)
+	assert.Equal(t, src.Tags, dst.Tags)
+	assert.Equal(t, src.Settings, dst.Settings)
+
+	// 修改源，验证独立性
+	src.Name = "Bob"
+	src.Tags[0] = "python"
+	src.Settings["theme"] = "light"
+	assert.Equal(t, "Alice", dst.Name)
+	assert.Equal(t, "go", dst.Tags[0])
+	assert.Equal(t, "dark", dst.Settings["theme"])
+}
+
+// 测试 Cloner 接口与 nil dst
+func TestClonerFastPathNilDst(t *testing.T) {
+	src := &clonerTestType{Name: "Test", Age: 1}
+	var dst *clonerTestType
+	err := DeepCopy(&dst, src)
+	assert.NoError(t, err)
+	assert.NotNil(t, dst)
+	assert.Equal(t, src.Name, dst.Name)
+}
+
+// 测试 Cloner 接口与空集合
+func TestClonerFastPathEmptyCollections(t *testing.T) {
+	src := &clonerTestType{
+		Name:     "Empty",
+		Tags:     []string{},
+		Settings: map[string]interface{}{},
+	}
+	var dst clonerTestType
+	err := DeepCopy(&dst, src)
+	assert.NoError(t, err)
+	assert.NotNil(t, dst.Tags)
+	assert.NotNil(t, dst.Settings)
+	assert.Equal(t, 0, len(dst.Tags))
+	assert.Equal(t, 0, len(dst.Settings))
+}
+
+// 测试 Cloner 接口与 nil 集合
+func TestClonerFastPathNilCollections(t *testing.T) {
+	src := &clonerTestType{
+		Name:     "Nil",
+		Tags:     nil,
+		Settings: nil,
+	}
+	var dst clonerTestType
+	err := DeepCopy(&dst, src)
+	assert.NoError(t, err)
+	assert.Nil(t, dst.Tags)
+	assert.Nil(t, dst.Settings)
+}
+
+// ============================================================================
+// 2. struct 字段元数据缓存测试
+// ============================================================================
+
+// 测试预生成克隆闭包正确性
+func TestStructCloneFnCache(t *testing.T) {
+	// 有导出字段的结构体 — 验证 clone 函数可正常获取
+	fn1 := getStructCloneFn(reflect.TypeOf(largeStruct{}))
+	assert.NotNil(t, fn1)
+
+	// 无导出字段的结构体 — 返回直接 Set 的函数
+	fn2 := getStructCloneFn(reflect.TypeOf(noExportType{}))
+	assert.NotNil(t, fn2)
+
+	// time.Time 无导出字段
+	fn3 := getStructCloneFn(reflect.TypeOf(time.Time{}))
+	assert.NotNil(t, fn3)
+}
+
+// 测试缓存命中（多次调用返回同一函数）
+func TestStructCloneFnCacheHit(t *testing.T) {
+	typ := reflect.TypeOf(largeStruct{})
+	fn1 := getStructCloneFn(typ)
+	fn2 := getStructCloneFn(typ)
+	// 闭包函数指针不可直接比较，但通过 fmt.Sprintf 可验证
+	assert.Equal(t, fmt.Sprintf("%p", fn1), fmt.Sprintf("%p", fn2), "缓存应返回同一函数")
+}
+
+// 测试 deepcopy:"-" 标签跳过引用类型字段的深拷贝
+func TestDeepCopyTagSkip(t *testing.T) {
+	src := &tagSkipType{
+		Name:     "Alice",
+		KeepName: "ShouldKeep",
+		Data:     map[string]int{"a": 1},
+	}
+	var dst tagSkipType
+	err := DeepCopy(&dst, src)
+	assert.NoError(t, err)
+
+	// 值类型字段被 dst.Set 拷贝
+	assert.Equal(t, "Alice", dst.Name)
+	assert.Equal(t, "ShouldKeep", dst.KeepName)
+	// Data 有 deepcopy:"-" 标签，不被深拷贝，共享引用（dst.Set 浅拷贝）
+	assert.Equal(t, 1, dst.Data["a"])
+
+	// 修改源 Data，目标也受影响（浅拷贝共享引用，证明跳过了深拷贝）
+	src.Data["a"] = 100
+	assert.Equal(t, 100, dst.Data["a"], "deepcopy:\"-\" 字段应共享引用")
+}
+
+// 测试缓存路径下复杂结构体深拷贝正确性
+func TestCachedStructDeepCopy(t *testing.T) {
+	now := time.Now()
+	src := &largeStruct{
+		ID:        "msg-1",
+		UserID:    "user-1",
+		Title:     "Hello",
+		Content:   "World",
+		Status:    1,
+		Priority:  5,
+		Tags:      []string{"urgent", "review"},
+		Metadata:  map[string]interface{}{"ip": "127.0.0.1", "port": 8080},
+		CreatedAt: now,
+		UpdatedAt: now.Add(1 * time.Hour),
+		Inner: &nestedData{
+			A: "inner-a",
+			B: 42,
+			C: map[string]string{"key": "val"},
+		},
+	}
+
+	var dst largeStruct
+	err := DeepCopy(&dst, src)
+	assert.NoError(t, err)
+
+	// 验证所有字段
+	assert.Equal(t, src.ID, dst.ID)
+	assert.Equal(t, src.Tags, dst.Tags)
+	assert.Equal(t, src.Metadata, dst.Metadata)
+	assert.True(t, src.CreatedAt.Equal(dst.CreatedAt))
+	assert.NotNil(t, dst.Inner)
+	assert.Equal(t, src.Inner.A, dst.Inner.A)
+	assert.Equal(t, src.Inner.C["key"], dst.Inner.C["key"])
+
+	// 修改源，验证独立性
+	src.Tags[0] = "modified"
+	src.Metadata["ip"] = "0.0.0.0"
+	src.Inner.A = "modified-a"
+	src.Inner.C["key"] = "modified-val"
+
+	assert.Equal(t, "urgent", dst.Tags[0])
+	assert.Equal(t, "127.0.0.1", dst.Metadata["ip"])
+	assert.Equal(t, "inner-a", dst.Inner.A)
+	assert.Equal(t, "val", dst.Inner.C["key"])
+}
+
+// 测试无导出字段结构体走快速 Set 路径
+func TestNoExportStructDeepCopy(t *testing.T) {
+	src := &noExportType{x: 1, y: "hello"}
+	var dst noExportType
+	err := DeepCopy(&dst, src)
+	assert.NoError(t, err)
+	// 未导出字段不会被拷贝（反射限制），但不报错
+}
+
+// ============================================================================
+// 3. 并发安全测试
+// ============================================================================
+
+// 测试并发 DeepCopy + 缓存写入安全
+func TestConcurrentDeepCopy(t *testing.T) {
+	src := &largeStruct{
+		ID:       "concurrent",
+		Tags:     []string{"a", "b"},
+		Metadata: map[string]interface{}{"k": "v"},
+		Inner:    &nestedData{A: "x", C: map[string]string{"k": "v"}},
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			var dst largeStruct
+			err := DeepCopy(&dst, src)
+			assert.NoError(t, err)
+			assert.Equal(t, src.ID, dst.ID)
+		}()
+	}
+	wg.Wait()
+}
+
+// 测试并发 Cloner 快速路径
+func TestConcurrentClonerFastPath(t *testing.T) {
+	src := &clonerTestType{
+		Name:     "concurrent-cloner",
+		Tags:     []string{"x"},
+		Settings: map[string]interface{}{"k": 1},
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			var dst clonerTestType
+			err := DeepCopy(&dst, src)
+			assert.NoError(t, err)
+			assert.Equal(t, src.Name, dst.Name)
+		}()
+	}
+	wg.Wait()
+}
+
+// 测试不同类型并发首次缓存写入（缓存竞争安全）
+func TestConcurrentCachePopulation(t *testing.T) {
+	types := []interface{}{
+		&largeStruct{},
+		&tagSkipType{},
+		&clonerTestType{},
+		&nestedData{},
+		&TestCloneStruct{},
+	}
+
+	var wg sync.WaitGroup
+	for _, typ := range types {
+		wg.Add(1)
+		go func(v interface{}) {
+			defer wg.Done()
+			for i := 0; i < 50; i++ {
+				// 并发触发不同类型的缓存首次写入
+				dst := v // shallow copy
+				err := DeepCopy(&dst, &v)
+				_ = err
+			}
+		}(typ)
+	}
+	wg.Wait()
+}
+
+// ============================================================================
+// 4. 性能压测
+// ============================================================================
+
+// 反射缓存路径 vs Cloner 快速路径 vs 无缓存（首次）
+// 对比三种路径的深拷贝性能
+
+// BenchmarkDeepCopyLargeStruct 反射 + 缓存路径深拷贝大型结构体
+func BenchmarkDeepCopyLargeStruct(b *testing.B) {
+	now := time.Now()
+	src := &largeStruct{
+		ID:        "bench-1",
+		UserID:    "user-1",
+		Title:     "Benchmark",
+		Content:   "Content",
+		Status:    1,
+		Priority:  5,
+		Tags:      []string{"tag1", "tag2", "tag3"},
+		Metadata:  map[string]interface{}{"ip": "127.0.0.1", "port": 8080, "ttl": 3600},
+		CreatedAt: now,
+		UpdatedAt: now,
+		Inner: &nestedData{
+			A: "a",
+			B: 42,
+			C: map[string]string{"key1": "val1", "key2": "val2"},
+		},
+	}
+	// 预热缓存
+	var warmup largeStruct
+	_ = DeepCopy(&warmup, src)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		var dst largeStruct
+		_ = DeepCopy(&dst, src)
+	}
+}
+
+// BenchmarkDeepCopyLargeStructParallel 反射 + 缓存路径并行深拷贝
+func BenchmarkDeepCopyLargeStructParallel(b *testing.B) {
+	src := &largeStruct{
+		ID:       "bench-par",
+		Tags:     []string{"a", "b"},
+		Metadata: map[string]interface{}{"k": "v"},
+		Inner:    &nestedData{A: "x", C: map[string]string{"k": "v"}},
+	}
+	// 预热缓存
+	var warmup largeStruct
+	_ = DeepCopy(&warmup, src)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			var dst largeStruct
+			_ = DeepCopy(&dst, src)
+		}
+	})
+}
+
+// BenchmarkClonerFastPath Cloner 接口快速路径深拷贝
+func BenchmarkClonerFastPath(b *testing.B) {
+	src := &clonerTestType{
+		Name:     "bench-cloner",
+		Age:      30,
+		Tags:     []string{"go", "rust", "python"},
+		Settings: map[string]interface{}{"theme": "dark", "count": 42, "verbose": true},
+	}
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		var dst clonerTestType
+		_ = DeepCopy(&dst, src)
+	}
+}
+
+// BenchmarkClonerFastPathParallel Cloner 接口快速路径并行深拷贝
+func BenchmarkClonerFastPathParallel(b *testing.B) {
+	src := &clonerTestType{
+		Name:     "bench-cloner-par",
+		Tags:     []string{"a", "b"},
+		Settings: map[string]interface{}{"k": "v"},
+	}
+	b.ResetTimer()
+	b.ReportAllocs()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			var dst clonerTestType
+			_ = DeepCopy(&dst, src)
+		}
+	})
+}
+
+// BenchmarkDeepCopyMap 反射路径深拷贝 map
+func BenchmarkDeepCopyMap(b *testing.B) {
+	src := &map[string]interface{}{
+		"string": "hello",
+		"int":    42,
+		"nested": map[string]interface{}{"key": "value"},
+		"slice":  []interface{}{1, 2, 3},
+	}
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		var dst map[string]interface{}
+		_ = DeepCopy(&dst, src)
+	}
+}
+
+// BenchmarkDeepCopySlice 反射路径深拷贝 slice
+func BenchmarkDeepCopySlice(b *testing.B) {
+	src := &[]NestedStruct{
+		{"item1", 1},
+		{"item2", 2},
+		{"item3", 3},
+		{"item4", 4},
+		{"item5", 5},
+	}
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		var dst []NestedStruct
+		_ = DeepCopy(&dst, src)
+	}
+}
+
+// BenchmarkGetStructCloneFn 缓存查找性能（命中 vs 首次）
+func BenchmarkGetStructCloneFn(b *testing.B) {
+	typ := reflect.TypeOf(largeStruct{})
+	// 预热
+	getStructCloneFn(typ)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = getStructCloneFn(typ)
+	}
+}
+
+// BenchmarkDeepCopySimpleStruct 简单结构体（仅值类型字段）深拷贝
+func BenchmarkDeepCopySimpleStruct(b *testing.B) {
+	type simple struct {
+		A string
+		B int
+		C bool
+		D time.Time
+	}
+	now := time.Now()
+	src := &simple{A: "hello", B: 42, C: true, D: now}
+	// 预热
+	var warmup simple
+	_ = DeepCopy(&warmup, src)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		var dst simple
+		_ = DeepCopy(&dst, src)
+	}
+}
+
+// BenchmarkCloneGeneric Clone[T] 泛型函数 + Cloner 零反射路径
+func BenchmarkCloneGeneric(b *testing.B) {
+	src := &clonerTestType{
+		Name:     "bench-clone-generic",
+		Age:      30,
+		Tags:     []string{"go", "rust", "python"},
+		Settings: map[string]interface{}{"theme": "dark", "count": 42, "verbose": true},
+	}
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = Clone(src)
+	}
+}
+
+// BenchmarkCloneGenericParallel Clone[T] 泛型函数并行
+func BenchmarkCloneGenericParallel(b *testing.B) {
+	src := &clonerTestType{
+		Name:     "bench-clone-par",
+		Tags:     []string{"a", "b"},
+		Settings: map[string]interface{}{"k": "v"},
+	}
+	b.ResetTimer()
+	b.ReportAllocs()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			_ = Clone(src)
+		}
+	})
+}
+
+// TestCloneGeneric Clone[T] 泛型函数正确性
+func TestCloneGeneric(t *testing.T) {
+	src := &clonerTestType{
+		Name:     "clone-test",
+		Age:      25,
+		Tags:     []string{"a", "b"},
+		Settings: map[string]interface{}{"k": "v"},
+	}
+	cloned := Clone(src)
+	assert.NotNil(t, cloned)
+	assert.Equal(t, src.Name, cloned.Name)
+	assert.Equal(t, src.Tags, cloned.Tags)
+
+	// 修改源，验证独立性
+	src.Tags[0] = "modified"
+	src.Settings["k"] = "modified"
+	assert.Equal(t, "a", cloned.Tags[0])
+	assert.Equal(t, "v", cloned.Settings["k"])
+}
+
+// TestCloneGenericNil Clone[T] 泛型函数 nil 处理
+func TestCloneGenericNil(t *testing.T) {
+	var src *clonerTestType
+	cloned := Clone(src)
+	assert.Nil(t, cloned)
+}
+
+// TestCloneGenericFallback Clone[T] 非 Cloner 类型走反射兜底
+func TestCloneGenericFallback(t *testing.T) {
+	type noCloner struct {
+		Name string
+		Tags []string
+	}
+	src := &noCloner{Name: "fallback", Tags: []string{"x"}}
+	cloned := Clone(src)
+	assert.NotNil(t, cloned)
+	assert.Equal(t, src.Name, cloned.Name)
+	assert.Equal(t, src.Tags, cloned.Tags)
+
+	src.Tags[0] = "modified"
+	assert.Equal(t, "x", cloned.Tags[0])
 }

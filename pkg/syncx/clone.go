@@ -4,7 +4,13 @@
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2025-01-05 15:27:15
  * @FilePath: \go-toolbox\pkg\syncx\clone.go
- * @Description:
+ * @Description: 深拷贝工具
+ *
+ * 三级性能优化：
+ *   1. Cloner 接口 + Clone[T] 泛型函数 — 零反射，热路径类型实现接口即可
+ *   2. 预生成类型克隆闭包 — 首次遇某 struct 类型时生成专属 clone 函数，
+ *      嵌套 struct 的 clone 函数递归预计算并捕获，热路径零缓存查找零 switch 分发
+ *   3. 反射通用兜底 — 未实现 Cloner 且无法预生成的类型走原始反射路径
  *
  * Copyright (c) 2025 by kamalyes, All Rights Reserved.
  */
@@ -14,10 +20,40 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sync"
 )
 
-// isPrimitiveKind 判断是否为基本类型（不可变，无需深拷贝）
-// string/bool/数值类型直接赋值即可，不存在引用共享问题
+// ============================================================================
+// Cloner 接口 — 零反射快速路径
+// ============================================================================
+
+// Cloner 接口允许类型提供自定义深拷贝实现，跳过反射开销
+type Cloner interface {
+	CloneDeep() any
+}
+
+// Clone 返回 src 的深拷贝 若 src 实现 Cloner 则零反射快速路径
+// 推荐用法：msg := syncx.Clone(msg) 替代 syncx.DeepCopy(&dst, &src)
+func Clone[T any](src *T) *T {
+	if src == nil {
+		return nil
+	}
+	if cloner, ok := any(src).(Cloner); ok {
+		if cloned, ok := cloner.CloneDeep().(*T); ok {
+			return cloned
+		}
+	}
+	var dst T
+	if err := DeepCopy(&dst, src); err != nil {
+		return nil
+	}
+	return &dst
+}
+
+// ============================================================================
+// 基本类型判断
+// ============================================================================
+
 func isPrimitiveKind(k reflect.Kind) bool {
 	switch k {
 	case reflect.Bool,
@@ -31,13 +67,127 @@ func isPrimitiveKind(k reflect.Kind) bool {
 	return false
 }
 
-// deepCopy 递归地复制值
-//
-// 性能优化要点：
-//  1. Struct 先整体值拷贝（dst.Set(src)，memcpy 级别），只对引用类型字段递归
-//     原实现逐字段递归反射，N 个字段 = N 次递归；优化后 1 次 Set + 引用类型字段递归
-//  2. Map 的 key 若为基本类型（如 string）直接复用，跳过递归
-//  3. Slice 元素若为基本类型，用 reflect.Copy 一次性拷贝，跳过逐元素递归
+// ============================================================================
+// 预生成类型克隆闭包
+// ============================================================================
+
+// kind 分类常量
+const (
+	kindOther     = 0 // 值类型，已由 dst.Set(src) 完成
+	kindMap       = 1
+	kindSlice     = 2
+	kindPtr       = 3
+	kindInterface = 4
+	kindStruct    = 5
+)
+
+func reflectKindToCached(k reflect.Kind) uint8 {
+	switch k {
+	case reflect.Map:
+		return kindMap
+	case reflect.Slice:
+		return kindSlice
+	case reflect.Ptr:
+		return kindPtr
+	case reflect.Interface:
+		return kindInterface
+	case reflect.Struct:
+		return kindStruct
+	default:
+		return kindOther
+	}
+}
+
+// structCloneFn 预生成的类型特定 struct 深拷贝函数
+// 闭包捕获所有字段信息（索引、kind、嵌套类型的 clone 函数），热路径零查找
+type structCloneFn func(dst, src reflect.Value)
+
+// fieldCloneInfo 预计算的单个字段深拷贝信息
+type fieldCloneInfo struct {
+	index    int           // 字段索引
+	kind     uint8         // 字段 kind 分类
+	nestedFn structCloneFn // kindStruct 时预计算的嵌套 clone 函数
+}
+
+var structCloneFnCache sync.Map // map[reflect.Type]structCloneFn
+
+// getStructCloneFn 获取或生成类型特定的克隆闭包
+// 首次调用对某类型做反射字段遍历并生成闭包，后续调用 O(1) 命中缓存
+func getStructCloneFn(t reflect.Type) structCloneFn {
+	if v, ok := structCloneFnCache.Load(t); ok {
+		return v.(structCloneFn)
+	}
+	fn := buildStructCloneFn(t)
+	actual, _ := structCloneFnCache.LoadOrStore(t, fn)
+	return actual.(structCloneFn)
+}
+
+// buildStructCloneFn 为 struct 类型生成专属克隆闭包
+// 嵌套 struct 字段的 clone 函数递归预计算，消除热路径中的缓存查找
+func buildStructCloneFn(t reflect.Type) structCloneFn {
+	// 收集需要深拷贝的字段
+	var fields []fieldCloneInfo
+	hasExported := false
+
+	n := t.NumField()
+	for i := 0; i < n; i++ {
+		ft := t.Field(i)
+		if !ft.IsExported() {
+			continue
+		}
+		hasExported = true
+		if ft.Tag.Get("deepcopy") == "-" {
+			continue
+		}
+		cachedKind := reflectKindToCached(ft.Type.Kind())
+		if cachedKind == kindOther {
+			continue
+		}
+		info := fieldCloneInfo{index: i, kind: cachedKind}
+		// 嵌套 struct：递归预计算 clone 函数，捕获到闭包中
+		// Go 不允许 struct 直接包含自身（无限大小），所以不会无限递归
+		if cachedKind == kindStruct {
+			info.nestedFn = getStructCloneFn(ft.Type)
+		}
+		fields = append(fields, info)
+	}
+
+	if !hasExported {
+		// 无导出字段（如 time.Time）：直接 Set
+		return func(dst, src reflect.Value) {
+			dst.Set(src)
+		}
+	}
+
+	// 闭包捕获 fields 切片，热路径直接遍历，零缓存查找
+	return func(dst, src reflect.Value) {
+		// Step 1: 整体值拷贝（memcpy 级别），值类型字段一次性完成
+		dst.Set(src)
+
+		// Step 2: 仅遍历引用类型字段 + 嵌套 struct 字段
+		for _, f := range fields {
+			srcField := src.Field(f.index)
+			switch f.kind {
+			case kindStruct:
+				// 嵌套 struct：调用预计算的 clone 函数，零缓存查找
+				f.nestedFn(dst.Field(f.index), srcField)
+			case kindMap, kindSlice, kindPtr, kindInterface:
+				// 引用类型：nil 跳过，非 nil 深拷贝
+				if srcField.IsNil() {
+					continue
+				}
+				dstField := dst.Field(f.index)
+				dstField.Set(reflect.Zero(dstField.Type()))
+				deepCopy(dstField, srcField)
+			}
+		}
+	}
+}
+
+// ============================================================================
+// 通用反射深拷贝（兜底路径）
+// ============================================================================
+
 func deepCopy(dst, src reflect.Value) {
 	if !src.IsValid() {
 		return // 如果源值无效，直接返回
@@ -116,62 +266,10 @@ func deepCopy(dst, src reflect.Value) {
 			deepCopy(dst.Index(i), src.Index(i)) // 递归复制每个元素
 		}
 
-	case reflect.Struct: // 处理结构体类型
-		// 特殊处理：如果结构体没有任何导出字段，直接赋值
-		// 这包括 time.Time, time.Duration 等标准库类型
-		hasExportedField := false
-		for i := 0; i < src.NumField(); i++ {
-			if src.Type().Field(i).IsExported() {
-				hasExportedField = true
-				break
-			}
-		}
-		if !hasExportedField {
-			dst.Set(src) // 无导出字段，直接值拷贝
-			return
-		}
-
-		// ⚡ 性能优化：先整体值拷贝（memcpy 级别），值类型字段（string/int/bool/time.Time 等）一次性完成
-		// 原实现逐字段递归反射调用，N 个字段 = N 次递归 + N 次 SetMapIndex
-		// 优化后：1 次 Set + 仅引用类型字段递归
-		dst.Set(src)
-
-		// 只对引用类型字段和含导出字段的 struct 字段递归深拷贝
-		// 值类型字段（string/int/bool/Array/Chan/Func 等）已在 dst.Set(src) 中完成
-		for i := 0; i < src.NumField(); i++ {
-			fieldType := src.Type().Field(i)     // 获取字段类型信息
-			tag := fieldType.Tag.Get("deepcopy") // 获取字段的deepcopy标签
-
-			// 跳过标记为不复制的字段
-			if tag == "-" {
-				continue
-			}
-
-			// 只处理可设置且导出的字段
-			dstField := dst.Field(i)
-			if !dstField.CanSet() || !fieldType.IsExported() {
-				continue
-			}
-
-			srcField := src.Field(i)
-			kind := fieldType.Type.Kind()
-
-			switch kind {
-			case reflect.Map, reflect.Slice, reflect.Ptr, reflect.Interface:
-				// 引用类型：先清零（消除 Set 留下的共享引用），再深拷贝
-				// nil 引用已被 dst.Set(src) 正确拷贝为 nil，跳过
-				if !srcField.IsNil() {
-					dstField.Set(reflect.Zero(dstField.Type()))
-					deepCopy(dstField, srcField)
-				}
-			case reflect.Struct:
-				// 含导出字段的 struct 字段：递归处理其引用类型子字段
-				// dst.Set(src) 已值拷贝，但内部引用类型子字段可能共享，需要递归
-				// （无导出字段的 struct 如 time.Time 已被 Set 完成，递归内部会直接 Set 返回）
-				deepCopy(dstField, srcField)
-			}
-			// 值类型字段（string/int/bool/Array 等）已在 dst.Set(src) 中完成，跳过
-		}
+	case reflect.Struct:
+		// ⚡ 使用预生成的类型克隆闭包，热路径零缓存查找
+		// 嵌套 struct 的 clone 函数已在闭包生成时递归预计算
+		getStructCloneFn(src.Type())(dst, src)
 
 	case reflect.Array: // 处理数组类型
 		// 快速路径：元素为基本类型，直接 Copy
@@ -191,19 +289,40 @@ func deepCopy(dst, src reflect.Value) {
 	}
 }
 
+// ============================================================================
+// 公开 API
+// ============================================================================
+
 // DeepCopy 复制源值到目标值
 //
-// @params dst: 目标值的指针，表示要将源值复制到的位置。必须是一个指向某种类型的指针。
-// @params src: 源值的指针，表示要复制的原始数据。也必须是一个指向某种类型的指针。
+// @params dst: 目标值的指针，必须是指向某种类型的指针
+// @params src: 源值的指针，必须是指向某种类型的指针
 //
-// @return:
-//
-//	如果成功，返回 nil；如果源值为 nil，返回一个错误。
+// @return: 成功返回 nil；源为 nil 返回错误
 func DeepCopy(dst, src interface{}) error {
-	dstVal := reflect.ValueOf(dst) // 获取目标的反射值
-	srcVal := reflect.ValueOf(src) // 获取源的反射值
+	// ⚡ 快速路径：src 实现 Cloner 接口时跳过反射
+	if cloner, ok := src.(Cloner); ok {
+		cloned := cloner.CloneDeep()
+		dstVal := reflect.ValueOf(dst)
+		srcVal := reflect.ValueOf(src)
+		if dstVal.Kind() != reflect.Ptr || srcVal.Kind() != reflect.Ptr {
+			panic("DeepCopy: both dst and src must be pointers")
+		}
+		if dstVal.IsNil() {
+			dstVal.Set(reflect.New(srcVal.Elem().Type()))
+		}
+		elem := dstVal.Elem()
+		clonedVal := reflect.ValueOf(cloned)
+		if clonedVal.Kind() == reflect.Ptr && elem.Kind() != reflect.Ptr {
+			clonedVal = clonedVal.Elem()
+		}
+		elem.Set(clonedVal)
+		return nil
+	}
 
-	// 检查目标和源是否都是指针
+	dstVal := reflect.ValueOf(dst)
+	srcVal := reflect.ValueOf(src)
+
 	if dstVal.Kind() != reflect.Ptr || srcVal.Kind() != reflect.Ptr {
 		panic("DeepCopy: both dst and src must be pointers") // 如果不是指针，抛出异常
 	}
