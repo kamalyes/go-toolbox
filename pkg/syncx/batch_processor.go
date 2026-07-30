@@ -6,7 +6,7 @@
  * @FilePath: \go-toolbox\pkg\syncx\batch_processor.go
  * @Description: 泛型批量处理器
  *   持续收集 T 类型的请求，满 batchSize 或每 flushInterval 触发一次 flush
- *   适用于高并发写入场景（如批量 DB 更新、批量日志写入、批量指标上报等）
+ *   适用于高并发写入场景（如批量 DB 更新、批量日志写入、批量消息分发等）
  *
  * 工作流程：
  *   1. 调用方调用 Submit（非阻塞，队列满时返回 false）
@@ -14,25 +14,62 @@
  *   3. flush 时调用 flushFn 回调，由调用方处理批量逻辑
  *   4. Stop 时 drain channel 并 flush 剩余数据后退出
  *
+ * 稳定性保障：
+ *   - WithClone：Submit 时克隆 item，防止调用方后续修改影响异步 flush（数据隔离）
+ *   - WithPanicHandler：flush panic 时恢复，单次 flush 失败不崩溃 worker（容错）
+ *   - DroppedCount：累计丢弃计数，便于监控背压（可观测性）
+ *
  * 示例:
  *
- *	processor := NewBatchProcessor(4096, 100, 500*time.Millisecond, func(batch []string) {
- *	    db.BatchInsert(batch)
- *	})
+ *	processor := NewBatchProcessor(4096, 100, 500*time.Millisecond,
+ *	    func(batch []string) { db.BatchInsert(batch) },
+ *	    WithClone(func(s string) string { return strings.Clone(s) }),
+ *	    WithName("db-batch-insert"),
+ *	)
  *	defer processor.Stop()
  *
  *	for _, item := range items {
-// 	    processor.Submit(item)
+ *	    processor.Submit(item)
  *	}
+ *
  * Copyright (c) 2026 by kamalyes, All Rights Reserved.
-*/
+ */
 
 package syncx
 
 import (
 	"context"
+	"sync/atomic"
 	"time"
 )
+
+// BatchProcessorOption 批量处理器配置选项（函数式选项模式）
+type BatchProcessorOption[T any] func(*BatchProcessor[T])
+
+// WithClone 设置克隆函数，Submit 时对 item 执行 Clone
+// 防止调用方在 Submit 后修改 item 影响异步 flush（数据隔离）
+// 适用于 item 包含指针/切片/Map 等引用类型的场景
+func WithClone[T any](fn func(T) T) BatchProcessorOption[T] {
+	return func(p *BatchProcessor[T]) {
+		p.cloneFn = fn
+	}
+}
+
+// WithPanicHandler 设置 flush panic 处理器
+// flush 发生 panic 时调用 handler 恢复，单次 flush 失败不崩溃 worker（容错）
+// 不设置时静默恢复（recover），避免 worker 退出
+func WithPanicHandler[T any](handler RecoverFunc) BatchProcessorOption[T] {
+	return func(p *BatchProcessor[T]) {
+		p.panicHandler = handler
+	}
+}
+
+// WithName 设置处理器名称，用于日志和监控标识
+func WithName[T any](name string) BatchProcessorOption[T] {
+	return func(p *BatchProcessor[T]) {
+		p.name = name
+	}
+}
 
 // BatchProcessor 泛型批量处理器
 // 持续收集 T 类型的请求，满 batchSize 或每 flushInterval 触发一次 flush
@@ -41,8 +78,12 @@ type BatchProcessor[T any] struct {
 	flushInterval time.Duration   // 最大 flush 间隔
 	batchSize     int             // 每批最大数量
 	flushFn       func(batch []T) // flush 回调
+	cloneFn       func(T) T       // optional: Submit 时克隆 item
+	panicHandler  RecoverFunc     // optional: flush panic 处理器
+	name          string          // optional: 日志/监控标识
 	stopChan      chan struct{}   // 停止信号通道
 	done          chan struct{}   // 完成信号通道
+	droppedCount  atomic.Int64    // 累计丢弃计数（队列满时丢弃）
 }
 
 // NewBatchProcessor 创建批量处理器并启动后台 worker
@@ -52,7 +93,10 @@ type BatchProcessor[T any] struct {
 //   - batchSize: 每批最大数量（建议 100）
 //   - flushInterval: 最大 flush 间隔（建议 500ms）
 //   - flushFn: flush 回调，接收一批数据
-func NewBatchProcessor[T any](queueSize, batchSize int, flushInterval time.Duration, flushFn func(batch []T)) *BatchProcessor[T] {
+//   - opts: 可选配置（WithClone / WithPanicHandler / WithName）
+//
+// 向后兼容：opts 为空时行为与旧版完全一致
+func NewBatchProcessor[T any](queueSize, batchSize int, flushInterval time.Duration, flushFn func(batch []T), opts ...BatchProcessorOption[T]) *BatchProcessor[T] {
 	p := &BatchProcessor[T]{
 		queue:         make(chan T, queueSize),
 		flushInterval: flushInterval,
@@ -60,6 +104,9 @@ func NewBatchProcessor[T any](queueSize, batchSize int, flushInterval time.Durat
 		flushFn:       flushFn,
 		stopChan:      make(chan struct{}),
 		done:          make(chan struct{}),
+	}
+	for _, opt := range opts {
+		opt(p)
 	}
 	go p.run()
 	return p
@@ -70,20 +117,25 @@ func NewBatchProcessor[T any](queueSize, batchSize int, flushInterval time.Durat
 // 行为说明：
 //   - 队列未满：item 写入 channel，返回 true
 //   - 队列已满：不会阻塞等待，也不会重试，直接走 default 分支丢弃该 item，返回 false
+//   - 若设置了 WithClone，Submit 时会先克隆 item（数据隔离）
 //
 // 也就是说队列满之后，新提交的数据进不来，会被静默丢弃（最终一致性语义）
 // 调用方可根据返回值决定后续处理：
-//   - 记录 metric（如丢弃计数）便于监控背压
+//   - 记录 metric（如 DroppedCount）便于监控背压
 //   - 降级处理（如改走同步更新、写本地缓冲等）
 //
 // 这种"非阻塞 + 丢弃"策略适用于可丢失的非核心路径（如消息状态更新），
 // 避免生产者因队列满而阻塞，拖垮上游主流程
 func (p *BatchProcessor[T]) Submit(item T) bool {
+	if p.cloneFn != nil {
+		item = p.cloneFn(item)
+	}
 	select {
 	case p.queue <- item:
 		return true
 	default:
 		// 队列满，直接丢弃，不阻塞调用方
+		p.droppedCount.Add(1)
 		return false
 	}
 }
@@ -93,6 +145,7 @@ func (p *BatchProcessor[T]) Submit(item T) bool {
 // 行为说明：
 //   - 队列未满：item 立即写入 channel，返回 true
 //   - 队列已满：阻塞等待，直到有空位可写入（返回 true）或 ctx 被取消/超时（返回 false）
+//   - 若设置了 WithClone，Submit 时会先克隆 item（数据隔离）
 //
 // 与 Submit 的区别：
 //   - Submit：队列满立即丢弃，适合可丢失的非核心路径（如消息状态更新）
@@ -108,13 +161,28 @@ func (p *BatchProcessor[T]) Submit(item T) bool {
 //   - 不想阻塞 + 可接受丢失 → Submit(item)
 //   - 想要"先阻塞再降级" → SubmitBlocking 配合较短 ctx 超时，超时后走降级逻辑
 func (p *BatchProcessor[T]) SubmitBlocking(ctx context.Context, item T) bool {
+	if p.cloneFn != nil {
+		item = p.cloneFn(item)
+	}
 	select {
 	case p.queue <- item:
 		return true
 	case <-ctx.Done():
 		// ctx 超时或取消，该条数据未能写入（由调用方决定是否补偿）
+		p.droppedCount.Add(1)
 		return false
 	}
+}
+
+// DroppedCount 返回累计丢弃的条目数（队列满时丢弃）
+// 用于监控背压情况，判断是否需要扩容 queueSize 或优化 flush 性能
+func (p *BatchProcessor[T]) DroppedCount() int64 {
+	return p.droppedCount.Load()
+}
+
+// Name 返回处理器名称（通过 WithName 设置）
+func (p *BatchProcessor[T]) Name() string {
+	return p.name
 }
 
 // run 后台 worker，收集并批量 flush
@@ -142,7 +210,7 @@ func (p *BatchProcessor[T]) run() {
 				batch = append(batch, <-p.queue)
 			}
 			if len(batch) > 0 {
-				p.flushFn(batch)
+				p.safeFlush(batch)
 			}
 			return
 		}
@@ -151,8 +219,15 @@ func (p *BatchProcessor[T]) run() {
 
 // flushAndReset 执行 flush 并重置 batch（复用底层数组，减少 GC）
 func (p *BatchProcessor[T]) flushAndReset(batch []T) []T {
-	p.flushFn(batch)
+	p.safeFlush(batch)
 	return batch[:0]
+}
+
+// safeFlush 安全执行 flush，带 panic 恢复
+// flushFn panic 时调用 panicHandler 恢复（不设置则静默恢复），避免 worker 崩溃
+func (p *BatchProcessor[T]) safeFlush(batch []T) {
+	defer RecoverWithHandler(p.panicHandler)
+	p.flushFn(batch)
 }
 
 // Stop 停止处理器，flush 剩余数据后退出
