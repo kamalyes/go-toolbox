@@ -13,6 +13,7 @@ package convert
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/kamalyes/go-toolbox/pkg/stringx"
@@ -146,7 +147,8 @@ func AppendValue(buf []byte, v any) []byte {
 	case uint64:
 		return stringx.FastAppendInt(buf, int(val))
 	case uintptr:
-		return append(buf, fmt.Sprintf("0x%x", val)...)
+		buf = append(buf, "0x"...)
+		return append(buf, strconv.FormatUint(uint64(val), 16)...)
 	case bool:
 		if val {
 			return append(buf, "true"...)

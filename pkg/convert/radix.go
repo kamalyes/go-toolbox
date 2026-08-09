@@ -13,7 +13,6 @@ package convert
 import (
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 )
@@ -70,5 +69,9 @@ func DecToHex(n uint64) string {
 
 // DecToBin 将十进制数转换为二进制字符串，并补齐到8位。
 func DecToBin(n uint64) string {
-	return fmt.Sprintf("%08b", n)
+	s := strconv.FormatUint(n, 2)
+	if len(s) >= 8 {
+		return s
+	}
+	return strings.Repeat("0", 8-len(s)) + s
 }

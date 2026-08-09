@@ -13,6 +13,7 @@ package breaker
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -268,6 +269,11 @@ func (mc *MetricsCollector) GetMetrics(name string) *Metrics {
 	mc.mu.RLock()
 	defer mc.mu.RUnlock()
 
+	return mc.getMetricsLocked(name)
+}
+
+// getMetricsLocked 在已持有锁的情况下获取单个指标
+func (mc *MetricsCollector) getMetricsLocked(name string) *Metrics {
 	return &Metrics{
 		Name:              name,
 		ExecutionCount:    mc.getInt64Value(mc.executionCount[name]),
@@ -289,7 +295,7 @@ func (mc *MetricsCollector) GetAllMetrics() map[string]*Metrics {
 
 	metrics := make(map[string]*Metrics)
 	for name := range mc.executionCount {
-		metrics[name] = mc.GetMetrics(name)
+		metrics[name] = mc.getMetricsLocked(name)
 	}
 	return metrics
 }
@@ -411,36 +417,36 @@ func NewPrometheusExporter(collector *MetricsCollector, namespace, service strin
 
 // Export 导出Prometheus格式指标
 func (pe *PrometheusExporter) Export() string {
-	var output string
-	prefix := fmt.Sprintf("%s_%s_", pe.namespace, pe.service)
+	var b strings.Builder
+	prefix := pe.namespace + "_" + pe.service + "_"
 
 	// 导出全局指标
 	global := pe.collector.GetGlobalMetrics()
-	output += fmt.Sprintf("# HELP %stotal_executions Total number of executions\n", prefix)
-	output += fmt.Sprintf("# TYPE %stotal_executions counter\n", prefix)
-	output += fmt.Sprintf("%stotal_executions %d\n", prefix, global.TotalExecutions)
+	fmt.Fprintf(&b, "# HELP %stotal_executions Total number of executions\n", prefix)
+	fmt.Fprintf(&b, "# TYPE %stotal_executions counter\n", prefix)
+	fmt.Fprintf(&b, "%stotal_executions %d\n", prefix, global.TotalExecutions)
 
-	output += fmt.Sprintf("# HELP %stotal_success Total number of successful executions\n", prefix)
-	output += fmt.Sprintf("# TYPE %stotal_success counter\n", prefix)
-	output += fmt.Sprintf("%stotal_success %d\n", prefix, global.TotalSuccess)
+	fmt.Fprintf(&b, "# HELP %stotal_success Total number of successful executions\n", prefix)
+	fmt.Fprintf(&b, "# TYPE %stotal_success counter\n", prefix)
+	fmt.Fprintf(&b, "%stotal_success %d\n", prefix, global.TotalSuccess)
 
-	output += fmt.Sprintf("# HELP %stotal_failure Total number of failed executions\n", prefix)
-	output += fmt.Sprintf("# TYPE %stotal_failure counter\n", prefix)
-	output += fmt.Sprintf("%stotal_failure %d\n", prefix, global.TotalFailure)
+	fmt.Fprintf(&b, "# HELP %stotal_failure Total number of failed executions\n", prefix)
+	fmt.Fprintf(&b, "# TYPE %stotal_failure counter\n", prefix)
+	fmt.Fprintf(&b, "%stotal_failure %d\n", prefix, global.TotalFailure)
 
-	output += fmt.Sprintf("# HELP %sactive_count Number of currently active executions\n", prefix)
-	output += fmt.Sprintf("# TYPE %sactive_count gauge\n", prefix)
-	output += fmt.Sprintf("%sactive_count %d\n", prefix, global.ActiveCount)
+	fmt.Fprintf(&b, "# HELP %sactive_count Number of currently active executions\n", prefix)
+	fmt.Fprintf(&b, "# TYPE %sactive_count gauge\n", prefix)
+	fmt.Fprintf(&b, "%sactive_count %d\n", prefix, global.ActiveCount)
 
 	// 导出所有指标
 	allMetrics := pe.collector.GetAllMetrics()
 	for name, metrics := range allMetrics {
-		output += fmt.Sprintf("%sexecution_count{name=\"%s\"} %d\n", prefix, name, metrics.ExecutionCount)
-		output += fmt.Sprintf("%ssuccess_count{name=\"%s\"} %d\n", prefix, name, metrics.SuccessCount)
-		output += fmt.Sprintf("%sfailure_count{name=\"%s\"} %d\n", prefix, name, metrics.FailureCount)
-		output += fmt.Sprintf("%savg_execution_time_ms{name=\"%s\"} %.2f\n", prefix, name, metrics.AvgExecutionTime)
-		output += fmt.Sprintf("%ssuccess_rate{name=\"%s\"} %.2f\n", prefix, name, metrics.SuccessRate)
+		fmt.Fprintf(&b, "%sexecution_count{name=\"%s\"} %d\n", prefix, name, metrics.ExecutionCount)
+		fmt.Fprintf(&b, "%ssuccess_count{name=\"%s\"} %d\n", prefix, name, metrics.SuccessCount)
+		fmt.Fprintf(&b, "%sfailure_count{name=\"%s\"} %d\n", prefix, name, metrics.FailureCount)
+		fmt.Fprintf(&b, "%savg_execution_time_ms{name=\"%s\"} %.2f\n", prefix, name, metrics.AvgExecutionTime)
+		fmt.Fprintf(&b, "%ssuccess_rate{name=\"%s\"} %.2f\n", prefix, name, metrics.SuccessRate)
 	}
 
-	return output
+	return b.String()
 }

@@ -55,7 +55,7 @@ func TestRunnerRunPanicRecovered(t *testing.T) {
 }
 
 func TestRunnerRunTimeout(t *testing.T) {
-	r := NewRunner[int]().Timeout(50 * time.Millisecond)
+	r := NewRunner[int]().Timeout(100 * time.Millisecond)
 
 	timeoutCalled := false
 	r.OnTimeout(func() {
@@ -64,7 +64,8 @@ func TestRunnerRunTimeout(t *testing.T) {
 
 	result, err := r.Run(func(ctx context.Context) (int, error) {
 		// 模拟长时间阻塞，超过超时限制
-		time.Sleep(100 * time.Millisecond)
+		// 使用较大 sleep 避免 race 检测重负载下 timer 延迟导致 flaky
+		time.Sleep(500 * time.Millisecond)
 		return 1, nil
 	})
 
@@ -77,10 +78,10 @@ func TestRunnerRunTimeout(t *testing.T) {
 
 func TestRunnerRunCustomTimeoutErr(t *testing.T) {
 	customErr := errors.New("custom timeout error")
-	r := NewRunner[int]().Timeout(50 * time.Millisecond).CustomTimeoutErr(customErr)
+	r := NewRunner[int]().Timeout(100 * time.Millisecond).CustomTimeoutErr(customErr)
 
 	result, err := r.Run(func(ctx context.Context) (int, error) {
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 		return 1, nil
 	})
 

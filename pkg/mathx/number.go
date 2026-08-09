@@ -27,9 +27,7 @@ func Decimals[T types.Numerical](num T, digit int) string {
 	divisor := T(math.Pow10(digit))
 	// 将整数转换为浮点数，然后除以除数
 	flt := float64(num) / float64(divisor)
-	// 格式化为字符串，保留小数点后指定位数
-	result := fmt.Sprintf("%.*f", digit, flt)
-	return result
+	return strconv.FormatFloat(flt, 'f', digit, 64)
 }
 
 // Min 返回多个数值中的最小值 - 使用 cmp.Compare 进行泛型比较

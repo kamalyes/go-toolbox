@@ -381,6 +381,354 @@ func TestNewShardedMapCustomHasher(t *testing.T) {
 	assert.Equal(t, 1, v)
 }
 
+// TestShardedMapSwap 测试 Swap 替换值并返回旧值
+func TestShardedMapSwap(t *testing.T) {
+	t.Run("key exists returns old value", func(t *testing.T) {
+		m := NewShardedMap[string, int](16)
+		m.Store("k", 100)
+
+		old, ok := m.Swap("k", 200)
+		assert.True(t, ok)
+		assert.Equal(t, 100, old)
+
+		v, ok := m.Load("k")
+		assert.True(t, ok)
+		assert.Equal(t, 200, v)
+		// Swap 已存在的 key 不改变元素总数
+		assert.Equal(t, 1, m.Len())
+	})
+
+	t.Run("key not exists stores and returns zero", func(t *testing.T) {
+		m := NewShardedMap[string, int](16)
+
+		old, ok := m.Swap("k", 200)
+		assert.False(t, ok)
+		assert.Equal(t, 0, old) // 零值
+
+		v, ok := m.Load("k")
+		assert.True(t, ok)
+		assert.Equal(t, 200, v)
+		assert.Equal(t, 1, m.Len())
+	})
+
+	t.Run("empty map swap string zero value", func(t *testing.T) {
+		m := NewShardedMap[string, string](16)
+
+		old, ok := m.Swap("k", "v")
+		assert.False(t, ok)
+		assert.Equal(t, "", old)
+	})
+
+	t.Run("concurrent swap same key", func(t *testing.T) {
+		m := NewShardedMap[int, int](64)
+		m.Store(1, 0)
+
+		var wg sync.WaitGroup
+		for i := 0; i < 100; i++ {
+			wg.Add(1)
+			go func(val int) {
+				defer wg.Done()
+				m.Swap(1, val)
+			}(i)
+		}
+		wg.Wait()
+
+		// 元素总数不变
+		assert.Equal(t, 1, m.Len())
+		v, ok := m.Load(1)
+		assert.True(t, ok)
+		_ = v
+	})
+}
+
+// TestShardedMapCompareAndSwap 测试原子比较并交换
+func TestShardedMapCompareAndSwap(t *testing.T) {
+	t.Run("key not exists returns false", func(t *testing.T) {
+		m := NewShardedMap[string, int](16)
+		assert.False(t, m.CompareAndSwap("k", 1, 2))
+	})
+
+	t.Run("value matches swap succeeds", func(t *testing.T) {
+		m := NewShardedMap[string, int](16)
+		m.Store("k", 1)
+
+		assert.True(t, m.CompareAndSwap("k", 1, 2))
+
+		v, ok := m.Load("k")
+		assert.True(t, ok)
+		assert.Equal(t, 2, v)
+	})
+
+	t.Run("value mismatch returns false", func(t *testing.T) {
+		m := NewShardedMap[string, int](16)
+		m.Store("k", 1)
+
+		assert.False(t, m.CompareAndSwap("k", 99, 2))
+
+		v, ok := m.Load("k")
+		assert.True(t, ok)
+		assert.Equal(t, 1, v) // 值未变
+	})
+
+	t.Run("empty map compare and swap", func(t *testing.T) {
+		m := NewShardedMap[string, int](16)
+		assert.False(t, m.CompareAndSwap("k", 0, 1))
+	})
+
+	t.Run("concurrent compare and swap increments", func(t *testing.T) {
+		m := NewShardedMap[string, int](16)
+		m.Store("counter", 0)
+
+		var wg sync.WaitGroup
+		var successCount atomic.Int64
+		for i := 0; i < 100; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for {
+					old, _ := m.Load("counter")
+					if m.CompareAndSwap("counter", old, old+1) {
+						successCount.Add(1)
+						return
+					}
+				}
+			}()
+		}
+		wg.Wait()
+
+		assert.Equal(t, int64(100), successCount.Load())
+		v, _ := m.Load("counter")
+		assert.Equal(t, 100, v)
+	})
+}
+
+// TestShardedMapCompareAndDelete 测试原子比较并删除
+func TestShardedMapCompareAndDelete(t *testing.T) {
+	t.Run("key not exists returns false", func(t *testing.T) {
+		m := NewShardedMap[string, int](16)
+		assert.False(t, m.CompareAndDelete("k", 1))
+		assert.Equal(t, 0, m.Len())
+	})
+
+	t.Run("value matches delete succeeds", func(t *testing.T) {
+		m := NewShardedMap[string, int](16)
+		m.Store("k", 1)
+
+		assert.True(t, m.CompareAndDelete("k", 1))
+		assert.False(t, m.Has("k"))
+		assert.Equal(t, 0, m.Len())
+	})
+
+	t.Run("value mismatch returns false", func(t *testing.T) {
+		m := NewShardedMap[string, int](16)
+		m.Store("k", 1)
+
+		assert.False(t, m.CompareAndDelete("k", 99))
+		assert.True(t, m.Has("k"))
+		assert.Equal(t, 1, m.Len())
+	})
+
+	t.Run("empty map compare and delete", func(t *testing.T) {
+		m := NewShardedMap[string, int](16)
+		assert.False(t, m.CompareAndDelete("k", 0))
+	})
+
+	t.Run("concurrent compare and delete", func(t *testing.T) {
+		m := NewShardedMap[int, int](64)
+		for i := 0; i < 100; i++ {
+			m.Store(i, i)
+		}
+
+		var wg sync.WaitGroup
+		var deletedCount atomic.Int64
+		for i := 0; i < 100; i++ {
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				if m.CompareAndDelete(idx, idx) {
+					deletedCount.Add(1)
+				}
+			}(i)
+		}
+		wg.Wait()
+
+		assert.Equal(t, int64(100), deletedCount.Load())
+		assert.Equal(t, 0, m.Len())
+	})
+}
+
+// TestShardedMapStoreBatch 测试批量存储
+func TestShardedMapStoreBatch(t *testing.T) {
+	t.Run("empty batch does nothing", func(t *testing.T) {
+		m := NewShardedMap[string, int](16)
+		m.StoreBatch(nil)
+		assert.Equal(t, 0, m.Len())
+
+		m.StoreBatch(map[string]int{})
+		assert.Equal(t, 0, m.Len())
+	})
+
+	t.Run("normal batch store", func(t *testing.T) {
+		m := NewShardedMap[string, int](16)
+		items := make(map[string]int, 5)
+		for i := 0; i < 5; i++ {
+			items[fmt.Sprintf("k%d", i)] = i
+		}
+
+		m.StoreBatch(items)
+		assert.Equal(t, 5, m.Len())
+
+		for i := 0; i < 5; i++ {
+			v, ok := m.Load(fmt.Sprintf("k%d", i))
+			assert.True(t, ok)
+			assert.Equal(t, i, v)
+		}
+	})
+
+	t.Run("batch with existing keys only counts new", func(t *testing.T) {
+		m := NewShardedMap[string, int](16)
+		m.Store("k0", 100)
+
+		items := map[string]int{"k0": 200, "k1": 300}
+		m.StoreBatch(items)
+
+		assert.Equal(t, 2, m.Len())
+		v, _ := m.Load("k0")
+		assert.Equal(t, 200, v) // 值被覆盖
+		v, _ = m.Load("k1")
+		assert.Equal(t, 300, v)
+	})
+
+	t.Run("large batch with int keys across shards", func(t *testing.T) {
+		m := NewShardedMap[int, int](64)
+		items := make(map[int]int, 1000)
+		for i := 0; i < 1000; i++ {
+			items[i] = i * 10
+		}
+
+		m.StoreBatch(items)
+		assert.Equal(t, 1000, m.Len())
+
+		// 抽样校验
+		for i := 0; i < 1000; i += 100 {
+			v, ok := m.Load(i)
+			assert.True(t, ok)
+			assert.Equal(t, i*10, v)
+		}
+	})
+
+	t.Run("concurrent store batch", func(t *testing.T) {
+		m := NewShardedMap[int, int](64)
+		var wg sync.WaitGroup
+
+		for w := 0; w < 10; w++ {
+			wg.Add(1)
+			go func(base int) {
+				defer wg.Done()
+				items := make(map[int]int, 100)
+				for i := 0; i < 100; i++ {
+					items[base*100+i] = i
+				}
+				m.StoreBatch(items)
+			}(w)
+		}
+		wg.Wait()
+
+		assert.Equal(t, 1000, m.Len())
+	})
+}
+
+// TestShardedMapClearWithPerShardHint 测试带预分配容量提示的 Clear
+// 覆盖 Clear 中 perShardHint > 0 的分支
+func TestShardedMapClearWithPerShardHint(t *testing.T) {
+	m := NewShardedMapWithOptions[string, int](16, WithPerShardHint[string, int](50))
+
+	for i := 0; i < 50; i++ {
+		m.Store(fmt.Sprintf("k%d", i), i)
+	}
+	assert.Equal(t, 50, m.Len())
+
+	m.Clear()
+
+	assert.Zero(t, m.Len())
+	// 验证 Clear 后仍可正常写入读取（复用预分配容量）
+	m.Store("after_clear", 999)
+	v, ok := m.Load("after_clear")
+	assert.True(t, ok)
+	assert.Equal(t, 999, v)
+}
+
+// TestNextPowerOfTwo 测试 NextPowerOfTwo 函数的各分支
+func TestNextPowerOfTwo(t *testing.T) {
+	t.Run("n <= 1 returns 2", func(t *testing.T) {
+		assert.Equal(t, 2, NextPowerOfTwo(0))
+		assert.Equal(t, 2, NextPowerOfTwo(1))
+		assert.Equal(t, 2, NextPowerOfTwo(-5))
+	})
+
+	t.Run("n is power of two returns next power", func(t *testing.T) {
+		assert.Equal(t, 4, NextPowerOfTwo(2))
+		assert.Equal(t, 8, NextPowerOfTwo(4))
+		assert.Equal(t, 16, NextPowerOfTwo(8))
+		assert.Equal(t, 32, NextPowerOfTwo(16))
+		assert.Equal(t, 64, NextPowerOfTwo(32))
+	})
+
+	t.Run("n is not power of two returns next power", func(t *testing.T) {
+		assert.Equal(t, 4, NextPowerOfTwo(3))
+		assert.Equal(t, 128, NextPowerOfTwo(100))
+		assert.Equal(t, 256, NextPowerOfTwo(200))
+	})
+}
+
+// TestKvHasher 测试 KvHasher 为各类型选择的 hash 函数
+func TestKvHasher(t *testing.T) {
+	t.Run("string hasher", func(t *testing.T) {
+		h := KvHasher[string]()
+		assert.NotZero(t, h("hello"))
+		assert.NotZero(t, h("world"))
+		assert.Equal(t, h("abc"), h("abc")) // 相同 key 返回相同 hash
+	})
+
+	t.Run("int hasher", func(t *testing.T) {
+		h := KvHasher[int]()
+		assert.NotZero(t, h(123))
+		assert.Equal(t, h(456), h(456))
+	})
+
+	t.Run("int64 hasher", func(t *testing.T) {
+		h := KvHasher[int64]()
+		assert.NotZero(t, h(int64(123456789)))
+		assert.Equal(t, h(int64(1)), h(int64(1)))
+	})
+
+	t.Run("int32 hasher", func(t *testing.T) {
+		h := KvHasher[int32]()
+		assert.NotZero(t, h(int32(123)))
+		assert.Equal(t, h(int32(1)), h(int32(1)))
+	})
+
+	t.Run("uint hasher", func(t *testing.T) {
+		h := KvHasher[uint]()
+		assert.NotZero(t, h(uint(123)))
+		assert.Equal(t, h(uint(1)), h(uint(1)))
+	})
+
+	t.Run("uint64 hasher", func(t *testing.T) {
+		h := KvHasher[uint64]()
+		assert.NotZero(t, h(uint64(123)))
+		assert.Equal(t, h(uint64(1)), h(uint64(1)))
+	})
+
+	t.Run("default hasher for bool type", func(t *testing.T) {
+		// bool 不在专用分支中，走 default 分支用 fmt.Sprintf 转 string 再 hash
+		h := KvHasher[bool]()
+		assert.NotZero(t, h(true))
+		assert.NotZero(t, h(false))
+		assert.Equal(t, h(true), h(true))
+	})
+}
+
 // BenchmarkShardedMapWrite 分片 map 写入基准测试
 func BenchmarkShardedMapWrite(b *testing.B) {
 	m := NewShardedMap[string, int](64)
@@ -419,6 +767,83 @@ func BenchmarkShardedMapRead(b *testing.B) {
 		i := 0
 		for pb.Next() {
 			m.Load(fmt.Sprintf("k%d", i%10000))
+			i++
+		}
+	})
+}
+
+// BenchmarkShardedMapReadPreGen 预生成 key 的读取基准测试（排除 fmt.Sprintf 干扰）
+func BenchmarkShardedMapReadPreGen(b *testing.B) {
+	m := NewShardedMap[string, int](64)
+	keys := make([]string, 10000)
+	for i := 0; i < 10000; i++ {
+		keys[i] = fmt.Sprintf("k%d", i)
+		m.Store(keys[i], i)
+	}
+
+	b.ReportAllocs()
+	b.RunParallel(func(pb *testing.PB) {
+		i := 0
+		for pb.Next() {
+			m.Load(keys[i%10000])
+			i++
+		}
+	})
+}
+
+// BenchmarkShardedMapWritePreGen 预生成 key 的写入基准测试（排除 fmt.Sprintf 干扰）
+func BenchmarkShardedMapWritePreGen(b *testing.B) {
+	m := NewShardedMap[string, int](64)
+	keys := make([]string, 100000)
+	for i := range keys {
+		keys[i] = fmt.Sprintf("k%d", i)
+	}
+
+	b.ReportAllocs()
+	b.RunParallel(func(pb *testing.PB) {
+		i := 0
+		for pb.Next() {
+			m.Store(keys[i%100000], i)
+			i++
+		}
+	})
+}
+
+// BenchmarkFNVHashString32 hash 函数基准测试
+func BenchmarkFNVHashString32(b *testing.B) {
+	s := "hello_world_key_12345"
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = FNVHashString32(s)
+	}
+}
+
+// BenchmarkShardedMapStoreBatch 批量写入基准测试
+func BenchmarkShardedMapStoreBatch(b *testing.B) {
+	m := NewShardedMap[int, int](64)
+	items := make(map[int]int, 1000)
+	for i := 0; i < 1000; i++ {
+		items[i] = i * 10
+	}
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		m.StoreBatch(items)
+	}
+}
+
+// BenchmarkShardedMapSwap Swap 操作基准测试
+func BenchmarkShardedMapSwap(b *testing.B) {
+	m := NewShardedMap[int, int](64)
+	for i := 0; i < 10000; i++ {
+		m.Store(i, i)
+	}
+
+	b.ReportAllocs()
+	b.RunParallel(func(pb *testing.PB) {
+		i := 0
+		for pb.Next() {
+			m.Swap(i%10000, i)
 			i++
 		}
 	})

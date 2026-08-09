@@ -11,7 +11,6 @@
 package syncx
 
 import (
-	"fmt"
 	"strconv"
 	"sync/atomic"
 )
@@ -323,5 +322,5 @@ func (ptr *Uintptr) CAS(old, new uintptr) bool {
 
 // String 返回值的字符串表示
 func (ptr *Uintptr) String() string {
-	return fmt.Sprintf("%+v", ptr.Load())
+	return strconv.FormatUint(uint64(ptr.Load()), 10)
 }

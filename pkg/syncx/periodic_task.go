@@ -171,32 +171,10 @@ func (m *PeriodicTaskManager) RemoveTask(name string) bool {
 	}
 
 	// 如果任务正在运行，先取消它
+	// 取消后 runTask 协程会通过 taskCtx.Done() 退出，
+	// 正在执行的 executeTask 协程会在完成后自行重置 isExecuting 状态
 	if cf := task.getCancelFunc(); cf != nil {
-		cf() // 取消任务上下文
-	}
-
-	// 等待正在执行的任务完成（带超时）
-	if task.preventOverlap && task.IsExecuting() {
-		// 异步等待任务完成，避免死锁
-		go func() {
-			timeout := time.NewTimer(10 * time.Second)
-			defer timeout.Stop()
-
-			ticker := time.NewTicker(100 * time.Millisecond)
-			defer ticker.Stop()
-
-			for {
-				select {
-				case <-timeout.C:
-					// 超时，强制认为任务已完成
-					return
-				case <-ticker.C:
-					if !task.IsExecuting() {
-						return
-					}
-				}
-			}
-		}()
+		cf()
 	}
 
 	// 从map中删除

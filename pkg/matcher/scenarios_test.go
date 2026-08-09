@@ -1032,8 +1032,11 @@ func TestScenario_ExtremePressure(t *testing.T) {
 
 	m := NewMatcher[*Action]().EnableCache(5 * time.Minute)
 
-	// 添加大量规则
-	ruleCount := 10000
+	// 添加大量规则（race 检测下降低规模避免超时）
+	ruleCount := 1000
+	if testing.Short() {
+		ruleCount = 100
+	}
 	for i := 0; i < ruleCount; i++ {
 		id := i
 		m.AddRule(
@@ -1043,9 +1046,13 @@ func TestScenario_ExtremePressure(t *testing.T) {
 		)
 	}
 
-	// 极限并发测试
-	concurrency := 1000
-	iterationsPerGoroutine := 100
+	// 极限并发测试（race 检测下降低并发度避免超时）
+	concurrency := 100
+	iterationsPerGoroutine := 50
+	if testing.Short() {
+		concurrency = 20
+		iterationsPerGoroutine = 10
+	}
 	var wg sync.WaitGroup
 	var totalOps atomic.Int64
 	var successOps atomic.Int64

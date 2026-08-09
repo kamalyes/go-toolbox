@@ -14,6 +14,7 @@ package syncx
 import (
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -356,6 +357,160 @@ func TestStateMachine_ConcurrentAccess(t *testing.T) {
 		}()
 	}
 
+	wg.Wait()
+}
+
+// TestStateMachine_GetLastTransitionTime 测试获取上次状态转换时间
+func TestStateMachine_GetLastTransitionTime(t *testing.T) {
+	t.Run("no history tracking returns creation time", func(t *testing.T) {
+		before := time.Now()
+		sm := NewStateMachine(StateDisconnected)
+		after := time.Now()
+
+		lt := sm.GetLastTransitionTime()
+		// 未启用历史追踪时，返回创建时的时间
+		assert.False(t, lt.Before(before))
+		assert.False(t, lt.After(after))
+	})
+
+	t.Run("history tracking before transition returns creation time", func(t *testing.T) {
+		before := time.Now()
+		sm := NewStateMachine(StateDisconnected, WithTrackHistory[ConnectionState](10))
+		after := time.Now()
+
+		lt := sm.GetLastTransitionTime()
+		assert.False(t, lt.Before(before))
+		assert.False(t, lt.After(after))
+	})
+
+	t.Run("history tracking after transition returns transition time", func(t *testing.T) {
+		sm := NewStateMachine(StateDisconnected, WithTrackHistory[ConnectionState](10))
+		sm.AllowTransition(StateDisconnected, StateConnecting)
+
+		time.Sleep(10 * time.Millisecond)
+		before := time.Now()
+		_ = sm.TransitionTo(StateConnecting)
+		after := time.Now()
+
+		lt := sm.GetLastTransitionTime()
+		// 转换时间应在 before 和 after 之间
+		assert.False(t, lt.Before(before))
+		assert.False(t, lt.After(after))
+	})
+}
+
+// TestStateMachine_GetLastTransitionDuration 测试获取上次状态转换的持续时间
+func TestStateMachine_GetLastTransitionDuration(t *testing.T) {
+	t.Run("no history tracking returns zero", func(t *testing.T) {
+		sm := NewStateMachine(StateDisconnected)
+		assert.Zero(t, sm.GetLastTransitionDuration())
+	})
+
+	t.Run("history tracking no transitions returns zero", func(t *testing.T) {
+		sm := NewStateMachine(StateDisconnected, WithTrackHistory[ConnectionState](10))
+		assert.Zero(t, sm.GetLastTransitionDuration())
+	})
+
+	t.Run("history tracking with transitions returns duration", func(t *testing.T) {
+		sm := NewStateMachine(StateDisconnected, WithTrackHistory[ConnectionState](10))
+		sm.AllowTransition(StateDisconnected, StateConnecting)
+
+		time.Sleep(20 * time.Millisecond)
+		_ = sm.TransitionTo(StateConnecting)
+
+		d := sm.GetLastTransitionDuration()
+		assert.True(t, d > 0, "持续时间应为正数")
+		assert.True(t, d >= 10*time.Millisecond, "持续时间应至少 10ms")
+	})
+}
+
+// TestStateMachine_GetLastTransition 测试获取最后一次状态转换记录
+func TestStateMachine_GetLastTransition(t *testing.T) {
+	t.Run("no history tracking returns zero and false", func(t *testing.T) {
+		sm := NewStateMachine(StateDisconnected)
+
+		trans, ok := sm.GetLastTransition()
+		assert.False(t, ok)
+		assert.Equal(t, StateTransition[ConnectionState]{}, trans)
+	})
+
+	t.Run("history tracking no transitions returns zero and false", func(t *testing.T) {
+		sm := NewStateMachine(StateDisconnected, WithTrackHistory[ConnectionState](10))
+
+		trans, ok := sm.GetLastTransition()
+		assert.False(t, ok)
+		assert.Equal(t, StateTransition[ConnectionState]{}, trans)
+	})
+
+	t.Run("history tracking with transitions returns last", func(t *testing.T) {
+		sm := NewStateMachine(StateDisconnected, WithTrackHistory[ConnectionState](10))
+		sm.AllowTransition(StateDisconnected, StateConnecting)
+		sm.AllowTransition(StateConnecting, StateConnected)
+
+		_ = sm.TransitionTo(StateConnecting)
+		_ = sm.TransitionTo(StateConnected)
+
+		trans, ok := sm.GetLastTransition()
+		assert.True(t, ok)
+		assert.Equal(t, StateConnecting, trans.From)
+		assert.Equal(t, StateConnected, trans.To)
+		assert.False(t, trans.Timestamp.IsZero())
+		assert.True(t, trans.Duration >= 0)
+	})
+}
+
+// TestStateMachine_GetTotalDuration 测试获取从状态机创建到当前的总时长
+func TestStateMachine_GetTotalDuration(t *testing.T) {
+	t.Run("no history tracking returns time since creation", func(t *testing.T) {
+		sm := NewStateMachine(StateDisconnected)
+		time.Sleep(20 * time.Millisecond)
+
+		d := sm.GetTotalDuration()
+		assert.True(t, d > 0, "总时长应为正数")
+		assert.True(t, d >= 10*time.Millisecond, "总时长应至少 10ms")
+	})
+
+	t.Run("history tracking no transitions returns time since creation", func(t *testing.T) {
+		sm := NewStateMachine(StateDisconnected, WithTrackHistory[ConnectionState](10))
+		time.Sleep(20 * time.Millisecond)
+
+		d := sm.GetTotalDuration()
+		assert.True(t, d > 0, "总时长应为正数")
+		assert.True(t, d >= 10*time.Millisecond, "总时长应至少 10ms")
+	})
+
+	t.Run("history tracking with transitions returns time since first transition", func(t *testing.T) {
+		sm := NewStateMachine(StateDisconnected, WithTrackHistory[ConnectionState](10))
+		sm.AllowTransition(StateDisconnected, StateConnecting)
+
+		_ = sm.TransitionTo(StateConnecting)
+		time.Sleep(20 * time.Millisecond)
+
+		d := sm.GetTotalDuration()
+		assert.True(t, d > 0, "总时长应为正数")
+		assert.True(t, d >= 10*time.Millisecond, "总时长应至少 10ms")
+	})
+}
+
+// TestStateMachine_GettersConcurrent 测试 getter 函数的并发安全性
+func TestStateMachine_GettersConcurrent(t *testing.T) {
+	sm := NewStateMachine(StateDisconnected, WithTrackHistory[ConnectionState](10))
+	sm.AllowTransition(StateDisconnected, StateConnecting)
+	sm.AllowTransition(StateConnecting, StateConnected)
+
+	_ = sm.TransitionTo(StateConnecting)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = sm.GetLastTransitionTime()
+			_ = sm.GetLastTransitionDuration()
+			_, _ = sm.GetLastTransition()
+			_ = sm.GetTotalDuration()
+		}()
+	}
 	wg.Wait()
 }
 

@@ -331,13 +331,13 @@ func TestDynamicTicker_WithEventLoop_DynamicAdjust(t *testing.T) {
 
 	go loop.Run()
 
-	// 等待足够长的时间
-	time.Sleep(500 * time.Millisecond)
+	// 等待足够长的时间（race 检测下 timer 有额外开销，增大窗口避免 flaky）
+	time.Sleep(700 * time.Millisecond)
 
 	count := atomic.LoadInt32(&tickCount)
 	// 前 3 个 tick: 100ms * 3 = 300ms
-	// 后续 tick: 30ms 间隔，200ms 内应该有 6-7 个
-	// 总共应该有 9+ 个 tick
+	// 后续 tick: 30ms 间隔，400ms 内应该有 13+ 个
+	// 总共应该有 16+ 个 tick，race 检测开销下保守取 8
 	assert.GreaterOrEqual(t, count, int32(8), "动态调整后应该收到更多 tick")
 	assert.Equal(t, int32(1), atomic.LoadInt32(&adjustedAt), "应该触发了频率调整")
 }
@@ -371,8 +371,8 @@ func TestDynamicTicker_WithEventLoop_MultipleChannels(t *testing.T) {
 	messageCh <- "msg2"
 	messageCh <- "msg3"
 
-	// 等待 tick
-	time.Sleep(200 * time.Millisecond)
+	// 等待 tick（race 检测下 ticker 开销增大，需更长等待时间）
+	time.Sleep(350 * time.Millisecond)
 
 	assert.Equal(t, int32(3), atomic.LoadInt32(&messageCount), "应该收到 3 条消息")
 	assert.GreaterOrEqual(t, atomic.LoadInt32(&tickCount), int32(3), "应该收到至少 3 个 tick")

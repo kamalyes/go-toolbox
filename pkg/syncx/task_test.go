@@ -587,3 +587,275 @@ func TestTaskManager_TrunDown(t *testing.T) {
 	assert.NoError(t, err)                          // 确保没有错误
 	assert.Equal(t, "Task Manager Stopped", result) // 确保返回结果正确
 }
+
+// 测试 casState 原子比较并交换（成功与失败路径）
+func TestTaskCasState(t *testing.T) {
+	task := NewTask[string, string, string]("task1", func(ctx context.Context, input string) (string, error) {
+		return input, nil
+	}, "input")
+
+	// 初始状态为 Pending
+	assert.Equal(t, Pending, task.GetState(), "初始状态应为 Pending")
+
+	// CAS 成功：Pending -> Running
+	assert.True(t, task.casState(Pending, Running), "CAS 应成功")
+	assert.Equal(t, Running, task.GetState(), "状态应为 Running")
+
+	// CAS 失败：old 不匹配（当前是 Running，不是 Pending）
+	assert.False(t, task.casState(Pending, Completed), "CAS 应失败")
+	assert.Equal(t, Running, task.GetState(), "状态应仍为 Running")
+
+	// CAS 成功：Running -> Completed
+	assert.True(t, task.casState(Running, Completed), "CAS 应成功")
+	assert.Equal(t, Completed, task.GetState(), "状态应为 Completed")
+}
+
+// 测试 TaskHistory 的所有 Get 方法（成功场景）
+func TestTaskHistoryGetters(t *testing.T) {
+	tm := NewTaskManager[string, string, string](2)
+
+	task := NewTask[string, string, string]("task1", func(ctx context.Context, input string) (string, error) {
+		time.Sleep(time.Millisecond) // 确保FnDuration大于0
+		return input, nil
+	}, "hello").SetSuccessCallback(func(result string, err error) (string, error) {
+		time.Sleep(time.Millisecond) // 确保CallbackDuration大于0
+		return "callback success", nil
+	})
+
+	tm.AddTask(task)
+	tm.Run()
+
+	history := task.GetTaskHistory("task1")
+	assert.NotNil(t, history, "任务历史记录应存在")
+	assert.Equal(t, 1, len(history), "任务历史记录应包含一条记录")
+
+	h := history[0]
+	assert.True(t, h.GetTimestamp() > int64(0), "时间戳应大于 0")
+	assert.Nil(t, h.GetError(), "错误应为 nil")
+	assert.True(t, h.GetFnDuration() > time.Duration(0), "函数执行时间应大于 0")
+	assert.True(t, h.GetCallbackDuration() > time.Duration(0), "回调执行时间应大于 0")
+	assert.Equal(t, MainTask, h.GetTaskType(), "任务类型应为主任务")
+}
+
+// 测试 TaskHistory GetError 方法（失败场景）
+func TestTaskHistoryGetError(t *testing.T) {
+	tm := NewTaskManager[string, string, string](2)
+
+	expectedErr := errors.New("任务执行失败")
+	task := NewTask[string, string, string]("task1", func(ctx context.Context, input string) (string, error) {
+		return "", expectedErr
+	}, "hello").SetMaxRetries(1).SetRetryInterval(time.Millisecond)
+
+	tm.AddTask(task)
+	tm.Run()
+
+	history := task.GetTaskHistory("task1")
+	assert.NotNil(t, history, "任务历史记录应存在")
+	assert.Equal(t, 1, len(history), "任务历史记录应包含一条记录")
+
+	h := history[0]
+	assert.Equal(t, expectedErr, h.GetError(), "错误应匹配")
+	assert.Equal(t, Failed, h.GetState(), "状态应为失败")
+	assert.Equal(t, MainTask, h.GetTaskType(), "任务类型应为主任务")
+	assert.True(t, h.GetTimestamp() > int64(0), "时间戳应大于 0")
+}
+
+// 测试 Task 的 Get 方法（执行前后对比）
+func TestTaskGetters(t *testing.T) {
+	tm := NewTaskManager[string, int, string](2)
+
+	depTask := NewTask[string, int, string]("dep", func(ctx context.Context, input string) (int, error) {
+		time.Sleep(time.Millisecond) // 确保FnDuration大于0
+		return 1, nil
+	}, "input")
+
+	mainTask := NewTask[string, int, string]("main", func(ctx context.Context, input string) (int, error) {
+		time.Sleep(time.Millisecond) // 确保FnDuration大于0
+		return 2, nil
+	}, "inputMain")
+
+	mainTask.AddDependency(depTask)
+	mainTask.SetDependExecutionMode(Sequential)
+
+	// 执行前验证零值
+	assert.Equal(t, time.Duration(0), mainTask.GetFnDuration(), "执行前 FnDuration 应为 0")
+	assert.Equal(t, time.Duration(0), mainTask.GetTotalDuration(), "执行前 TotalDuration 应为 0")
+	assert.Equal(t, int64(0), mainTask.GetTimestamp(), "执行前 Timestamp 应为 0")
+
+	// 验证依赖和执行模式
+	depends := mainTask.GetDepends()
+	assert.Equal(t, 1, len(depends), "应有 1 个依赖任务")
+	assert.Equal(t, "dep", depends[0].GetName(), "依赖任务名称应为 dep")
+	assert.Equal(t, Sequential, mainTask.GetDependExecutionMode(), "执行模式应为顺序")
+
+	// 验证依赖任务执行前的状态
+	states := mainTask.GetDependencyStates()
+	assert.Equal(t, Pending, states["dep"], "依赖任务状态应为 Pending")
+
+	tm.AddTask(depTask)
+	tm.AddTask(mainTask)
+	tm.Run()
+
+	// 执行后验证非零值
+	assert.True(t, mainTask.GetFnDuration() > time.Duration(0), "执行后 FnDuration 应大于 0")
+	assert.True(t, mainTask.GetTotalDuration() > time.Duration(0), "执行后 TotalDuration 应大于 0")
+	assert.True(t, mainTask.GetTimestamp() > int64(0), "执行后 Timestamp 应大于 0")
+
+	// 验证依赖任务执行后的状态
+	states = mainTask.GetDependencyStates()
+	assert.Equal(t, Completed, states["dep"], "依赖任务状态应为 Completed")
+}
+
+// 测试 TaskManager.GetTask 方法（存在与不存在）
+func TestTaskManagerGetTask(t *testing.T) {
+	tm := NewTaskManager[string, string, string](2)
+
+	task := NewTask[string, string, string]("task1", func(ctx context.Context, input string) (string, error) {
+		return input, nil
+	}, "hello")
+	tm.AddTask(task)
+
+	// 测试获取存在的任务
+	foundTask, exists := tm.GetTask("task1")
+	assert.True(t, exists, "任务应存在")
+	assert.NotNil(t, foundTask, "任务不应为 nil")
+	assert.Equal(t, "task1", foundTask.GetName(), "任务名称应为 task1")
+
+	// 测试获取不存在的任务
+	notFoundTask, exists := tm.GetTask("nonexistent")
+	assert.False(t, exists, "任务不应存在")
+	assert.Nil(t, notFoundTask, "任务应为 nil")
+}
+
+// 测试 TrunUp 未设置函数时返回零值
+func TestTaskManagerTrunUpNilFunc(t *testing.T) {
+	tm := NewTaskManager[string, string, string](2)
+	// 不设置 trunUpFunc
+	result, err := tm.TrunUp()
+	assert.NoError(t, err, "未设置函数时不应返回错误")
+	assert.Equal(t, "", result, "未设置函数时应返回零值")
+}
+
+// 测试 TrunDown 未设置函数时返回零值
+func TestTaskManagerTrunDownNilFunc(t *testing.T) {
+	tm := NewTaskManager[string, string, string](2)
+	// 不设置 trunDownFunc
+	result, err := tm.TrunDown()
+	assert.NoError(t, err, "未设置函数时不应返回错误")
+	assert.Equal(t, "", result, "未设置函数时应返回零值")
+}
+
+// 测试取消已完成任务（不可取消状态分支）
+func TestTaskCancelNonCancellableState(t *testing.T) {
+	tm := NewTaskManager[string, string, string](2)
+
+	task := NewTask[string, string, string]("task1", func(ctx context.Context, input string) (string, error) {
+		return input, nil
+	}, "hello")
+	tm.AddTask(task)
+	tm.Run()
+
+	// 任务已完成
+	assert.Equal(t, Completed, task.GetState(), "任务状态应为已完成")
+
+	// 取消已完成的任务，状态不应改变（canCancel 为 false）
+	tm.Cancel("task1")
+	assert.Equal(t, Completed, task.GetState(), "已完成任务的状态不应被取消")
+}
+
+// 测试取消已取消任务（提前返回分支）
+func TestTaskCancelAlreadyCancelled(t *testing.T) {
+	tm := NewTaskManager[string, string, string](2)
+
+	task := NewTask[string, string, string]("task1", func(ctx context.Context, input string) (string, error) {
+		return input, nil
+	}, "hello")
+	tm.AddTask(task)
+
+	// 第一次取消
+	tm.Cancel("task1")
+	assert.Equal(t, Cancelled, task.GetState(), "任务状态应为已取消")
+
+	// 第二次取消，触发 early return（current == Cancelled）
+	tm.Cancel("task1")
+	assert.Equal(t, Cancelled, task.GetState(), "任务状态应仍为已取消")
+}
+
+// 测试取消带 cancel 函数和依赖的任务（cancel 非空分支与递归取消）
+func TestTaskCancelWithCancelFunc(t *testing.T) {
+	tm := NewTaskManager[string, int, string](2)
+
+	depTask := NewTask[string, int, string]("dep", func(ctx context.Context, input string) (int, error) {
+		return 1, nil
+	}, "input")
+
+	mainTask := NewTask[string, int, string]("main", func(ctx context.Context, input string) (int, error) {
+		return 2, nil
+	}, "inputMain")
+
+	mainTask.AddDependency(depTask)
+
+	// 设置 cancel 函数（覆盖 task.cancel != nil 分支）
+	cancelCalled := false
+	mainTask.cancel = func() { cancelCalled = true }
+	depCancelCalled := false
+	depTask.cancel = func() { depCancelCalled = true }
+
+	tm.AddTask(mainTask)
+
+	// 取消主任务及其依赖（递归调用）
+	tm.Cancel("main")
+
+	assert.True(t, cancelCalled, "主任务的 cancel 函数应被调用")
+	assert.True(t, depCancelCalled, "依赖任务的 cancel 函数应被调用")
+	assert.Equal(t, Cancelled, mainTask.GetState(), "主任务状态应为已取消")
+	assert.Equal(t, Cancelled, depTask.GetState(), "依赖任务状态应为已取消")
+}
+
+// 测试 runWithRetries 在已取消状态下的行为（getState == Cancelled 分支）
+func TestTaskRunWithRetriesCancelledState(t *testing.T) {
+	task := NewTask[string, string, string]("task1", func(ctx context.Context, input string) (string, error) {
+		return "", errors.New("fail")
+	}, "input")
+
+	// 直接设置为已取消状态
+	task.setState(Cancelled)
+	task.maxRetries = 3
+
+	result, err := task.runWithRetries()
+	assert.Equal(t, "", result, "结果应为零值")
+	assert.NoError(t, err, "已取消任务不应返回错误")
+	assert.Equal(t, Cancelled, task.GetState(), "状态应仍为已取消")
+}
+
+// 测试 runWithRetries 在上下文取消时的行为（ctx.Done 分支）
+func TestTaskRunWithRetriesContextDone(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // 立即取消上下文
+
+	task := NewTaskWithOptions[string, string, string]("task1", func(ctx context.Context, input string) (string, error) {
+		return input, nil
+	}, "input", ctx, 3, 1*time.Second)
+
+	result, err := task.runWithRetries()
+	assert.Equal(t, "", result, "结果应为零值")
+	assert.NoError(t, err, "上下文取消不应返回错误")
+	assert.Equal(t, Cancelled, task.GetState(), "状态应为已取消")
+}
+
+// 测试 logHistory 的历史记录裁剪逻辑（maxHistorySize > 0 分支）
+func TestTaskLogHistoryTrimming(t *testing.T) {
+	task := NewTask[string, string, string]("task1", func(ctx context.Context, input string) (string, error) {
+		return input, nil
+	}, "input")
+
+	task.SetMaxHistorySize(2)
+
+	// 调用 logHistory 三次，触发裁剪逻辑
+	task.logHistory()
+	task.logHistory()
+	task.logHistory()
+
+	history := task.GetTaskHistory("task1")
+	assert.Equal(t, 2, len(history), "历史记录应被裁剪为最大数量")
+}

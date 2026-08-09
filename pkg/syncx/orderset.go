@@ -126,14 +126,16 @@ func (s *OrderedSet[T]) Clear() {
 // Returns:
 //   - string：格式如 OrderedSet{elem1, elem2, ...}
 func (s *OrderedSet[T]) String() string {
-	var sb strings.Builder
-	sb.WriteString("OrderedSet{")
-	for i, v := range s.elements {
-		if i > 0 {
-			sb.WriteString(", ")
+	return WithRLockReturnValue(&s.mu, func() string {
+		var sb strings.Builder
+		sb.WriteString("OrderedSet{")
+		for i, v := range s.elements {
+			if i > 0 {
+				sb.WriteString(", ")
+			}
+			fmt.Fprint(&sb, v)
 		}
-		sb.WriteString(fmt.Sprintf("%v", v))
-	}
-	sb.WriteString("}")
-	return sb.String()
+		sb.WriteString("}")
+		return sb.String()
+	})
 }

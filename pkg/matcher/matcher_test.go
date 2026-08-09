@@ -449,9 +449,14 @@ func TestStressTest(t *testing.T) {
 
 	m := NewMatcher[*Result]().EnableCache(time.Second)
 
-	const numRules = 1000
-	const numGoroutines = 100
-	const numIterations = 1000
+	// race 检测下减少规模，避免大量 RLock/RUnlock 导致超时
+	numRules := 1000
+	numGoroutines := 100
+	numIterations := 1000
+	if raceEnabled {
+		numGoroutines = 10
+		numIterations = 100
+	}
 
 	// 添加大量规则
 	for i := 0; i < numRules; i++ {

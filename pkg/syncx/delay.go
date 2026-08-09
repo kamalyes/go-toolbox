@@ -153,6 +153,7 @@ type Delayer[T any] struct {
 	running        int64              // 正在运行的任务数
 	stopped        int64              // 是否已停止
 	completionChan chan struct{}      // 等待任务完成的通道
+	completionOnce sync.Once          // 确保 completionChan 只关闭一次
 	pendingTasks   int64              // 待执行任务数
 }
 
@@ -486,6 +487,12 @@ func (d *Delayer[T]) Execute() error {
 		return fmt.Errorf("no function to execute")
 	}
 
+	// 重置完成状态，支持多次调用 Execute
+	d.mu.Lock()
+	d.completionChan = make(chan struct{})
+	d.completionOnce = sync.Once{}
+	d.mu.Unlock()
+
 	// 执行延迟任务
 	if d.taskFunc != nil {
 		// 如果有泛型任务函数，直接执行
@@ -523,7 +530,9 @@ func (d *Delayer[T]) executeSequentially() error {
 			delay := d.calculateDelay(i)
 			if delay > 0 {
 				timer := time.NewTimer(delay)
+				d.mu.Lock()
 				d.timers = append(d.timers, timer)
+				d.mu.Unlock()
 
 				select {
 				case <-timer.C:
@@ -555,7 +564,9 @@ func (d *Delayer[T]) executeSequentially() error {
 	}
 
 	// 通知任务完成
-	close(d.completionChan)
+	d.completionOnce.Do(func() {
+		close(d.completionChan)
+	})
 	return nil
 }
 
@@ -598,6 +609,9 @@ func (d *Delayer[T]) executeConcurrently() error {
 				delay := d.calculateDelay(index)
 				if delay > 0 {
 					timer := time.NewTimer(delay)
+					d.mu.Lock()
+					d.timers = append(d.timers, timer)
+					d.mu.Unlock()
 					select {
 					case <-timer.C:
 					case <-d.ctx.Done():
@@ -634,7 +648,9 @@ func (d *Delayer[T]) executeConcurrently() error {
 	go func() {
 		wg.Wait()
 		close(errChan)
-		close(d.completionChan)
+		d.completionOnce.Do(func() {
+			close(d.completionChan)
+		})
 	}()
 
 	// 收集错误

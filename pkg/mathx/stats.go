@@ -12,9 +12,9 @@ package mathx
 
 import (
 	"cmp"
-	"fmt"
 	"math"
 	"sort"
+	"strconv"
 )
 
 // Percentile 计算百分位数（支持50, 90, 95, 99）
@@ -72,7 +72,7 @@ func Percentage(part, total uint64) float64 {
 
 // FormatPercentage 格式化百分比
 func FormatPercentage(part, total uint64, precision int) string {
-	return fmt.Sprintf("%.*f%%", precision, Percentage(part, total))
+	return strconv.FormatFloat(Percentage(part, total), 'f', precision, 64) + "%"
 }
 
 // Mean 计算平均值

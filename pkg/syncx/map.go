@@ -28,29 +28,15 @@ func NewMap[K comparable, V comparable]() *Map[K, V] {
 }
 
 // CompareAndDelete 比较指定键的值，如果相等则删除该键的值。
+// 使用 sync.Map 的原生原子方法，避免 Load+Delete 之间的 TOCTOU 竞争
 func (m *Map[K, V]) CompareAndDelete(key K, value V) bool {
-	actual, loaded := m.mp.Load(key)
-	if !loaded {
-		return false
-	}
-	if actualValue, ok := actual.(V); ok && actualValue == value {
-		m.mp.Delete(key)
-		return true
-	}
-	return false
+	return m.mp.CompareAndDelete(key, value)
 }
 
 // CompareAndSwap 比较指定键的现有值，如果相等则将其替换为新值。
+// 使用 sync.Map 的原生原子方法，避免 Load+Store 之间的 TOCTOU 竞争
 func (m *Map[K, V]) CompareAndSwap(key K, old, new V) bool {
-	actual, loaded := m.mp.Load(key)
-	if !loaded {
-		return false
-	}
-	if actualValue, ok := actual.(V); ok && actualValue == old {
-		m.mp.Store(key, new)
-		return true
-	}
-	return false
+	return m.mp.CompareAndSwap(key, old, new)
 }
 
 // Delete 删除指定键的值。
@@ -127,20 +113,13 @@ func (m *Map[K, V]) Store(key K, value V) {
 }
 
 // Swap 替换指定键的值，并返回之前的值。
+// 使用 sync.Map 的原生原子方法，避免 Load+Delete+Store 之间的竞争
 func (m *Map[K, V]) Swap(key K, value V) (pre V, ok bool) {
-	// 尝试加载当前值
-	previous, loaded := m.mp.Load(key)
-	if loaded {
-		// 如果加载成功，先删除当前键
-		m.mp.Delete(key)
-		// 然后存储新值
-		m.mp.Store(key, value)
-		// 返回之前的值
-		return m.loadValue(previous, true)
+	previous, loaded := m.mp.Swap(key, value)
+	if !loaded {
+		return zeroValue[V](), false
 	}
-	// 如果键不存在，直接存储新值
-	m.mp.Store(key, value)
-	return zeroValue[V](), false // 返回零值和 false
+	return m.loadValue(previous, true)
 }
 
 // loadValue 处理从 sync.Map 加载的值，返回类型 V 和成功标志

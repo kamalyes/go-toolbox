@@ -16,7 +16,6 @@ package syncx
 
 import (
 	"fmt"
-	"hash/fnv"
 	"sync"
 	"sync/atomic"
 )
@@ -32,11 +31,12 @@ import (
 //   - Range 性能更好（可并行遍历不同 shard）
 //   - Len 性能更好（原子计数，无需遍历）
 type ShardedMap[K comparable, V any] struct {
-	shards     []*shardEntry[K, V]
-	shardCount int
-	mask       int            // shardCount-1，用于位运算取模（shardCount 必须是 2 的幂）
-	hasher     func(K) uint32 // key 的 hash 函数
-	count      atomic.Int64   // 元素总数（原子计数，零锁开销）
+	shards       []*shardEntry[K, V]
+	shardCount   int
+	mask         int            // shardCount-1，用于位运算取模（shardCount 必须是 2 的幂）
+	hasher       func(K) uint32 // key 的 hash 函数
+	count        atomic.Int64   // 元素总数（原子计数，零锁开销）
+	perShardHint int            // 每 shard 预分配容量提示（Clear 时复用）
 }
 
 // shardEntry 单个分片
@@ -120,10 +120,11 @@ func NewShardedMapWithOptions[K comparable, V any](shardCount int, opts ...Shard
 	}
 
 	return &ShardedMap[K, V]{
-		shards:     shards,
-		shardCount: shardCount,
-		mask:       shardCount - 1,
-		hasher:     KvHasher[K](),
+		shards:       shards,
+		shardCount:   shardCount,
+		mask:         shardCount - 1,
+		hasher:       KvHasher[K](),
+		perShardHint: cfg.perShardHint,
 	}
 }
 
@@ -206,9 +207,95 @@ func (m *ShardedMap[K, V]) Has(key K) bool {
 	return exists
 }
 
+// Swap 替换 key 的值并返回之前的值
+// 如果 key 不存在，存储新值并返回零值和 false
+func (m *ShardedMap[K, V]) Swap(key K, value V) (V, bool) {
+	shard := m.getShard(key)
+	shard.mu.Lock()
+	old, exists := shard.data[key]
+	shard.data[key] = value
+	shard.mu.Unlock()
+	if !exists {
+		m.count.Add(1)
+	}
+	return old, exists
+}
+
+// CompareAndSwap 原子比较并交换
+// 仅当 key 存在且当前值等于 old 时，才替换为 new
+// 注意：V 为非可比较类型（如 slice/map）时会 panic，与 sync.Map 行为一致
+func (m *ShardedMap[K, V]) CompareAndSwap(key K, old, new V) bool {
+	shard := m.getShard(key)
+	shard.mu.Lock()
+	defer shard.mu.Unlock()
+	current, exists := shard.data[key]
+	if !exists {
+		return false
+	}
+	if any(current) == any(old) {
+		shard.data[key] = new
+		return true
+	}
+	return false
+}
+
+// CompareAndDelete 原子比较并删除
+// 仅当 key 存在且当前值等于 value 时，才删除
+// 注意：V 为非可比较类型（如 slice/map）时会 panic，与 sync.Map 行为一致
+func (m *ShardedMap[K, V]) CompareAndDelete(key K, value V) bool {
+	shard := m.getShard(key)
+	shard.mu.Lock()
+	defer shard.mu.Unlock()
+	current, exists := shard.data[key]
+	if !exists {
+		return false
+	}
+	if any(current) == any(value) {
+		delete(shard.data, key)
+		m.count.Add(-1)
+		return true
+	}
+	return false
+}
+
 // ============================================================================
 // 批量操作
 // ============================================================================
+
+// StoreBatch 批量存储，按 shard 分组减少锁获取次数
+// 相比逐个 Store，N 个元素分散到 S 个 shard 时锁获取次数从 N 降到 S
+func (m *ShardedMap[K, V]) StoreBatch(items map[K]V) {
+	if len(items) == 0 {
+		return
+	}
+
+	// 按 shard 索引分组
+	groups := make(map[int]map[K]V, m.shardCount)
+	for k, v := range items {
+		idx := int(m.hasher(k)) & m.mask
+		if groups[idx] == nil {
+			groups[idx] = make(map[K]V)
+		}
+		groups[idx][k] = v
+	}
+
+	// 每个 shard 只获取一次写锁
+	for idx, group := range groups {
+		shard := m.shards[idx]
+		shard.mu.Lock()
+		added := 0
+		for k, v := range group {
+			if _, exists := shard.data[k]; !exists {
+				added++
+			}
+			shard.data[k] = v
+		}
+		shard.mu.Unlock()
+		if added > 0 {
+			m.count.Add(int64(added))
+		}
+	}
+}
 
 // Range 遍历所有键值对
 // 遍历期间每个 shard 持有读锁（分片粒度，不影响其他 shard 写入）
@@ -235,11 +322,15 @@ func (m *ShardedMap[K, V]) Len() int {
 	return int(m.count.Load())
 }
 
-// Clear 清空所有元素
+// Clear 清空所有元素，保留预分配容量提示
 func (m *ShardedMap[K, V]) Clear() {
 	for _, shard := range m.shards {
 		shard.mu.Lock()
-		shard.data = make(map[K]V)
+		if m.perShardHint > 0 {
+			shard.data = make(map[K]V, m.perShardHint)
+		} else {
+			shard.data = make(map[K]V)
+		}
 		shard.mu.Unlock()
 	}
 	m.count.Store(0)
@@ -332,10 +423,18 @@ func NextPowerOfTwo(n int) int {
 }
 
 // FNVHashString32 使用 FNV-1a 算法计算 string 的 32 位 hash
+// 内联实现，零分配（对比 fnv.New32a()+Write 消除 heap alloc 和 []byte 转换）
 func FNVHashString32(s string) uint32 {
-	h := fnv.New32a()
-	_, _ = h.Write([]byte(s))
-	return h.Sum32()
+	const (
+		offsetBasis uint32 = 2166136261
+		prime       uint32 = 16777619
+	)
+	h := offsetBasis
+	for i := 0; i < len(s); i++ {
+		h ^= uint32(s[i])
+		h *= prime
+	}
+	return h
 }
 
 // KvHasher 为 ShardedMap 的 K 类型选择最优的 hash 函数

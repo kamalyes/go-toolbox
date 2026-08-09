@@ -79,27 +79,37 @@ func (fc *FuncChain[T]) Clear() {
 	})
 }
 
-// GetFuncItems 返回 FuncChain 中的所有 FuncItem
+// GetFuncItems 返回 FuncChain 中的所有 FuncItem（副本）
 func (fc *FuncChain[T]) GetFuncItems() []FuncItem[T] {
 	return WithRLockReturnValue(&fc.mu, func() []FuncItem[T] {
-		return fc.funcs
+		copied := make([]FuncItem[T], len(fc.funcs))
+		copy(copied, fc.funcs)
+		return copied
 	})
 }
 
-// Execute 按顺序执行所有添加的函数，使用协程，并支持超时
+// Execute 按顺序执行所有添加的函数，使用协程
 func (fc *FuncChain[T]) Execute() {
+	// 在写锁内对函数按优先级进行排序
 	WithLock(&fc.mu, func() {
-		// 对函数按优先级进行排序，优先级越小的排在前面
 		sort.Slice(fc.funcs, func(i, j int) bool {
 			return fc.funcs[i].priority < fc.funcs[j].priority // 优先级越小，排在前面
 		})
 	})
 
+	// 在读锁内获取函数项指针快照，避免执行期间并发修改导致数据竞争
+	items := WithRLockReturnValue(&fc.mu, func() []*FuncItem[T] {
+		result := make([]*FuncItem[T], len(fc.funcs))
+		for i := range fc.funcs {
+			result[i] = &fc.funcs[i]
+		}
+		return result
+	})
+
 	var wg sync.WaitGroup
 
 	// 为每个 FuncItem 启动一个 goroutine
-	for i := range fc.funcs {
-		item := &fc.funcs[i] // 获取指向当前 FuncItem 的指针
+	for _, item := range items {
 		wg.Add(1)
 
 		go func(item *FuncItem[T]) {
@@ -110,7 +120,6 @@ func (fc *FuncChain[T]) Execute() {
 					item.err = fmt.Errorf("panic: %v", r) // 处理恐慌
 				}
 			}()
-			// 在超时上下文内执行函数
 			item.result, item.err = item.fn() // 正常调用
 		}(item)
 	}

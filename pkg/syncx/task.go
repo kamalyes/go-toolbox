@@ -38,6 +38,7 @@ import (
 	"reflect"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -91,7 +92,7 @@ type Task[T any, R any, U any] struct {
 	fn                  TaskExecuteFunc[T, R]    // 任务执行的函数
 	depends             []*Task[T, R, U]         // 依赖的任务列表
 	priority            int                      // 任务优先级
-	state               TaskState                // 任务状态
+	state               atomic.Int32             // 任务状态（原子操作，无锁）
 	result              R                        // 任务执行结果
 	err                 error                    // 任务执行错误
 	cancel              context.CancelFunc       // 取消函数
@@ -114,12 +115,28 @@ type Task[T any, R any, U any] struct {
 	dependExecutionMode ExecutionMode            // 依赖任务的执行模式
 	history             map[string][]TaskHistory // 任务执行历史
 	maxHistorySize      int                      // 最大历史行数
+	execOnce            sync.Once                // 确保 executeTask 只执行一次
+}
+
+// getState 原子读取任务状态
+func (tk *Task[T, R, U]) getState() TaskState {
+	return TaskState(tk.state.Load())
+}
+
+// setState 原子设置任务状态
+func (tk *Task[T, R, U]) setState(s TaskState) {
+	tk.state.Store(int32(s))
+}
+
+// casState 原子比较并交换任务状态
+func (tk *Task[T, R, U]) casState(old, new TaskState) bool {
+	return tk.state.CompareAndSwap(int32(old), int32(new))
 }
 
 // TaskManager 管理所有的任务
 type TaskManager[T any, R any, U any] struct {
 	tasks        map[string]*Task[T, R, U] // 存储所有任务的映射
-	mu           sync.Mutex                // 互斥锁，确保并发安全
+	mu           sync.RWMutex              // 读写锁，确保并发安全
 	concurrency  int                       // 并发数
 	trunUpFunc   TaskTrunFunc[R]           // 启动时执行的函数
 	trunDownFunc TaskTrunFunc[R]           // 关闭时执行的函数
@@ -183,20 +200,21 @@ func NewTaskManager[T any, R any, U any](concurrency int) *TaskManager[T, R, U] 
 
 // NewTaskWithOptions 创建一个新的任务
 func NewTaskWithOptions[T any, R any, U any](name string, fn TaskExecuteFunc[T, R], input T, ctx context.Context, maxRetries int32, retryInterval time.Duration) *Task[T, R, U] {
-	return &Task[T, R, U]{
+	tk := &Task[T, R, U]{
 		name:           name,                           // 任务名称
 		fn:             fn,                             // 任务执行的函数
 		ctx:            ctx,                            // 存储传入的上下文
 		input:          input,                          // 任务的输入数据
 		maxRetries:     maxRetries,                     // 最大重试次数
 		retryInterval:  retryInterval,                  // 使用传入的重试间隔时间
-		state:          Pending,                        // 任务状态默认为等待中
 		callbackState:  Pending,                        // 回调任务状态默认为等待中
 		funcPointer:    reflect.ValueOf(fn).Pointer(),  // 获取函数指针
 		taskType:       MainTask,                       // 任务类型，默认为主任务
 		history:        make(map[string][]TaskHistory), // 初始化历史记录
 		maxHistorySize: -1,
 	}
+	tk.setState(Pending) // 任务状态默认为等待中
+	return tk
 }
 
 // NewTask 创建一个新的任务，使用背景上下文
@@ -302,7 +320,7 @@ func (tk *Task[T, R, U]) GetName() string {
 
 // GetState 获取任务状态
 func (tk *Task[T, R, U]) GetState() TaskState {
-	return tk.state
+	return tk.getState()
 }
 
 // GetCallbackState 获取回调状态
@@ -379,7 +397,7 @@ func (tk *Task[T, R, U]) GetDepends() []*Task[T, R, U] {
 func (tk *Task[T, R, U]) GetDependencyStates() map[string]TaskState {
 	dependencyStates := make(map[string]TaskState)
 	for _, dep := range tk.depends {
-		dependencyStates[dep.name] = dep.state
+		dependencyStates[dep.name] = dep.getState()
 	}
 	return dependencyStates
 }
@@ -442,13 +460,16 @@ func (tm *TaskManager[T, R, U]) Run() error {
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, tm.concurrency) // 创建一个通道，限制并发数量
 
-	// 创建并按优先级排序任务
-	taskSlice := make([]*Task[T, R, U], 0, len(tm.tasks))
-	for _, task := range tm.tasks {
-		taskSlice = append(taskSlice, task)
-	}
+	// 快照任务列表（在锁内完成，避免执行期间被修改）
+	taskSlice := WithLockReturnValue(&tm.mu, func() []*Task[T, R, U] {
+		result := make([]*Task[T, R, U], 0, len(tm.tasks))
+		for _, task := range tm.tasks {
+			result = append(result, task)
+		}
+		return result
+	})
 
-	// 按优先级排序任务
+	// 按优先级排序任务（快照上排序，不影响原 map）
 	sort.Slice(taskSlice, func(i, j int) bool {
 		return taskSlice[i].priority > taskSlice[j].priority
 	})
@@ -461,9 +482,9 @@ func (tm *TaskManager[T, R, U]) Run() error {
 			defer wg.Done()
 			defer func() { <-sem }() // 任务完成后，从通道中接收信号
 
-			WithLock(&tm.mu, func() {
-				t.executeTask()
-			})
+			// executeTask 不持有 tm.mu，避免全局串行化和死锁
+			// 任务的并发安全由 executeTask 内部的状态检查保证
+			t.executeTask()
 		}(task)
 	}
 
@@ -472,23 +493,23 @@ func (tm *TaskManager[T, R, U]) Run() error {
 }
 
 // cancelTaskAndDependencies 递归取消任务及其依赖
+// 使用 CAS 原子操作，避免重复取消，无锁
 func (tm *TaskManager[T, R, U]) cancelTaskAndDependencies(task *Task[T, R, U]) {
-	// 检查任务是否已经取消
-	if task.state == Cancelled {
+	// 原子检查：只有 Pending/Running 状态才能取消
+	current := task.getState()
+	if current == Cancelled {
 		return
 	}
-
-	// 只在可取消的状态下执行
-	if _, canCancel := cancellableStates[task.state]; canCancel {
+	if _, canCancel := cancellableStates[current]; canCancel {
 		if task.cancel != nil {
-			task.cancel() // 调用取消函数
+			task.cancel()
 		}
-		task.state = Cancelled // 设置状态为已取消
+		task.setState(Cancelled)
 	}
 
 	// 递归取消所有依赖任务
 	for _, depTask := range task.depends {
-		tm.cancelTaskAndDependencies(depTask) // 递归取消依赖任务
+		tm.cancelTaskAndDependencies(depTask)
 	}
 }
 
@@ -510,48 +531,71 @@ func (tm *TaskManager[T, R, U]) Cancel(taskName string) {
 	})
 }
 
-// GetTasks 获取所有任务
+// GetTasks 获取所有任务的快照副本（避免外部并发修改内部 map）
 func (tm *TaskManager[T, R, U]) GetTasks() map[string]*Task[T, R, U] {
-	return tm.tasks
+	return WithRLockReturnValue(&tm.mu, func() map[string]*Task[T, R, U] {
+		result := make(map[string]*Task[T, R, U], len(tm.tasks))
+		for k, v := range tm.tasks {
+			result[k] = v
+		}
+		return result
+	})
+}
+
+// GetTask 获取指定名称的任务（线程安全）
+func (tm *TaskManager[T, R, U]) GetTask(name string) (*Task[T, R, U], bool) {
+	return WithRLockReturnWithE(&tm.mu, func() (*Task[T, R, U], bool) {
+		task, exists := tm.tasks[name]
+		return task, exists
+	})
 }
 
 // executeTask 执行任务的具体逻辑
+// 使用 sync.Once 确保同一任务只执行一次：
+//   - Run() 直接调用和依赖任务间接调用可能同时触发
+//   - 第一个调用者执行任务，后续调用者阻塞等待 Once.Do 完成后直接返回
+//   - result/err 等字段由 Once 的 happens-before 保证可见性，无需额外锁
 func (tk *Task[T, R, U]) executeTask() {
-	if tk.timestamp == 0 {
-		tk.timestamp = time.Now().UnixNano()
-	}
-	if tk.state == Cancelled || tk.state == Completed || tk.state == Failed {
-		return
-	}
+	tk.execOnce.Do(func() {
+		if tk.timestamp == 0 {
+			tk.timestamp = time.Now().UnixNano()
+		}
 
-	// 记录任务开始时间
-	startTime := time.Now()
-	// 执行依赖任务
-	if err := tk.executeDependencies(); err != nil {
-		tk.totalDuration = time.Since(startTime) // 更新总耗时
-		tk.state = Failed
-		tk.err = err
-		return
-	}
+		// 被取消的任务直接跳过执行
+		if tk.getState() == Cancelled {
+			return
+		}
 
-	// 开始主任务的执行
-	tk.result, tk.err = tk.runWithRetries()
+		startTime := time.Now()
 
-	// 调用回调函数并获取结果与错误
-	tk.invokeCallback()
+		// 执行依赖任务
+		if err := tk.executeDependencies(); err != nil {
+			tk.totalDuration = time.Since(startTime)
+			tk.setState(Failed)
+			tk.err = err
+			return
+		}
 
-	// 更新总耗时
-	tk.totalDuration = time.Since(startTime)
-	tk.logHistory() // 记录任务历史
+		// 执行主任务（含重试）
+		tk.result, tk.err = tk.runWithRetries()
+
+		// 调用回调
+		tk.invokeCallback()
+
+		// 更新总耗时并记录历史
+		tk.totalDuration = time.Since(startTime)
+		tk.logHistory()
+	})
 }
 
 // executeDependencies 执行依赖任务
+// dep.executeTask() 由 sync.Once 保证只执行一次，返回后 happens-before 保证字段可见
 func (tk *Task[T, R, U]) executeDependencies() error {
 	switch tk.dependExecutionMode {
 	case Sequential:
 		for _, dep := range tk.depends {
 			dep.executeTask()
-			if dep.state == Failed {
+			if dep.getState() == Failed {
 				return fmt.Errorf("dependency '%s' failed: %w", dep.name, dep.err)
 			}
 		}
@@ -564,9 +608,9 @@ func (tk *Task[T, R, U]) executeDependencies() error {
 				dep.executeTask()
 			}(dep)
 		}
-		wg.Wait() // 等待所有依赖任务完成
+		wg.Wait()
 		for _, dep := range tk.depends {
-			if dep.state == Failed {
+			if dep.getState() == Failed {
 				return dep.err
 			}
 		}
@@ -575,84 +619,69 @@ func (tk *Task[T, R, U]) executeDependencies() error {
 }
 
 // runWithRetries 函数处理任务的重试逻辑
+// 由 sync.Once 保证唯一调用，retryCount/fnDuration 等字段无需加锁
+// state 用原子操作，允许 cancelTaskAndDependencies 并发取消
 func (tk *Task[T, R, U]) runWithRetries() (result R, err error) {
-	// 在重试次数小于最大重试次数的情况下进行重试
 	for tk.retryCount < tk.maxRetries {
-		// 如果任务被取消，直接返回
-		if tk.state == Cancelled {
+		// 原子检查取消状态（无锁）
+		if tk.getState() == Cancelled {
 			return result, nil
 		}
 
 		select {
-		// 检查上下文是否已经被取消
 		case <-tk.ctx.Done():
-			tk.state = Cancelled // 将任务状态设置为取消
+			tk.setState(Cancelled)
 			return result, nil
 		default:
-			tk.state = Running // 将任务状态设置为正在运行
+			tk.setState(Running)
+
 			startTime := time.Now()
-			// 执行任务函数
-			result, err = tk.fn(tk.ctx, tk.input)
-			tk.fnDuration = time.Since(startTime) // 记录任务执行时间
-			// 如果没有错误，表示任务成功完成
+			result, err = tk.fn(tk.ctx, tk.input) // 执行任务函数（不持有锁）
+			tk.fnDuration = time.Since(startTime)
+
 			if err == nil {
-				tk.state = Completed // 任务成功完成
+				tk.setState(Completed)
 				return result, nil
 			}
 
-			// 处理任务错误
-			tk.state = Failed            // 任务执行失败状态
-			tk.retryCount++              // 增加重试计数
-			time.Sleep(tk.retryInterval) // 等待重试间隔
+			tk.setState(Failed)
+			tk.retryCount++
+			time.Sleep(tk.retryInterval)
 		}
 	}
-	return result, err // 返回最终结果和错误
+	return result, err
 }
 
 // invokeCallback 处理回调的执行
-// 根据任务的执行结果调用相应的回调函数（成功或失败），并记录相关的执行时间和状态
+// 由 sync.Once 保证唯一调用，字段无需加锁
 func (tk *Task[T, R, U]) invokeCallback() {
-	// 定义一个映射，将错误状态映射到相应的回调函数
-	// 如果没有错误，使用成功回调；如果有错误，使用失败回调
 	callbackMap := map[bool]TaskCallbackFunc[R, U]{
-		false: tk.successCallback, // err == nil
-		true:  tk.failureCallback, // err != nil
+		false: tk.successCallback,
+		true:  tk.failureCallback,
 	}
-
-	// 根据错误状态获取相应的回调函数
 	callback := callbackMap[tk.err != nil]
 
-	// 如果回调函数存在，执行它
 	if callback != nil {
-		// 设置回调状态为正在运行
 		tk.callbackState = Running
-
-		// 记录回调开始执行的时间
 		callbackStartTime := time.Now()
 
-		// 调用回调函数并处理返回值
 		tk.callbackResult, tk.callbackError = callback(tk.result, tk.err)
-
-		// 记录回调的运行时间
 		tk.callbackDuration = time.Since(callbackStartTime)
-
-		// 设置回调状态为完成
 		tk.callbackState = Completed
 
-		// 处理回调函数返回的错误
 		if tk.callbackError != nil {
-			// 如果回调执行失败，设置任务状态为失败
-			tk.state = Failed
-			tk.callbackState = Failed // 更新回调状态为失败
+			tk.setState(Failed)
+			tk.callbackState = Failed
 		}
 	}
 }
 
 // logHistory 记录任务执行历史
+// 由 sync.Once 保证唯一调用，字段无需加锁
 func (tk *Task[T, R, U]) logHistory() {
 	history := TaskHistory{
 		taskType:         tk.taskType,
-		state:            tk.state,
+		state:            tk.getState(),
 		result:           tk.result,
 		err:              tk.err,
 		timestamp:        tk.timestamp,
@@ -662,9 +691,8 @@ func (tk *Task[T, R, U]) logHistory() {
 	}
 
 	tk.history[tk.name] = append(tk.history[tk.name], history)
-	// 限制历史记录的大小
 	if tk.maxHistorySize > 0 && len(tk.history[tk.name]) > tk.maxHistorySize {
-		tk.history[tk.name] = tk.history[tk.name][1:] // 删除最旧的记录
+		tk.history[tk.name] = tk.history[tk.name][1:]
 	}
 }
 

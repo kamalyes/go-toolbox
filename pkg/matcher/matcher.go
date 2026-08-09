@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -423,7 +424,8 @@ func (m *Matcher[T]) getCache(ctx *contextx.Context) (*cacheEntry[T], bool) {
 		if time.Now().Before(entry.expiresAt) {
 			return entry, true
 		}
-		m.cache.cache.Delete(key)
+		// 过期不调用 Delete：后续 setCache 的 Store 会覆盖该条目
+		// 多个 goroutine 同时 Delete 同一 key 会导致 sync.Map 写锁竞争
 	}
 	return nil, false
 }
@@ -476,9 +478,9 @@ func (m *Matcher[T]) getCacheKey(ctx *contextx.Context) string {
 		case string:
 			builder.WriteString(v)
 		case int:
-			builder.WriteString(fastIntToString(v))
+			builder.WriteString(strconv.Itoa(v))
 		case int64:
-			builder.WriteString(fastInt64ToString(v))
+			builder.WriteString(strconv.FormatInt(v, 10))
 		case bool:
 			if v {
 				builder.WriteString("true")
@@ -517,9 +519,9 @@ func (m *Matcher[T]) tryGetSingleFieldCache(ctx *contextx.Context) string {
 		case string:
 			return foundKey + "=" + v
 		case int:
-			return foundKey + "=" + fastIntToString(v)
+			return foundKey + "=" + strconv.Itoa(v)
 		case int64:
-			return foundKey + "=" + fastInt64ToString(v)
+			return foundKey + "=" + strconv.FormatInt(v, 10)
 		case bool:
 			if v {
 				return foundKey + "=true"
@@ -532,64 +534,7 @@ func (m *Matcher[T]) tryGetSingleFieldCache(ctx *contextx.Context) string {
 	return "" // 不是单字段场景
 }
 
-// 快速整数转字符串（避免 fmt.Sprintf 的开销）
-func fastIntToString(n int) string {
-	if n == 0 {
-		return "0"
-	}
-
-	isNeg := n < 0
-	if isNeg {
-		n = -n
-	}
-
-	// 使用固定大小的缓冲区
-	buf := make([]byte, 0, 20) // int 最多 19 位 + 负号
-
-	for n > 0 {
-		buf = append(buf, byte('0'+n%10))
-		n /= 10
-	}
-
-	if isNeg {
-		buf = append(buf, '-')
-	}
-
-	// 反转字符串
-	for i, j := 0, len(buf)-1; i < j; i, j = i+1, j-1 {
-		buf[i], buf[j] = buf[j], buf[i]
-	}
-
-	return string(buf)
-}
-
-func fastInt64ToString(n int64) string {
-	if n == 0 {
-		return "0"
-	}
-
-	isNeg := n < 0
-	if isNeg {
-		n = -n
-	}
-
-	buf := make([]byte, 0, 21) // int64 最多 20 位 + 负号
-
-	for n > 0 {
-		buf = append(buf, byte('0'+n%10))
-		n /= 10
-	}
-
-	if isNeg {
-		buf = append(buf, '-')
-	}
-
-	for i, j := 0, len(buf)-1; i < j; i, j = i+1, j-1 {
-		buf[i], buf[j] = buf[j], buf[i]
-	}
-
-	return string(buf)
-} // Stats 获取统计信息
+// Stats 获取统计信息
 func (m *Matcher[T]) Stats() map[string]int64 {
 	return map[string]int64{
 		"total_matches":   m.stats.totalMatches.Load(),
@@ -624,7 +569,7 @@ func NewChainRule[T any](result T) *ChainRule[T] {
 		conditions: make([]func(*contextx.Context) bool, 0),
 		priority:   0,
 		result:     result,
-		id:         fmt.Sprintf("rule_%d", time.Now().UnixNano()),
+		id:         "rule_" + strconv.FormatInt(time.Now().UnixNano(), 10),
 		enabled:    true,
 	}
 }

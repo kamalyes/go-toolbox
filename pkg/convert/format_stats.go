@@ -12,7 +12,7 @@
 package convert
 
 import (
-	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -69,54 +69,74 @@ func formatDurationFromSeconds(totalSeconds int64) string {
 		secondsPerYear   = 31536000 // 365 天
 	)
 
-	var parts []string
+	var b strings.Builder
+	count := 0
 
 	// 年
 	if totalSeconds >= secondsPerYear {
-		years := totalSeconds / secondsPerYear
-		parts = append(parts, fmt.Sprintf("%dy", years))
+		if count > 0 {
+			b.WriteByte(' ')
+		}
+		b.WriteString(strconv.FormatInt(totalSeconds/secondsPerYear, 10))
+		b.WriteByte('y')
 		totalSeconds %= secondsPerYear
+		count++
 	}
 
 	// 月
-	if totalSeconds >= secondsPerMonth {
-		months := totalSeconds / secondsPerMonth
-		parts = append(parts, fmt.Sprintf("%dmo", months))
+	if totalSeconds >= secondsPerMonth && count < 3 {
+		if count > 0 {
+			b.WriteByte(' ')
+		}
+		b.WriteString(strconv.FormatInt(totalSeconds/secondsPerMonth, 10))
+		b.WriteString("mo")
 		totalSeconds %= secondsPerMonth
+		count++
 	}
 
 	// 天
-	if totalSeconds >= secondsPerDay {
-		days := totalSeconds / secondsPerDay
-		parts = append(parts, fmt.Sprintf("%dd", days))
+	if totalSeconds >= secondsPerDay && count < 3 {
+		if count > 0 {
+			b.WriteByte(' ')
+		}
+		b.WriteString(strconv.FormatInt(totalSeconds/secondsPerDay, 10))
+		b.WriteByte('d')
 		totalSeconds %= secondsPerDay
+		count++
 	}
 
 	// 小时
-	if totalSeconds >= secondsPerHour {
-		hours := totalSeconds / secondsPerHour
-		parts = append(parts, fmt.Sprintf("%dh", hours))
+	if totalSeconds >= secondsPerHour && count < 3 {
+		if count > 0 {
+			b.WriteByte(' ')
+		}
+		b.WriteString(strconv.FormatInt(totalSeconds/secondsPerHour, 10))
+		b.WriteByte('h')
 		totalSeconds %= secondsPerHour
+		count++
 	}
 
 	// 分钟
-	if totalSeconds >= secondsPerMinute {
-		minutes := totalSeconds / secondsPerMinute
-		parts = append(parts, fmt.Sprintf("%dm", minutes))
+	if totalSeconds >= secondsPerMinute && count < 3 {
+		if count > 0 {
+			b.WriteByte(' ')
+		}
+		b.WriteString(strconv.FormatInt(totalSeconds/secondsPerMinute, 10))
+		b.WriteByte('m')
 		totalSeconds %= secondsPerMinute
+		count++
 	}
 
 	// 秒
-	if totalSeconds > 0 || len(parts) == 0 {
-		parts = append(parts, fmt.Sprintf("%ds", totalSeconds))
+	if (totalSeconds > 0 || count == 0) && count < 3 {
+		if count > 0 {
+			b.WriteByte(' ')
+		}
+		b.WriteString(strconv.FormatInt(totalSeconds, 10))
+		b.WriteByte('s')
 	}
 
-	// 最多显示前 3 个单位，避免过长
-	if len(parts) > 3 {
-		parts = parts[:3]
-	}
-
-	return strings.Join(parts, " ")
+	return b.String()
 }
 
 // FormatCount 格式化数量（处理 nil 值）
@@ -165,6 +185,5 @@ func FormatPercentage(value any, precision int) string {
 		return "0%"
 	}
 
-	format := fmt.Sprintf("%%.%df%%%%", precision)
-	return fmt.Sprintf(format, rate)
+	return strconv.FormatFloat(rate, 'f', precision, 64) + "%"
 }

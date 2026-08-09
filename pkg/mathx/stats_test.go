@@ -243,6 +243,31 @@ func TestPercentage(t *testing.T) {
 	}
 }
 
+// TestFormatPercentage 测试百分比格式化（验证零分配优化后输出一致性）
+func TestFormatPercentage(t *testing.T) {
+	tests := []struct {
+		name      string
+		part      uint64
+		total     uint64
+		precision int
+		expected  string
+	}{
+		{"Normal", 50, 100, 2, "50.00%"},
+		{"ZeroPart", 0, 100, 2, "0.00%"},
+		{"ZeroTotal", 50, 0, 2, "0.00%"},
+		{"FullPercent", 100, 100, 1, "100.0%"},
+		{"SmallPercent", 1, 1000, 3, "0.100%"},
+		{"NoPrecision", 1, 3, 0, "33%"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := FormatPercentage(tt.part, tt.total, tt.precision)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 // TestPercentile 测试百分位数计算
 func TestPercentile(t *testing.T) {
 	tests := []struct {

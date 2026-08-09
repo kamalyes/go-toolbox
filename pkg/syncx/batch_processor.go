@@ -39,6 +39,7 @@ package syncx
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -82,6 +83,7 @@ type BatchProcessor[T any] struct {
 	panicHandler  RecoverFunc     // optional: flush panic 处理器
 	name          string          // optional: 日志/监控标识
 	stopChan      chan struct{}   // 停止信号通道
+	stopOnce      sync.Once       // 确保 Stop 只执行一次
 	done          chan struct{}   // 完成信号通道
 	droppedCount  atomic.Int64    // 累计丢弃计数（队列满时丢弃）
 }
@@ -232,6 +234,8 @@ func (p *BatchProcessor[T]) safeFlush(batch []T) {
 
 // Stop 停止处理器，flush 剩余数据后退出
 func (p *BatchProcessor[T]) Stop() {
-	close(p.stopChan)
+	p.stopOnce.Do(func() {
+		close(p.stopChan)
+	})
 	<-p.done
 }

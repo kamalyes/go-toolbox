@@ -225,6 +225,9 @@ func (p *WorkerPool) Wait() {
 // Close 关闭 Worker 池，等待所有任务完成
 // 调用此方法后，所有新的提交都会返回 ErrClosed
 //
+// 注意：不关闭 queue channel，避免 Submit 在检查 closed 标志后
+// 仍向已关闭 channel 发送数据导致 panic。worker 通过 ctx.Done() 退出
+//
 // 示例:
 //
 //	pool := NewWorkerPool(20, 100)
@@ -236,18 +239,21 @@ func (p *WorkerPool) Close() error {
 		p.closed = true
 		p.mu.Unlock()
 
-		// 关闭队列，停止接收新任务
-		close(p.queue)
-
 		// 取消 context，通知所有 worker 退出
+		// 不关闭 queue channel，避免 Submit panic
 		p.cancel()
 
 		// 等待所有 worker 完成（in-flight 任务也会执行完）
 		p.wg.Wait()
 
 		// 排空队列中未被 worker 取走的任务，保持 taskWg 计数一致
-		for range p.queue {
-			p.taskWg.Done()
+		for drain := true; drain; {
+			select {
+			case <-p.queue:
+				p.taskWg.Done()
+			default:
+				drain = false
+			}
 		}
 	})
 
