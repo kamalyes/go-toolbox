@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -476,4 +477,273 @@ func TestRequestQueryValuesPriority(t *testing.T) {
 	resp, err := req.Send()
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+// TestRequestGetters 测试请求的各类 Getter 方法
+func TestRequestGetters(t *testing.T) {
+	ctx := context.WithValue(context.Background(), struct{ k string }{"k"}, "v")
+	client := &http.Client{}
+	req := NewRequest(ctx, client, http.MethodPost, "http://example.com/api").
+		SetHeader("X-Test", "value").
+		SetQuery("page", "1").
+		SetBodyJSON(map[string]string{"name": "test"}).
+		SetBodyEncodeFunc(encodeJSON)
+
+	assert.Equal(t, ctx, req.Context())
+	assert.Equal(t, ctx, req.GetCtx())
+	assert.Equal(t, client, req.Client())
+	assert.Equal(t, client, req.GetClient())
+	assert.Equal(t, http.MethodPost, req.Method())
+	assert.Equal(t, http.MethodPost, req.GetMethod())
+	assert.Equal(t, "http://example.com/api", req.URL())
+	assert.Equal(t, "http://example.com/api", req.GetURL())
+	assert.Equal(t, "value", req.GetHeaders().Get("X-Test"))
+	assert.Equal(t, "value", req.Header().Get("X-Test"))
+	assert.Equal(t, "1", req.GetQueryValues().Get("page"))
+	assert.NotNil(t, req.GetBody())
+	assert.NotNil(t, req.GetBodyEncodeFunc())
+	assert.Nil(t, req.GetError())
+	assert.Nil(t, req.GetBodyBytes()) // bodyBytes 尚未生成
+}
+
+// TestRequestWithContext 测试 WithContext 方法
+func TestRequestWithContext(t *testing.T) {
+	originalCtx := context.Background()
+	req := setupRequest("GET", testURL)
+	assert.Equal(t, originalCtx, req.Context())
+
+	newCtx := context.WithValue(originalCtx, struct{ k string }{"k"}, "newValue")
+	newReq := req.WithContext(newCtx)
+	assert.Equal(t, newCtx, newReq.Context())
+	// 原请求的 context 不应被修改
+	assert.Equal(t, originalCtx, req.Context())
+}
+
+// TestRequestSetEndpoint 测试 SetEndpoint 方法
+func TestRequestSetEndpoint(t *testing.T) {
+	req := setupRequest("GET", "http://old.example.com").
+		SetEndpoint("http://new.example.com")
+	assert.Equal(t, "http://new.example.com", req.URL())
+}
+
+// TestRequestSetBodyRaw 测试 SetBodyRaw 方法
+func TestRequestSetBodyRaw(t *testing.T) {
+	req := setupRequest("POST", testURL).
+		SetBodyRaw([]byte("raw body"))
+	assert.NotNil(t, req.GetBodyBytes())
+}
+
+// TestRequestSetBodyWithReader 测试 SetBody 接收 io.Reader 时的分支
+func TestRequestSetBodyWithReader(t *testing.T) {
+	reader := strings.NewReader("reader body")
+	req := setupRequest("POST", testURL).
+		SetBody(reader)
+	assert.Equal(t, reader, req.GetBodyBytes())
+	assert.Nil(t, req.GetBodyEncodeFunc()) // Reader 分支不会设置 encodeFunc
+}
+
+// TestRequestSetBodyFormSend 测试 SetBodyForm 后通过 Send 真正执行编码函数
+func TestRequestSetBodyFormSend(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, ContentTypeWWWFormURLEncoded, r.Header.Get(HeaderContentType))
+		assert.Equal(t, "value", r.FormValue("key"))
+		w.Write([]byte("OK"))
+	}))
+	defer server.Close()
+
+	client := &http.Client{}
+	req := NewRequest(context.Background(), client, "POST", server.URL).
+		SetBodyForm(url.Values{"key": {"value"}})
+
+	resp, err := req.Send()
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+// TestRequestCookie 测试 Cookie 和 AddCookie 方法
+func TestRequestCookie(t *testing.T) {
+	t.Run("未设置 Cookie 头", func(t *testing.T) {
+		req := setupRequest("GET", testURL)
+		_, err := req.Cookie("missing")
+		assert.Equal(t, http.ErrNoCookie, err)
+	})
+
+	t.Run("获取已设置的 Cookie", func(t *testing.T) {
+		req := setupRequest("GET", testURL).
+			AddCookie(&http.Cookie{Name: "session", Value: "abc"})
+		cookie, err := req.Cookie("session")
+		assert.NoError(t, err)
+		assert.Equal(t, "session", cookie.Name)
+		assert.Equal(t, "abc", cookie.Value)
+	})
+
+	t.Run("AddCookie nil 时无副作用", func(t *testing.T) {
+		req := setupRequest("GET", testURL)
+		// 不应 panic
+		result := req.AddCookie(nil)
+		assert.NotNil(t, result)
+		_, err := req.Cookie("any")
+		assert.Equal(t, http.ErrNoCookie, err)
+	})
+
+	t.Run("AddCookie 多次追加", func(t *testing.T) {
+		req := setupRequest("GET", testURL).
+			AddCookie(&http.Cookie{Name: "a", Value: "1"}).
+			AddCookie(&http.Cookie{Name: "b", Value: "2"})
+		values := req.GetHeaders().Values(HeaderCookie)
+		assert.Len(t, values, 2)
+	})
+
+	t.Run("headers 为 nil 返回 ErrNoCookie", func(t *testing.T) {
+		req := &Request{}
+		_, err := req.Cookie("any")
+		assert.Equal(t, http.ErrNoCookie, err)
+	})
+
+	t.Run("Cookie 头存在但找不到指定 Cookie", func(t *testing.T) {
+		req := setupRequest("GET", testURL).
+			AddCookie(&http.Cookie{Name: "a", Value: "1"})
+		_, err := req.Cookie("nonexistent")
+		assert.Equal(t, http.ErrNoCookie, err)
+	})
+}
+
+// TestRequestDo 测试 Do 方法
+func TestRequestDo(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("do response"))
+	}))
+	defer server.Close()
+
+	client := &http.Client{}
+	req := NewRequest(context.Background(), client, "GET", server.URL)
+
+	// 传入新的 context
+	newCtx := context.WithValue(context.Background(), struct{ k string }{"k"}, "v")
+	data, err := req.Do(newCtx)
+	assert.NoError(t, err)
+	assert.Equal(t, "do response", string(data))
+	assert.Equal(t, newCtx, req.Context())
+
+	// 传入 nil context 时保持原 context
+	req2 := NewRequest(context.Background(), client, "GET", server.URL)
+	originalCtx := req2.Context()
+	data2, err2 := req2.Do(nil)
+	assert.NoError(t, err2)
+	assert.Equal(t, "do response", string(data2))
+	assert.Equal(t, originalCtx, req2.Context())
+}
+
+// TestRequestDoError 测试 Do 方法在请求失败时返回错误
+func TestRequestDoError(t *testing.T) {
+	client := &http.Client{}
+	// 使用一个无效的 URL 触发请求失败
+	req := NewRequest(context.Background(), client, "GET", "http://127.0.0.1:0/test")
+	_, err := req.Do(context.Background())
+	assert.Error(t, err)
+}
+
+// TestRequestSendInvalidMethod 测试 Send 方法对无效方法的处理
+func TestRequestSendInvalidMethod(t *testing.T) {
+	client := &http.Client{}
+	req := NewRequest(context.Background(), client, "INVALID", "http://example.com")
+	resp, err := req.Send()
+	assert.Error(t, err)
+	assert.Nil(t, resp.Response)
+}
+
+// TestRequestSendInvalidURL 测试 Send 方法在创建 http.Request 失败时返回错误
+func TestRequestSendInvalidURL(t *testing.T) {
+	client := &http.Client{}
+	// 使用一个会导致 http.NewRequestWithContext 失败的 URL（包含控制字符）
+	req := NewRequest(context.Background(), client, http.MethodGet, "http://example.com\x7f")
+	resp, err := req.Send()
+	assert.Error(t, err)
+	assert.Nil(t, resp.Response)
+}
+
+// TestRequestCloneWithBodyBytes 测试 Clone 在 bodyBytes 和 body 都非空时的分支
+func TestRequestCloneWithBodyBytes(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	}))
+	defer server.Close()
+
+	client := &http.Client{}
+	// SetBodyJSON 设置 body 和 bodyEncodeFunc，Send 后会生成 bodyBytes
+	req := NewRequest(context.Background(), client, "POST", server.URL).
+		SetBodyJSON(map[string]string{"name": "test"})
+	resp, err := req.Send()
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// 此时 body 和 bodyBytes 都非 nil，触发 Clone 中保留 body 的分支
+	cloned := req.Clone()
+	assert.NotNil(t, cloned.GetBody())
+	assert.Equal(t, req.GetBody(), cloned.GetBody())
+}
+
+// TestRequestEncodeBodyError 测试 encodeBody 在没有编码函数时返回错误
+func TestRequestEncodeBodyError(t *testing.T) {
+	req := setupRequest("POST", testURL)
+	// 直接设置 body 但不设置 encodeFunc
+	req.body = map[string]string{"key": "value"}
+	req.bodyEncodeFunc = nil
+	_, err := req.encodeBody()
+	assert.Error(t, err)
+}
+
+// TestRequestEncodeBodyCustomFuncError 测试 encodeBody 在自定义编码函数返回错误时返回错误
+func TestRequestEncodeBodyCustomFuncError(t *testing.T) {
+	req := setupRequest("POST", testURL)
+	req.body = map[string]string{"key": "value"}
+	req.bodyEncodeFunc = func(body any) (io.Reader, error) {
+		return nil, assert.AnError
+	}
+	_, err := req.encodeBody()
+	assert.Equal(t, assert.AnError, err)
+}
+
+// TestEncodeJSONError 测试 encodeJSON 在序列化失败时返回错误
+func TestEncodeJSONError(t *testing.T) {
+	// channel 无法被 JSON 序列化
+	_, err := encodeJSON(make(chan int))
+	assert.Error(t, err)
+}
+
+// TestRequestSetBodyMultipartEmpty 测试 SetBodyMultipartWithFields 使用空 fields 和 files
+func TestRequestSetBodyMultipartEmpty(t *testing.T) {
+	t.Run("空 fields 和空 files", func(t *testing.T) {
+		req := setupRequest("POST", testURL).
+			SetBodyMultipartWithFields(nil, nil)
+		assert.NoError(t, req.GetError())
+		assert.NotNil(t, req.GetBodyBytes())
+		assert.Contains(t, req.GetHeaders().Get(HeaderContentType), "multipart/form-data")
+	})
+
+	t.Run("仅 files", func(t *testing.T) {
+		files := map[string]FileField{
+			"file": {FileName: "test.txt", Content: []byte("content")},
+		}
+		req := setupRequest("POST", testURL).
+			SetBodyMultipartWithFields(nil, files)
+		assert.NoError(t, req.GetError())
+		assert.NotNil(t, req.GetBodyBytes())
+	})
+}
+
+// TestRequestFullURLEdgeCases 测试 FullURL 各种边界情况
+func TestRequestFullURLEdgeCases(t *testing.T) {
+	t.Run("无查询参数返回原始 endpoint", func(t *testing.T) {
+		req := setupRequest("GET", "http://example.com/api")
+		assert.Equal(t, "http://example.com/api", req.FullURL())
+	})
+
+	t.Run("endpoint 已包含问号使用 & 分隔", func(t *testing.T) {
+		req := setupRequest("GET", "http://example.com/api?existing=true").
+			SetQuery("page", "1")
+		fullURL := req.FullURL()
+		assert.Contains(t, fullURL, "?existing=true")
+		assert.Contains(t, fullURL, "&page=1")
+	})
 }

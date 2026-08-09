@@ -128,7 +128,9 @@ func isJSONStructScanError(err error) bool {
 		IsJSONExpectedObjectError(err) ||
 		IsJSONExpectedObjectKeySeparatorError(err) ||
 		IsJSONInvalidUnknownFieldValueError(err) ||
-		IsJSONExpectedObjectNextError(err)
+		IsJSONExpectedObjectNextError(err) ||
+		IsJSONExpectedArrayError(err) ||
+		IsJSONExpectedArrayNextError(err)
 }
 
 // NewJSONFieldError 包装字段级 JSON 错误，保留字段名上下文

@@ -178,3 +178,50 @@ func TestPrintErrorMap(t *testing.T) {
 	classifiedType = ClassifyError(wrappedErr)
 	assert.Equal(t, ErrorType(1), classifiedType)
 }
+
+// TestNewTypedError 测试 NewTypedError 函数
+func TestNewTypedError(t *testing.T) {
+	t.Run("无格式化参数", func(t *testing.T) {
+		err := NewTypedError(ErrTypeInternal, "plain message")
+		assert.NotNil(t, err)
+		assert.Equal(t, "plain message", err.Error())
+		assert.Equal(t, ErrorType(ErrTypeInternal), err.(BaseError).GetType())
+	})
+
+	t.Run("带格式化参数", func(t *testing.T) {
+		err := NewTypedError(ErrTypeInvalidParam, "user %s not found", "alice")
+		assert.NotNil(t, err)
+		assert.Equal(t, "user alice not found", err.Error())
+		assert.Equal(t, ErrorType(ErrTypeInvalidParam), err.(BaseError).GetType())
+	})
+
+	t.Run("带多个格式化参数", func(t *testing.T) {
+		err := NewTypedError(ErrTypeInternal, "code=%d msg=%s", 404, "missing")
+		assert.Equal(t, "code=404 msg=missing", err.Error())
+	})
+}
+
+// TestNew 测试 New 函数
+func TestNew(t *testing.T) {
+	err := New("simple error")
+	assert.NotNil(t, err)
+	assert.Equal(t, "simple error", err.Error())
+	// 校验返回的是 BaseError 类型，且 Type 为默认值 0
+	be, ok := err.(BaseError)
+	assert.True(t, ok)
+	assert.Equal(t, ErrorType(0), be.GetType())
+}
+
+// TestNewf 测试 Newf 函数
+func TestNewf(t *testing.T) {
+	t.Run("带格式化参数", func(t *testing.T) {
+		err := Newf("user %s has %d items", "alice", 5)
+		assert.NotNil(t, err)
+		assert.Equal(t, "user alice has 5 items", err.Error())
+	})
+
+	t.Run("无格式化参数", func(t *testing.T) {
+		err := Newf("plain message")
+		assert.Equal(t, "plain message", err.Error())
+	})
+}

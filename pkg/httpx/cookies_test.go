@@ -47,3 +47,12 @@ func TestGetCookies(t *testing.T) {
 		assert.Equal(t, expectedCookies[cookie.Name], cookie.Value)
 	}
 }
+
+// TestGetCookiesError 测试 GetCookies 在请求失败时返回错误
+func TestGetCookiesError(t *testing.T) {
+	// 使用一个无法访问的 URL 触发 client.Get 错误
+	cookies, err := GetCookies("http://127.0.0.1:0/test")
+	assert.Error(t, err)
+	assert.Nil(t, cookies)
+	assert.Contains(t, err.Error(), "failed to get URL")
+}

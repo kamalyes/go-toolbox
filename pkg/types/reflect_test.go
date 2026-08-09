@@ -131,3 +131,140 @@ func TestUnwrapModelValue(t *testing.T) {
 	assert.Nil(t, UnwrapModelValue((*int)(nil)))
 	assert.Equal(t, 3.14, UnwrapModelValue(3.14))
 }
+
+// TestHasJSONTagOptionEdgeCases 测试 HasJSONTagOption 的各种边界情况
+func TestHasJSONTagOptionEdgeCases(t *testing.T) {
+	t.Run("空 options 返回 false", func(t *testing.T) {
+		f := reflect.StructField{Name: "F", Tag: reflect.StructTag(`json:"name,omitempty"`)}
+		assert.False(t, HasJSONTagOption(f))
+	})
+
+	t.Run("json tag 为空返回 false", func(t *testing.T) {
+		f := reflect.StructField{Name: "F", Tag: reflect.StructTag(``)}
+		assert.False(t, HasJSONTagOption(f, "omitempty"))
+	})
+
+	t.Run("json tag 为 dash 返回 false", func(t *testing.T) {
+		f := reflect.StructField{Name: "F", Tag: reflect.StructTag(`json:"-"`)}
+		assert.False(t, HasJSONTagOption(f, "omitempty"))
+	})
+
+	t.Run("json tag 无逗号返回 false", func(t *testing.T) {
+		// tag 为 `json:"name"`，没有逗号，没有选项
+		f := reflect.StructField{Name: "F", Tag: reflect.StructTag(`json:"name"`)}
+		assert.False(t, HasJSONTagOption(f, "omitempty"))
+	})
+
+	t.Run("逗号在末尾返回 false", func(t *testing.T) {
+		// tag 为 `json:"name,"`，逗号后面没有选项
+		f := reflect.StructField{Name: "F", Tag: reflect.StructTag(`json:"name,"`)}
+		assert.False(t, HasJSONTagOption(f, "omitempty"))
+	})
+
+	t.Run("选项不匹配返回 false", func(t *testing.T) {
+		f := reflect.StructField{Name: "F", Tag: reflect.StructTag(`json:"name,omitempty"`)}
+		assert.False(t, HasJSONTagOption(f, "omitzero"))
+	})
+
+	t.Run("多个选项中有一个匹配", func(t *testing.T) {
+		f := reflect.StructField{Name: "F", Tag: reflect.StructTag(`json:"name,omitempty,string"`)}
+		assert.True(t, HasJSONTagOption(f, "string"))
+		assert.True(t, HasJSONTagOption(f, "omitempty"))
+		assert.False(t, HasJSONTagOption(f, "omitzero"))
+	})
+
+	t.Run("多个期望选项中匹配任意一个", func(t *testing.T) {
+		f := reflect.StructField{Name: "F", Tag: reflect.StructTag(`json:"name,omitempty"`)}
+		assert.True(t, HasJSONTagOption(f, "omitzero", "omitempty"))
+	})
+}
+
+// TestEnsureStructDefaults 测试 EnsureStructDefaults 函数
+func TestEnsureStructDefaults(t *testing.T) {
+	t.Run("非结构体类型直接返回", func(t *testing.T) {
+		// 传入一个 int 值
+		v := reflect.ValueOf(42)
+		// 不应 panic
+		EnsureStructDefaults(v)
+	})
+
+	t.Run("初始化 nil proto 指针字段", func(t *testing.T) {
+		type S struct {
+			PB *wrapperspb.StringValue
+		}
+		s := &S{}
+		v := reflect.ValueOf(s).Elem()
+		EnsureStructDefaults(v)
+		assert.NotNil(t, s.PB)
+	})
+
+	t.Run("初始化 nil 结构体指针字段", func(t *testing.T) {
+		type Inner struct {
+			Name string
+		}
+		type S struct {
+			Inner *Inner
+		}
+		s := &S{}
+		v := reflect.ValueOf(s).Elem()
+		EnsureStructDefaults(v)
+		assert.NotNil(t, s.Inner)
+	})
+
+	t.Run("nil 基本类型指针字段不被初始化", func(t *testing.T) {
+		type S struct {
+			Num *int
+		}
+		s := &S{}
+		v := reflect.ValueOf(s).Elem()
+		EnsureStructDefaults(v)
+		assert.Nil(t, s.Num)
+	})
+
+	t.Run("已初始化的指针字段保持不变", func(t *testing.T) {
+		type Inner struct {
+			Name string
+		}
+		existing := &Inner{Name: "existing"}
+		type S struct {
+			Inner *Inner
+		}
+		s := &S{Inner: existing}
+		v := reflect.ValueOf(s).Elem()
+		EnsureStructDefaults(v)
+		assert.Same(t, existing, s.Inner)
+	})
+
+	t.Run("非指针字段不受影响", func(t *testing.T) {
+		type S struct {
+			Name string
+			Age  int
+		}
+		s := &S{Name: "test", Age: 20}
+		v := reflect.ValueOf(s).Elem()
+		EnsureStructDefaults(v)
+		assert.Equal(t, "test", s.Name)
+		assert.Equal(t, 20, s.Age)
+	})
+}
+
+// TestNewProtoMessage 测试 NewProtoMessage 泛型函数
+func TestNewProtoMessage(t *testing.T) {
+	t.Run("创建 StringValue", func(t *testing.T) {
+		msg := NewProtoMessage[*wrapperspb.StringValue]()
+		assert.NotNil(t, msg)
+		assert.IsType(t, &wrapperspb.StringValue{}, msg)
+	})
+
+	t.Run("创建 Int32Value", func(t *testing.T) {
+		msg := NewProtoMessage[*wrapperspb.Int32Value]()
+		assert.NotNil(t, msg)
+		assert.IsType(t, &wrapperspb.Int32Value{}, msg)
+	})
+
+	t.Run("创建 BoolValue", func(t *testing.T) {
+		msg := NewProtoMessage[*wrapperspb.BoolValue]()
+		assert.NotNil(t, msg)
+		assert.IsType(t, &wrapperspb.BoolValue{}, msg)
+	})
+}

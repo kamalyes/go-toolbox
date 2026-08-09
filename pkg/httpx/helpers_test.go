@@ -85,6 +85,64 @@ func TestReadRequestBody(t *testing.T) {
 	}
 }
 
+// errReader 是一个在读取时返回错误的 io.ReadCloser 实现，用于测试错误路径
+type errReader struct {
+	err error
+}
+
+func (e *errReader) Read(p []byte) (int, error) {
+	return 0, e.err
+}
+
+func (e *errReader) Close() error {
+	return nil
+}
+
+// TestReadRequestBodyError 测试 ReadRequestBody 在读取失败时返回错误
+func TestReadRequestBodyError(t *testing.T) {
+	r := &http.Request{Body: &errReader{err: assert.AnError}}
+	bodyBytes, err := ReadRequestBody(r)
+	assert.Error(t, err)
+	assert.Equal(t, assert.AnError, err)
+	assert.Nil(t, bodyBytes)
+}
+
+// TestGetValueFromHeaderOrQuery 测试从请求头或查询参数中获取值
+func TestGetValueFromHeaderOrQuery(t *testing.T) {
+	tests := []struct {
+		name       string
+		header     string
+		query      string
+		headerName string
+		queryName  string
+		expected   string
+	}{
+		{"仅请求头有值", "headerVal", "", "X-Header", "q", "headerVal"},
+		{"仅查询参数有值", "", "queryVal", "X-Header", "q", "queryVal"},
+		{"两者都有值优先请求头", "headerVal", "queryVal", "X-Header", "q", "headerVal"},
+		{"两者都为空", "", "", "X-Header", "q", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := &http.Request{
+				Header: http.Header{},
+				URL:    &url.URL{},
+			}
+			if tt.header != "" {
+				req.Header.Set(tt.headerName, tt.header)
+			}
+			if tt.query != "" {
+				q := url.Values{}
+				q.Set(tt.queryName, tt.query)
+				req.URL.RawQuery = q.Encode()
+			}
+			got := GetValueFromHeaderOrQuery(req, tt.headerName, tt.queryName)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
 // TestBuildParams 测试构建请求参数
 func TestBuildParams(t *testing.T) {
 	tests := []struct {

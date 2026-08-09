@@ -13,6 +13,7 @@ package breaker
 
 import (
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -403,4 +404,70 @@ func TestCircuitAllowRequestConcurrency(t *testing.T) {
 	}
 
 	assert.NotNil(t, cb.GetState())
+}
+
+// TestCircuitAllowRequestUnknownState 测试 AllowRequest 在未知状态下返回 false
+func TestCircuitAllowRequestUnknownState(t *testing.T) {
+	cb := New("test", Config{MaxFailures: 5})
+	// 将状态设置为未知值
+	atomic.StoreInt32(&cb.state, int32(999))
+	assert.False(t, cb.AllowRequest())
+}
+
+// TestCircuitAllowRequestHalfOpenState 测试 AllowRequest 在半开状态下返回 true
+func TestCircuitAllowRequestHalfOpenState(t *testing.T) {
+	cb := New("test", Config{MaxFailures: 5})
+	// 将状态直接设置为半开状态
+	atomic.StoreInt32(&cb.state, int32(StateHalfOpen))
+	assert.True(t, cb.AllowRequest())
+}
+
+// TestCircuitSetStateSameState 测试 setState 在状态相同时提前返回
+func TestCircuitSetStateSameState(t *testing.T) {
+	var triggered bool
+	cb := New("test", Config{
+		MaxFailures:  2,
+		ResetTimeout: 50 * time.Millisecond,
+		OnStateChange: func(from, to State) {
+			triggered = true
+		},
+	})
+	// 初始状态为 StateClosed，再次设置为 StateClosed 应提前返回，不触发回调
+	cb.setState(StateClosed)
+	assert.False(t, triggered, "状态未变化时不应触发 onStateChange 回调")
+	assert.Equal(t, StateClosed, cb.GetState())
+}
+
+// TestCircuitRecordSuccessInOpenState 测试在 Open 状态下记录成功（无副作用）
+func TestCircuitRecordSuccessInOpenState(t *testing.T) {
+	cb := New("test", Config{
+		MaxFailures:  1,
+		ResetTimeout: 50 * time.Millisecond,
+	})
+
+	// 触发熔断
+	cb.RecordFailure()
+	assert.Equal(t, StateOpen, cb.GetState())
+
+	// Open 状态下记录成功不应改变状态
+	cb.RecordSuccess()
+	assert.Equal(t, StateOpen, cb.GetState())
+}
+
+// TestCircuitRecordFailureInOpenState 测试在 Open 状态下记录失败（无副作用）
+func TestCircuitRecordFailureInOpenState(t *testing.T) {
+	cb := New("test", Config{
+		MaxFailures:  1,
+		ResetTimeout: 50 * time.Millisecond,
+	})
+
+	// 触发熔断
+	cb.RecordFailure()
+	assert.Equal(t, StateOpen, cb.GetState())
+
+	// Open 状态下记录失败不应改变状态
+	prevFailures := atomic.LoadInt32(&cb.failures)
+	cb.RecordFailure()
+	assert.Equal(t, prevFailures, atomic.LoadInt32(&cb.failures))
+	assert.Equal(t, StateOpen, cb.GetState())
 }
