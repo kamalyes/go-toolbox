@@ -980,6 +980,141 @@ jsonStr := mathx.MarshalJSONOrDefault(data, "{}")
 
 ---
 
+### 场景 41：数值比较
+
+**推荐使用：`IfGt` / `IfGe` / `IfLt` / `IfLe` / `IfEq` / `IfNe`**
+
+```go
+// ✅ 大于比较
+result := mathx.IfGt(10, 5, "greater", "not greater")   // "greater"
+
+// ✅ 等于比较
+result := mathx.IfEq(5, 5, "equal", "not equal")       // "equal"
+
+// ✅ 不等于比较
+result := mathx.IfNe(5, 3, "different", "same")       // "different"
+```
+
+**适用场景：**
+
+- 数值阈值判断
+- 状态比较
+
+---
+
+### 场景 42：数值范围限制
+
+**推荐使用：`IfClamp` / `IfDefaultAndClamp`**
+
+```go
+// ✅ 限制在 [0, 100] 范围内
+result := mathx.IfClamp(150, 0, 100)   // 100
+result := mathx.IfClamp(-10, 0, 100)   // 0
+result := mathx.IfClamp(50, 0, 100)    // 50
+
+// ✅ 先应用默认值，再限制范围（适用于分页参数）
+pageSize := mathx.IfDefaultAndClamp(pageSize, 10, 1, 100)
+// pageSize<=0 时取 10，最后限制在 [1, 100] 范围
+```
+
+**适用场景：**
+
+- 分页参数处理
+- 配置项范围限制
+
+---
+
+### 场景 43：零值判断
+
+**推荐使用：`IfLeZero` / `IfLtZero` / `IfGeZero` / `IfGtZero`**
+
+```go
+// ✅ 小于等于零时使用默认值
+config.Timeout = mathx.IfLeZero(config.Timeout, 30*time.Second)
+
+// ✅ 小于零时使用默认值
+config.Offset = mathx.IfLtZero(config.Offset, 0)
+```
+
+**适用场景：**
+
+- 配置参数默认值
+- 超时时间设置
+
+---
+
+### 场景 44：基于 validator 的条件判断
+
+**推荐使用：`IfEmpty` / `IfNil` / `IfCEmpty` / `IfIPAllowed` 等**
+
+```go
+// ✅ 空值检查（基于反射，支持任意类型）
+result := mathx.IfEmpty("", "default")        // "default"
+result := mathx.IfEmpty([]int{}, []int{1, 2})  // []int{1, 2}
+
+// ✅ Nil 检查
+var ptr *string
+result := mathx.IfNil(ptr, "is nil", "not nil")  // "is nil"
+
+// ✅ IP 白名单检查
+allowList := []string{"192.168.1.0/24", "10.0.0.1"}
+result := mathx.IfIPAllowed("192.168.1.100", allowList, "allowed", "denied")  // "allowed"
+
+// ✅ 中文字符检查
+result := mathx.IfContainsChinese("你好world", "has chinese", "no chinese")  // "has chinese"
+```
+
+**适用场景：**
+
+- 复杂空值判断（支持切片、map、结构体等）
+- IP 白名单/黑名单
+- 字段安全校验
+
+---
+
+### 场景 45：Proto 时间戳转换
+
+**推荐使用：`IfProtoTimeOr` / `IfProtoTimeOrPtr` / `IfTimeToProto`**
+
+```go
+// ✅ proto 时间戳转 time.Time（nil 时使用偏移量）
+startTime := mathx.IfProtoTimeOr(req.StartTime, -30*24*time.Hour)  // 30天前
+endTime := mathx.IfProtoTimeOr(req.EndTime, 0)                     // 当前时间
+
+// ✅ time.Time 转 proto 时间戳（nil 时使用偏移量）
+protoTime := mathx.IfTimeToProto(timePtr, 0)
+```
+
+**适用场景：**
+
+- gRPC 请求参数转换
+- 时间范围查询默认值
+
+---
+
+### 场景 46：指针默认值
+
+**推荐使用：`DefaultIfNilPtr`**
+
+```go
+// ✅ nil 指针返回默认值指针
+var page *PageReq
+page = mathx.DefaultIfNilPtr(page, PageReq{Page: 1, PageSize: 10})
+// page 现在指向默认值
+
+// ✅ 已存在的指针保持原值
+existing := &PageReq{Page: 2, PageSize: 20}
+result := mathx.DefaultIfNilPtr(existing, PageReq{Page: 1, PageSize: 10})
+// result == existing (保持原值)
+```
+
+**适用场景：**
+
+- 分页参数默认值
+- 配置对象初始化
+
+---
+
 ## ⚠️ 已废弃函数清单
 
 | 已废弃函数 | 替代函数 | 原因 |

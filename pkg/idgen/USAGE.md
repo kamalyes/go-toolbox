@@ -1,6 +1,6 @@
 # IDGen - 高性能 ID 生成器
 
-`idgen` 包提供了多种高性能 ID 生成器实现，适用于分布式系统中的 TraceID、SpanID、RequestID 和 CorrelationID 生成。
+`idgen` 包提供了多种高性能 ID 生成器实现，适用于分布式系统中的 TraceID、SpanID、RequestID 和 CorrelationID 生成
 
 ## 特性
 
@@ -77,11 +77,18 @@ spanID := gen.GenerateSpanID()        // "56781234" (随机8位)
 requestID := gen.GenerateRequestID()  // "10100005" (天+计数器)
 correlationID := gen.GenerateCorrelationID() // "87654321" (随机8位)
 
+// 查询运行时状态
+gen.WorkerID()  // uint64
+gen.Config()    // NumericIDConfig
+
 // 手动指定 Worker ID（测试或特殊场景）
 gen0 := idgen.NewNumericIDGeneratorWithWorker(0)
 gen1 := idgen.NewNumericIDGeneratorWithWorker(1)
 // Worker 0: 10000000-10009999
 // Worker 1: 10010000-10019999
+
+// 自定义配置 + 手动指定 Worker ID
+gen := idgen.NewNumericIDGeneratorWithConfigAndWorker(cfg, 2)
 ```
 
 #### 动态配置
@@ -90,18 +97,20 @@ gen1 := idgen.NewNumericIDGeneratorWithWorker(1)
 
 ```go
 cfg := idgen.NumericIDConfig{
-    Epoch:        1704067200,  // 纪元时间戳（秒）
+    Epoch:        1767225600,  // 纪元时间戳（秒），默认 2026-01-01 00:00:00 UTC
     Base:         100000000,   // 起始基数（9位数字起点）
     WorkerSpace:  100000,      // 每Worker容量（10万/天/机）
     MaxWorkers:   5,           // 最大Worker数（5台机器）
     DaySpace:     500000,      // 每天总容量 = WorkerSpace * MaxWorkers
     RandomDigits: 9,           // 随机ID位数
-    BatchSize:    1000,        // 批量预取大小
+    BatchSize:    100,         // 批量预取大小（默认100）
 }
 
 gen := idgen.NewNumericIDGeneratorWithConfig(cfg)
 userID := gen.GenerateUserID()  // 9位纯数字
 ```
+
+> **默认 Epoch**：`DefaultNumericIDConfig()` 中 `Epoch = 1767225600`（2026-01-01 UTC），8 位容量约 899 天（~2.46 年）后溢出至 9 位配置前请调用 `cfg.Validate()` 校验合法性（`DaySpace` 必须等于 `WorkerSpace * MaxWorkers`，`BatchSize` 必须 > 0 且 ≤ `WorkerSpace`）
 
 #### 持久化回收（CounterStore）⭐ **分布式安全**
 
@@ -109,7 +118,7 @@ userID := gen.GenerateUserID()  // 9位纯数字
 - 默认模式下，进程重启后计数器从"时间地板"重新开始，当天未使用的序列空间被浪费
 - 分布式环境下，`Load + Save` 不是原子操作，多实例可能读到同一个值导致 ID 重复
 
-**解决方案**：实现 `CounterStore` 接口，使用原子递增（如 Redis INCRBY），保证分布式安全。
+**解决方案**：实现 `CounterStore` 接口，使用原子递增（如 Redis INCRBY），保证分布式安全
 
 ```go
 // CounterStore 接口定义（原子递增）
@@ -195,13 +204,14 @@ gen := idgen.NewIDGenerator("shortflake")
 // 手动指定 nodeID: 0-63
 gen := idgen.NewShortFlakeGenerator(1)
 
-traceID := gen.GenerateTraceID()     // "3425234523452" (13-16位数字)
-spanID := gen.GenerateSpanID()       // "3425234523453"
+traceID := gen.GenerateTraceID()     // "018f5a3c7d2e4" (13字符 hex)
+spanID := gen.GenerateSpanID()       // "7d2e4b10" (8字符 hex)
+requestID := gen.GenerateRequestID() // "3425234523452-1" (数字-计数器)
 id := gen.Generate()                 // int64: 3425234523454
 
 // Base62 编码版本（更短，字符串格式）
 b62Gen := idgen.NewShortFlakeBase62Generator(1)
-traceID := b62Gen.GenerateTraceID()  // "aB3xK9mP" (9-10字符)
+traceID := b62Gen.GenerateTraceID()  // "aB3xK9mPqR" (9-10字符)
 ```
 
 ### 3. ShortID Generator ⭐ **推荐用于短链接/邀请码**
@@ -244,8 +254,20 @@ correlationID := gen.GenerateCorrelationID() // UUID v4格式
 gen := idgen.NewUUIDGenerator()
 
 traceID := gen.GenerateTraceID()     // "550e8400-e29b-41d4-a716-446655440000"
-spanID := gen.GenerateSpanID()       // "550e8400-e29b-41"
+spanID := gen.GenerateSpanID()       // "550e8400e29b41d4" (16字符，去除连字符)
 requestID := gen.GenerateRequestID() // "550e8400-1"
+```
+
+**UUID 格式化工具函数：**
+
+```go
+// 将标准 UUID 去除连字符，生成 32 字符 TraceID（兼容 OpenTelemetry）
+traceID := idgen.FormatTraceID("550e8400-e29b-41d4-a716-446655440000")
+// "550e8400e29b41d4a716446655440000"
+
+// 从 UUID 中提取 16 字符 SpanID
+spanID := idgen.FormatSpanID("550e8400-e29b-41d4-a716-446655440000")
+// "550e8400e29b41d4"
 ```
 
 ### 6. NanoID Generator
@@ -286,9 +308,10 @@ correlationID := gen.GenerateCorrelationID() // UUID格式
 ```go
 gen := idgen.NewULIDGenerator()
 
-traceID := gen.GenerateTraceID()     // "01ARZ3NDEKTSV4RRFFQ69G5FAV"
-spanID := gen.GenerateSpanID()       // "01ARZ3NDEKTSV4RR"
+traceID := gen.GenerateTraceID()     // "01ARZ3NDEKTSV4RRFFQ69G5FAV" (26字符)
+spanID := gen.GenerateSpanID()       // "TSV4RRFFQ69G5FAV" (16字符，随机部分)
 requestID := gen.GenerateRequestID() // "01ARZ3NDEK-1"
+correlationID := gen.GenerateCorrelationID() // "01ARZ3NDEKTSV4RRFFQ69G5FAV-01ARZ3ND0LWM4PQXX7HVK5FAVZ" (双段拼接，53字符)
 ```
 
 ## 工厂函数
@@ -319,8 +342,11 @@ gen := idgen.NewIDGenerator("nanoid")     // NanoID
 gen := idgen.NewIDGenerator("ulid")       // ULID
 gen := idgen.NewIDGenerator("default")    // Default Hex
 gen := idgen.NewIDGenerator("hex")        // 同 default
-gen := idgen.NewIDGenerator("")           // 默认
+gen := idgen.NewIDGenerator("logger")     // 同 default
+gen := idgen.NewIDGenerator("")           // 默认（Default Hex）
 ```
+
+> `NewIDGenerator` 接受 `GeneratorType` 或 `string` 类型参数，未知类型返回 Default Hex 生成器`NewIDGeneratorFromString` 已废弃，请使用 `NewIDGenerator`
 
 ## 分布式部署（K8s StatefulSet）
 
@@ -335,7 +361,7 @@ gen := idgen.NewIDGenerator("")           // 默认
 
 ### StatefulSet 部署示例
 
-StatefulSet 的 Pod 命名规则为 `<statefulset-name>-<ordinal>`，`HOSTNAME` 环境变量自动设置为 Pod 名称，`osx` 包会自动提取序号作为 Worker ID。
+StatefulSet 的 Pod 命名规则为 `<statefulset-name>-<ordinal>`，`HOSTNAME` 环境变量自动设置为 Pod 名称，`osx` 包会自动提取序号作为 Worker ID
 
 ```yaml
 apiVersion: apps/v1
@@ -408,6 +434,31 @@ type IDGenerator interface {
 }
 ```
 
+### ID 语义类型与规格
+
+```go
+// IDType ID 语义类型
+type IDType string
+
+const (
+    IDTypeTraceID       IDType = "trace_id"       // 全链路追踪 ID
+    IDTypeSpanID        IDType = "span_id"        // 单次操作跨度 ID
+    IDTypeRequestID     IDType = "request_id"     // 请求唯一标识
+    IDTypeCorrelationID IDType = "correlation_id" // 跨系统关联 ID
+)
+
+// IDSpec ID 规格配置（每种 GeneratorType 对应不同规格）
+type IDSpec struct {
+    TraceLen       int  // TraceID 长度
+    SpanLen        int  // SpanID 长度
+    RequestCounter bool // RequestID 是否附加计数器后缀
+    CorrelationFmt bool // CorrelationID 是否使用 UUID 格式（含连字符）
+}
+
+// 通过 GeneratorType 获取规格
+spec := idgen.GeneratorTypeNumeric.Spec() // {TraceLen:8, SpanLen:8, ...}
+```
+
 ## 性能对比
 
 | 生成器 | ns/op | B/op | allocs/op | ID长度 | 特点 |
@@ -433,13 +484,14 @@ type IDGenerator interface {
 
 ## 注意事项
 
-1. **NumericID 容量**：每机每天 10000 个，10台机器共 10万/天，覆盖约 2.7年
-2. **NumericID 动态配置**：通过 `NumericIDConfig` 自定义所有参数，无需修改底层代码
+1. **NumericID 容量**：默认每机每天 10000 个，10 台机器共 10 万/天；默认 Epoch（2026-01-01）后约 899 天（~2.46 年）8 位空间耗尽，溢出至 9 位
+2. **NumericID 动态配置**：通过 `NumericIDConfig` 自定义所有参数，配置后调用 `Validate()` 校验合法性
 3. **NumericID 持久化回收**：实现 `CounterStore` 接口可避免重启后日空间浪费
 4. **Snowflake 参数**：`workerID` 和 `datacenter` 范围为 0-31
-5. **并发性能**：Snowflake 在高并发下使用互斥锁，可能成为瓶颈
-6. **时钟回拨**：Snowflake 检测时钟回拨，会等待至时钟追上
-7. **StatefulSet 副本数**：NumericID 默认最多支持 10 个副本（Worker ID 0-9），可通过 `MaxWorkers` 调整
+5. **ShortFlake 参数**：`nodeID` 范围为 0-63
+6. **并发性能**：Snowflake/ShortFlake 在高并发下使用互斥锁，可能成为瓶颈；NumericID/ShortID 使用纯原子操作
+7. **时钟回拨**：Snowflake/ShortFlake 检测时钟回拨，会等待至时钟追上
+8. **StatefulSet 副本数**：NumericID 默认最多支持 10 个副本（Worker ID 0-9），可通过 `MaxWorkers` 调整
 
 ## 参考资料
 

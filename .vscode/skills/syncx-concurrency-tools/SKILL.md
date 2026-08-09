@@ -1,11 +1,11 @@
 ---
 name: syncx-concurrency-tools
-description: 并发编程工具包，提供互斥锁封装、协程安全启动与恢复、并发安全数据结构（Map/Set/Pool）、事件循环、状态机、并行执行器等。当需要加锁执行代码块、安全启动goroutine、使用并发Map/Set/Pool、构建事件驱动/状态机/并行任务逻辑时使用。
+description: 并发编程工具包，提供互斥锁封装、协程安全启动与恢复、并发安全数据结构（Map/Set/Pool）、事件循环、状态机、并行执行器等当需要加锁执行代码块、安全启动goroutine、使用并发Map/Set/Pool、构建事件驱动/状态机/并行任务逻辑时使用
 ---
 
 # syncx - 并发编程工具包
 
-提供互斥锁快捷操作、协程安全启动与恢复、并发安全数据结构、事件循环、状态机与并行执行器等并发编程原语。
+提供互斥锁快捷操作、协程安全启动与恢复、并发安全数据结构、事件循环、状态机与并行执行器等并发编程原语
 
 ## 快速开始
 
@@ -88,11 +88,16 @@ s := syncx.NewSet[string]()
 |---|---|---|
 | `NewMap[K,V]` | `func() *Map[K,V]` | 创建并发安全Map |
 | `NewSet[K]` | `func() *Set[K]` | 创建并发安全Set |
+| `NewShardedMap[K,V]` | `func(shardCount int) *ShardedMap[K,V]` | 创建分片映射表（无预分配） |
+| `NewShardedMapWithOptions[K,V]` | `func(shardCount int, opts...) *ShardedMap[K,V]` | 创建分片映射表（支持配置选项） |
 | `NewLimitedPool` | `func(min, max) *LimitedPool` | 创建有限对象池 |
 | `NewPool[T]` | `func(new func() T) *Pool[T]` | 创建泛型对象池 |
 | `NewWorkerPool` | `func(workers, queueSize int) *WorkerPool` | 创建工作池 |
 | `NewRWLock` | `func() *RWLock` | 创建读写锁封装 |
 | `NewLock` | `func() *Lock` | 创建互斥锁封装 |
+| `NewTaskManager[T,R,U]` | `func(concurrency int) *TaskManager[T,R,U]` | 创建任务管理器 |
+| `NewTask[T,R,U]` | `func(name, fn, input) *Task[T,R,U]` | 创建任务（默认上下文） |
+| `NewTaskWithOptions[T,R,U]` | `func(name, fn, input, ctx, maxRetries, retryInterval) *Task[T,R,U]` | 创建任务（自定义选项） |
 
 #### Panic恢复
 
@@ -129,10 +134,10 @@ s := syncx.NewSet[string]()
 
 | 导出名称 | 签名 | 说明 |
 |---|---|---|
-| `NewStateMachine[S]` | `func(initial S, opts...) *StateMachine[S]` | 创建泛型状态机 |
+| `NewStateMachine[S]` | `func(initial S, opts...) *StateMachine[S]` | 创建泛型状态机（S 须 comparable） |
 | `WithAllowAnyTransition[S]` | `func() StateMachineOption[S]` | 允许任意状态转换 |
-| `WithTrackHistory[S]` | `func(max int) StateMachineOption[S]` | 跟踪状态转换历史 |
-| `WithTimeFormat[S]` | `func(fmt string) StateMachineOption[S]` | 设置历史时间格式 |
+| `WithTrackHistory[S]` | `func(max int) StateMachineOption[S]` | 跟踪状态转换历史（0 表示不限制） |
+| `WithTimeFormat[S]` | `func(fmt string) StateMachineOption[S]` | 设置历史时间格式（默认 RFC3339） |
 
 #### 延迟器与并行执行器
 
@@ -141,6 +146,15 @@ s := syncx.NewSet[string]()
 | `NewDelayer[T]` | `func() *Delayer[T]` | 创建延迟器 |
 | `NewParallelExecutor[K,V,R]` | `func(m map[K]V) *ParallelExecutor[K,V,R]` | 创建并行执行器 |
 | `NewParallelSliceExecutor[T,R]` | `func(s []T) *ParallelSliceExecutor[T,R]` | 创建切片并行执行器 |
+
+#### ShardedMap 辅助函数
+
+| 导出名称 | 签名 | 说明 |
+|---|---|---|
+| `WithPerShardHint[K,V]` | `func(perShardHint int) ShardedMapOption[K,V]` | 设置每 shard 预分配容量提示 |
+| `FNVHashString32` | `func(s string) uint32` | FNV-1a 内联 hash（零分配） |
+| `KvHasher[K]` | `func() func(K) uint32` | 为 K 类型选择最优 hash 函数 |
+| `NextPowerOfTwo` | `func(n int) int` | 返回不小于 n 的最小 2 的幂 |
 
 ### 类型
 
@@ -152,6 +166,8 @@ s := syncx.NewSet[string]()
 | `TryRLocker` | 尝试加读锁接口 |
 | `Map[K,V]` | 泛型并发安全字典 |
 | `Set[K]` | 泛型并发安全集合 |
+| `ShardedMap[K,V]` | 泛型分片映射表（高并发读写，原子计数） |
+| `ShardedMapOption[K,V]` | ShardedMap 配置选项函数类型 |
 | `LimitedPool` | 有限对象池 |
 | `Pool[T]` | 泛型对象池 |
 | `WorkerPool` | 工作池 |
@@ -168,8 +184,9 @@ s := syncx.NewSet[string]()
 | `FuncItem[T]` | 函数链节点类型 |
 | `FuncChain[T]` | 函数链类型 |
 | `EventLoop` | 事件循环类型 |
-| `StateMachine[S]` | 泛型状态机类型 |
+| `StateMachine[S]` | 泛型状态机类型（S 须 comparable） |
 | `StateMachineOption[S]` | 状态机选项类型 |
+| `StateTransition[S]` | 状态转换记录类型（From/To/Timestamp/Duration） |
 | `DelayStrategy` | 延迟策略接口 |
 | `FixedDelayStrategy` | 固定延迟策略 |
 | `LinearDelayStrategy` | 线性延迟策略 |
@@ -180,12 +197,15 @@ s := syncx.NewSet[string]()
 | `Delayer[T]` | 泛型延迟器类型 |
 | `ExecutionContext` | 执行上下文类型 |
 | `ExecutionResult` | 执行结果类型 |
-| `TaskFunc[T]` | 任务函数类型 |
-| `SimpleTaskFunc` | 简单任务函数类型 |
-| `CallbackFunc[T]` | 回调函数类型 |
-| `ErrorHandlerFunc` | 错误处理函数类型 |
-| `TaskProgressFunc` | 任务进度函数类型 |
-| `ExecutionStats` | 执行统计类型 |
+| `TaskExecuteFunc[T,R]` | 任务执行函数类型 |
+| `TaskCallbackFunc[R,U]` | 任务回调函数类型 |
+| `TaskTrunFunc[R]` | 任务启动/关闭函数类型 |
+| `Task[T,R,U]` | 泛型异步任务类型（sync.Once + atomic.Int32 保证单次执行） |
+| `TaskManager[T,R,U]` | 任务管理器类型 |
+| `TaskHistory` | 任务执行历史记录类型 |
+| `TaskState` | 任务状态枚举（Pending/Running/Completed/Cancelled/Failed） |
+| `ExecutionMode` | 执行模式枚举（Sequential/Concurrent） |
+| `TaskType` | 任务类型枚举（MainTask/DependencyTask） |
 | `ParallelExecuteFunc[K,V,R]` | 并行执行函数类型 |
 | `ParallelSliceExecuteFunc[T,R]` | 切片并行执行函数类型 |
 | `ParallelSuccessCallback` | 并行成功回调类型 |
@@ -193,9 +213,6 @@ s := syncx.NewSet[string]()
 | `ParallelCompleteCallback` | 并行完成回调类型 |
 | `ParallelExecutor[K,V,R]` | 泛型并行执行器类型 |
 | `ParallelSliceExecutor[T,R]` | 泛型切片并行执行器类型 |
-| `TaskState` | 任务状态枚举 |
-| `ExecutionMode` | 执行模式枚举 |
-| `TaskType` | 任务类型枚举 |
 | `RWLock` | 读写锁封装类型 |
 | `Lock` | 互斥锁封装类型 |
 

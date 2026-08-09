@@ -44,6 +44,7 @@ graph TB
     A --> D[系统工具]
     A --> E[算法工具]
     A --> F[高可用]
+    A --> G[并发工具]
     
     B --> B1[类型转换 convert]
     B --> B2[JSON 处理 json]
@@ -63,6 +64,8 @@ graph TB
     E --> E3[校验算法 crc]
     
     F --> F1[熔断器 breaker]
+    
+    G --> G1[并发原语 syncx]
 ```
 
 ## 🧰 核心模块
@@ -102,6 +105,12 @@ graph TB
 | [🔢 mathx](pkg/mathx) | 数学计算增强、三元运算符 | 数据分析、算法实现、条件判断 |
 | [🔐 sign](pkg/sign) | 加密签名工具 | 安全认证、数据完整性 |
 | [✅ validator](pkg/validator) | 数据验证器 | 表单验证、参数检查 |
+
+### 🔀 并发工具类
+
+| 模块 | 功能描述 | 使用场景 |
+|------|----------|----------|
+| [🔀 syncx](pkg/syncx) | 并发原语：ShardedMap、Delayer、Task、原子类型 | 高并发读写、延迟任务、任务编排 |
 
 ### ⚙️ 基础设施类
 
@@ -221,9 +230,10 @@ import "github.com/kamalyes/go-toolbox/pkg/mathx"
 
 // 统计计算
 data := []float64{1, 2, 3, 4, 5}
-avg := mathx.Average(data)          // 平均值
-max := mathx.Max(data)              // 最大值
-min := mathx.Min(data)              // 最小值
+avg := mathx.Mean(data)             // 平均值
+max := mathx.Max(data...)           // 最大值（变参）
+min := mathx.Min(data...)           // 最小值（变参）
+pct := mathx.FormatPercentage(80, 100, 2)  // 百分比格式化 "80.00%"
 
 // 三元运算符
 status := mathx.IF(score >= 60, "及格", "不及格")
@@ -236,8 +246,36 @@ result := mathx.WhenValue(age >= 18).
     ElseReturn("未成年人").
     Get()
 
-// 概率计算
-prob := mathx.Probability(0.8)      // 80% 概率
+// 小数位格式化（使用 strconv.FormatFloat 零分配优化）
+s := mathx.Decimals(12345, 2)       // "123.45"
+```
+
+#### 🔀 并发原语（syncx）
+
+```go
+import "github.com/kamalyes/go-toolbox/pkg/syncx"
+
+// 高并发分片映射表（替代 sync.Map，写性能更好）
+m := syncx.NewShardedMap[string, int](64) // 64 个分片
+m.Store("foo", 1)
+m.StoreBatch(map[string]int{"a": 1, "b": 2, "c": 3}) // 批量写入减少锁次数
+v, ok := m.Load("foo")     // 读取
+m.CompareAndSwap("foo", 1, 100) // 原子 CAS
+
+// 泛型原子值
+av := syncx.NewAtomicValue("hello")
+av.Store("world")
+old := av.Swap("again")     // 原子交换并返回旧值
+
+// 延迟任务执行器（详见 pkg/syncx/DELAY_README.md）
+delayer := syncx.NewDelayer[string]().
+    WithDelay(100 * time.Millisecond).
+    WithTimes(5).
+    WithTaskFunc(func(ctx *syncx.ExecutionContext) (string, error) {
+        return fmt.Sprintf("task-%d", ctx.Index), nil
+    })
+_ = delayer.Execute()
+delayer.WaitForCompletion()
 ```
 
 #### ⚡ 高性能 ID 生成器
@@ -330,7 +368,7 @@ go test -v 2>&1 | Select-String -Pattern "FAIL"
 
 ## 📄 许可协议
 
-本项目采用 [MIT License](LICENSE) 许可协议。
+本项目采用 [MIT License](LICENSE) 许可协议
 
 ## 🙏 致谢
 

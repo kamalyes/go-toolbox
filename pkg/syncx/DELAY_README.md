@@ -1,6 +1,6 @@
 # SyncX Delayer
 
-一个高性能、线程安全的泛型延迟任务执行器，支持多种延迟策略、并发执行、丰富的回调机制和实时结果收集。
+一个高性能、线程安全的泛型延迟任务执行器，支持多种延迟策略、并发执行、丰富的回调机制和实时结果收集
 
 ## 🚀 特性
 
@@ -351,9 +351,11 @@ BenchmarkChannelOperationsAtomic-8   273954898               4.338 ns/op        
 本库使用原子操作和精心设计的并发控制确保线程安全：
 
 - ✅ 通过 `go test -race` 竞争检测
-- ✅ 原子操作管理通道状态
-- ✅ 读写锁保护共享数据
-- ✅ 无锁设计提升性能
+- ✅ 原子操作管理通道状态（`atomic.Int64` 维护 `channelClosed`/`running`/`stopped`/`pendingTasks`）
+- ✅ 原子操作维护统计计数（`SuccessCount`/`ErrorCount` 等）
+- ✅ 读写锁保护共享数据（`sync.RWMutex` 保护 `results`/`genericResults`/`timers`）
+- ✅ `sync.Once` 保证完成信号通道只关闭一次（`completionOnce`）
+- ✅ 对象池复用 `ExecutionContext` 减少 GC 压力
 
 ## 📝 API 参考
 
@@ -366,7 +368,8 @@ BenchmarkChannelOperationsAtomic-8   273954898               4.338 ns/op        
 | `WaitForCompletion()` | 等待任务完成 |
 | `Wait()` | 等待上下文取消 |
 | `Stop()` | 停止执行 |
-| `Close()` | 关闭资源 |
+| `Close()` | 关闭结果通道 |
+| `IsRunning()` | 检查是否正在运行 |
 
 ### 配置方法
 
@@ -377,8 +380,17 @@ BenchmarkChannelOperationsAtomic-8   273954898               4.338 ns/op        
 | `WithStrategy(strategy)` | 设置延迟策略 |
 | `WithConcurrent(bool)` | 启用并发执行 |
 | `WithMaxConcurrency(n)` | 设置最大并发数 |
-| `WithTaskFunc(func)` | 设置泛型任务函数 |
+| `WithTaskFunc(func)` | 设置泛型任务函数（返回 `T, error`） |
+| `WithSimpleTaskFunc(func)` | 设置简单任务函数（仅返回 `error`） |
+| `WithFunction(func)` | 设置要执行的函数（返回 `error`） |
+| `WithSimpleFunction(func)` | 设置无返回值的函数 |
 | `WithContext(ctx)` | 设置上下文 |
+| `WithMaxDelay(duration)` | 设置最大延迟时间 |
+| `WithMultiplier(float)` | 设置指数策略倍数 |
+| `WithRandomBase(float)` | 设置随机基数（随机策略） |
+| `WithCustomDelay(func)` | 设置自定义延迟函数 |
+| `WithStopOnError(bool)` | 设置遇到错误是否停止 |
+| `WithDisableCallbacks(bool)` | 禁用回调以提升性能 |
 
 ### 回调方法
 
@@ -389,14 +401,18 @@ BenchmarkChannelOperationsAtomic-8   273954898               4.338 ns/op        
 | `WithOnSuccess(func)` | 成功回调 (泛型) |
 | `WithOnErrorContext(func)` | 错误处理回调 |
 | `WithOnProgress(func)` | 进度回调 |
+| `WithOnStart(func)` | ⚠️ 向后兼容：开始执行回调 |
+| `WithOnComplete(func)` | ⚠️ 向后兼容：完成执行回调 |
+| `WithOnError(func)` | ⚠️ 向后兼容：错误处理回调 |
 
 ### 结果获取
 
 | 方法 | 描述 |
 |------|------|
-| `GetResults()` | 获取所有结果切片 |
-| `GetResultChannel()` | 获取结果通道 |
+| `GetResults()` | 获取所有泛型结果切片 |
+| `GetResultChannel()` | 获取结果通道（只读） |
 | `GetStats()` | 获取执行统计 |
+| `GetLegacyResults()` | 获取所有执行结果（向后兼容，返回 `[]*ExecutionResult`） |
 
 ## 🎨 使用场景
 

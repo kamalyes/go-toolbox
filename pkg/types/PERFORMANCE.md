@@ -1,47 +1,61 @@
 # Slice 操作性能优化报告
 
+> **说明**：以下性能数据为特定环境下的基准测试结果，绝对数值会随硬件、Go 版本、
+> 负载变化，但内存分配次数（allocs/op）和分配大小（B/op）由算法决定，在不同
+> 环境下保持一致基准测试在 `pkg/types` 目录下通过 `go test -bench=BenchmarkUnique
+> -benchmem -benchtime=2s` 执行
+
 ## Unique 函数优化
 
 ### 优化策略
 
-1. **快速路径优化**：为单个切片场景提供专门的优化路径
+1. **快速路径优化**：为单个切片场景提供专门的优化路径，跳过多切片合并逻辑
 2. **智能容量预分配**：
    - Map 预分配完整容量以避免扩容
-   - Result 切片基于经验值（30% 重复率）预估容量
+   - 多切片场景下 result 基于经验值（30% 重复率）预估容量
    - 小切片（< 8 元素）使用完整容量
 3. **减少内存分配**：通过合理的容量预估减少 append 时的扩容操作
 
+### 函数签名
+
+```go
+// Unique 去重切片（保持原始顺序），支持合并多个切片后去重
+func Unique[T comparable](slices ...[]T) []T
+```
+
 ### 性能基准测试结果
 
+**测试环境：** Windows (amd64)，GOMAXPROCS=8，`-benchtime=2s`
+
 ```
-BenchmarkUnique-20                       5813125               192.0 ns/op           424 B/op          4 allocs/op
-BenchmarkUniqueMultipleSlices-20         2562367               464.0 ns/op          1352 B/op          4 allocs/op
-BenchmarkUniqueLargeSlice-20               95955             12884 ns/op           45136 B/op          6 allocs/op
-BenchmarkUniqueNoDuplicates-20            711675              1656 ns/op            3240 B/op          4 allocs/op
-BenchmarkUniqueAllDuplicates-20          1459696               832.1 ns/op          3240 B/op          4 allocs/op
-BenchmarkUniqueSmallSlice-20            17756732                66.80 ns/op           64 B/op          1 allocs/op
+BenchmarkUnique-8                        3958028               718.3 ns/op           424 B/op          4 allocs/op
+BenchmarkUniqueMultipleSlices-8          1673751              1542 ns/op            1352 B/op          4 allocs/op
+BenchmarkUniqueLargeSlice-8                57770             36655 ns/op           45136 B/op          6 allocs/op
+BenchmarkUniqueNoDuplicates-8             461962              5912 ns/op            3240 B/op          4 allocs/op
+BenchmarkUniqueAllDuplicates-8            861399              2828 ns/op            3240 B/op          4 allocs/op
+BenchmarkUniqueSmallSlice-8             10222339               232.9 ns/op            64 B/op          1 allocs/op
 ```
 
 ### 性能特点
 
-1. **小切片场景**（< 10 元素）：
-   - 单次操作仅需 ~67 ns
+1. **小切片场景**（7 元素）：
+   - 单次操作约 233 ns
    - 内存分配极少（64 B，1 次分配）
    - 适合高频调用场景
 
-2. **中等切片场景**（10-100 元素）：
-   - 单次操作 ~200-1600 ns
+2. **中等切片场景**（12-100 元素）：
+   - 单次操作约 718-5912 ns
    - 内存分配合理（424-3240 B，4 次分配）
    - 性能稳定
 
 3. **大切片场景**（1000+ 元素）：
-   - 单次操作 ~13 μs
+   - 单次操作约 37 μs
    - 线性时间复杂度 O(n)
    - 内存使用高效
 
-4. **多切片合并**：
-   - 相比单切片略慢（~2.4x）
-   - 但仍保持高性能（~464 ns）
+4. **多切片合并**（3 个切片，共 30 元素）：
+   - 相比单切片略慢（约 2.1x）
+   - 但仍保持高性能（约 1542 ns）
    - 内存分配优化（仅 4 次分配）
 
 ### 时间复杂度

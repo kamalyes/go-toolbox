@@ -1,6 +1,6 @@
 # Go-Toolbox Serializer
 
-高性能、类型安全的 Go 泛型序列化器，支持多种序列化格式和压缩算法。
+高性能、类型安全的 Go 泛型序列化器，支持多种序列化格式和压缩算法
 
 ## ✨ 特性
 
@@ -107,12 +107,15 @@ serializer := serializer.New[YourType]().
 
 - `TypeJSON` - JSON 格式（跨语言兼容）
 - `TypeGob` - Go 二进制格式（高效）
+- `TypeMsgpack` - MessagePack 格式（跨语言，尚未实现）
+- `TypeProtobuf` - Protobuf 格式（尚未实现）
 
 ### 压缩类型
 
 - `CompressionNone` - 无压缩
-- `CompressionGzip` - Gzip 压缩
-- `CompressionZlib` - Zlib 压缩（通常效果更好）
+- `CompressionGzip` - Gzip 压缩（基于 `zipx` 包）
+- `CompressionZlib` - Zlib 压缩（基于 `zipx` 包，通常效果更好）
+- `CompressionZstd` - Zstd 压缩（预留，尚未实现）
 
 ### Base64 编码
 
@@ -196,8 +199,11 @@ customSerializer := serializer.New[YourType]().
 
 ### 性能统计
 
+`GetStats` 是 `Serializer[T]` 的方法，需在实例上调用：
+
 ```go
-stats, err := serializer.GetStats(yourObject)
+s := serializer.NewCompact[YourType]()
+stats, err := s.GetStats(yourObject)
 if err != nil {
     log.Fatal(err)
 }
@@ -209,10 +215,15 @@ fmt.Printf("压缩比: %.1f%%\\n", stats.CompressionRatio*100)
 fmt.Printf("节省空间: %.1f%%\\n", stats.SpaceSavedPercent)
 ```
 
+`Stats` 结构体字段：`Type`、`Compression`、`Base64`、`CurrentSize`、`JSONSize`、`GobSize`、`CompressionRatio`、`SpaceSaved`、`SpaceSavedPercent`
+
 ### 性能基准测试
 
+`Benchmark` 同样是 `Serializer[T]` 的方法：
+
 ```go
-result, err := serializer.Benchmark(yourObject, 1000)
+s := serializer.NewCompact[YourType]()
+result, err := s.Benchmark(yourObject, 1000)
 if err != nil {
     log.Fatal(err)
 }
@@ -220,14 +231,19 @@ if err != nil {
 fmt.Printf("编码时间: %v\\n", result.EncodeTime)
 fmt.Printf("解码时间: %v\\n", result.DecodeTime)
 fmt.Printf("数据大小: %d 字节\\n", result.DataSize)
+fmt.Println(result) // 实现 String()，可直接打印
 ```
+
+`BenchmarkResult` 字段：`EncodeTime`、`DecodeTime`、`DataSize`、`Type`、`Compression`、`Iterations`
+若传入的 `iterations <= 0`，会自动回退为 1000
 
 ## 🔍 错误处理
 
-序列化器提供详细的错误信息：
+序列化器提供详细的错误信息，`DecodeFromString` 是 `Serializer[T]` 的方法：
 
 ```go
-decoded, err := serializer.DecodeFromString(encoded)
+s := serializer.NewCompact[YourType]()
+decoded, err := s.DecodeFromString(encoded)
 if err != nil {
     switch {
     case strings.Contains(err.Error(), "无法解码数据"):
@@ -306,15 +322,15 @@ func processBatch(items []LargeData) {
 
 ### ProtoJSONMarshal
 
-将 protobuf 消息序列化为 JSON 字符串。
+将 protobuf 消息序列化为 JSON 字符串
 
 ```go
-func ProtoJSONMarshal(m proto.Message) (string, error)
+func ProtoJSONMarshal(m interface{}) (string, error)
 ```
 
 **参数：**
 
-- `m` - protobuf 消息，可以为 nil
+- `m` - 任意类型，内部会断言为 `proto.Message`；传入 `nil` 或非 `proto.Message` 类型时返回 `("", nil)`
 
 **返回：**
 
@@ -334,23 +350,23 @@ if err != nil {
 }
 fmt.Println(jsonStr) // 输出: "hello"
 
-// 处理 nil 消息
+// 处理 nil 消息（返回空字符串，不报错）
 emptyStr, _ := serializer.ProtoJSONMarshal(nil)
 fmt.Println(emptyStr) // 输出: ""
 ```
 
 ### ProtoJSONUnmarshal
 
-将 JSON 字符串反序列化为 protobuf 消息。
+将 JSON 字符串反序列化为 protobuf 消息**两个参数顺序不限**，内部自动识别哪个是 `proto.Message`、哪个是 JSON 数据
 
 ```go
-func ProtoJSONUnmarshal(s string, m proto.Message) error
+func ProtoJSONUnmarshal(a, b interface{}) error
 ```
 
 **参数：**
 
-- `s` - JSON 字符串，可以为空或 "null"
-- `m` - 目标 protobuf 消息指针
+- `a`, `b` - 两个参数分别为 protobuf 消息指针和 JSON 数据，顺序任意
+- JSON 数据支持 `string`、`[]byte` 或实现 `fmt.Stringer` 的类型
 
 **返回：**
 
@@ -358,15 +374,16 @@ func ProtoJSONUnmarshal(s string, m proto.Message) error
 
 **特性：**
 
-- 自动处理空字符串和 "null"，不做任何操作
-- 自动去除字符串首尾空白
+- 自动识别参数类型，无需关心顺序
+- JSON 数据为空字符串、空白或 `"null"` 时不报错，直接返回 nil
+- 自动去除 JSON 数据首尾空白
 
 **示例：**
 
 ```go
 import "github.com/kamalyes/go-toolbox/pkg/serializer"
 
-// 反序列化 JSON 字符串
+// 反序列化 JSON 字符串（参数顺序任意）
 var msg wrapperspb.StringValue
 err := serializer.ProtoJSONUnmarshal(`"hello"`, &msg)
 if err != nil {
@@ -374,13 +391,87 @@ if err != nil {
 }
 fmt.Println(msg.GetValue()) // 输出: hello
 
-// 处理空字符串（不报错）
+// 也支持 (msg, jsonStr) 顺序
 var msg2 wrapperspb.StringValue
-serializer.ProtoJSONUnmarshal("", &msg2) // 不会报错
+err = serializer.ProtoJSONUnmarshal(&msg2, `"hello"`)
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println(msg2.GetValue()) // 输出: hello
+
+// 处理空字符串（不报错）
+var msg3 wrapperspb.StringValue
+serializer.ProtoJSONUnmarshal("", &msg3) // 不会报错
 
 // 处理 null（不报错）
-var msg3 wrapperspb.StringValue
-serializer.ProtoJSONUnmarshal("null", &msg3) // 不会报错
+var msg4 wrapperspb.StringValue
+serializer.ProtoJSONUnmarshal("null", &msg4) // 不会报错
+```
+
+### LenientProtoJSONUnmarshal（宽松反序列化）
+
+兼容前端将 `int64`/`uint64`/`float64`/`double` 等数字字段以字符串形式传递的场景
+
+```go
+func LenientProtoJSONUnmarshal(data []byte, msg proto.Message) error
+```
+
+**执行流程：**
+
+1. 先用标准 `protojson.Unmarshal` 尝试反序列化（零额外开销）
+2. 失败时快速判断是否为「字符串给了数值字段」类型错误
+3. 若是数字类型错误，调用 `validator.ConvertNumericStrings` 将数字字符串转为 JSON 数字后重试一次
+4. 若重试仍失败，返回第一次的原始错误（避免转换产生的误导性错误）
+
+**支持兼容的类型：**
+
+- `int64` / `sint64` / `sfixed64` / `int32` 等（有符号整数）
+- `uint64` / `fixed64` / `uint32` 等（无符号整数）
+- `float` / `double`（浮点数，如 `"3.14"`、`"1e10"`）
+
+**安全保障：**
+
+- 非数字字符串（如 `"hello"`）不会被错误转换
+- 标准请求（数字以正确形式传递）无额外性能开销
+- 非数字类型错误（语法错误、缺字段等）直接返回，不执行转换
+
+**示例：**
+
+```go
+import "github.com/kamalyes/go-toolbox/pkg/serializer"
+
+var msg wrapperspb.Int64Value
+// 前端将 int64 以字符串形式传递："123" 而非 123
+err := serializer.LenientProtoJSONUnmarshal([]byte(`"123"`), &msg)
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println(msg.GetValue()) // 输出: 123
+```
+
+### LenientProtoJSONOptions（宽松反序列化选项）
+
+封装 `protojson.UnmarshalOptions`，在标准解析失败时自动执行数字字符串转换并重试
+
+```go
+type LenientProtoJSONOptions struct {
+    DiscardUnknown bool // 是否忽略未知字段
+    AllowPartial   bool // 是否允许部分反序列化（缺少必填字段不报错）
+}
+
+func (o LenientProtoJSONOptions) Unmarshal(data []byte, msg proto.Message) error
+func (o LenientProtoJSONOptions) ToProtojsonOptions() protojson.UnmarshalOptions
+```
+
+**示例：**
+
+```go
+opts := serializer.LenientProtoJSONOptions{
+    DiscardUnknown: true,
+    AllowPartial:   true,
+}
+var msg wrapperspb.Int64Value
+err := opts.Unmarshal([]byte(`"123"`), &msg)
 ```
 
 ### 使用场景
@@ -389,6 +480,7 @@ serializer.ProtoJSONUnmarshal("null", &msg3) // 不会报错
 2. **API 响应**：将 protobuf 消息转换为 JSON 格式返回
 3. **配置文件**：读取 JSON 配置到 protobuf 消息
 4. **消息队列**：在消息队列中传输 protobuf 消息
+5. **前端兼容**：使用 `LenientProtoJSONUnmarshal` 兼容前端以字符串传递数字字段的场景
 
 ### 完整示例
 
@@ -398,7 +490,7 @@ package main
 import (
     "fmt"
     "log"
-    
+
     "github.com/kamalyes/go-toolbox/pkg/serializer"
     "google.golang.org/protobuf/types/known/wrapperspb"
 )
@@ -406,14 +498,14 @@ import (
 func main() {
     // 创建 protobuf 消息
     original := wrapperspb.String("test message")
-    
+
     // 序列化为 JSON
     jsonStr, err := serializer.ProtoJSONMarshal(original)
     if err != nil {
         log.Fatal(err)
     }
     fmt.Printf("序列化结果: %s\n", jsonStr)
-    
+
     // 反序列化回 protobuf
     var restored wrapperspb.StringValue
     err = serializer.ProtoJSONUnmarshal(jsonStr, &restored)
@@ -423,6 +515,72 @@ func main() {
     fmt.Printf("反序列化结果: %s\n", restored.GetValue())
 }
 ```
+
+---
+
+## 📝 JSON 便捷函数
+
+### ToJSON / FromJSON
+
+`ToJSON` 将任意类型转换为 JSON 字符串（兼容 nil 和零值，序列化失败返回空字符串）
+`FromJSON` 将 JSON 字符串转换为指定类型（兼容空字符串，反序列化失败返回零值）
+
+```go
+func ToJSON[T any](v T) string
+func FromJSON[T any](jsonStr string) T
+```
+
+**示例：**
+
+```go
+type User struct {
+    ID   string `json:"id"`
+    Name string `json:"name"`
+}
+
+// 序列化
+jsonStr := serializer.ToJSON(User{ID: "1", Name: "kamalyes"})
+fmt.Println(jsonStr) // {"id":"1","name":"kamalyes"}
+
+// 反序列化
+user := serializer.FromJSON[User](jsonStr)
+fmt.Println(user.Name) // kamalyes
+
+// 空字符串返回零值
+empty := serializer.FromJSON[User]("")
+fmt.Println(empty.ID) // ""
+```
+
+### JSONMarshal / JSONUnmarshal
+
+支持 protobuf 消息的泛型 JSON 编解码函数，会通过反射自动检测类型中是否包含 protobuf 消息字段，包含时使用 `protojson` 处理对应字段
+
+```go
+func JSONMarshal[T any](value T) ([]byte, error)
+func JSONUnmarshal[T any](data []byte, target *T) error
+```
+
+- `JSONUnmarshal` 的 `target` 为 nil 时返回 `ErrJSONNilTarget` 错误
+- 反序列化结构体时优先使用快速字段扫描，失败后回退到标准 `map` 解码路径
+
+### JSON 错误类型
+
+包内提供一组结构化 JSON 错误，便于调用方按 `errors.Is` 精确判断：
+
+| 错误变量 | 说明 |
+|---------|------|
+| `ErrJSONNilTarget` | 反序列化目标为 nil |
+| `ErrJSONUnexpectedEndObject` | JSON 对象意外结束 |
+| `ErrJSONExpectedObject` | 期望 JSON 对象 |
+| `ErrJSONExpectedArray` | 期望 JSON 数组 |
+| `ErrJSONExpectedObjectKeySeparator` | 对象键值后缺少 `:` |
+| `ErrJSONInvalidUnknownFieldValue` | 未知字段值非法 |
+| `ErrJSONExpectedObjectNext` | 对象值后缺少 `,` 或 `}` |
+| `ErrJSONExpectedArrayNext` | 数组元素后缺少 `,` 或 `]` |
+| `ErrJSONMapKeyUnsupported` | proto-aware map 仅支持 string 键 |
+
+每个错误均有对应的 `NewJSONXxxError` 构造函数和 `IsJSONXxxError` 判断函数
+字段级、元素级、键级错误分别由 `NewJSONFieldError`、`NewJSONItemError`、`NewJSONKeyError` 包装，保留上下文信息
 
 ## 📄 许可证
 

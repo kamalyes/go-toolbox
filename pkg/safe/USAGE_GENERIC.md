@@ -2,7 +2,7 @@
 
 ## 概述
 
-`SafeAccess` 现在支持强大的泛型操作和类型转换，集成了 `convert` 包的转换能力，提供了类似 JavaScript 可选链的安全访问体验。
+`SafeAccess` 现在支持强大的泛型操作和类型转换，集成了 `convert` 包的转换能力，提供了类似 JavaScript 可选链的安全访问体验
 
 ## 核心特性
 
@@ -142,7 +142,7 @@ result := s.FlatMap(func(v interface{}) *safe.SafeAccess {
     if num, ok := v.(int); ok {
         return safe.Safe(num * 3)
     }
-    return &safe.SafeAccess{valid: false}
+    return safe.Safe(nil) // 返回无效的 SafeAccess
 })
 // SafeAccess(15)
 ```
@@ -152,7 +152,7 @@ result := s.FlatMap(func(v interface{}) *safe.SafeAccess {
 s := safe.Safe(42)
 result := safe.OrDefault[int](s, 999)  // 42
 
-s = &safe.SafeAccess{valid: false}
+s = safe.Safe(nil) // 无效值
 result = safe.OrDefault[int](s, 999)   // 999
 ```
 
@@ -162,9 +162,11 @@ s := safe.Safe(100)
 result := safe.Must[int](s)  // 100
 
 // 无效值会 panic
-s = &safe.SafeAccess{valid: false}
+s = safe.Safe(nil)
 result = safe.Must[int](s)  // panic!
 ```
+
+> 注意：`SafeAccess` 的 `value` 和 `valid` 字段均为未导出字段，不能通过 `&safe.SafeAccess{valid: false}` 构造，请使用 `safe.Safe(nil)` 获取一个无效的 `SafeAccess`
 
 ### 6. 条件操作
 
@@ -203,14 +205,37 @@ s := safe.Safe(42)
 
 s.IsNumber()              // true
 s.IsString()              // false
+s.IsBool()                // false
 safe.IsType[int](s)       // true
 safe.IsType[string](s)    // false
+
+s = safe.Safe(true)
+s.IsBool()                // true
 
 s = safe.Safe([]int{1, 2, 3})
 s.IsSlice()               // true
 
 s = safe.Safe(map[string]interface{}{})
 s.IsMap()                 // true
+```
+
+### 7.5 路径访问方法
+
+`At()` 及其衍生方法支持点号分隔的字段路径，比逐级 `Field()` 更简洁：
+
+```go
+s := safe.Safe(config)
+
+// At 返回 *SafeAccess，可继续链式调用
+raw := s.At("Server.Port")
+
+// 便捷取值方法
+port := s.IntAt("Server.Port", 8080)
+enabled := s.BoolAt("Health.Redis.Enabled", false)
+timeout := s.DurationAt("Health.Redis.Timeout", 30*time.Second)
+name := s.StringAt("Server.Name", "default")
+nameOr := s.StringOrAt("Server.Name", "default") // 空字符串也走默认值
+val := s.ValueAt("Server.Metadata")              // 原始值
 ```
 
 ### 8. 集合操作

@@ -24,75 +24,83 @@ if config != nil {
 
 ## ✨ 解决方案
 
-我们提供了类似JavaScript可选链操作符的Go装饰器模式，让配置访问变得安全且优雅。
+我们提供了类似JavaScript可选链操作符的Go装饰器模式，让配置访问变得安全且优雅
 
-### 1. 通用安全访问 - Safe()
+### 通用安全访问 - Safe()
 
 ```go
-import gotoolbox "github.com/kamalyes/go-toolbox"
+import "github.com/kamalyes/go-toolbox/pkg/safe"
 
 // ✅ 安全的链式访问
-enabled := gotoolbox.Safe(config).
+enabled := safe.Safe(config).
     Field("Health").
     Field("Redis").
     Field("Enabled").
     Bool(false) // 默认值
 
-timeout := gotoolbox.Safe(config).
+timeout := safe.Safe(config).
     Field("Health").
     Field("Redis").
     Field("Timeout").
     Duration(30 * time.Second)
+
+// ✅ 使用路径访问方法 At() 更简洁
+port := safe.Safe(config).At("Server.Port").Int(8080)
+host := safe.Safe(config).At("Server.Host").String("localhost")
 ```
 
-### 2. 配置专用安全访问 - SafeConfig()
+### 路径便捷方法
+
+除了逐级 `Field()` 访问，还支持以点号分隔的路径访问：
 
 ```go
-// ✅ 更简洁的配置访问
-configSafe := gotoolbox.SafeConfig(config)
-
-// 预定义的方法，更易读
-if configSafe.IsRedisHealthEnabled() {
-    timeout := configSafe.GetRedisHealthTimeout(30 * time.Second)
-    // ...
-}
-
-if configSafe.IsMySQLHealthEnabled() {
-    timeout := configSafe.GetMySQLHealthTimeout(30 * time.Second)
-    // ...
-}
-
-// 链式访问
-port := configSafe.HTTP().Port(8080)
-host := configSafe.Server().Host("localhost")
+// BoolAt / IntAt / StringAt / StringOrAt / DurationAt / ValueAt
+enabled := safe.Safe(config).BoolAt("Health.Redis.Enabled", false)
+timeout := safe.Safe(config).DurationAt("Health.Redis.Timeout", 30*time.Second)
+port    := safe.Safe(config).IntAt("Server.Port", 8080)
+name    := safe.Safe(config).StringOrAt("Server.Name", "default")
+raw     := safe.Safe(config).ValueAt("Server.Metadata")
 ```
 
 ## 🚀 特性
 
 ### 支持的数据类型
 
-- `Bool(defaultValue)` - 布尔值
-- `Int(defaultValue)` - 整数
-- `String(defaultValue)` - 字符串  
-- `Duration(defaultValue)` - 时间间隔
-- `Value()` - 原始值
+SafeAccess 提供以下取值方法（均支持可变参数默认值）：
+
+| 方法 | 返回类型 | 说明 |
+|------|----------|------|
+| `Bool(defaultValue...)` | `bool` | 布尔值，底层使用 `convert.MustBool` |
+| `Int(defaultValue...)` | `int` | 整数，支持类型自动转换 |
+| `Int64(defaultValue...)` | `int64` | int64 值 |
+| `Int32(defaultValue...)` | `int32` | int32 值 |
+| `Uint(defaultValue...)` | `uint` | 无符号整数 |
+| `Uint64(defaultValue...)` | `uint64` | uint64 值 |
+| `Float32(defaultValue...)` | `float32` | float32 值 |
+| `Float64(defaultValue...)` | `float64` | float64 值 |
+| `String(defaultValue...)` | `string` | 字符串，底层使用 `convert.MustString` |
+| `StringOr(defaultValue)` | `string` | 字符串，无效或为空时返回默认值 |
+| `Duration(defaultValue...)` | `time.Duration` | 时间间隔，支持 `time.Duration`、`*time.Duration`、字符串、`int` |
+| `Value()` | `interface{}` | 原始值 |
+
+> 字段名匹配支持多种命名风格：camelCase、PascalCase、snake_case、kebab-case，由 `stringx.NormalizeFieldName` 自动归一化
 
 ### 高级功能
 
 ```go
 // 条件执行
-gotoolbox.Safe(config).Field("Name").IfPresent(func(v interface{}) {
+safe.Safe(config).Field("Name").IfPresent(func(v interface{}) {
     fmt.Printf("配置名称: %v\n", v)
 })
 
 // 备选值
-debugMode := gotoolbox.Safe(config).
+debugMode := safe.Safe(config).
     Field("Debug").
     OrElse(false).
     Bool()
 
 // 值转换
-upperName := gotoolbox.Safe(config).Field("Name").Map(func(v interface{}) interface{} {
+upperName := safe.Safe(config).Field("Name").Map(func(v interface{}) interface{} {
     if s, ok := v.(string); ok {
         return strings.ToUpper(s)
     }
@@ -100,7 +108,7 @@ upperName := gotoolbox.Safe(config).Field("Name").Map(func(v interface{}) interf
 }).String()
 
 // 值过滤
-validPort := gotoolbox.Safe(config).
+validPort := safe.Safe(config).
     Field("Server").
     Field("Port").
     Filter(func(v interface{}) bool {
@@ -112,9 +120,37 @@ validPort := gotoolbox.Safe(config).
     Int(8080)
 ```
 
+### 泛型取值方法
+
+除上述固定类型方法外，还提供泛型版本（详见 [USAGE_GENERIC.md](USAGE_GENERIC.md)）：
+
+```go
+// 泛型数值转换
+intVal := safe.As[int](s, 999)
+
+// 泛型浮点转换（支持取整模式）
+fVal := safe.AsFloat[float64](s, convert.RoundNearest)
+
+// 泛型默认值 / 强制取值
+v := safe.OrDefault[int](s, 100)
+v := safe.Must[int](s)  // 无效时 panic
+```
+
+### Map 快捷取值函数
+
+针对 `map[string]interface{}` 提供的便捷函数：
+
+```go
+m := map[string]interface{}{"host": "localhost", "port": 8080, "tags": []string{"a", "b"}}
+
+safe.SafeGetString(m, "host")        // "localhost"
+safe.SafeGetBool(m, "enabled")       // false
+safe.SafeGetStringSlice(m, "tags")   // []string{"a", "b"}
+```
+
 ## 🔧 实际应用示例
 
-### 修复前 (middleware_init.go)
+### 修复前
 
 ```go
 // ❌ 容易出错的写法
@@ -134,16 +170,16 @@ if s.config.Health != nil {
 
 ```go
 // ✅ 简洁安全的写法
-configSafe := gotoolbox.SafeConfig(s.config)
+configSafe := safe.Safe(s.config)
 
-if configSafe.IsRedisHealthEnabled() {
-    timeout := configSafe.GetRedisHealthTimeout(30 * time.Second)
+if configSafe.BoolAt("Health.Redis.Enabled", false) {
+    timeout := configSafe.DurationAt("Health.Redis.Timeout", 30*time.Second)
     redisChecker := middleware.NewRedisChecker(timeout)
     healthManager.RegisterChecker(redisChecker)
 }
 
-if configSafe.IsMySQLHealthEnabled() {
-    timeout := configSafe.GetMySQLHealthTimeout(30 * time.Second)
+if configSafe.BoolAt("Health.MySQL.Enabled", false) {
+    timeout := configSafe.DurationAt("Health.MySQL.Timeout", 30*time.Second)
     mysqlChecker := middleware.NewMySQLChecker(timeout)
     healthManager.RegisterChecker(mysqlChecker)
 }
@@ -151,21 +187,41 @@ if configSafe.IsMySQLHealthEnabled() {
 
 ## 🕵️ Nil Panic 检测工具
 
-我们还提供了静态分析工具来检测项目中潜在的nil panic风险：
+`safe` 包内置了 `NilPanicDetector`，可扫描 Go 源码中潜在的 nil panic 风险：
 
-```bash
-# 检测当前目录
-go run ./cmd/nil-detector -path=.
+```go
+import "github.com/kamalyes/go-toolbox/pkg/safe"
 
-# 只显示高风险问题
-go run ./cmd/nil-detector -path=. -high-only
+detector := safe.NewNilPanicDetector()
 
-# 显示修复建议
-go run ./cmd/nil-detector -path=. -suggestions
+// 扫描整个目录
+if err := detector.ScanDirectory("."); err != nil {
+    log.Fatal(err)
+}
 
-# JSON格式输出
-go run ./cmd/nil-detector -path=. -format=json
+// 输出文本报告
+fmt.Println(detector.GenerateReport())
+
+// 获取结构化问题列表
+issues := detector.GetIssues()
+for _, issue := range issues {
+    fmt.Printf("%s:%d %s %s\n", issue.File, issue.Line, issue.Severity, issue.Description)
+}
+
+// 获取修复建议
+for _, s := range detector.GetFixSuggestions() {
+    fmt.Println(s)
+}
 ```
+
+检测器内置的风险模式：
+
+| 类型 | 严重级别 | 说明 |
+|------|----------|------|
+| `NestedFieldAccess` | HIGH | 深度 ≥3 的嵌套字段访问 |
+| `PointerDereference` | HIGH | 未做 nil 检查的指针解引用 |
+| `IndexAccess` | MEDIUM | 切片/数组索引访问可能越界 |
+| `TypeAssertion` | MEDIUM | 类型断言可能失败 |
 
 检测输出示例：
 
@@ -186,7 +242,7 @@ go run ./cmd/nil-detector -path=. -format=json
 1. 在你的项目中导入：
 
 ```go
-import gotoolbox "github.com/kamalyes/go-toolbox"
+import "github.com/kamalyes/go-toolbox/pkg/safe"
 ```
 
 2. 替换危险的嵌套访问：
@@ -196,23 +252,24 @@ import gotoolbox "github.com/kamalyes/go-toolbox"
 if config.Health.Redis.Enabled {  // 危险!
 
 // 替换为
-if gotoolbox.SafeConfig(config).IsRedisHealthEnabled() {  // 安全!
+if safe.Safe(config).BoolAt("Health.Redis.Enabled", false) {  // 安全!
 ```
 
 ## 🎯 最佳实践
 
-1. **优先使用ConfigSafe**: 对于配置结构体，优先使用`SafeConfig()`
-2. **提供默认值**: 总是为`Bool()`, `Int()`, `String()`等方法提供合理的默认值
-3. **链式调用**: 利用链式调用使代码更简洁
-4. **运行检测工具**: 定期运行nil-detector检测潜在风险
+1. **提供默认值**：为 `Bool()`、`Int()`、`String()` 等方法提供合理的默认值
+2. **善用路径访问**：`At()` / `BoolAt()` 等方法支持点号路径，比逐级 `Field()` 更简洁
+3. **链式调用**：利用链式调用使代码更简洁
+4. **运行检测工具**：定期用 `NilPanicDetector` 扫描潜在风险
+5. **泛型优先**：需要灵活类型转换时优先使用 `As[T]` / `AsFloat[T]`
 
 ## 🔄 与JavaScript可选链的对比
 
-| JavaScript | Go安全访问 |
+| JavaScript | Go 安全访问 |
 |------------|-----------|
-| `config?.health?.redis?.enabled` | `Safe(config).Field("Health").Field("Redis").Field("Enabled").Bool()` |
-| `config?.health?.redis?.enabled ?? false` | `SafeConfig(config).IsRedisHealthEnabled()` |
-| `config?.server?.port ?? 8080` | `SafeConfig(config).GetServerPort(8080)` |
+| `config?.health?.redis?.enabled` | `safe.Safe(config).At("Health.Redis.Enabled").Bool()` |
+| `config?.health?.redis?.enabled ?? false` | `safe.Safe(config).BoolAt("Health.Redis.Enabled", false)` |
+| `config?.server?.port ?? 8080` | `safe.Safe(config).IntAt("Server.Port", 8080)` |
 
 ## 🤝 贡献
 

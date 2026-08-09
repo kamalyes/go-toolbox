@@ -1,54 +1,54 @@
 # 快速格式化函数性能报告
 
+> **包位置说明**：本文档涉及的 `FastFormatTime`、`FastAppendInt`、`FastFormatTimeISO`、
+> `FastFormatTimeCompact`、`FastItoa`、`FastFloat` 函数均定义在
+> [`pkg/stringx`](../stringx/conv.go) 包中`convert` 包的 `AppendValue` 函数内部
+> 通过 `stringx.FastAppendInt` 和 `stringx.FastFloat` 复用这些优化实现
+> 下文代码示例统一使用 `stringx.` 前缀引用
+
 ## 📊 实际性能测试结果
 
 **测试环境：**
-- CPU: 12th Gen Intel(R) Core(TM) i7-12700KF
 - OS: Windows (amd64)
 - Go Version: 1.20+
-- 测试方法：`go test -bench=. -benchmem -benchtime=3s`
+- GOMAXPROCS: 8
+- 测试方法：`go test -bench=. -benchmem -benchtime=2s`（在 `pkg/stringx` 目录下执行）
 
 ---
 
 ## 1. FastAppendInt vs strconv.Itoa 性能对比
 
-**测试方法：** 5 次运行取平均值（`-benchtime=5s -count=5`）
-
 ### 详细数据表
 
-| 场景 | FastAppendInt (平均) | strconv.Itoa (平均) | strconv.AppendInt (平均) | 最优方案 |
-|------|---------------------|--------------------|-----------------------|----------|
-| 单位数 (5) | 1.058 ns/op, 0B, 0 allocs | 1.068 ns/op, 0B, 0 allocs | 2.115 ns/op, 0B, 0 allocs | **相当** |
-| 两位数 (42) | 1.628 ns/op, 0B, 0 allocs | 1.058 ns/op, 0B, 0 allocs | 2.095 ns/op, 0B, 0 allocs | **strconv.Itoa (1.54x)** |
-| **三位数 (123)** | **2.494 ns/op, 0B, 0 allocs** | **12.15 ns/op, 3B, 1 allocs** | **7.071 ns/op, 0B, 0 allocs** | **FastAppendInt (4.87x)** ⚡ |
-| 四位数 (1234) | 7.622 ns/op, 0B, 0 allocs | 12.59 ns/op, 4B, 1 allocs | 6.848 ns/op, 0B, 0 allocs | **strconv.AppendInt (1.11x)** |
-| 大数 (123567) | 8.141 ns/op, 0B, 0 allocs | 14.72 ns/op, 8B, 1 allocs | 7.808 ns/op, 0B, 0 allocs | **strconv.AppendInt (1.04x)** |
+| 场景 | FastAppendInt | strconv.Itoa | strconv.AppendInt | 最优方案 |
+|------|---------------|--------------|-------------------|----------|
+| 单位数 (5) | 3.449 ns/op, 0B, 0 allocs | 3.807 ns/op, 0B, 0 allocs | 7.526 ns/op, 0B, 0 allocs | **FastAppendInt (1.10x)** |
+| 两位数 (42) | 5.705 ns/op, 0B, 0 allocs | 3.666 ns/op, 0B, 0 allocs | 7.409 ns/op, 0B, 0 allocs | **strconv.Itoa (1.56x)** |
+| **三位数 (123)** | **7.503 ns/op, 0B, 0 allocs** | **35.34 ns/op, 3B, 1 allocs** | **15.14 ns/op, 0B, 0 allocs** | **FastAppendInt (4.71x)** ⚡ |
+| 四位数 (1234) | 17.07 ns/op, 0B, 0 allocs | 29.86 ns/op, 4B, 1 allocs | 15.95 ns/op, 0B, 0 allocs | **strconv.AppendInt (1.07x)** |
+| 大数 (123567) | 22.36 ns/op, 0B, 0 allocs | 33.11 ns/op, 8B, 1 allocs | 17.35 ns/op, 0B, 0 allocs | **strconv.AppendInt (1.29x)** |
 
 ### 关键发现
 
-✅ **三位数场景最优**：FastAppendInt 比 strconv.Itoa 快 **4.87 倍**
-- FastAppendInt: 2.494 ns/op, 0B, 0 allocs
-- strconv.Itoa: 12.15 ns/op, 3B, 1 allocs
-- 性能提升：(12.15 - 2.494) / 2.494 = **387%**
-
-✅ **稳定性极佳**：5 次运行标准差 < 0.01 ns
-- 三位数 FastAppendInt: 2.485-2.502 ns（波动 0.7%）
-- 三位数 strconv.Itoa: 12.03-12.24 ns（波动 1.7%）
+✅ **三位数场景最优**：FastAppendInt 比 strconv.Itoa 快 **4.71 倍**
+- FastAppendInt: 7.503 ns/op, 0B, 0 allocs
+- strconv.Itoa: 35.34 ns/op, 3B, 1 allocs
+- 性能提升：(35.34 - 7.503) / 7.503 = **371%**
 
 ⚠️ **单双位数**：strconv.Itoa 有编译器优化，性能相当或更好
-- 单位数：性能相当（1.058 vs 1.068 ns）
-- 两位数：strconv.Itoa 快 1.54x（1.058 vs 1.628 ns）
+- 单位数：FastAppendInt 略快 1.10x（3.449 vs 3.807 ns）
+- 两位数：strconv.Itoa 快 1.56x（3.666 vs 5.705 ns）
 
 ✅ **零内存分配**：FastAppendInt 在所有场景下都是 0 allocs
 
 💡 **使用建议**：
-- **100-999 范围**：优先使用 FastAppendInt（4.87x 性能提升）
+- **100-999 范围**：优先使用 FastAppendInt（4.71x 性能提升）
 - **0-99 范围**：使用 strconv.Itoa（编译器优化）
 - **≥1000 范围**：使用 strconv.AppendInt（标准库优化）
 
 ---
 
-## 📊 为什么三位数时 FastAppendInt 比 strconv.Itoa 快 4.87 倍？
+## 📊 为什么三位数时 FastAppendInt 比 strconv.Itoa 快 4.71 倍？
 
 ### 根本原因分析
 
@@ -61,7 +61,7 @@
 ```go
 // 三位数 (100-999) 的优化实现
 if val < 1000 {
-    return append(buf, 
+    return append(buf,
         byte('0'+val/100),           // 百位
         byte('0'+(val/10)%10),       // 十位
         byte('0'+val%10))            // 个位
@@ -85,32 +85,13 @@ if val < 1000 {
 | **三位数** | **0 allocs** ✅ | **1 allocs** ❌ |
 | 四位数 | 0 allocs | 1 allocs |
 
-**实际耗时分解：**
-
-FastAppendInt (2.494 ns)：
-```
-算术运算：    ~1.5 ns  (60%)
-内存追加：    ~0.8 ns  (32%)
-其他开销：    ~0.2 ns  (8%)
-```
-
-strconv.Itoa (12.15 ns)：
-```
-内存分配：    ~8 ns    (66%)
-算术运算：    ~2 ns    (16%)
-字符串转换：  ~1.5 ns  (12%)
-其他开销：    ~0.65 ns (6%)
-```
-
-**性能差异主要来自：内存分配占用了 66% 的时间！**
-
 ### 关键洞察
 
 > **内存分配是性能杀手！**
-> 
-> 在纳秒级别的操作中，一次内存分配（~8 ns）的开销
-> 远大于几次算术运算（~1.5 ns）的开销
-> 
+>
+> 在纳秒级别的操作中，一次内存分配的开销
+> 远大于几次算术运算的开销
+>
 > 这就是为什么零内存分配的设计如此重要
 
 ---
@@ -121,15 +102,15 @@ strconv.Itoa (12.15 ns)：
 
 | 格式 | FastFormat | time.Format | 性能提升 | 内存节省 |
 |------|------------|-------------|----------|----------|
-| 标准格式 (YYYY/M/D HH:MM:SS) | 31.01 ns/op, 0B, 0 allocs | 93.64 ns/op, 24B, 1 allocs | **3.0x** ⚡ | 24B |
-| ISO 格式 (YYYY-MM-DD HH:MM:SS) | 30.02 ns/op, 0B, 0 allocs | 79.34 ns/op, 24B, 1 allocs | **2.6x** ⚡ | 24B |
-| 紧凑格式 (YYYYMMDDHHMMSS) | 27.91 ns/op, 0B, 0 allocs | 65.05 ns/op, 16B, 1 allocs | **2.3x** ⚡ | 16B |
+| 标准格式 (YYYY/M/D HH:MM:SS) | 69.13 ns/op, 0B, 0 allocs | 214.4 ns/op, 24B, 1 allocs | **3.1x** ⚡ | 24B |
+| ISO 格式 (YYYY-MM-DD HH:MM:SS) | 58.85 ns/op, 0B, 0 allocs | 177.3 ns/op, 24B, 1 allocs | **3.0x** ⚡ | 24B |
+| 紧凑格式 (YYYYMMDDHHMMSS) | 67.57 ns/op, 0B, 0 allocs | 188.7 ns/op, 16B, 1 allocs | **2.8x** ⚡ | 16B |
 
 ### 关键发现
 
-✅ **稳定高性能**：所有格式都在 28-31 ns 范围内
+✅ **稳定高性能**：所有格式都在 58-69 ns 范围内
 ✅ **零内存分配**：完全避免 GC 压力
-✅ **性能提升**：比 time.Format 快 **2.3-3.0 倍**
+✅ **性能提升**：比 time.Format 快 **2.8-3.1 倍**
 
 ---
 
@@ -139,10 +120,10 @@ strconv.Itoa (12.15 ns)：
 
 | 方法 | 性能 | 内存分配 | 性能提升 |
 |------|------|----------|----------|
-| FastFormatTime (并发) | 2.57 ns/op, 0B, 0 allocs | - | **基准** |
-| time.Format (并发) | 14.85 ns/op, 24B, 1 allocs | - | **5.8x** ⚡ |
+| FastFormatTime (并发) | 19.24 ns/op, 0B, 0 allocs | - | **基准** |
+| time.Format (并发) | 108.0 ns/op, 24B, 1 allocs | - | **5.6x** ⚡ |
 
-💡 **并发场景下性能提升更明显**：FastFormatTime 比 time.Format 快 **5.8 倍**
+💡 **并发场景下性能提升更明显**：FastFormatTime 比 time.Format 快 **5.6 倍**
 
 ---
 
@@ -155,12 +136,12 @@ strconv.Itoa (12.15 ns)：
 
 | 方法 | 性能 | 内存分配 | 性能提升 |
 |------|------|----------|----------|
-| FastFormat 方案 | 42.73 ns/op, 0B, 0 allocs | - | **基准** |
-| 标准库方案 | 153.5 ns/op, 93B, 3 allocs | - | **3.6x** ⚡ |
+| FastFormat 方案 | 75.74 ns/op, 0B, 0 allocs | - | **基准** |
+| 标准库方案 | 309.3 ns/op, 93B, 3 allocs | - | **4.1x** ⚡ |
 
 ### 关键发现
 
-✅ **真实场景性能提升**：**3.6 倍**
+✅ **真实场景性能提升**：**4.1 倍**
 ✅ **内存分配减少**：**100%**（0 vs 3 次分配）
 ✅ **内存使用减少**：**100%**（0B vs 93B）
 
@@ -172,15 +153,15 @@ strconv.Itoa (12.15 ns)：
 
 | 测试项 | 性能 | 内存分配 |
 |--------|------|----------|
-| FastFormatTime (无分配) | 30.57 ns/op | 0B, 0 allocs ✅ |
-| time.Format (有分配) | 92.50 ns/op | 24B, 1 allocs ❌ |
+| FastFormatTime (无分配) | 69.69 ns/op | 0B, 0 allocs ✅ |
+| time.Format (有分配) | 252.5 ns/op | 24B, 1 allocs ❌ |
 
 ### FastAppendInt 内存分配
 
 | 测试项 | 性能 | 内存分配 |
 |--------|------|----------|
-| FastAppendInt (无分配) | 2.494 ns/op | 0B, 0 allocs ✅ |
-| strconv.Itoa (有分配) | 12.15 ns/op | 3B, 1 allocs ❌ |
+| FastAppendInt (无分配) | 6.630 ns/op | 0B, 0 allocs ✅ |
+| strconv.Itoa (有分配) | 26.98 ns/op | 3B, 1 allocs ❌ |
 
 ---
 
@@ -190,31 +171,29 @@ strconv.Itoa (12.15 ns)：
 
 | 场景 | 推荐方案 | 性能提升 | 原因 |
 |------|----------|----------|------|
-| 0-9 | strconv.Itoa | 相当 | 编译器优化 |
-| 10-99 | strconv.Itoa | 1.54x | 编译器优化 |
-| **100-999** | **FastAppendInt** | **4.87x** ⚡ | **零分配 + 简单算术** |
-| 1000-9999 | strconv.AppendInt | 1.11x | 标准库优化 |
-| >= 10000 | strconv.AppendInt | 1.04x | 标准库优化 |
-| 时间格式化（任意格式） | FastFormatTime | **2.3-3.0x** | 零分配 |
-| 并发时间格式化 | FastFormatTime | **5.8x** | 无锁竞争 |
-| 日志行构建 | FastFormat 组合 | **3.6x** | 综合优化 |
+| 0-9 | FastAppendInt / strconv.Itoa | 相当 | 编译器优化 |
+| 10-99 | strconv.Itoa | 1.56x | 编译器优化 |
+| **100-999** | **FastAppendInt** | **4.71x** ⚡ | **零分配 + 简单算术** |
+| 1000-9999 | strconv.AppendInt | 1.07x | 标准库优化 |
+| >= 10000 | strconv.AppendInt | 1.29x | 标准库优化 |
+| 时间格式化（任意格式） | FastFormatTime | **2.8-3.1x** | 零分配 |
+| 并发时间格式化 | FastFormatTime | **5.6x** | 无锁竞争 |
+| 日志行构建 | FastFormat 组合 | **4.1x** | 综合优化 |
 
 ### 性能提升汇总
 
 | 指标 | 提升幅度 | 数据来源 |
 |------|----------|----------|
-| 整数格式化 (100-999) | **4.87x** ⚡ | 5 次运行平均 |
-| 时间格式化（标准） | **3.0x** ⚡ | 基准测试 |
-| 时间格式化（ISO） | **2.6x** ⚡ | 基准测试 |
-| 时间格式化（紧凑） | **2.3x** ⚡ | 基准测试 |
-| 并发时间格式化 | **5.8x** ⚡ | 并发测试 |
-| 真实日志场景 | **3.6x** ⚡ | 综合测试 |
+| 整数格式化 (100-999) | **4.71x** ⚡ | 基准测试 |
+| 时间格式化（标准） | **3.1x** ⚡ | 基准测试 |
+| 时间格式化（ISO） | **3.0x** ⚡ | 基准测试 |
+| 时间格式化（紧凑） | **2.8x** ⚡ | 基准测试 |
+| 并发时间格式化 | **5.6x** ⚡ | 并发测试 |
+| 真实日志场景 | **4.1x** ⚡ | 综合测试 |
 | 内存分配 | **100% 减少** ✅ | 所有场景 |
 
-**测试稳定性：**
-- 标准差 < 1%
-- 5 次运行结果高度一致
-- 性能数据可靠
+**说明：** 以上数据为特定环境下的基准测试结果，绝对数值会随硬件、Go 版本、
+负载变化，但零内存分配的特性在所有环境下均成立，相对性能优势稳定
 
 ---
 
@@ -250,17 +229,19 @@ strconv.Itoa (12.15 ns)：
 ### 1. 复用缓冲区
 
 ```go
+import "github.com/kamalyes/go-toolbox/pkg/stringx"
+
 // ✅ 推荐：复用缓冲区
 buf := make([]byte, 0, 128)
 for _, item := range items {
-    buf = FastFormatTime(buf[:0], item.Time)
+    buf = stringx.FastFormatTime(buf[:0], item.Time)
     // 使用 buf...
 }
 
 // ❌ 避免：每次都创建新缓冲区
 for _, item := range items {
     buf := make([]byte, 0, 128)
-    buf = FastFormatTime(buf, item.Time)
+    buf = stringx.FastFormatTime(buf, item.Time)
 }
 ```
 
@@ -283,11 +264,25 @@ buf := make([]byte, 0, 16)
 // ✅ 推荐：批量构建后一次性写入
 buf := make([]byte, 0, 4096)
 for _, item := range items {
-    buf = FastFormatTime(buf, item.Time)
+    buf = stringx.FastFormatTime(buf, item.Time)
     buf = append(buf, item.Message...)
     buf = append(buf, '\n')
 }
 writer.Write(buf)
+```
+
+### 4. 在 convert 包中的间接使用
+
+`convert.AppendValue` 内部已集成 `stringx.FastAppendInt` / `stringx.FastFloat`，
+可直接使用 `convert.AppendValue` 将任意值零拷贝追加到缓冲区：
+
+```go
+import "github.com/kamalyes/go-toolbox/pkg/convert"
+
+buf := make([]byte, 0, 128)
+buf = convert.AppendValue(buf, 123)   // 内部调用 stringx.FastAppendInt
+buf = convert.AppendValue(buf, 3.14)  // 内部调用 stringx.FastFloat
+buf = convert.AppendValue(buf, "text")
 ```
 
 ---
@@ -297,7 +292,7 @@ writer.Write(buf)
 ### 核心优势
 
 1. ✅ **零内存分配** - 完全避免 GC 压力
-2. ✅ **高性能** - 2.3-5.8 倍性能提升
+2. ✅ **高性能** - 2.8-5.6 倍性能提升
 3. ✅ **易用性** - API 简单，易于集成
 4. ✅ **可复用** - 支持缓冲区复用
 5. ✅ **稳定性** - 性能稳定可预测

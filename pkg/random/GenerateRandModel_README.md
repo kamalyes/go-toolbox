@@ -1,6 +1,6 @@
 # GenerateRandModel - 智能随机模型生成器
 
-一个强大的Go语言随机数据生成库，能够为任意复杂的结构体自动生成随机数据并转换为JSON格式。
+一个强大的Go语言随机数据生成库，能够为任意复杂的结构体自动生成随机数据并转换为JSON格式
 
 ## ✨ 主要特性
 
@@ -56,13 +56,15 @@ func main() {
 输出示例：
 ```json
 {
-  "name": "sKdT0gAw3x",
+  "name": "a1B2c3D4e5",
   "age": 42,
-  "email": "xyz@example.com",
+  "email": "f6G7h8I9j0",
   "is_active": true,
-  "created_at": "2025-11-09T15:30:45Z"
+  "created_at": "2026-01-15T10:20:30Z"
 }
 ```
+
+> 注意：未使用 `rand` 标签的 `string` 字段会生成随机字母数字字符串（默认长度 10），而非人类可读的姓名或邮箱如需特定格式数据，请使用 `rand` 标签（见下文）或调用 `random.RandomEmail()`、`random.RandomName()` 等业务函数
 
 ## 🎯 支持的数据类型
 
@@ -137,8 +139,17 @@ type WithInterface struct {
 type UserProfile struct {
     Email    string `json:"email" rand:"email"`       // 自动生成邮箱格式
     Phone    string `json:"phone" rand:"phone"`       // 生成11位手机号
-    FullName string `json:"name" rand:"name"`         // 生成随机姓名
+    Name     string `json:"name" rand:"name"`         // 生成随机字符串
     UUID     string `json:"uuid" rand:"uuid"`         // 生成UUID格式
+    URL      string `json:"url" rand:"url"`           // 生成URL格式
+    Domain   string `json:"domain" rand:"domain"`     // 生成域名
+    IPv4     string `json:"ipv4" rand:"ipv4"`         // 生成IPv4地址
+    MAC      string `json:"mac" rand:"mac"`           // 生成MAC地址
+    Color    string `json:"color" rand:"color"`       // 生成颜色值
+    Username string `json:"username" rand:"username"` // 生成用户名
+    Password string `json:"password" rand:"password"` // 生成密码
+    City     string `json:"city" rand:"city"`         // 生成城市名
+    Country  string `json:"country" rand:"country"`   // 生成国家名
     Custom   string `json:"custom" rand:"MyValue"`    // 自定义固定值
 }
 ```
@@ -147,11 +158,59 @@ type UserProfile struct {
 
 | 标签值 | 描述 | 示例输出 |
 |--------|------|----------|
-| `email` | 邮箱格式 | `abc123@xyz456.com` |
-| `phone` | 11位手机号 | `13812345678` |
-| `name` | 随机姓名 | `John123` |
+| `email` | 邮箱格式 | `a1b2c@d3e4f.com` |
+| `phone` | 11位手机号（1 开头） | `13812345678` |
+| `name` | 随机字母数字字符串 | `a1B2c3` |
 | `uuid` | UUID格式 | `a1b2c3d4-e5f6-7890-abcd-1234567890ab` |
-| 自定义值 | 固定字符串 | 按标签值设置 |
+| `url` | URL格式 | `https://a1b2c3d4.com/a1b2c` |
+| `domain` | 域名 | `a1b2c3d4.com` |
+| `ipv4` | IPv4地址 | `192.168.1.100` |
+| `mac` | MAC地址 | `aa:bb:cc:dd:ee:ff` |
+| `color` | 十六进制颜色 | `#a1b2c3` |
+| `username` | 用户名（user_ 前缀） | `user_a1b2c3d4` |
+| `password` | 强密码（大小写+数字+特殊字符） | `A1b!c2D#e3F$` |
+| `city` | 城市名（从预设列表随机） | `Shanghai` |
+| `country` | 国家名（从预设列表随机） | `China` |
+| 自定义值 | 固定字符串 | 按标签值原样设置 |
+
+> 数值类型字段也支持 `rand` 标签：传入数字字符串会被解析为对应数值，如 `rand:"42"`
+
+### 🔌 自定义生成器注册
+
+除了内置标签，还可以注册自定义生成器来扩展 `rand` 标签的能力：
+
+```go
+// 注册自定义生成器
+random.RegisterGenerator("order_id", func() interface{} {
+    return fmt.Sprintf("ORD-%d", time.Now().UnixNano())
+})
+
+random.RegisterGenerator("price", func() interface{} {
+    return 99.9
+})
+
+// 在结构体中使用
+type Order struct {
+    OrderID string  `json:"order_id" rand:"order_id"`
+    Price   float64 `json:"price" rand:"price"`
+}
+
+result, jsonStr, err := random.GenerateRandModel(&Order{})
+
+// 查看已注册的生成器
+names := random.ListRegisteredGenerators() // []string{"order_id", "price"}
+
+// 获取生成器
+gen, exists := random.GetGenerator("order_id")
+
+// 注销生成器
+random.UnregisterGenerator("order_id")
+
+// 清除所有生成器
+random.ClearAllGenerators()
+```
+
+注册的生成器优先于内置标签，若未找到已注册生成器则回退到内置逻辑
 
 ## ⚙️ 配置选项
 
@@ -247,15 +306,15 @@ type Contact struct {
 }
 
 type User struct {
-    ID       string     `json:"id" rand:"uuid"`
-    Name     string     `json:"name" rand:"name"`
-    Age      *int       `json:"age"`
-    Contact  Contact    `json:"contact"`
-    Address  *Address   `json:"address"`
-    Tags     []string   `json:"tags"`
-    Settings map[string]int `json:"settings"`
-    IsActive bool       `json:"is_active"`
-    CreatedAt time.Time `json:"created_at"`
+    ID        string        `json:"id" rand:"uuid"`
+    Name      string        `json:"name" rand:"name"`
+    Age       *int          `json:"age"`
+    Contact   Contact       `json:"contact"`
+    Address   *Address      `json:"address"`
+    Tags      []string      `json:"tags"`
+    Settings  map[string]int `json:"settings"`
+    IsActive  bool          `json:"is_active"`
+    CreatedAt time.Time     `json:"created_at"`
 }
 
 func main() {
@@ -279,21 +338,21 @@ func main() {
 ```json
 {
   "id": "a1b2c3d4-e5f6-7890-abcd-1234567890ab",
-  "name": "Alice123",
+  "name": "a1B2c3",
   "age": 28,
   "contact": {
-    "email": "abc123@xyz456.com",
+    "email": "a1b2c@d3e4f.com",
     "phone": "13812345678"
   },
   "address": {
-    "street": "Main Street 123",
-    "city": "Shanghai",
-    "zip_code": "200000"
+    "street": "a1B2c3D4e5",
+    "city": "a1B2c3D4e5",
+    "zip_code": "a1B2c3D4e5"
   },
-  "tags": ["tag1", "tag2", "tag3"],
+  "tags": ["a1B2c3D4e5", "f6G7h8I9j0"],
   "settings": {
-    "theme": 1,
-    "notifications": 0
+    "a1B2c3D4e5": 42,
+    "f6G7h8I9j0": 17
   },
   "is_active": true,
   "created_at": "2025-11-09T15:30:45Z"
@@ -336,6 +395,71 @@ opts.UseCustomTags = false  // 忽略rand标签，使用默认生成
 result, jsonStr, err := random.GenerateRandModel(structWithTags, opts)
 ```
 
+### 搭配业务数据生成函数
+
+`random` 包提供了独立的业务数据生成函数，可在 `GenerateRandModel` 之外直接使用，也可通过自定义生成器注册到 `rand` 标签：
+
+```go
+// 邮箱（随机域名）
+random.RandomEmail()    // "a1b2c3d4@gmail.com"
+
+// 手机号（中国大陆）
+random.RandomPhone()    // "13812345678"
+
+// 中文姓名
+random.RandomName()     // "王伟" / "李秀芳"
+
+// 身份证号（仅用于测试）
+random.RandomIDCard()   // "110101199001011234"
+
+// 公司名称
+random.RandomCompany()  // "云科技有限公司"
+```
+
+### 域名关键词生成
+
+`DomainKeywordBuilder` 支持链式调用，批量生成域名关键词并拼接 TLD：
+
+```go
+domains := random.NewDomainKeywordBuilder("shop").
+    WithCount(3).
+    WithPrefixLength(2, 4).
+    WithSuffixLength(1, 3).
+    Generate()
+// ["ab1shop2", "cd3ef4shop5", "g6shop7h8"]
+
+joined := random.NewDomainKeywordBuilder("game").
+    WithCount(2).
+    GenerateAndJoinWithTLDs([]string{"com", "net"}, ",")
+// "ab1game23.com,ab1game23.net,xy5game67.com,xy5game67.net"
+
+// 也可直接拼接已有域名与 TLD（支持优先级排序）
+full := random.JoinDomainsWithTLDs(
+    []string{"game", "shop"},
+    []string{"com", "net", "org"},
+    "net", // priorityTLDs...
+)
+// [game.net, shop.net, game.com, shop.com, game.org, shop.org]
+```
+
+### 时间相关随机函数
+
+```go
+random.RandDuration(100*time.Millisecond, 500*time.Millisecond) // 随机时间间隔
+random.RandTimeBetween(start, end)                               // 范围内随机时间点
+random.RandTimeInPast(24 * time.Hour)                            // 过去24小时内
+random.RandTimeInFuture(7 * 24 * time.Hour)                      // 未来7天内
+random.RandDate(start, end)                                      // 随机日期（截断到天）
+random.RandWeekday()                                             // 随机星期
+random.RandMonth()                                               // 随机月份
+random.RandHour()    // 0-23
+random.RandMinute()  // 0-59
+random.RandSecond()  // 0-59
+random.RandTimeOfDay()       // 今天内随机时间
+random.RandBusinessHour()    // 工作时间 9:00-18:00
+random.RandUnixTimestamp(min, max) // 随机 Unix 时间戳
+```
+
 ## 🚨 注意事项
 
 1. **类型限制**: 复数类型(complex64/128)、通道(chan)、函数(func)等无法JSON序列化的类型会被自动跳过
@@ -348,13 +472,13 @@ result, jsonStr, err := random.GenerateRandModel(structWithTags, opts)
 ### 常见问题
 
 **Q: 为什么某些字段没有被填充？**
-A: 检查字段是否为私有字段、是否有`json:"-"`标签，或者类型是否支持JSON序列化。
+A: 检查字段是否为私有字段、是否有`json:"-"`标签，或者类型是否支持JSON序列化
 
 **Q: 如何生成特定格式的数据？**
-A: 使用`rand`标签，如`rand:"email"`、`rand:"phone"`等。
+A: 使用`rand`标签，如`rand:"email"`、`rand:"phone"`等
 
 **Q: 如何控制生成数据的大小？**
-A: 使用配置选项中的`MaxSliceLen`、`MaxMapLen`、`StringLength`等参数。
+A: 使用配置选项中的`MaxSliceLen`、`MaxMapLen`、`StringLength`等参数
 
 **Q: 如何处理深度嵌套的结构体？**
-A: 调整`MaxDepth`参数来控制最大递归深度。
+A: 调整`MaxDepth`参数来控制最大递归深度
