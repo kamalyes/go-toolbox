@@ -47,26 +47,26 @@ import (
 // BatchProcessorOption 批量处理器配置选项（函数式选项模式）
 type BatchProcessorOption[T any] func(*BatchProcessor[T])
 
-// WithClone 设置克隆函数，Submit 时对 item 执行 Clone
+// WithBatchProcessorClone 设置克隆函数，Submit 时对 item 执行 Clone
 // 防止调用方在 Submit 后修改 item 影响异步 flush（数据隔离）
 // 适用于 item 包含指针/切片/Map 等引用类型的场景
-func WithClone[T any](fn func(T) T) BatchProcessorOption[T] {
+func WithBatchProcessorClone[T any](fn func(T) T) BatchProcessorOption[T] {
 	return func(p *BatchProcessor[T]) {
 		p.cloneFn = fn
 	}
 }
 
-// WithPanicHandler 设置 flush panic 处理器
+// WithBatchProcessorPanicHandler 设置 flush panic 处理器
 // flush 发生 panic 时调用 handler 恢复，单次 flush 失败不崩溃 worker（容错）
 // 不设置时静默恢复（recover），避免 worker 退出
-func WithPanicHandler[T any](handler RecoverFunc) BatchProcessorOption[T] {
+func WithBatchProcessorPanicHandler[T any](handler RecoverFunc) BatchProcessorOption[T] {
 	return func(p *BatchProcessor[T]) {
 		p.panicHandler = handler
 	}
 }
 
-// WithName 设置处理器名称，用于日志和监控标识
-func WithName[T any](name string) BatchProcessorOption[T] {
+// WithBatchProcessorName 设置处理器名称，用于日志和监控标识
+func WithBatchProcessorName[T any](name string) BatchProcessorOption[T] {
 	return func(p *BatchProcessor[T]) {
 		p.name = name
 	}

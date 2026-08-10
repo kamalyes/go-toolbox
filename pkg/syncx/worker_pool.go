@@ -19,6 +19,17 @@ import (
 // WorkerTask 任务接口
 type WorkerTask func()
 
+// PoolOption Worker 池选项函数
+type PoolOption func(*WorkerPool)
+
+// WithWorkerPoolPanicHandler 设置 panic 恢复处理器
+// 任务 panic 时调用 handler，handler 为 nil 时仅 recover 不记录（防止进程崩溃）
+func WithWorkerPoolPanicHandler(handler RecoverFunc) PoolOption {
+	return func(p *WorkerPool) {
+		p.panicHandler = handler
+	}
+}
+
 // WorkerPool Worker 池，用于限制并发 goroutine 数量
 // 防止高频操作导致 goroutine 无限增长导致 OOM
 //
@@ -41,15 +52,16 @@ type WorkerTask func()
 //	    }
 //	}
 type WorkerPool struct {
-	workers int             // worker 数量
-	queue   chan WorkerTask // 任务队列
-	wg      sync.WaitGroup  // worker goroutine 等待
-	taskWg  sync.WaitGroup  // 任务完成等待（提交时 +1，执行完 -1）
-	ctx     context.Context
-	cancel  context.CancelFunc
-	once    sync.Once
-	closed  bool
-	mu      sync.Mutex
+	workers      int             // worker 数量
+	queue        chan WorkerTask // 任务队列
+	wg           sync.WaitGroup  // worker goroutine 等待
+	taskWg       sync.WaitGroup  // 任务完成等待（提交时 +1，执行完 -1）
+	panicHandler RecoverFunc     // panic 恢复处理器（nil 时仅 recover 防崩溃）
+	ctx          context.Context
+	cancel       context.CancelFunc
+	once         sync.Once
+	closed       bool
+	mu           sync.Mutex
 }
 
 var (
@@ -63,13 +75,20 @@ var (
 // NewWorkerPool 创建 Worker 池
 // workers: worker 数量，建议 10-50，根据 CPU 核心数调整
 // queueSize: 任务队列大小，建议 100-1000
+// opts: 可选配置（如 WithWorkerPoolPanicHandler）
 //
 // 示例:
 //
 //	创建 20 个 worker，队列大小 100
 //	pool := NewWorkerPool(20, 100)
 //	defer pool.Close()
-func NewWorkerPool(workers, queueSize int) *WorkerPool {
+//
+// 带 panic 恢复处理器：
+//
+//	pool := NewWorkerPool(20, 100, WithWorkerPoolPanicHandler(func(r interface{}) {
+//	    log.Error("worker panic recovered", "panic", r)
+//	}))
+func NewWorkerPool(workers, queueSize int, opts ...PoolOption) *WorkerPool {
 	if workers <= 0 {
 		workers = 10 // 默认 10 个 worker
 	}
@@ -85,6 +104,9 @@ func NewWorkerPool(workers, queueSize int) *WorkerPool {
 		ctx:     ctx,
 		cancel:  cancel,
 	}
+	for _, opt := range opts {
+		opt(pool)
+	}
 
 	// 启动 worker goroutine
 	for i := 0; i < workers; i++ {
@@ -96,6 +118,7 @@ func NewWorkerPool(workers, queueSize int) *WorkerPool {
 }
 
 // worker 工作 goroutine，从队列中取任务执行
+// 任务 panic 会被 recover，确保 taskWg.Done() 始终被调用（防止 Wait/Close 死锁）
 func (p *WorkerPool) worker() {
 	defer p.wg.Done()
 
@@ -109,12 +132,14 @@ func (p *WorkerPool) worker() {
 				// 队列已关闭，退出 worker
 				return
 			}
-			if task != nil {
-				task()
-			}
-			// 任务执行完成（或为 nil），标记完成
-			// 注意：Submit/SubmitNonBlocking 在入队前已 Add(1)，此处必须 Done
-			p.taskWg.Done()
+			// defer 顺序：先 recover 再 Done，确保 panic 不影响 taskWg 计数
+			func() {
+				defer p.taskWg.Done()
+				defer RecoverWithHandler(p.panicHandler)
+				if task != nil {
+					task()
+				}
+			}()
 		}
 	}
 }

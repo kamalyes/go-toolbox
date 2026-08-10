@@ -253,7 +253,7 @@ func TestBatchProcessor_WithClone(t *testing.T) {
 		defer mu.Unlock()
 		flushed = append(flushed, batch...)
 	},
-		WithClone(func(i item) item { return item{value: i.value} }),
+		WithBatchProcessorClone(func(i item) item { return item{value: i.value} }),
 	)
 
 	original := item{value: 42}
@@ -294,7 +294,7 @@ func TestBatchProcessor_WithClone_SubmitBlocking(t *testing.T) {
 		defer mu.Unlock()
 		flushed = append(flushed, batch...)
 	},
-		WithClone(func(i item) item {
+		WithBatchProcessorClone(func(i item) item {
 			cloneCount++
 			return item{value: i.value}
 		}),
@@ -355,7 +355,7 @@ func TestBatchProcessor_WithPanicHandler(t *testing.T) {
 		flushAfterPanic = true
 		mu.Unlock()
 	},
-		WithPanicHandler[int](handler),
+		WithBatchProcessorPanicHandler[int](handler),
 	)
 	defer p.Stop()
 
@@ -500,7 +500,7 @@ func TestBatchProcessor_DroppedCount_SubmitBlocking(t *testing.T) {
 // TestBatchProcessor_WithName verifies that the name is set correctly
 func TestBatchProcessor_WithName(t *testing.T) {
 	p := NewBatchProcessor(10, 10, time.Second, func(batch []int) {},
-		WithName[int]("my-batcher"),
+		WithBatchProcessorName[int]("my-batcher"),
 	)
 	defer p.Stop()
 
@@ -536,7 +536,7 @@ func BenchmarkBatchProcessor_Submit(b *testing.B) {
 func BenchmarkBatchProcessor_Submit_WithClone(b *testing.B) {
 	type item struct{ value int }
 	p := NewBatchProcessor(65536, 1000, 50*time.Millisecond, func(batch []item) {},
-		WithClone(func(i item) item { return item{value: i.value} }),
+		WithBatchProcessorClone(func(i item) item { return item{value: i.value} }),
 	)
 	defer p.Stop()
 
