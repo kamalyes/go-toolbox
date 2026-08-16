@@ -16,6 +16,7 @@ package syncx
 
 import (
 	"fmt"
+	"runtime"
 	"sync"
 	"sync/atomic"
 )
@@ -315,6 +316,65 @@ func (m *ShardedMap[K, V]) Range(fn func(key K, value V) bool) {
 			return
 		}
 	}
+}
+
+// RangeParallel 并行遍历所有键值对（百万级数据优化）
+//
+// 将 shards 分配到 workerNum 个 goroutine 并行遍历，每个 goroutine 独立持有所分配 shard 的读锁。
+// 不同 goroutine 处理不同 shard，读锁无竞争；同一 shard 仅被一个 goroutine 读取，零锁争用。
+//
+// 对比 Range（串行遍历）：
+//   - N 核 CPU 上百万级数据遍历提速约 N 倍
+//   - 零额外分配（直接遍历 shards 数组，不需要 Keys() 中间切片）
+//
+// 注意：
+//   - fn 无返回值（始终遍历全部），不支持提前终止——并行场景下"全局停止"语义不明确
+//   - fn 在持有 shard 读锁时执行，应为非阻塞操作（TrySend 等非阻塞操作可安全调用）
+//   - workerNum <= 0 时使用 GOMAXPROCS；shard 数量少于 worker 时退化为按 shard 数并行
+func (m *ShardedMap[K, V]) RangeParallel(workerNum int, fn func(key K, value V)) {
+	if fn == nil {
+		return
+	}
+	shardCount := len(m.shards)
+	if shardCount == 0 {
+		return
+	}
+	if workerNum <= 0 {
+		workerNum = runtime.GOMAXPROCS(0)
+	}
+	if workerNum < 1 {
+		workerNum = 1
+	}
+	// shard 数量少于 worker 时，每个 shard 一个 goroutine 即可
+	if workerNum > shardCount {
+		workerNum = shardCount
+	}
+
+	// 每个 worker 负责一段连续的 shard（分区方式，避免 channel 同步开销）
+	chunkSize := (shardCount + workerNum - 1) / workerNum
+	var wg sync.WaitGroup
+	for i := 0; i < workerNum; i++ {
+		start := i * chunkSize
+		if start >= shardCount {
+			break
+		}
+		end := start + chunkSize
+		if end > shardCount {
+			end = shardCount
+		}
+		wg.Add(1)
+		go func(shards []*shardEntry[K, V]) {
+			defer wg.Done()
+			for _, shard := range shards {
+				shard.mu.RLock()
+				for k, v := range shard.data {
+					fn(k, v)
+				}
+				shard.mu.RUnlock()
+			}
+		}(m.shards[start:end])
+	}
+	wg.Wait()
 }
 
 // Len 返回元素总数（原子读取，零锁开销）

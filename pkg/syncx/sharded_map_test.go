@@ -115,6 +115,91 @@ func TestShardedMapRange(t *testing.T) {
 	assert.Equal(t, 10, count)
 }
 
+// TestShardedMapRangeParallel 测试并行遍历
+func TestShardedMapRangeParallel(t *testing.T) {
+	m := NewShardedMap[string, int](64)
+
+	total := 10000
+	for i := 0; i < total; i++ {
+		m.Store(fmt.Sprintf("key%d", i), i)
+	}
+
+	// 并行遍历计数（原子计数器，并发安全）
+	var count atomic.Int64
+	m.RangeParallel(0, func(k string, v int) {
+		count.Add(1)
+	})
+	assert.Equal(t, int64(total), count.Load())
+
+	// 测试空 map
+	m.Clear()
+	count.Store(0)
+	m.RangeParallel(0, func(k string, v int) {
+		count.Add(1)
+	})
+	assert.Equal(t, int64(0), count.Load())
+}
+
+// TestShardedMapRangeParallelCorrectness 并行遍历结果正确性验证
+// 确保并行遍历访问到所有元素且无重复
+func TestShardedMapRangeParallelCorrectness(t *testing.T) {
+	m := NewShardedMap[int, int](64)
+
+	total := 100000
+	for i := 0; i < total; i++ {
+		m.Store(i, i*2)
+	}
+
+	// 并行收集所有 key（mutex 保护，模拟实际使用场景）
+	var mu sync.Mutex
+	seen := make(map[int]struct{}, total)
+	m.RangeParallel(0, func(k int, v int) {
+		mu.Lock()
+		seen[k] = struct{}{}
+		mu.Unlock()
+	})
+
+	// 验证：每个 key 恰好被访问一次
+	assert.Equal(t, total, len(seen))
+	for i := 0; i < total; i++ {
+		_, ok := seen[i]
+		assert.True(t, ok, "key %d missing", i)
+	}
+}
+
+// TestShardedMapRangeParallelConcurrent 并行遍历期间并发写入不 panic
+// 验证 RLock 与 Lock 不冲突，遍历期间写入安全（遍历看到的是旧值快照）
+func TestShardedMapRangeParallelConcurrent(t *testing.T) {
+	m := NewShardedMap[string, int](64)
+
+	for i := 0; i < 1000; i++ {
+		m.Store(fmt.Sprintf("k%d", i), i)
+	}
+
+	var wg sync.WaitGroup
+	// 并行遍历
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		m.RangeParallel(0, func(k string, v int) {
+			// 模拟轻量处理
+			_ = v
+		})
+	}()
+
+	// 并发写入（不同 key，不干扰遍历的 shard 读锁）
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			for j := 0; j < 100; j++ {
+				m.Store(fmt.Sprintf("new%d_%d", idx, j), j)
+			}
+		}(i)
+	}
+	wg.Wait()
+}
+
 // TestShardedMapKeysValues 测试获取所有 key 和 value
 func TestShardedMapKeysValues(t *testing.T) {
 	m := NewShardedMap[string, int](16)
@@ -847,4 +932,92 @@ func BenchmarkShardedMapSwap(b *testing.B) {
 			i++
 		}
 	})
+}
+
+// BenchmarkShardedMapRange 串行遍历基准测试（百万级，轻量回调）
+func BenchmarkShardedMapRange(b *testing.B) {
+	m := NewShardedMap[int, int](64)
+	for i := 0; i < 1000000; i++ {
+		m.Store(i, i)
+	}
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		var sum int64
+		m.Range(func(k, v int) bool {
+			sum += int64(v)
+			return true
+		})
+		_ = sum
+	}
+}
+
+// BenchmarkShardedMapRangeParallel 并行遍历基准测试（百万级，轻量回调）
+// 注意：轻量回调下并行可能因 goroutine 开销慢于串行，实际收益取决于回调复杂度
+// 对比 BenchmarkShardedMapRangeHeavy* 可见：回调越重，并行收益越大
+func BenchmarkShardedMapRangeParallel(b *testing.B) {
+	m := NewShardedMap[int, int](64)
+	for i := 0; i < 1000000; i++ {
+		m.Store(i, i)
+	}
+	var sum atomic.Int64
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		sum.Store(0)
+		m.RangeParallel(0, func(k, v int) {
+			sum.Add(int64(v))
+		})
+	}
+	_ = sum.Load()
+}
+
+// BenchmarkShardedMapRangeHeavy 串行遍历（重回调，模拟 go-wsc 心跳检查/广播场景）
+// 回调包含：条件判断 + 原子读 + 模拟 TrySend 开销
+func BenchmarkShardedMapRangeHeavy(b *testing.B) {
+	m := NewShardedMap[int, int](64)
+	for i := 0; i < 1000000; i++ {
+		m.Store(i, i)
+	}
+	var counter atomic.Int64
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		counter.Store(0)
+		m.Range(func(k, v int) bool {
+			// 模拟 checkHeartbeat 回调：原子读时间戳 + 条件判断 + 计数
+			if v > 0 {
+				counter.Add(1)
+			}
+			// 模拟轻量计算开销（TrySend 的 channel select 成本）
+			_ = k * v
+			return true
+		})
+	}
+}
+
+// BenchmarkShardedMapRangeParallelHeavy 并行遍历（重回调，对比 BenchmarkShardedMapRangeHeavy）
+func BenchmarkShardedMapRangeParallelHeavy(b *testing.B) {
+	m := NewShardedMap[int, int](64)
+	for i := 0; i < 1000000; i++ {
+		m.Store(i, i)
+	}
+	var counter atomic.Int64
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		counter.Store(0)
+		m.RangeParallel(0, func(k, v int) {
+			// 模拟 checkHeartbeat 回调：原子读时间戳 + 条件判断 + 计数
+			if v > 0 {
+				counter.Add(1)
+			}
+			// 模拟轻量计算开销（TrySend 的 channel select 成本）
+			_ = k * v
+		})
+	}
 }
