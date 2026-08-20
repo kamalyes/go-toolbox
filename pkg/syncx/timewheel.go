@@ -31,8 +31,9 @@ import (
 //   - 零额外分配：任务复用双向链表节点，无中间 slice
 //
 // 精度说明：
-//   - 触发精度为 ±1 tick（默认 1ms），不保证精确到纳秒
-//   - 任务可能因 worker 调度竞态而延迟至多 1 圈（bucketCount * tickInterval）触发
+//   - 触发精度严格为 ±1 tick（默认 1ms），不保证精确到纳秒
+//   - 通过 shard.mu 同步 currentTick 读写，消除 schedule 与 worker 的竞态，
+//     任务不会因调度竞态而延迟整圈触发
 //   - 任务永远不会提前触发（ticks 向上取整 + rounds 保证）
 //
 // 适用场景：
@@ -86,35 +87,34 @@ type TimerStats struct {
 
 // HashedWheelTimer 分片时间轮主实现
 type HashedWheelTimer struct {
-	shards         []*wheelShard
-	shardCount     int
-	mask           int          // shardCount-1，位运算取模
-	keyIndex       sync.Map     // key → *TimerTask（仅 keyed 任务）
-	rrCounter      atomic.Int64 // 无 key 任务的轮询分配计数器
-	started        atomic.Bool
-	stopped        atomic.Bool
-	executor       func(func()) // 回调执行器（默认安全异步执行）
-	completedCount atomic.Int64
-	cancelledCount atomic.Int64
+	shards     []*wheelShard
+	shardCount int                             // 分片数
+	mask       int                             // shardCount-1，位运算取模
+	keyIndex   *ShardedMap[string, *TimerTask] // key → *TimerTask（仅 keyed 任务，类型化避免 sync.Map 接口装箱）
+	rrCounter  atomic.Int64                    // 无 key 任务的轮询分配计数器
+	started    atomic.Bool
+	stopped    atomic.Bool
+	executor   func(func()) // 回调执行器（默认安全异步执行）
 }
 
 // wheelShard 单个分片时间轮
+//
+// 性能设计：
+//   - completed/cancelled 计数器下沉到 shard，避免 worker 路径对 parent 全局原子
+//     的跨 shard cache-line 弹跳（百万级 Refresh 下每秒百万次原子加）
 type wheelShard struct {
-	buckets      []*bucketEntry
-	bucketCount  int
-	mask         int // bucketCount-1，位运算取模
-	tickInterval time.Duration
-	currentPos   atomic.Int64 // 下一个待处理 bucket 位置
-	taskCount    atomic.Int64 // 本 shard 活跃任务数
-	stopCh       chan struct{}
-	wg           sync.WaitGroup
-	parent       *HashedWheelTimer
-}
-
-// bucketEntry 单个桶（双向链表 + mutex）
-type bucketEntry struct {
-	mu   sync.Mutex
-	head *TimerTask
+	mu             sync.Mutex   // 保护 currentTick 读写 + 所有 bucket 的 head
+	buckets        []*TimerTask // 每个 bucket 直接持有链表头指针（无包装结构，少一次间接寻址）
+	bucketCount    int
+	mask           int // bucketCount-1，位运算取模
+	tickInterval   time.Duration
+	currentTick    int // worker 下一个待处理 bucket 位置（由 mu 保护，消除 schedule/worker 竞态）
+	stopCh         chan struct{}
+	wg             sync.WaitGroup
+	parent         *HashedWheelTimer
+	taskCount      atomic.Int64 // 本 shard 活跃任务数（schedule/cancel 写）
+	completedCount atomic.Int64 // 本 shard 已完成任务数（worker 写）
+	cancelledCount atomic.Int64 // 本 shard 已取消任务数（worker 写）
 }
 
 // timerConfig 时间轮初始化配置（私有，避免外部直接修改）
@@ -180,20 +180,19 @@ func NewHashedWheelTimer(opts ...TimerOption) *HashedWheelTimer {
 		shardCount: cfg.shardCount,
 		mask:       cfg.shardCount - 1,
 		executor:   cfg.executor,
+		// keyIndex 与时间轮同分片数（FNV-1a hash），类型化 map 避免 sync.Map 接口装箱
+		keyIndex: NewShardedMap[string, *TimerTask](cfg.shardCount),
 	}
 
 	t.shards = make([]*wheelShard, cfg.shardCount)
 	for i := range t.shards {
 		shard := &wheelShard{
-			buckets:      make([]*bucketEntry, cfg.bucketCount),
+			buckets:      make([]*TimerTask, cfg.bucketCount), // nil 即空 bucket，无需逐个分配
 			bucketCount:  cfg.bucketCount,
 			mask:         cfg.bucketCount - 1,
 			tickInterval: cfg.tickInterval,
 			stopCh:       make(chan struct{}),
 			parent:       t,
-		}
-		for j := range shard.buckets {
-			shard.buckets[j] = &bucketEntry{}
 		}
 		t.shards[i] = shard
 	}
@@ -222,33 +221,35 @@ func (s *wheelShard) run() {
 	ticker := time.NewTicker(s.tickInterval)
 	defer ticker.Stop()
 
-	pos := int(s.currentPos.Load())
 	for {
 		select {
 		case <-s.stopCh:
 			return
 		case <-ticker.C:
-			s.processBucket(pos)
-			pos = (pos + 1) & s.mask
-			s.currentPos.Store(int64(pos))
+			s.processCurrentBucket()
 		}
 	}
 }
 
-// processBucket 处理指定 bucket 的所有任务
-// 三阶段：提取链表（持锁最短）→ 锁外分类处理 → 重新挂回未到期任务
-func (s *wheelShard) processBucket(pos int) {
-	b := s.buckets[pos]
-
-	// Phase 1：提取整个 bucket 链表（持锁时间最短）
-	b.mu.Lock()
-	head := b.head
-	b.head = nil
-	b.mu.Unlock()
+// processCurrentBucket 处理当前 bucket 的所有任务
+// 三阶段：持 shard.mu 提取链表并推进 currentTick → 锁外分类处理 → 持 shard.mu 挂回未到期任务
+// currentTick 推进与 schedule 的读取互斥，消除"任务落入已扫过 bucket"的竞态
+func (s *wheelShard) processCurrentBucket() {
+	// Phase 1：持锁提取 bucket 链表并推进 currentTick
+	s.mu.Lock()
+	pos := s.currentTick
+	head := s.buckets[pos]
+	s.buckets[pos] = nil
+	s.currentTick = (pos + 1) & s.mask
+	s.mu.Unlock()
 
 	if head == nil {
 		return
 	}
+
+	// 提取 parent 到局部变量，避免热循环中重复解引用
+	parent := s.parent
+	keyIndex := parent.keyIndex
 
 	// Phase 2：遍历提取的任务，分类处理（锁外执行，避免回调阻塞 worker）
 	var keepHead, keepTail *TimerTask
@@ -260,11 +261,11 @@ func (s *wheelShard) processBucket(pos int) {
 
 		if current.cancelled.Load() {
 			// 惰性取消：从链表移除，不执行回调
-			s.parent.cancelledCount.Add(1)
+			s.cancelledCount.Add(1)
 			s.taskCount.Add(-1)
 			if current.key != "" {
 				// 清理 key 索引（仅当索引仍指向此任务时）
-				s.parent.keyIndex.CompareAndDelete(current.key, current)
+				keyIndex.CompareAndDelete(current.key, current)
 			}
 			current = next
 			continue
@@ -286,30 +287,32 @@ func (s *wheelShard) processBucket(pos int) {
 		}
 
 		// 到期，执行回调
-		s.parent.completedCount.Add(1)
+		s.completedCount.Add(1)
 		s.taskCount.Add(-1)
 		if current.key != "" {
 			// 清理已执行任务的 key 索引
-			s.parent.keyIndex.CompareAndDelete(current.key, current)
+			keyIndex.CompareAndDelete(current.key, current)
 		}
 		task := current
-		s.parent.executor(task.callback)
+		parent.executor(task.callback)
 		current = next
 	}
 
-	// Phase 3：重新挂回未到期任务（持锁，合并处理期间新 Schedule 的任务）
+	// Phase 3：持锁挂回未到期任务（合并处理期间新 Schedule 插入的任务）
 	if keepHead != nil {
-		b.mu.Lock()
-		keepTail.next = b.head
-		if b.head != nil {
-			b.head.prev = keepTail
+		s.mu.Lock()
+		keepTail.next = s.buckets[pos]
+		if s.buckets[pos] != nil {
+			s.buckets[pos].prev = keepTail
 		}
-		b.head = keepHead
-		b.mu.Unlock()
+		s.buckets[pos] = keepHead
+		s.mu.Unlock()
 	}
 }
 
 // schedule 在当前 shard 上调度任务（内部方法）
+// 持 shard.mu 读取 currentTick 并头插，与 worker 推进 currentTick 互斥，
+// 保证 bucketIdx 落在 worker 尚未扫过的区间，消除"延迟整圈"竞态
 func (s *wheelShard) schedule(delay time.Duration, callback func(), key string, shardIdx int) *TimerTask {
 	// 向上取整计算 tick 数（保证不提前触发）
 	ticks := int((delay + s.tickInterval - 1) / s.tickInterval)
@@ -317,28 +320,25 @@ func (s *wheelShard) schedule(delay time.Duration, callback func(), key string, 
 		ticks = 1
 	}
 
-	pos := int(s.currentPos.Load())
-	bucketIdx := (pos + ticks) & s.mask
-	rounds := int64(ticks / s.bucketCount)
-
 	task := &TimerTask{
-		key:       key,
-		callback:  callback,
-		rounds:    rounds,
-		bucketIdx: bucketIdx,
-		shardIdx:  shardIdx,
-		wheel:     s.parent,
+		key:      key,
+		callback: callback,
+		shardIdx: shardIdx,
+		wheel:    s.parent,
+		// bucketIdx / rounds 在持锁内填入
 	}
 
-	// 头插法加入 bucket 链表（O(1)）
-	b := s.buckets[bucketIdx]
-	b.mu.Lock()
-	task.next = b.head
-	if b.head != nil {
-		b.head.prev = task
+	// 持锁读取 currentTick + 计算 + 头插（同一临界区，消除竞态）
+	s.mu.Lock()
+	task.bucketIdx = (s.currentTick + ticks) & s.mask
+	task.rounds = int64(ticks / s.bucketCount)
+	head := s.buckets[task.bucketIdx]
+	task.next = head
+	if head != nil {
+		head.prev = task
 	}
-	b.head = task
-	b.mu.Unlock()
+	s.buckets[task.bucketIdx] = task
+	s.mu.Unlock()
 
 	s.taskCount.Add(1)
 	return task
@@ -362,10 +362,8 @@ func (t *HashedWheelTimer) ScheduleWithKey(key string, delay time.Duration, task
 	tt := t.shards[idx].schedule(delay, task, key, idx)
 	if tt != nil {
 		// 原子交换：新任务入索引，旧任务（若存在）惰性取消
-		if old, loaded := t.keyIndex.Swap(key, tt); loaded {
-			if oldTask, ok := old.(*TimerTask); ok {
-				oldTask.cancelled.Store(true)
-			}
+		if oldTask, loaded := t.keyIndex.Swap(key, tt); loaded && oldTask != nil {
+			oldTask.cancelled.Store(true)
 		}
 	}
 	return tt
@@ -393,10 +391,8 @@ func (t *HashedWheelTimer) CancelByKey(key string) {
 	if key == "" {
 		return
 	}
-	if old, loaded := t.keyIndex.LoadAndDelete(key); loaded {
-		if oldTask, ok := old.(*TimerTask); ok {
-			oldTask.cancelled.Store(true)
-		}
+	if oldTask, loaded := t.keyIndex.LoadAndDelete(key); loaded && oldTask != nil {
+		oldTask.cancelled.Store(true)
 	}
 }
 
@@ -415,14 +411,17 @@ func (t *HashedWheelTimer) Stop() {
 }
 
 // Stats 返回时间轮统计信息
+// completed/cancelled 为各 shard 计数器之和（下沉到 shard 避免全局原子竞争）
 func (t *HashedWheelTimer) Stats() TimerStats {
-	var active int64
+	var active, completed, cancelled int64
 	for _, shard := range t.shards {
 		active += shard.taskCount.Load()
+		completed += shard.completedCount.Load()
+		cancelled += shard.cancelledCount.Load()
 	}
 	return TimerStats{
 		ActiveTasks:    active,
-		CompletedTasks: t.completedCount.Load(),
-		CancelledTasks: t.cancelledCount.Load(),
+		CompletedTasks: completed,
+		CancelledTasks: cancelled,
 	}
 }

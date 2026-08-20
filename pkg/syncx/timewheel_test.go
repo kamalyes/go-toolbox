@@ -72,9 +72,11 @@ func TestTimerScheduleNoEarlyFire(t *testing.T) {
 		fired.Add(1)
 	})
 
-	// 在 80ms 时检查，任务不应触发
-	time.Sleep(80 * time.Millisecond)
-	assert.Equal(t, int32(0), fired.Load(), "任务不应在延迟前触发")
+	// 任务 100ms 后才触发；用 assert.Never 在 80ms 窗口内持续轮询断言 fired 保持 0，
+	// 替代 sleep+assert（sleep 在 -race 负载下会过睡越过触发点导致 flaky）
+	assert.Never(t, func() bool {
+		return fired.Load() > 0
+	}, 80*time.Millisecond, 5*time.Millisecond, "任务不应在延迟前触发")
 
 	waitFired(t, &fired, 1, 200*time.Millisecond)
 	assert.Equal(t, int32(1), fired.Load(), "任务应该在延迟后触发")
@@ -232,9 +234,10 @@ func TestTimerLargeRounds(t *testing.T) {
 		fired.Add(1)
 	})
 
-	// 在 400ms 时检查，不应触发
-	time.Sleep(400 * time.Millisecond)
-	assert.Equal(t, int32(0), fired.Load(), "大延迟任务不应提前触发")
+	// 任务 500ms 后才触发；用 assert.Never 在 400ms 窗口内持续断言 fired 保持 0
+	assert.Never(t, func() bool {
+		return fired.Load() > 0
+	}, 400*time.Millisecond, 10*time.Millisecond, "大延迟任务不应提前触发")
 
 	waitFired(t, &fired, 1, 300*time.Millisecond)
 	assert.Equal(t, int32(1), fired.Load(), "大延迟任务应最终触发")
@@ -520,4 +523,81 @@ func TestTimerCustomExecutor(t *testing.T) {
 	waitFired(t, &fired, 1, 200*time.Millisecond)
 	assert.Equal(t, int32(1), fired.Load(), "任务应通过自定义执行器触发")
 	assert.Equal(t, int32(1), executedOnCaller.Load(), "自定义执行器应被调用")
+}
+
+// ============================================================================
+// 精度回归测试（消除"延迟整圈"竞态后锁住回归）
+// newTestTimer: 4 shard/16 bucket/10ms tick → 1 圈 = 160ms
+// 重构前 schedule 读 currentPos 与 worker 推进存在竞态，短延迟任务最坏延迟整圈（160ms）
+// 重构后 shard.mu 同步 currentTick 读写，触发精度严格 ±1 tick
+// ============================================================================
+
+// TestTimerShortDelayPrecision 验证短延迟任务不延迟整圈触发
+// delay=5ms → ticks=1，重构前竞态触发时任务会延迟到 ~160ms（1 圈）后才触发
+// 重构后应在 1~2 tick（10~20ms）内触发，断言 50ms 内触发（远小于 1 圈 160ms）
+func TestTimerShortDelayPrecision(t *testing.T) {
+	timer := newTestTimer()
+	defer timer.Stop()
+
+	var fired atomic.Int32
+	start := time.Now()
+	timer.Schedule(5*time.Millisecond, func() {
+		fired.Add(1)
+	})
+
+	waitFired(t, &fired, 1, 50*time.Millisecond)
+	elapsed := time.Since(start)
+	assert.Less(t, elapsed, 50*time.Millisecond, "短延迟任务不应延迟整圈（160ms）触发，实际 %v", elapsed)
+}
+
+// TestTimerConcurrentShortDelayPrecision 并发调度短延迟任务，全部应快速触发
+// 并发提高 schedule/worker 竞态触发概率，重构前会有部分任务延迟到 1 圈后
+func TestTimerConcurrentShortDelayPrecision(t *testing.T) {
+	timer := newTestTimer()
+	defer timer.Stop()
+
+	const n = 100
+	var fired atomic.Int32
+	var wg sync.WaitGroup
+	start := time.Now()
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			timer.Schedule(5*time.Millisecond, func() {
+				fired.Add(1)
+			})
+		}()
+	}
+	wg.Wait()
+
+	waitFired(t, &fired, int32(n), 50*time.Millisecond)
+	elapsed := time.Since(start)
+	assert.Less(t, elapsed, 50*time.Millisecond, "并发短延迟任务应全部在 1 圈内触发，实际 %v", elapsed)
+	assert.Equal(t, int32(n), fired.Load(), "全部任务应触发")
+}
+
+// TestTimerBoundaryTicks 验证边界 tick 数的触发精度
+//   - delay=tickInterval（10ms）：ticks=1，应在 [1,2] tick（10~20ms）内触发
+//   - delay=bucketCount*tickInterval（160ms）：ticks=16，rounds=1，应在 [16,17] tick（160~170ms）内触发
+func TestTimerBoundaryTicks(t *testing.T) {
+	timer := newTestTimer() // tick=10ms, bucketCount=16
+	defer timer.Stop()
+
+	// 边界1：delay = 1 tick
+	var fired1 atomic.Int32
+	start1 := time.Now()
+	timer.Schedule(10*time.Millisecond, func() { fired1.Add(1) })
+	waitFired(t, &fired1, 1, 100*time.Millisecond)
+	elapsed1 := time.Since(start1)
+	assert.Less(t, elapsed1, 30*time.Millisecond, "1 tick 任务应在 2 tick 内触发，实际 %v", elapsed1)
+
+	// 边界2：delay = bucketCount tick（rounds=1 路径）
+	var fired2 atomic.Int32
+	start2 := time.Now()
+	timer.Schedule(160*time.Millisecond, func() { fired2.Add(1) })
+	waitFired(t, &fired2, 1, 250*time.Millisecond)
+	elapsed2 := time.Since(start2)
+	// rounds=1：worker 第 1 次扫到 bucket 减圈，第 2 次触发，应在 160~180ms
+	assert.Less(t, elapsed2, 200*time.Millisecond, "16 tick（rounds=1）任务应在 17 tick 内触发，实际 %v", elapsed2)
 }
