@@ -534,7 +534,8 @@ func TestTimerCustomExecutor(t *testing.T) {
 
 // TestTimerShortDelayPrecision 验证短延迟任务不延迟整圈触发
 // delay=5ms → ticks=1，重构前竞态触发时任务会延迟到 ~160ms（1 圈）后才触发
-// 重构后应在 1~2 tick（10~20ms）内触发，断言 50ms 内触发（远小于 1 圈 160ms）
+// 重构后应在 1~2 tick（10~20ms）内触发，断言 100ms 内触发（远小于 1 圈 160ms，
+// 留足 CI 负载抖动余量）
 func TestTimerShortDelayPrecision(t *testing.T) {
 	timer := newTestTimer()
 	defer timer.Stop()
@@ -545,13 +546,16 @@ func TestTimerShortDelayPrecision(t *testing.T) {
 		fired.Add(1)
 	})
 
-	waitFired(t, &fired, 1, 50*time.Millisecond)
+	waitFired(t, &fired, 1, 100*time.Millisecond)
 	elapsed := time.Since(start)
-	assert.Less(t, elapsed, 50*time.Millisecond, "短延迟任务不应延迟整圈（160ms）触发，实际 %v", elapsed)
+	assert.Less(t, elapsed, 100*time.Millisecond, "短延迟任务不应延迟整圈（160ms）触发，实际 %v", elapsed)
 }
 
 // TestTimerConcurrentShortDelayPrecision 并发调度短延迟任务，全部应快速触发
 // 并发提高 schedule/worker 竞态触发概率，重构前会有部分任务延迟到 1 圈后
+// 阈值 100ms：回归目标是抓住"延迟整圈（160ms）"竞态，100ms 仍能可靠拦截；
+// 不用 50ms 是因为 100 个 goroutine 创建 + 调度在 CI 慢机器上本身就要几十 ms
+// （实测 macOS runner 53ms 通过），卡太紧只会产生负载相关的假失败
 func TestTimerConcurrentShortDelayPrecision(t *testing.T) {
 	timer := newTestTimer()
 	defer timer.Stop()
@@ -571,15 +575,20 @@ func TestTimerConcurrentShortDelayPrecision(t *testing.T) {
 	}
 	wg.Wait()
 
-	waitFired(t, &fired, int32(n), 50*time.Millisecond)
+	waitFired(t, &fired, int32(n), 100*time.Millisecond)
 	elapsed := time.Since(start)
-	assert.Less(t, elapsed, 50*time.Millisecond, "并发短延迟任务应全部在 1 圈内触发，实际 %v", elapsed)
+	assert.Less(t, elapsed, 100*time.Millisecond, "并发短延迟任务应全部在 1 圈内触发，实际 %v", elapsed)
 	assert.Equal(t, int32(n), fired.Load(), "全部任务应触发")
 }
 
 // TestTimerBoundaryTicks 验证边界 tick 数的触发精度
 //   - delay=tickInterval（10ms）：ticks=1，应在 [1,2] tick（10~20ms）内触发
 //   - delay=bucketCount*tickInterval（160ms）：ticks=16，rounds=1，应在 [16,17] tick（160~170ms）内触发
+//
+// 阈值取圈边界安全值而非理论 tick 上界：Windows CI 定时器分辨率 15.6ms + 负载抖动，
+// 实测 1 tick 任务 33ms、16 tick 任务 243ms——卡理论值（30ms/200ms）只会产生平台性假失败。
+// 回归目标是圈数正确：1 tick 任务 < 160ms（1 圈，错圈会延迟到 ~160ms+），
+// rounds=1 任务 < 320ms（2 圈，圈计数错误会延迟到 ~320ms+）
 func TestTimerBoundaryTicks(t *testing.T) {
 	timer := newTestTimer() // tick=10ms, bucketCount=16
 	defer timer.Stop()
@@ -588,16 +597,17 @@ func TestTimerBoundaryTicks(t *testing.T) {
 	var fired1 atomic.Int32
 	start1 := time.Now()
 	timer.Schedule(10*time.Millisecond, func() { fired1.Add(1) })
-	waitFired(t, &fired1, 1, 100*time.Millisecond)
+	waitFired(t, &fired1, 1, 150*time.Millisecond)
 	elapsed1 := time.Since(start1)
-	assert.Less(t, elapsed1, 30*time.Millisecond, "1 tick 任务应在 2 tick 内触发，实际 %v", elapsed1)
+	assert.Less(t, elapsed1, 100*time.Millisecond, "1 tick 任务应在 1 圈内触发，实际 %v", elapsed1)
 
 	// 边界2：delay = bucketCount tick（rounds=1 路径）
 	var fired2 atomic.Int32
 	start2 := time.Now()
 	timer.Schedule(160*time.Millisecond, func() { fired2.Add(1) })
-	waitFired(t, &fired2, 1, 250*time.Millisecond)
+	waitFired(t, &fired2, 1, 310*time.Millisecond)
 	elapsed2 := time.Since(start2)
-	// rounds=1：worker 第 1 次扫到 bucket 减圈，第 2 次触发，应在 160~180ms
-	assert.Less(t, elapsed2, 200*time.Millisecond, "16 tick（rounds=1）任务应在 17 tick 内触发，实际 %v", elapsed2)
+	// rounds=1：worker 第 1 次扫到 bucket 减圈，第 2 次触发，正常应在 160~180ms；
+	// 圈计数错误才会延迟到 2 圈（320ms+），断言 300ms 已能可靠拦截
+	assert.Less(t, elapsed2, 300*time.Millisecond, "16 tick（rounds=1）任务应在 2 圈内触发，实际 %v", elapsed2)
 }

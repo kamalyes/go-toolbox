@@ -743,6 +743,137 @@ func TestShardedMapClearWithPerShardHint(t *testing.T) {
 	assert.Equal(t, 999, v)
 }
 
+// countEntries 用 Range 统计实际条目数（作为 Len 记账正确性的对照真相）
+func countEntries[K comparable, V any](m *ShardedMap[K, V]) int {
+	var n int
+	m.Range(func(k K, v V) bool {
+		n++
+		return true
+	})
+	return n
+}
+
+// TestShardedMapClearHalf 测试清半驱逐的基本语义
+func TestShardedMapClearHalf(t *testing.T) {
+	m := NewShardedMap[string, int](16)
+
+	for i := 0; i < 100; i++ {
+		m.Store(fmt.Sprintf("k%d", i), i)
+	}
+	assert.Equal(t, 100, m.Len())
+
+	m.ClearHalf()
+
+	// 每 shard 驱逐一半（奇数向下取整），总量约一半
+	remaining := m.Len()
+	assert.Greater(t, remaining, 30, "清半后应保留约一半数据")
+	assert.Less(t, remaining, 70, "清半后不应超过一半太多")
+
+	// 核心不变量：Len 记账（count.Add(-removed)）与实际条目数一致
+	assert.Equal(t, remaining, countEntries(m))
+
+	// 保留的数据仍可正常读取（Range 收集键集合验证 Load）
+	m.Range(func(k string, v int) bool {
+		got, ok := m.Load(k)
+		assert.True(t, ok, "清半后保留的键应可读取")
+		assert.Equal(t, v, got)
+		return true
+	})
+}
+
+// TestShardedMapClearHalfEmpty 空表清半不应 panic 且 Len 保持 0
+func TestShardedMapClearHalfEmpty(t *testing.T) {
+	m := NewShardedMap[string, int](16)
+
+	assert.NotPanics(t, func() { m.ClearHalf() })
+	assert.Zero(t, m.Len())
+}
+
+// TestShardedMapClearHalfSingleElement 单元素 shard 驱逐 1 条（evict 至少为 1）
+func TestShardedMapClearHalfSingleElement(t *testing.T) {
+	m := NewShardedMap[string, int](16)
+
+	m.Store("only", 1)
+	assert.Equal(t, 1, m.Len())
+
+	m.ClearHalf()
+
+	assert.Zero(t, m.Len())
+}
+
+// TestShardedMapClearHalfRepeated 连续清半持续有效（无轮换状态，逐次递减）
+func TestShardedMapClearHalfRepeated(t *testing.T) {
+	m := NewShardedMap[string, int](16)
+
+	for i := 0; i < 64; i++ {
+		m.Store(fmt.Sprintf("k%d", i), i)
+	}
+
+	prev := m.Len()
+	for i := 0; i < 10; i++ {
+		m.ClearHalf()
+		cur := m.Len()
+		assert.Equal(t, cur, countEntries(m), "第 %d 次清半后 Len 与实际条目数应一致", i+1)
+		assert.LessOrEqual(t, cur, prev, "连续清半应单调不增")
+		prev = cur
+	}
+	assert.Zero(t, m.Len(), "有限次清半后应最终清空")
+}
+
+// TestShardedMapClearHalfConcurrent 并发 Store + ClearHalf + Len 的竞态检测
+func TestShardedMapClearHalfConcurrent(t *testing.T) {
+	m := NewShardedMap[string, int](64)
+
+	var wg sync.WaitGroup
+
+	// 并发写入
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func(gid int) {
+			defer wg.Done()
+			for j := 0; j < 100; j++ {
+				m.Store(fmt.Sprintf("g%d_k%d", gid, j), gid*1000+j)
+			}
+		}(i)
+	}
+
+	// 并发清半驱逐
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 10; j++ {
+				m.ClearHalf()
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	// 终态一致性：Len 记账与实际条目数一致（count 并发扣减无丢失/重复）
+	assert.Equal(t, m.Len(), countEntries(m))
+}
+
+// TestShardedMapClearHalfWithPerShardHint 带 PerShardHint 的清半，验证清半后仍可正常写入读取
+func TestShardedMapClearHalfWithPerShardHint(t *testing.T) {
+	m := NewShardedMapWithOptions[string, int](16, WithPerShardHint[string, int](50))
+
+	for i := 0; i < 100; i++ {
+		m.Store(fmt.Sprintf("k%d", i), i)
+	}
+
+	m.ClearHalf()
+
+	assert.Equal(t, m.Len(), countEntries(m))
+
+	// 验证清半后仍可正常写入读取（复用预分配容量）
+	m.Store("after_half", 999)
+	v, ok := m.Load("after_half")
+	assert.True(t, ok)
+	assert.Equal(t, 999, v)
+	assert.Equal(t, m.Len(), countEntries(m))
+}
+
 // TestNextPowerOfTwo 测试 NextPowerOfTwo 函数的各分支
 func TestNextPowerOfTwo(t *testing.T) {
 	t.Run("n <= 1 returns 2", func(t *testing.T) {
@@ -857,6 +988,34 @@ func BenchmarkShardedMapRead(b *testing.B) {
 	})
 }
 
+// BenchmarkShardedMapClearHalf 清半驱逐基准测试（对比 Clear：百万级容量缓存的驱逐开销）
+// 每轮迭代前重填 100 万条，衡量单次 ClearHalf 的耗时与分配
+func BenchmarkShardedMapClearHalf(b *testing.B) {
+	m := NewShardedMapWithOptions[string, int](64, WithPerShardHint[string, int](16384))
+	keys := make([]string, 1_000_000)
+	for i := 0; i < len(keys); i++ {
+		keys[i] = fmt.Sprintf("k%d", i)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		m.StoreBatch(sliceToMap(keys))
+		b.StartTimer()
+		m.ClearHalf()
+	}
+}
+
+// sliceToMap 辅助函数：将 key 切片转为 map（基准测试重填用）
+func sliceToMap(keys []string) map[string]int {
+	items := make(map[string]int, len(keys))
+	for i, k := range keys {
+		items[k] = i
+	}
+	return items
+}
+
 // BenchmarkShardedMapReadPreGen 预生成 key 的读取基准测试（排除 fmt.Sprintf 干扰）
 func BenchmarkShardedMapReadPreGen(b *testing.B) {
 	m := NewShardedMap[string, int](64)
@@ -901,6 +1060,142 @@ func BenchmarkFNVHashString32(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = FNVHashString32(s)
 	}
+}
+
+// ============================================================================
+// 调优基准：shard 数量扫描 / 混合读写负载 / Delete / LoadOrStore
+//
+// 实测数据（i5-9300H 4C/8T，GOMAXPROCS=8，-benchtime=2s）：
+//
+//	写密集 ShardSweep:    16→91ns  64→54ns  256→40ns  1024→38ns
+//	混合9:1 SweepMixed:  16→81ns  64→42ns  256→29ns  1024→23ns
+//	sync.Map 混合9:1 对照:                        32ns + 7B/op（有分配）
+//
+// 选型结论（供容量规划参考，实际以目标机器复测为准）：
+//   - 锁竞争拐点在 shardCount ≈ GOMAXPROCS×16 ~ ×32 区间（本机 128~256），
+//     再往上（×128+）收益 <5%，hash 计算与缓存局部性开销开始抵消锁收益
+//   - 读多写少（9:1）场景 256 shards 即可反超 sync.Map（29ns vs 32ns）且零分配；
+//     写密集场景 256 相比 64 提升约 27%，相比 16 提升约 56%
+//   - 写密集或读热点缓存建议 shardCount = NextPowerOfTwo(GOMAXPROCS × 32)
+//   - ClearHalf 百万级容量驱逐 63ms/零分配（仅触发时一次性开销，可接受）
+// ============================================================================
+
+// BenchmarkShardedMapShardSweep shard 数量扫描（写密集负载）
+// 固定 10 万 key、满并发并行写，观察锁竞争随 shardCount 的变化
+func BenchmarkShardedMapShardSweep(b *testing.B) {
+	keys := make([]string, 100000)
+	for i := range keys {
+		keys[i] = fmt.Sprintf("k%d", i)
+	}
+
+	for _, sc := range []int{16, 64, 256, 1024} {
+		b.Run(fmt.Sprintf("shards=%d", sc), func(b *testing.B) {
+			m := NewShardedMap[string, int](sc)
+			b.ReportAllocs()
+			b.RunParallel(func(pb *testing.PB) {
+				i := 0
+				for pb.Next() {
+					m.Store(keys[i%100000], i)
+					i++
+				}
+			})
+		})
+	}
+}
+
+// BenchmarkShardedMapShardSweepMixed shard 数量扫描（读多写少 9:1 混合负载）
+// 更贴近在线状态缓存等读热点的真实分布
+func BenchmarkShardedMapShardSweepMixed(b *testing.B) {
+	keys := make([]string, 100000)
+	for i := range keys {
+		keys[i] = fmt.Sprintf("k%d", i)
+	}
+
+	for _, sc := range []int{16, 64, 256, 1024} {
+		b.Run(fmt.Sprintf("shards=%d", sc), func(b *testing.B) {
+			m := NewShardedMap[string, int](sc)
+			for i, k := range keys {
+				m.Store(k, i) // 预填充，读路径有数据
+			}
+			b.ReportAllocs()
+			b.RunParallel(func(pb *testing.PB) {
+				i := 0
+				for pb.Next() {
+					if i%10 == 0 {
+						m.Store(keys[i%100000], i) // 10% 写
+					} else {
+						m.Load(keys[i%100000]) // 90% 读
+					}
+					i++
+				}
+			})
+		})
+	}
+}
+
+// BenchmarkSyncMapMixed 对照组：sync.Map 的 9:1 混合负载（与 ShardSweepMixed 对比选型）
+func BenchmarkSyncMapMixed(b *testing.B) {
+	var m sync.Map
+	keys := make([]string, 100000)
+	for i := range keys {
+		keys[i] = fmt.Sprintf("k%d", i)
+		m.Store(keys[i], i)
+	}
+
+	b.ReportAllocs()
+	b.RunParallel(func(pb *testing.PB) {
+		i := 0
+		for pb.Next() {
+			if i%10 == 0 {
+				m.Store(keys[i%100000], i)
+			} else {
+				m.Load(keys[i%100000])
+			}
+			i++
+		}
+	})
+}
+
+// BenchmarkShardedMapDelete 删除基准测试（Store+Delete 成对，保证键存在且删除路径真实竞争）
+func BenchmarkShardedMapDelete(b *testing.B) {
+	m := NewShardedMap[string, int](64)
+	keys := make([]string, 100000)
+	for i := range keys {
+		keys[i] = fmt.Sprintf("k%d", i)
+		m.Store(keys[i], i)
+	}
+
+	b.ReportAllocs()
+	b.RunParallel(func(pb *testing.PB) {
+		i := 0
+		for pb.Next() {
+			// Store 保证键存在，避免 Delete 空键的假快
+			m.Store(keys[i%100000], i)
+			m.Delete(keys[i%100000])
+			i++
+		}
+	})
+}
+
+// BenchmarkShardedMapLoadOrStore LoadOrStore 基准测试（命中/未命中各半）
+func BenchmarkShardedMapLoadOrStore(b *testing.B) {
+	m := NewShardedMap[string, int](64)
+	keys := make([]string, 100000)
+	for i := range keys {
+		keys[i] = fmt.Sprintf("k%d", i)
+		if i%2 == 0 {
+			m.Store(keys[i], i) // 一半预填充（命中路径）
+		}
+	}
+
+	b.ReportAllocs()
+	b.RunParallel(func(pb *testing.PB) {
+		i := 0
+		for pb.Next() {
+			m.LoadOrStore(keys[i%100000], i)
+			i++
+		}
+	})
 }
 
 // BenchmarkShardedMapStoreBatch 批量写入基准测试

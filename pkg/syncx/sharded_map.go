@@ -396,6 +396,36 @@ func (m *ShardedMap[K, V]) Clear() {
 	m.count.Store(0)
 }
 
+// ClearHalf 随机清空每个 shard 内一半的元素
+//
+// 用于大容量缓存的超限驱逐：相比整表 Clear 保留一半数据，避免缓存命中率雪崩
+// （重建窗口内的查询全部回源），驱逐成本相同（无 LRU 链表维护开销）
+// 每 shard 独立驱逐一半（map 遍历序随机），无轮换状态、多次调用持续有效
+func (m *ShardedMap[K, V]) ClearHalf() {
+	var removed int64
+	for _, shard := range m.shards {
+		shard.mu.Lock()
+		n := len(shard.data)
+		if n > 0 {
+			evict := n / 2
+			if evict < 1 {
+				evict = 1
+			}
+			i := 0
+			for k := range shard.data {
+				delete(shard.data, k)
+				i++
+				if i >= evict {
+					break
+				}
+			}
+			removed += int64(i)
+		}
+		shard.mu.Unlock()
+	}
+	m.count.Add(-removed)
+}
+
 // Count 返回满足条件的元素数量
 // filter 为 nil 时等价于 Len
 func (m *ShardedMap[K, V]) Count(filter func(K, V) bool) int {
