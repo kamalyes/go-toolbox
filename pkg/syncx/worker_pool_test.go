@@ -178,23 +178,29 @@ func TestWorkerPoolQueueSize(t *testing.T) {
 	// 初始队列应该为空
 	assert.Equal(t, 0, pool.GetQueueSize())
 
-	// 提交阻塞任务
+	// 两个 worker 全部阻塞并确认已开始，后续提交必然积压在队列
 	blockChan := make(chan struct{})
-	pool.Submit(context.Background(), func() {
+	started := make(chan struct{}, 2)
+	assert.NoError(t, pool.Submit(context.Background(), func() {
+		started <- struct{}{}
 		<-blockChan
-	})
+	}))
+	assert.NoError(t, pool.Submit(context.Background(), func() {
+		started <- struct{}{}
+		<-blockChan
+	}))
+	<-started
+	<-started
 
 	// 提交更多任务
 	for i := 0; i < 5; i++ {
-		pool.Submit(context.Background(), func() {})
+		assert.NoError(t, pool.Submit(context.Background(), func() {}))
 	}
 
-	// 队列大小应该反映待处理任务数
-	queueSize := pool.GetQueueSize()
-	assert.Greater(t, queueSize, 0)
+	// 无空闲 worker 可消费，队列大小应精确等于待处理任务数
+	assert.Equal(t, 5, pool.GetQueueSize())
 
 	close(blockChan)
-	time.Sleep(100 * time.Millisecond)
 }
 
 // TestWorkerPoolWorkerCount 测试 Worker 池的 worker 数量
