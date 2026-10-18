@@ -13,9 +13,11 @@ package idgen
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -844,5 +846,315 @@ func TestConcurrentGeneration(t *testing.T) {
 			wg.Wait()
 			assert.Equal(t, 100, len(ids), "应生成 100 个唯一 ID")
 		})
+	}
+}
+
+// ============================================================================
+// 定宽 hex 格式化：与被替换掉的 fmt.Sprintf 实现逐字符对照
+// ============================================================================
+
+// 下面四个函数是替换前的 Sprintf 实现原样复刻，仅用于对照
+func oldHex16(id int64) string { return fmt.Sprintf("%016x", id) }
+func oldHex8(id int64) string  { return fmt.Sprintf("%08x", id&0xFFFFFFFF) }
+func oldHex13(id int64) string { return fmt.Sprintf("%013x", id) }
+func oldSnowflakeCorr(id int64, counter uint64) string {
+	h := fmt.Sprintf("%016x", id)
+	var buf [36]byte
+	copy(buf[0:8], h[0:8])
+	buf[8] = '-'
+	copy(buf[9:13], h[8:12])
+	buf[13] = '-'
+	copy(buf[14:18], "4b10")
+	buf[18] = '-'
+	copy(buf[19:23], h[12:16])
+	buf[23] = '-'
+	copy(buf[24:36], fmt.Sprintf("%012x", counter))
+	return string(buf[:])
+}
+func oldShortFlakeCorr(id1, id2 int64) string {
+	h1 := fmt.Sprintf("%016x", id1)
+	h2 := fmt.Sprintf("%016x", id2)
+	h1 = h1[:12] + "4" + h1[13:]
+	h2 = "8" + h2[1:]
+	var buf [36]byte
+	copy(buf[0:8], h1[0:8])
+	buf[8] = '-'
+	copy(buf[9:13], h1[8:12])
+	buf[13] = '-'
+	copy(buf[14:18], h1[12:16])
+	buf[18] = '-'
+	copy(buf[19:23], h2[0:4])
+	buf[23] = '-'
+	copy(buf[24:36], h2[4:16])
+	return string(buf[:])
+}
+
+// hexTestIDs 覆盖真实 ID 范围与边界：0、小值、53 位上限、63 位上限
+func hexTestIDs() []int64 {
+	return []int64{
+		0, 1, 0xF, 0x10, 0xFFFFFFFF, 0x100000000,
+		1 << 20, 1 << 40, 1 << 52, (1 << 53) - 1,
+		1 << 53, 1 << 62, (1 << 62) - 1, 0x7FFFFFFFFFFFFFFF,
+		1732184000123456789, 6203154432000000,
+	}
+}
+
+// TestHexHelpersMatchSprintf 手写定宽 hex 必须与 Sprintf 逐字符一致
+//
+// hex16 与 hex8 是精确等价而非近似：uint64 最多 16 位 hex、uint32 最多 8 位，
+// 不存在值超出宽度的情况而 13 位低于 53 位 ID 的上限，所以那里用的是补零版
+//
+// [EN] The hand-written fixed-width hex must match Sprintf character for
+// character. hex16 and hex8 are exact, not approximate: a uint64 never needs
+// more than 16 digits nor a uint32 more than 8. Width 13 is below a 53-bit ID's
+// maximum, which is why that path uses the zero-padding variant instead
+func TestHexHelpersMatchSprintf(t *testing.T) {
+	for _, id := range hexTestIDs() {
+		assert.Equal(t, oldHex16(id), hex16(uint64(id)), "hex16(%#x)", id)
+		assert.Equal(t, oldHex8(id), hex8(uint32(id)), "hex8(%#x)", id)
+		var buf [16]byte
+		assert.Equal(t, oldHex13(id), string(appendHexPadded(buf[:0], uint64(id), 13)),
+			"appendHexPadded(%#x, 13)", id)
+	}
+	// 补零版还要在宽度小于值所需位数时照实输出，不截断
+	for _, w := range []int{8, 12, 13, 16} {
+		for _, v := range []uint64{0, 1, 0xFFFFFFFF, 1 << 52, (1 << 53) - 1, ^uint64(0)} {
+			var buf [32]byte
+			assert.Equal(t, fmt.Sprintf("%0*x", w, v),
+				string(appendHexPadded(buf[:0], v, w)), "width=%d v=%#x", w, v)
+		}
+	}
+}
+
+// TestCorrelationIDLayoutUnchanged 关联 ID 的 8-4-4-4-12 版式不得因改写而变化
+func TestCorrelationIDLayoutUnchanged(t *testing.T) {
+	ids := hexTestIDs()
+	for _, id := range ids {
+		for _, counter := range []uint64{1, 0xFF, 1 << 20, (1 << 48) - 1} {
+			var h, c [16]byte
+			putHex16(&h, uint64(id))
+			putHex16(&c, counter)
+			var buf [36]byte
+			copy(buf[0:8], h[0:8])
+			buf[8] = '-'
+			copy(buf[9:13], h[8:12])
+			buf[13] = '-'
+			copy(buf[14:18], "4b10")
+			buf[18] = '-'
+			copy(buf[19:23], h[12:16])
+			buf[23] = '-'
+			copy(buf[24:36], c[4:16])
+			assert.Equal(t, oldSnowflakeCorr(id, counter), string(buf[:]),
+				"snowflake corr(%#x, %d)", id, counter)
+		}
+	}
+	for _, id1 := range ids {
+		for _, id2 := range ids {
+			var h1, h2 [16]byte
+			putHex16(&h1, uint64(id1))
+			putHex16(&h2, uint64(id2))
+			h1[12] = '4'
+			h2[0] = '8'
+			var buf [36]byte
+			copy(buf[0:8], h1[0:8])
+			buf[8] = '-'
+			copy(buf[9:13], h1[8:12])
+			buf[13] = '-'
+			copy(buf[14:18], h1[12:16])
+			buf[18] = '-'
+			copy(buf[19:23], h2[0:4])
+			buf[23] = '-'
+			copy(buf[24:36], h2[4:16])
+			assert.Equal(t, oldShortFlakeCorr(id1, id2), string(buf[:]),
+				"shortflake corr(%#x, %#x)", id1, id2)
+		}
+	}
+}
+
+// TestSnowflakeClockRegression Snowflake 对时钟回拨做钳位，ID 不回头
+func TestSnowflakeClockRegression(t *testing.T) {
+	g := NewSnowflakeGenerator(1, 1)
+	g.Generate()
+	g.mu.Lock()
+	g.lastTime += 3
+	g.mu.Unlock()
+
+	seen := make(map[int64]bool, 256)
+	prev := int64(-1)
+	for i := 0; i < 200; i++ {
+		id := g.Generate()
+		assert.False(t, seen[id], "第 %d 个 ID 重复: %d", i, id)
+		assert.Greater(t, id, prev, "第 %d 个 ID 不递增", i)
+		seen[id] = true
+		prev = id
+	}
+}
+
+// ============================================================================
+// 序列号耗尽后的等待：只量 CPU 占用，不断言
+// ============================================================================
+
+func processCPUTime() time.Duration {
+	var ru syscall.Rusage
+	_ = syscall.Getrusage(syscall.RUSAGE_SELF, &ru)
+	return time.Duration(ru.Utime.Nano() + ru.Stime.Nano())
+}
+
+// TestWaitStrategyCPUCost 打印等待期间的 CPU 占用，供改动等待策略时对照
+//
+// 不做断言：CPU 比例随机器与负载波动，断了只会变成假红
+// 改造前两种等法（持锁轮询 time.Now、runtime.Gosched 自旋）都是 100% 占满一个
+// 核空转，改成精确睡到毫秒边界后 Snowflake 降到约 34%、ShortFlake 约 2%，
+// 而吞吐完全不变——吞吐由每毫秒配额决定，与等法无关
+//
+// [EN] Logs the CPU burned while waiting, for comparison when the wait strategy
+// changes. It asserts nothing: the ratio moves with machine and load, so an
+// assertion would only produce false failures
+func TestWaitStrategyCPUCost(t *testing.T) {
+	cases := []struct {
+		name string
+		n    int
+		gen  func() int64
+	}{
+		{"Snowflake", 40000, NewSnowflakeGenerator(1, 1).Generate},
+		{"ShortFlake", 600, NewShortFlakeGenerator(1).Generate},
+	}
+	for _, c := range cases {
+		c.gen() // 预热，让首个毫秒窗口对齐
+		cpu0, wall0 := processCPUTime(), time.Now()
+		var sink int64
+		for i := 0; i < c.n; i++ {
+			sink = c.gen()
+		}
+		_ = sink
+		wall := time.Since(wall0)
+		cpu := processCPUTime() - cpu0
+		t.Logf("%-11s %6d 个 ID  墙上 %7.2fms  CPU %7.2fms  CPU/墙上 %5.1f%%",
+			c.name, c.n, float64(wall.Microseconds())/1000,
+			float64(cpu.Microseconds())/1000, 100*float64(cpu)/float64(wall))
+	}
+}
+
+// ============================================================================
+// 基准：定宽 hex 手写与 fmt.Sprintf 的差距
+// ============================================================================
+
+var hexSink string
+
+func BenchmarkHexFormatting(b *testing.B) {
+	v := uint64(0x18f5a3c7d2e4b109)
+	b.Run("16位/Sprintf", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			hexSink = fmt.Sprintf("%016x", v)
+		}
+	})
+	b.Run("16位/手写", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			hexSink = hex16(v)
+		}
+	})
+	b.Run("8位/Sprintf", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			hexSink = fmt.Sprintf("%08x", uint32(v))
+		}
+	})
+	b.Run("8位/手写", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			hexSink = hex8(uint32(v))
+		}
+	})
+	b.Run("13位/Sprintf", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			hexSink = fmt.Sprintf("%013x", v)
+		}
+	})
+	b.Run("13位/补零", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			var buf [16]byte
+			hexSink = string(appendHexPadded(buf[:0], v, 13))
+		}
+	})
+}
+
+// ============================================================================
+// 参数校验：越界的节点 ID 必须启动即报错，不能静默折回
+// ============================================================================
+
+// TestSnowflakeConfigRejectsOutOfRange 越界或负的 ID 必须 panic
+//
+// 原先是 workerID & 0x1F 静默折回，于是配成 32 的机器和配成 0 的机器变成同一个
+// worker，两台机器从此发出完全相同的 ID这个测试守住「宁可启动失败」
+func TestSnowflakeConfigRejectsOutOfRange(t *testing.T) {
+	cases := []struct {
+		name               string
+		worker, datacenter int64
+	}{
+		{"worker 刚越界", SnowflakeMaxWorkerID + 1, 0},
+		{"worker 折回会与 0 冲突", 32, 0},
+		{"worker 负数", -1, 0},
+		{"datacenter 刚越界", 0, SnowflakeMaxDatacenterID + 1},
+		{"datacenter 负数", 0, -1},
+		{"两者都越界", 999, 999},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			assert.Panics(t, func() { NewSnowflakeGenerator(c.worker, c.datacenter) })
+			err := SnowflakeConfig{Epoch: 1640995200000, WorkerID: c.worker, DatacenterID: c.datacenter}.Validate()
+			assert.Error(t, err, "Validate 应报错")
+			assert.Contains(t, err.Error(), "must be in [0,", "错误信息应给出合法区间")
+		})
+	}
+}
+
+// TestSnowflakeConfigAcceptsBoundary 边界值必须可用，且节点位精确落位
+func TestSnowflakeConfigAcceptsBoundary(t *testing.T) {
+	for _, w := range []int64{0, 1, SnowflakeMaxWorkerID} {
+		for _, d := range []int64{0, 1, SnowflakeMaxDatacenterID} {
+			g := NewSnowflakeGenerator(w, d)
+			id := g.Generate()
+			assert.Equal(t, w, (id>>17)&0x1F, "worker 位应为 %d", w)
+			assert.Equal(t, d, (id>>12)&0x1F, "datacenter 位应为 %d", d)
+		}
+	}
+}
+
+// TestSnowflakeConfigEpoch 纪元必须为正且不在未来
+func TestSnowflakeConfigEpoch(t *testing.T) {
+	assert.Error(t, SnowflakeConfig{Epoch: 0}.Validate())
+	assert.Error(t, SnowflakeConfig{Epoch: -1}.Validate())
+	assert.Error(t, SnowflakeConfig{Epoch: time.Now().Add(time.Hour).UnixMilli()}.Validate())
+	assert.NoError(t, DefaultSnowflakeConfig().Validate())
+	// Epoch 留空时按默认纪元填充，不应报错
+	assert.NotPanics(t, func() { NewSnowflakeGeneratorWithConfig(SnowflakeConfig{WorkerID: 1}) })
+}
+
+// TestBoundNodeID 工厂把宿主推导的 ID 收进容量内，且对 MinInt64 不崩
+func TestBoundNodeID(t *testing.T) {
+	assert.Equal(t, int64(0), boundNodeID(0, 63))
+	assert.Equal(t, int64(63), boundNodeID(63, 63))
+	assert.Equal(t, int64(0), boundNodeID(64, 63), "64 折回 0，这是容量所限")
+	assert.Equal(t, int64(1), boundNodeID(-1, 63), "负数取绝对值")
+	assert.Equal(t, int64(0), boundNodeID(math.MinInt64, 63), "MinInt64 取反会溢出，须特判")
+	for _, id := range []int64{0, 1, 7, 1023, -5, math.MinInt64, math.MaxInt64} {
+		got := boundNodeID(id, SnowflakeMaxWorkerID)
+		assert.GreaterOrEqual(t, got, int64(0))
+		assert.LessOrEqual(t, got, int64(SnowflakeMaxWorkerID))
+	}
+}
+
+// TestFactoryBuildsAllTypes 工厂对所有类型都能构造出来，不因参数越界 panic
+func TestFactoryBuildsAllTypes(t *testing.T) {
+	for _, name := range []string{"uuid", "nanoid", "snowflake", "shortflake", "short", "shortid", "numeric", "ulid", "default", "hex", "logger", "", "unknown"} {
+		assert.NotPanics(t, func() {
+			g := NewIDGenerator(name)
+			assert.NotNil(t, g, "类型 %q", name)
+			assert.NotEmpty(t, g.GenerateTraceID(), "类型 %q", name)
+		}, "类型 %q", name)
 	}
 }

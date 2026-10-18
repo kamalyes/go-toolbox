@@ -13,7 +13,6 @@ package idgen
 
 import (
 	"fmt"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -25,19 +24,92 @@ import (
 // 时间戳(41位) + 机器ID(6位) + 序列号(6位) = 53位
 // 最大值: 9007199254740991 (约 9PB，16位数字)
 type ShortFlakeGenerator struct {
-	epoch   int64  // 自定义纪元（毫秒）
-	nodeID  int64  // 节点ID (0-63)
+	epoch   int64         // 自定义纪元（毫秒）
+	nodeID  int64         // 节点ID (0-63)
 	state   atomic.Uint64 // 无锁状态：高位 epoch 起毫秒数，低 6 位同毫秒序列号
 	counter uint64
 }
 
-// NewShortFlakeGenerator 创建短 Snowflake 生成器
-// nodeID: 0-63 (支持64个节点)
-func NewShortFlakeGenerator(nodeID int64) *ShortFlakeGenerator {
-	return &ShortFlakeGenerator{
-		epoch:  1640995200000, // 2022-01-01 00:00:00
-		nodeID: nodeID & 0x3F, // 6位，最大63
+// ShortFlake 位布局
+//
+// 时间戳(41位) + 节点ID(6位) + 序列号(6位) = 53位，刚好落在 JavaScript 的
+// Number 安全整数范围内，前端不需要用字符串承载
+//
+// 序列号只有 6 位，单实例吞吐上限是 6.4 万每秒，远低于 Snowflake 的 409.6 万
+// 这是为了压进 53 位换来的，取舍本身合理，但容量必须让调用方看得见：
+// 把常量公开出来，免得压测时才发现卡在一个来路不明的数字上
+const (
+	// ShortFlakeMaxNodeID 节点 ID 上限（含），6 位
+	ShortFlakeMaxNodeID = 63
+	// ShortFlakeSequencePerMilli 同一毫秒内可发的 ID 数，6 位
+	// 超出后会等到下一毫秒，因此单实例吞吐上限约为 6.4 万每秒
+	ShortFlakeSequencePerMilli = 64
+
+	shortFlakeSequenceMask = ShortFlakeSequencePerMilli - 1
+	// shortFlakeDefaultEpoch 默认纪元 2022-01-01 00:00:00 UTC（毫秒）
+	shortFlakeDefaultEpoch = 1640995200000
+)
+
+// ShortFlakeConfig ShortFlake 生成器配置
+type ShortFlakeConfig struct {
+	Epoch  int64 // 纪元时间戳（毫秒），默认 2022-01-01 00:00:00 UTC
+	NodeID int64 // 节点 ID，0 到 ShortFlakeMaxNodeID
+}
+
+// DefaultShortFlakeConfig 返回默认配置（纪元 2022-01-01，节点 0）
+func DefaultShortFlakeConfig() ShortFlakeConfig {
+	return ShortFlakeConfig{Epoch: shortFlakeDefaultEpoch}
+}
+
+// Validate 校验配置合法性
+//
+// 越界的节点 ID 必须报错，不能像原先那样用 nodeID & 0x3F 静默折回
+// 折回会让配成 64 的节点和配成 0 的节点变成同一个节点，从此发出完全相同的 ID，
+// 负数同理（-1 折成 63）这种错误启动时毫无迹象，只会在数据里留下重复
+// 详见 SnowflakeConfig.Validate 的说明
+//
+// [EN] An out-of-range node ID must be rejected rather than folded back with
+// nodeID & 0x3F. Folding makes a node configured as 64 and one configured as 0
+// the same node, emitting identical IDs; negatives fold too. See
+// SnowflakeConfig.Validate
+func (c ShortFlakeConfig) Validate() error {
+	if c.Epoch <= 0 {
+		return fmt.Errorf("ShortFlakeConfig.Epoch must be > 0, got %d", c.Epoch)
 	}
+	if c.Epoch > time.Now().UnixMilli() {
+		return fmt.Errorf("ShortFlakeConfig.Epoch must not be in the future, got %d", c.Epoch)
+	}
+	if c.NodeID < 0 || c.NodeID > ShortFlakeMaxNodeID {
+		return fmt.Errorf("ShortFlakeConfig.NodeID must be in [0, %d], got %d", ShortFlakeMaxNodeID, c.NodeID)
+	}
+	return nil
+}
+
+// NewShortFlakeGeneratorWithConfig 按配置创建短 Snowflake 生成器
+//
+// 配置非法时 panic，与包内其他生成器一致
+func NewShortFlakeGeneratorWithConfig(cfg ShortFlakeConfig) *ShortFlakeGenerator {
+	if cfg.Epoch == 0 {
+		cfg.Epoch = shortFlakeDefaultEpoch
+	}
+	if err := cfg.Validate(); err != nil {
+		panic(err)
+	}
+	return &ShortFlakeGenerator{
+		epoch:  cfg.Epoch,
+		nodeID: cfg.NodeID,
+	}
+}
+
+// NewShortFlakeGenerator 创建短 Snowflake 生成器
+//
+// nodeID 取值 0 到 ShortFlakeMaxNodeID，越界会 panic
+// 原因见 ShortFlakeConfig.Validate
+func NewShortFlakeGenerator(nodeID int64) *ShortFlakeGenerator {
+	return NewShortFlakeGeneratorWithConfig(ShortFlakeConfig{
+		Epoch:  shortFlakeDefaultEpoch,
+		NodeID: nodeID,
+	})
 }
 
 // GenerateTraceID 生成跟踪ID（hex 编码，13字符）
@@ -46,7 +118,9 @@ func NewShortFlakeGenerator(nodeID int64) *ShortFlakeGenerator {
 // 与 RequestID 的区别: hex 编码更紧凑，适合 HTTP Header 传递
 func (g *ShortFlakeGenerator) GenerateTraceID() string {
 	id := g.generate()
-	return fmt.Sprintf("%013x", id)
+	// 13 位低于 53 位 ID 的 hex 上限（最多 14 位），必须用补零版而非定宽截断
+	var buf [16]byte
+	return string(appendHexPadded(buf[:0], uint64(id), 13))
 }
 
 // GenerateSpanID 生成跨度ID（hex 低8字符）
@@ -55,7 +129,7 @@ func (g *ShortFlakeGenerator) GenerateTraceID() string {
 // 与 TraceID 的区别: 更短，仅保留低位部分
 func (g *ShortFlakeGenerator) GenerateSpanID() string {
 	id := g.generate()
-	return fmt.Sprintf("%08x", id&0xFFFFFFFF)
+	return hex8(uint32(id))
 }
 
 // GenerateRequestID 生成请求ID（纯数字+计数器后缀）
@@ -82,11 +156,15 @@ func (g *ShortFlakeGenerator) GenerateRequestID() string {
 func (g *ShortFlakeGenerator) GenerateCorrelationID() string {
 	id1 := g.generate()
 	id2 := g.generate()
-	h1 := fmt.Sprintf("%016x", id1)
-	h2 := fmt.Sprintf("%016x", id2)
 
-	h1 = h1[:12] + "4" + h1[13:]
-	h2 = "8" + h2[1:]
+	// 写进栈上数组后就地改那两位
+	// 原先是两次 Sprintf 加两次字符串拼接，四个中间字符串各分配一次，
+	// 全都只为被 copy 一次就丢掉
+	var h1, h2 [16]byte
+	putHex16(&h1, uint64(id1))
+	putHex16(&h2, uint64(id2))
+	h1[12] = '4'
+	h2[0] = '8'
 
 	var buf [36]byte
 	copy(buf[0:8], h1[0:8])
@@ -113,16 +191,36 @@ func (g *ShortFlakeGenerator) Generate() int64 {
 func (g *ShortFlakeGenerator) generate() int64 {
 	for {
 		old := g.state.Load()
+		last := old >> 6
 		now := uint64(time.Now().UnixMilli() - g.epoch)
 
+		// 时钟回拨时钳到已记录的毫秒数上
+		//
+		// 不钳位的话 last != now 成立，序列号从 0 重新开始，于是把那一毫秒已经
+		// 发出去的号重新发一遍——ID 生成器唯一必须保证的事就此失效
+		// NTP 校正、虚拟机挂起恢复、手工改系统时间都会造成回拨
+		// 注意这种重复查不出于「本轮生成的 ID 是否唯一」，重复的对象在回拨之前，
+		// 所以 TestShortFlakeClockRegression 直接断言时间戳不回头
+		//
+		// [EN] Clamps to the recorded millisecond when the clock steps back.
+		// Without it last != now holds, the sequence restarts at 0, and the
+		// numbers already issued in that millisecond are issued again — the one
+		// thing an ID generator must guarantee. NTP correction, VM
+		// suspend/resume and manual clock changes all cause this
+		if now < last {
+			now = last
+		}
+
 		seq := uint64(0)
-		if old>>6 == now {
+		if last == now {
 			// 同一毫秒内，序列号递增
-			seq = (old & 0x3F) + 1
-			if seq > 0x3F {
-				// 序列号溢出（64/ms 用尽），等待下一毫秒
-				// 旧实现在持锁状态下忙等，会阻塞所有排队者；此处无锁自旋，天然让出
-				runtime.Gosched()
+			seq = (old & shortFlakeSequenceMask) + 1
+			if seq > shortFlakeSequenceMask {
+				// 本毫秒的序列号用尽（ShortFlakeSequencePerMilli 个），等到下一毫秒
+				// 这里不持任何锁，睡眠期间其余调用方不受影响
+				// 原先用 runtime.Gosched 自旋，而 Gosched 只让给其他 goroutine、
+				// 不交还操作系统，实测仍是 100% 占满一个核空转
+				sleepToNextMilli()
 				continue
 			}
 		}

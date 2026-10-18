@@ -231,3 +231,80 @@ func BenchmarkShortFlakeBase62Generator(b *testing.B) {
 		}
 	})
 }
+
+// TestShortFlakeClockRegression 时钟回拨后 ID 仍须唯一且不回头
+//
+// 不钳位时 last != now 成立，序列号从 0 重开，于是把墙上时间那一毫秒已经发出
+// 的号重新发一遍NTP 校正、虚拟机挂起恢复、手工改系统时间都会造成回拨
+//
+// 断言的是「时间戳不低于已记录的毫秒数」而不是「本轮生成的 ID 互不相同」：
+// 重复的对象在回拨之前已经发出去了，只看本轮唯一性查不出来——第一版测试就是
+// 这么写的，去掉钳位照样绿
+//
+// [EN] After a clock step back, IDs must stay unique and must not go backwards.
+// This asserts the timestamp never falls below the recorded millisecond rather
+// than merely checking the IDs generated here are distinct: the collisions are
+// with IDs issued before the step back, so a within-run uniqueness check passes
+// even with the bug present
+func TestShortFlakeClockRegression(t *testing.T) {
+	g := NewShortFlakeGenerator(7)
+	g.Generate()
+
+	// state 停在未来 3 毫秒，等价于系统时钟被回拨 3 毫秒
+	floor := (g.state.Load() >> 6) + 3
+	g.state.Store(floor << 6)
+
+	seen := make(map[int64]bool, 256)
+	prev := int64(-1)
+	for i := 0; i < 200; i++ {
+		id := g.Generate()
+		if ts := uint64(id >> 12); ts < floor {
+			t.Fatalf("第 %d 个 ID 的时间戳回退到 %d，低于已记录的 %d，会与回拨前发出的号重复", i, ts, floor)
+		}
+		if seen[id] {
+			t.Fatalf("第 %d 个 ID 重复: %d", i, id)
+		}
+		if id <= prev {
+			t.Fatalf("第 %d 个 ID 不递增: %d <= %d", i, id, prev)
+		}
+		seen[id] = true
+		prev = id
+	}
+}
+
+// TestShortFlakeConfigRejectsOutOfRange 越界或负的节点 ID 必须启动即报错
+//
+// 原先是 nodeID & 0x3F 静默折回，配成 64 的节点和配成 0 的节点会变成同一个节点
+func TestShortFlakeConfigRejectsOutOfRange(t *testing.T) {
+	for _, nodeID := range []int64{ShortFlakeMaxNodeID + 1, 64, 100, -1, -64} {
+		assert.Panics(t, func() { NewShortFlakeGenerator(nodeID) }, "nodeID=%d", nodeID)
+		assert.Panics(t, func() { NewShortFlakeBase62Generator(nodeID) }, "nodeID=%d", nodeID)
+		err := ShortFlakeConfig{Epoch: 1640995200000, NodeID: nodeID}.Validate()
+		assert.Error(t, err, "nodeID=%d", nodeID)
+		assert.Contains(t, err.Error(), "must be in [0,")
+	}
+}
+
+// TestShortFlakeConfigAcceptsBoundary 边界节点 ID 可用，且节点位精确落位
+func TestShortFlakeConfigAcceptsBoundary(t *testing.T) {
+	for _, nodeID := range []int64{0, 1, 42, ShortFlakeMaxNodeID} {
+		g := NewShortFlakeGenerator(nodeID)
+		id := g.Generate()
+		assert.Equal(t, nodeID, (id>>6)&0x3F, "节点位应为 %d", nodeID)
+	}
+	assert.NoError(t, DefaultShortFlakeConfig().Validate())
+	assert.NotPanics(t, func() { NewShortFlakeGeneratorWithConfig(ShortFlakeConfig{NodeID: 7}) })
+}
+
+// TestShortFlakeCapacityConstantsMatchLayout 公开的容量常量必须与实际位宽一致
+//
+// 常量是给调用方核算容量用的，和实现脱节比不公开更糟
+func TestShortFlakeCapacityConstantsMatchLayout(t *testing.T) {
+	g := NewShortFlakeGenerator(ShortFlakeMaxNodeID)
+	id := g.Generate()
+	assert.Equal(t, int64(ShortFlakeMaxNodeID), (id>>6)&0x3F, "节点位应容得下 ShortFlakeMaxNodeID")
+
+	// 同一毫秒内最多发 ShortFlakeSequencePerMilli 个，序列位必须容得下
+	assert.Equal(t, int64(ShortFlakeSequencePerMilli-1), int64(shortFlakeSequenceMask))
+	assert.Equal(t, 0, ShortFlakeSequencePerMilli&(ShortFlakeSequencePerMilli-1), "应为 2 的幂")
+}
