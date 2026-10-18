@@ -224,38 +224,38 @@ var benchFieldStruct = &benchUser{Name: "kamalyes", Profile: &benchProfile{Avata
 func BenchmarkField_MapExactHit(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		_ = Safe(benchFieldMap).Field("user_name").String()
+		_ = New(benchFieldMap).Field("user_name").String()
 	}
 }
 func BenchmarkField_MapVariantHit(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		_ = Safe(benchFieldMap).Field("userName").String()
+		_ = New(benchFieldMap).Field("userName").String()
 	}
 }
 func BenchmarkField_MapMiss(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		_ = Safe(benchFieldMap).Field("nope").String()
+		_ = New(benchFieldMap).Field("nope").String()
 	}
 }
 func BenchmarkField_StructExactHit(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		_ = Safe(benchFieldStruct).Field("Name").String()
+		_ = New(benchFieldStruct).Field("Name").String()
 	}
 }
 func BenchmarkField_StructChain(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		_ = Safe(benchFieldStruct).Field("Profile").Field("Avatar").String()
+		_ = New(benchFieldStruct).Field("Profile").Field("Avatar").String()
 	}
 }
 func BenchmarkField_NilChain(b *testing.B) {
 	var u *benchUser
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		_ = Safe(u).Field("Profile").Field("Avatar").String()
+		_ = New(u).Field("Profile").Field("Avatar").String()
 	}
 }
 func BenchmarkField_NormalizeFieldName(b *testing.B) {

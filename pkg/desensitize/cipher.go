@@ -222,6 +222,21 @@ func NewCipher(key []byte) (*Cipher, error) {
 	// separate from the encryption key: using one key across two primitives is
 	// the kind of reuse to avoid. A labelled HMAC derives an independent
 	// subkey, with the label versioned so the construction can change later
+	//
+	// 下面这个标签是协议常量，不要改
+	//
+	// 它参与派生 macKey，而 macKey 决定确定性模式的 nonce改动标签会改变密文，
+	// 已经加密出去的数据就解不开了字符串里的 go-desensitize 是这份代码独立成
+	// 库时的名字，如今代码已回到 go-toolbox，但标签必须留着——它标识的是构造而
+	// 不是仓库要换构造就把 v1 递增，而不是改前缀
+	//
+	// [EN] The label below is a protocol constant: do not change it. It feeds
+	// the derivation of macKey, which determines the deterministic nonce, so
+	// changing it changes ciphertexts and makes already-encrypted data
+	// undecryptable. The go-desensitize in the string is the name this code had
+	// as a standalone library; the code is back in go-toolbox now, but the label
+	// has to stay — it identifies the construction, not the repository. To change
+	// the construction, bump v1 rather than rewriting the prefix
 	mac := hmac.New(sha256.New, key)
 	mac.Write([]byte("go-desensitize/siv/v1"))
 

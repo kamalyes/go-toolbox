@@ -22,14 +22,44 @@ import (
 	"github.com/kamalyes/go-toolbox/pkg/types"
 )
 
-type SafeAccess struct {
+// Access 安全访问装饰器
+//
+// 包住一个任意值，之后的取字段、转类型、取下标都不会 panic：路径不存在或类型
+// 不符时返回零值或调用方给的默认值，而不是崩掉本包的「安全」指的就是这件事——
+// 程序不崩，与信息安全无关
+//
+// 命名不带 Safe 前缀
+//
+// 包名已经是 safe，再叫 SafeAccess 从包外看就是 safe.SafeAccess，重复一遍
+// Go 官方的命名约定正是为此：包名承担限定作用，类型名不该再重复它
+// 同理 safe.Add / safe.Sqrt / safe.GetString 而不是 safe.SafeAdd 等，
+// 入口从 safe.Safe(v) 改为 safe.New(v)——原先那个函数的文档注释本来就写着 New
+//
+// [EN] A wrapper around an arbitrary value: field access, type conversion and
+// indexing on it never panic, returning a zero value or a caller-supplied
+// default when the path is missing or the type does not match. "Safe" here means
+// exactly that — the program does not crash — and has nothing to do with
+// information security.
+//
+// The name carries no Safe prefix. The package is already called safe, so
+// SafeAccess reads as safe.SafeAccess from outside and says it twice; Go's
+// naming convention exists for this, with the package name doing the
+// qualifying. Likewise safe.Add, safe.Sqrt and safe.GetString rather than
+// safe.SafeAdd, and the entry point is safe.New(v) rather than safe.Safe(v) —
+// whose own doc comment already said New
+type Access struct {
 	value interface{}
 	valid bool
 }
 
 // New 创建安全访问装饰器
-func Safe(v interface{}) *SafeAccess {
-	return &SafeAccess{
+//
+// v 为 nil 时返回的 Access 标记为无效，后续取值一律走默认值分支
+//
+// [EN] Creates the decorator. A nil v yields an Access marked invalid, so every
+// later read takes the default-value path
+func New(v interface{}) *Access {
+	return &Access{
 		value: v,
 		valid: v != nil,
 	}
@@ -37,14 +67,14 @@ func Safe(v interface{}) *SafeAccess {
 
 // invalidAccess 所有「取不到」路径共用的实例
 //
-// SafeAccess 构造后不再被改写（只有读方法），因此同一个实例可以被任意多条链共享，
+// Access 构造后不再被改写（只有读方法），因此同一个实例可以被任意多条链共享，
 // 省掉每次未命中的一次分配——而未命中在 nil 链路上恰恰是最常走的路
 //
-// [EN] Shared by every "not found" path. An SafeAccess is never written to after
+// [EN] Shared by every "not found" path. An Access is never written to after
 // construction (its methods only read), so one instance can be shared by any
 // number of chains, saving an allocation on each miss — and a miss is exactly
 // what a nil chain hits most
-var invalidAccess = &SafeAccess{valid: false}
+var invalidAccess = &Access{valid: false}
 
 // Field 安全访问字段，支持链式调用
 // 支持多种命名风格：camelCase, PascalCase, snake_case, kebab-case
@@ -57,7 +87,7 @@ var invalidAccess = &SafeAccess{valid: false}
 // are only computed on a miss. Hitting on the given name is the common case,
 // while building variants means four string conversions with an allocation
 // each, so sparing the hit path that cost matters more than tuning the miss path
-func (s *SafeAccess) Field(fieldName string) *SafeAccess {
+func (s *Access) Field(fieldName string) *Access {
 	if !s.valid || s.value == nil {
 		return invalidAccess
 	}
@@ -65,7 +95,7 @@ func (s *SafeAccess) Field(fieldName string) *SafeAccess {
 	// 首先检查是否是 map[string]interface{}
 	if m, ok := s.value.(map[string]interface{}); ok {
 		if value, exists := m[fieldName]; exists && value != nil {
-			return &SafeAccess{value: value, valid: true}
+			return &Access{value: value, valid: true}
 		}
 		var buf [stringx.MaxFieldNameVariants]string
 		variants := stringx.AppendFieldNameVariants(buf[:0], fieldName)
@@ -73,7 +103,7 @@ func (s *SafeAccess) Field(fieldName string) *SafeAccess {
 		// 字段名为空时变体列表为空，用下标循环而不是 variants[1:]，后者会越界
 		for i := 1; i < len(variants); i++ {
 			if value, exists := m[variants[i]]; exists && value != nil {
-				return &SafeAccess{value: value, valid: true}
+				return &Access{value: value, valid: true}
 			}
 		}
 		return invalidAccess
@@ -109,7 +139,7 @@ func (s *SafeAccess) Field(fieldName string) *SafeAccess {
 //
 // 指针字段为 nil 时视为取不到：继续往下链式取值只会得到零值，
 // 这正是本库要替调用方省掉的那一层 if
-func structField(rv reflect.Value, name string) (*SafeAccess, bool) {
+func structField(rv reflect.Value, name string) (*Access, bool) {
 	field := rv.FieldByName(name)
 	if !field.IsValid() || !field.CanInterface() {
 		return nil, false
@@ -118,13 +148,13 @@ func structField(rv reflect.Value, name string) (*SafeAccess, bool) {
 		if field.IsNil() {
 			return invalidAccess, true
 		}
-		return &SafeAccess{value: field.Elem().Interface(), valid: true}, true
+		return &Access{value: field.Elem().Interface(), valid: true}, true
 	}
-	return &SafeAccess{value: field.Interface(), valid: true}, true
+	return &Access{value: field.Interface(), valid: true}, true
 }
 
 // Bool 获取布尔值，如果无效则返回默认值
-func (s *SafeAccess) Bool(defaultValue ...bool) bool {
+func (s *Access) Bool(defaultValue ...bool) bool {
 	if !s.valid {
 		if len(defaultValue) > 0 {
 			return defaultValue[0]
@@ -142,7 +172,7 @@ func (s *SafeAccess) Bool(defaultValue ...bool) bool {
 }
 
 // Int 获取整数值，支持强大的类型自动转换
-func (s *SafeAccess) Int(defaultValue ...int) int {
+func (s *Access) Int(defaultValue ...int) int {
 	if !s.valid {
 		if len(defaultValue) > 0 {
 			return defaultValue[0]
@@ -159,7 +189,7 @@ func (s *SafeAccess) Int(defaultValue ...int) int {
 }
 
 // Int64 获取int64值，支持强大的类型自动转换
-func (s *SafeAccess) Int64(defaultValue ...int64) int64 {
+func (s *Access) Int64(defaultValue ...int64) int64 {
 	if !s.valid {
 		if len(defaultValue) > 0 {
 			return defaultValue[0]
@@ -175,7 +205,7 @@ func (s *SafeAccess) Int64(defaultValue ...int64) int64 {
 }
 
 // Int32 获取int32值
-func (s *SafeAccess) Int32(defaultValue ...int32) int32 {
+func (s *Access) Int32(defaultValue ...int32) int32 {
 	if !s.valid {
 		if len(defaultValue) > 0 {
 			return defaultValue[0]
@@ -191,7 +221,7 @@ func (s *SafeAccess) Int32(defaultValue ...int32) int32 {
 }
 
 // Uint 获取uint值，支持强大的类型自动转换
-func (s *SafeAccess) Uint(defaultValue ...uint) uint {
+func (s *Access) Uint(defaultValue ...uint) uint {
 	if !s.valid {
 		if len(defaultValue) > 0 {
 			return defaultValue[0]
@@ -207,7 +237,7 @@ func (s *SafeAccess) Uint(defaultValue ...uint) uint {
 }
 
 // Uint64 获取uint64值
-func (s *SafeAccess) Uint64(defaultValue ...uint64) uint64 {
+func (s *Access) Uint64(defaultValue ...uint64) uint64 {
 	if !s.valid {
 		if len(defaultValue) > 0 {
 			return defaultValue[0]
@@ -223,7 +253,7 @@ func (s *SafeAccess) Uint64(defaultValue ...uint64) uint64 {
 }
 
 // Float32 获取float32值，支持强大的类型自动转换
-func (s *SafeAccess) Float32(defaultValue ...float32) float32 {
+func (s *Access) Float32(defaultValue ...float32) float32 {
 	if !s.valid {
 		if len(defaultValue) > 0 {
 			return defaultValue[0]
@@ -239,7 +269,7 @@ func (s *SafeAccess) Float32(defaultValue ...float32) float32 {
 }
 
 // Float64 获取float64值，支持强大的类型自动转换
-func (s *SafeAccess) Float64(defaultValue ...float64) float64 {
+func (s *Access) Float64(defaultValue ...float64) float64 {
 	if !s.valid {
 		if len(defaultValue) > 0 {
 			return defaultValue[0]
@@ -255,7 +285,7 @@ func (s *SafeAccess) Float64(defaultValue ...float64) float64 {
 }
 
 // String 获取字符串值
-func (s *SafeAccess) String(defaultValue ...string) string {
+func (s *Access) String(defaultValue ...string) string {
 	if !s.valid {
 		if len(defaultValue) > 0 {
 			return defaultValue[0]
@@ -275,7 +305,7 @@ func (s *SafeAccess) String(defaultValue ...string) string {
 }
 
 // StringOr 获取字符串值，如果无效或为空则返回默认值
-func (s *SafeAccess) StringOr(defaultValue string) string {
+func (s *Access) StringOr(defaultValue string) string {
 	if !s.valid {
 		return defaultValue
 	}
@@ -289,7 +319,7 @@ func (s *SafeAccess) StringOr(defaultValue string) string {
 }
 
 // Duration 获取时间间隔值
-func (s *SafeAccess) Duration(defaultValue ...time.Duration) time.Duration {
+func (s *Access) Duration(defaultValue ...time.Duration) time.Duration {
 	if !s.valid {
 		if len(defaultValue) > 0 {
 			return defaultValue[0]
@@ -319,7 +349,7 @@ func (s *SafeAccess) Duration(defaultValue ...time.Duration) time.Duration {
 }
 
 // Value 获取原始值
-func (s *SafeAccess) Value() interface{} {
+func (s *Access) Value() interface{} {
 	if !s.valid {
 		return nil
 	}
@@ -327,20 +357,20 @@ func (s *SafeAccess) Value() interface{} {
 }
 
 // IsValid 检查值是否有效
-func (s *SafeAccess) IsValid() bool {
+func (s *Access) IsValid() bool {
 	return s.valid
 }
 
 // OrElse 如果当前值无效，返回备用值
-func (s *SafeAccess) OrElse(alternative interface{}) *SafeAccess {
+func (s *Access) OrElse(alternative interface{}) *Access {
 	if s.valid {
 		return s
 	}
-	return Safe(alternative)
+	return New(alternative)
 }
 
 // IfPresent 如果值存在则执行函数
-func (s *SafeAccess) IfPresent(fn func(interface{})) *SafeAccess {
+func (s *Access) IfPresent(fn func(interface{})) *Access {
 	if s.valid && s.value != nil {
 		fn(s.value)
 	}
@@ -348,23 +378,23 @@ func (s *SafeAccess) IfPresent(fn func(interface{})) *SafeAccess {
 }
 
 // Map 转换值（类似JavaScript的map）
-func (s *SafeAccess) Map(fn func(interface{}) interface{}) *SafeAccess {
+func (s *Access) Map(fn func(interface{}) interface{}) *Access {
 	if !s.valid {
 		return s
 	}
-	return Safe(fn(s.value))
+	return New(fn(s.value))
 }
 
 // Filter 过滤值（类似JavaScript的filter）
-func (s *SafeAccess) Filter(predicate func(interface{}) bool) *SafeAccess {
+func (s *Access) Filter(predicate func(interface{}) bool) *Access {
 	if !s.valid || !predicate(s.value) {
 		return invalidAccess
 	}
 	return s
 }
 
-// SafeGetString 安全获取map中的字符串值
-func SafeGetString(m map[string]interface{}, key string) string {
+// GetString 安全获取map中的字符串值
+func GetString(m map[string]interface{}, key string) string {
 	if v, ok := m[key]; ok {
 		// 使用 convert.MustString 进行类型转换
 		return convert.MustString(v)
@@ -372,8 +402,8 @@ func SafeGetString(m map[string]interface{}, key string) string {
 	return ""
 }
 
-// SafeGetBool 安全获取map中的布尔值
-func SafeGetBool(m map[string]interface{}, key string) bool {
+// GetBool 安全获取map中的布尔值
+func GetBool(m map[string]interface{}, key string) bool {
 	if v, ok := m[key]; ok {
 		// 使用 convert.MustBool 进行类型转换
 		return convert.MustBool(v)
@@ -381,8 +411,8 @@ func SafeGetBool(m map[string]interface{}, key string) bool {
 	return false
 }
 
-// SafeGetStringSlice 安全获取map中的字符串切片
-func SafeGetStringSlice(m map[string]interface{}, key string) []string {
+// GetStringSlice 安全获取map中的字符串切片
+func GetStringSlice(m map[string]interface{}, key string) []string {
 	if v, ok := m[key]; ok {
 		// 直接使用[]string类型
 		if slice, ok := v.([]string); ok {
@@ -413,11 +443,11 @@ func splitFieldPath(path string) []string {
 // 通用便捷方法
 
 // At 通用字段路径访问方法，支持链式调用和默认值
-func (s *SafeAccess) At(fieldPath string, defaultValue ...interface{}) *SafeAccess {
+func (s *Access) At(fieldPath string, defaultValue ...interface{}) *Access {
 	// 空路径视为无效
 	if fieldPath == "" {
 		if len(defaultValue) > 0 {
-			return Safe(defaultValue[0])
+			return New(defaultValue[0])
 		}
 		return invalidAccess
 	}
@@ -434,45 +464,45 @@ func (s *SafeAccess) At(fieldPath string, defaultValue ...interface{}) *SafeAcce
 	}
 
 	if !current.valid && len(defaultValue) > 0 {
-		return Safe(defaultValue[0])
+		return New(defaultValue[0])
 	}
 
 	return current
 }
 
 // BoolAt 获取布尔字段的便捷方法
-func (s *SafeAccess) BoolAt(fieldPath string, defaultValue ...bool) bool {
+func (s *Access) BoolAt(fieldPath string, defaultValue ...bool) bool {
 	return s.At(fieldPath).Bool(defaultValue...)
 }
 
 // StringAt 获取字符串字段的便捷方法
-func (s *SafeAccess) StringAt(fieldPath string, defaultValue ...string) string {
+func (s *Access) StringAt(fieldPath string, defaultValue ...string) string {
 	return s.At(fieldPath).String(defaultValue...)
 }
 
 // StringOrAt 获取字符串字段，支持空值默认值
-func (s *SafeAccess) StringOrAt(fieldPath string, defaultValue string) string {
+func (s *Access) StringOrAt(fieldPath string, defaultValue string) string {
 	return s.At(fieldPath).StringOr(defaultValue)
 }
 
 // IntAt 获取整数字段的便捷方法
-func (s *SafeAccess) IntAt(fieldPath string, defaultValue ...int) int {
+func (s *Access) IntAt(fieldPath string, defaultValue ...int) int {
 	return s.At(fieldPath).Int(defaultValue...)
 }
 
 // DurationAt 获取时间间隔字段的便捷方法
-func (s *SafeAccess) DurationAt(fieldPath string, defaultValue ...time.Duration) time.Duration {
+func (s *Access) DurationAt(fieldPath string, defaultValue ...time.Duration) time.Duration {
 	return s.At(fieldPath).Duration(defaultValue...)
 }
 
 // ValueAt 获取任意类型字段的原始值
-func (s *SafeAccess) ValueAt(fieldPath string, defaultValue ...interface{}) interface{} {
+func (s *Access) ValueAt(fieldPath string, defaultValue ...interface{}) interface{} {
 	result := s.At(fieldPath, defaultValue...)
 	return result.Value()
 }
 
-// GetIntValue 从SafeAccess中获取int值,支持int/int64/float64类型转换
-func (sa *SafeAccess) GetIntValue(defaultValue int) int {
+// GetIntValue 从Access中获取int值,支持int/int64/float64类型转换
+func (sa *Access) GetIntValue(defaultValue int) int {
 	if !sa.valid {
 		return defaultValue
 	}
@@ -485,8 +515,8 @@ func (sa *SafeAccess) GetIntValue(defaultValue int) int {
 	return result
 }
 
-// GetInt64Value 从SafeAccess中获取int64值,支持int/int64/float64类型转换
-func (sa *SafeAccess) GetInt64Value(defaultValue int64) int64 {
+// GetInt64Value 从Access中获取int64值,支持int/int64/float64类型转换
+func (sa *Access) GetInt64Value(defaultValue int64) int64 {
 	if !sa.valid {
 		return defaultValue
 	}
@@ -502,7 +532,7 @@ func (sa *SafeAccess) GetInt64Value(defaultValue int64) int64 {
 // ==================== 泛型转换方法 ====================
 
 // As 泛型转换方法 - 支持所有数值类型
-func As[T types.Numerical](s *SafeAccess, defaultValue ...T) T {
+func As[T types.Numerical](s *Access, defaultValue ...T) T {
 	if !s.valid {
 		if len(defaultValue) > 0 {
 			return defaultValue[0]
@@ -523,7 +553,7 @@ func As[T types.Numerical](s *SafeAccess, defaultValue ...T) T {
 }
 
 // AsFloat 泛型浮点数转换方法
-func AsFloat[T types.Float](s *SafeAccess, mode convert.RoundMode, defaultValue ...T) T {
+func AsFloat[T types.Float](s *Access, mode convert.RoundMode, defaultValue ...T) T {
 	if !s.valid {
 		if len(defaultValue) > 0 {
 			return defaultValue[0]
@@ -544,7 +574,7 @@ func AsFloat[T types.Float](s *SafeAccess, mode convert.RoundMode, defaultValue 
 }
 
 // AsString 智能字符串转换
-func (s *SafeAccess) AsString(timeLayout ...string) string {
+func (s *Access) AsString(timeLayout ...string) string {
 	if !s.valid {
 		return ""
 	}
@@ -552,7 +582,7 @@ func (s *SafeAccess) AsString(timeLayout ...string) string {
 }
 
 // AsBool 智能布尔转换
-func (s *SafeAccess) AsBool() bool {
+func (s *Access) AsBool() bool {
 	if !s.valid {
 		return false
 	}
@@ -560,7 +590,7 @@ func (s *SafeAccess) AsBool() bool {
 }
 
 // AsJSON 转换为JSON字符串
-func (s *SafeAccess) AsJSON(indent bool) (string, error) {
+func (s *Access) AsJSON(indent bool) (string, error) {
 	if !s.valid {
 		return "", fmt.Errorf("invalid value")
 	}
@@ -577,7 +607,7 @@ func (s *SafeAccess) AsJSON(indent bool) (string, error) {
 // ==================== 切片操作 ====================
 
 // AsSlice 泛型切片转换
-func AsSlice[T types.Numerical](s *SafeAccess) ([]T, error) {
+func AsSlice[T types.Numerical](s *Access) ([]T, error) {
 	if !s.valid {
 		return nil, fmt.Errorf("invalid value")
 	}
@@ -609,7 +639,7 @@ func AsSlice[T types.Numerical](s *SafeAccess) ([]T, error) {
 }
 
 // AsFloatSlice 泛型浮点数切片转换
-func AsFloatSlice[T types.Float](s *SafeAccess, mode convert.RoundMode) ([]T, error) {
+func AsFloatSlice[T types.Float](s *Access, mode convert.RoundMode) ([]T, error) {
 	if !s.valid {
 		return nil, fmt.Errorf("invalid value")
 	}
@@ -641,7 +671,7 @@ func AsFloatSlice[T types.Float](s *SafeAccess, mode convert.RoundMode) ([]T, er
 }
 
 // AsStringSlice 字符串切片转换
-func (s *SafeAccess) AsStringSlice() []string {
+func (s *Access) AsStringSlice() []string {
 	if !s.valid {
 		return nil
 	}
@@ -666,18 +696,18 @@ func (s *SafeAccess) AsStringSlice() []string {
 // ==================== 链式操作增强 ====================
 
 // Map 映射转换（支持泛型）
-func Map[T any, R any](s *SafeAccess, fn func(T) R) *SafeAccess {
+func Map[T any, R any](s *Access, fn func(T) R) *Access {
 	if !s.valid {
 		return s
 	}
 	if val, ok := s.value.(T); ok {
-		return Safe(fn(val))
+		return New(fn(val))
 	}
 	return invalidAccess
 }
 
 // FlatMap 扁平化映射
-func (s *SafeAccess) FlatMap(fn func(interface{}) *SafeAccess) *SafeAccess {
+func (s *Access) FlatMap(fn func(interface{}) *Access) *Access {
 	if !s.valid {
 		return s
 	}
@@ -685,7 +715,7 @@ func (s *SafeAccess) FlatMap(fn func(interface{}) *SafeAccess) *SafeAccess {
 }
 
 // OrDefault 提供默认值
-func OrDefault[T any](s *SafeAccess, defaultValue T) T {
+func OrDefault[T any](s *Access, defaultValue T) T {
 	if !s.valid {
 		return defaultValue
 	}
@@ -696,43 +726,43 @@ func OrDefault[T any](s *SafeAccess, defaultValue T) T {
 }
 
 // Must 强制获取值，无效时panic
-func Must[T any](s *SafeAccess) T {
+func Must[T any](s *Access) T {
 	if !s.valid {
-		panic("SafeAccess: value is invalid")
+		panic("Access: value is invalid")
 	}
 	if val, ok := s.value.(T); ok {
 		return val
 	}
 	var zero T
-	panic(fmt.Sprintf("SafeAccess: cannot convert %T to %T", s.value, zero))
+	panic(fmt.Sprintf("Access: cannot convert %T to %T", s.value, zero))
 }
 
 // ==================== 条件操作 ====================
 
 // When 条件执行
-func (s *SafeAccess) When(predicate func(interface{}) bool, fn func(interface{}) interface{}) *SafeAccess {
+func (s *Access) When(predicate func(interface{}) bool, fn func(interface{}) interface{}) *Access {
 	if !s.valid {
 		return s
 	}
 	if predicate(s.value) {
-		return Safe(fn(s.value))
+		return New(fn(s.value))
 	}
 	return s
 }
 
 // Unless 条件排除
-func (s *SafeAccess) Unless(predicate func(interface{}) bool, fn func(interface{}) interface{}) *SafeAccess {
+func (s *Access) Unless(predicate func(interface{}) bool, fn func(interface{}) interface{}) *Access {
 	if !s.valid {
 		return s
 	}
 	if !predicate(s.value) {
-		return Safe(fn(s.value))
+		return New(fn(s.value))
 	}
 	return s
 }
 
 // IsEmpty 检查是否为空值
-func (s *SafeAccess) IsEmpty() bool {
+func (s *Access) IsEmpty() bool {
 	if !s.valid {
 		return true
 	}
@@ -752,14 +782,14 @@ func (s *SafeAccess) IsEmpty() bool {
 }
 
 // IsNonEmpty 检查是否非空
-func (s *SafeAccess) IsNonEmpty() bool {
+func (s *Access) IsNonEmpty() bool {
 	return !s.IsEmpty()
 }
 
 // ==================== 类型检查 ====================
 
 // IsType 检查值是否为指定类型
-func IsType[T any](s *SafeAccess) bool {
+func IsType[T any](s *Access) bool {
 	if !s.valid {
 		return false
 	}
@@ -768,7 +798,7 @@ func IsType[T any](s *SafeAccess) bool {
 }
 
 // IsNumber 检查是否为数值类型
-func (s *SafeAccess) IsNumber() bool {
+func (s *Access) IsNumber() bool {
 	if !s.valid {
 		return false
 	}
@@ -783,7 +813,7 @@ func (s *SafeAccess) IsNumber() bool {
 }
 
 // IsString 检查是否为字符串
-func (s *SafeAccess) IsString() bool {
+func (s *Access) IsString() bool {
 	if !s.valid {
 		return false
 	}
@@ -792,7 +822,7 @@ func (s *SafeAccess) IsString() bool {
 }
 
 // IsBool 检查是否为布尔值
-func (s *SafeAccess) IsBool() bool {
+func (s *Access) IsBool() bool {
 	if !s.valid {
 		return false
 	}
@@ -801,7 +831,7 @@ func (s *SafeAccess) IsBool() bool {
 }
 
 // IsSlice 检查是否为切片
-func (s *SafeAccess) IsSlice() bool {
+func (s *Access) IsSlice() bool {
 	if !s.valid {
 		return false
 	}
@@ -810,7 +840,7 @@ func (s *SafeAccess) IsSlice() bool {
 }
 
 // IsMap 检查是否为map
-func (s *SafeAccess) IsMap() bool {
+func (s *Access) IsMap() bool {
 	if !s.valid {
 		return false
 	}
@@ -821,7 +851,7 @@ func (s *SafeAccess) IsMap() bool {
 // ==================== 集合操作 ====================
 
 // Len 获取长度（字符串、切片、map等）
-func (s *SafeAccess) Len() int {
+func (s *Access) Len() int {
 	if !s.valid {
 		return 0
 	}
@@ -847,7 +877,7 @@ func (s *SafeAccess) Len() int {
 }
 
 // Keys 获取map的所有键
-func (s *SafeAccess) Keys() []string {
+func (s *Access) Keys() []string {
 	if !s.valid {
 		return nil
 	}
@@ -864,7 +894,7 @@ func (s *SafeAccess) Keys() []string {
 }
 
 // Values 获取map的所有值
-func (s *SafeAccess) Values() []interface{} {
+func (s *Access) Values() []interface{} {
 	if !s.valid {
 		return nil
 	}
@@ -881,7 +911,7 @@ func (s *SafeAccess) Values() []interface{} {
 }
 
 // Contains 检查切片或map是否包含指定值
-func (s *SafeAccess) Contains(target interface{}) bool {
+func (s *Access) Contains(target interface{}) bool {
 	if !s.valid {
 		return false
 	}

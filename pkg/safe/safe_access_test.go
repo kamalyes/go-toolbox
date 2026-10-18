@@ -4,7 +4,7 @@
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2025-12-30 09:21:46
  * @FilePath: \go-toolbox\pkg\safe\safe_access_test.go
- * @Description: SafeAccess 的链式取值、类型转换与泛型入口测试
+ * @Description: Access 的链式取值、类型转换与泛型入口测试
  *
  * Copyright (c) 2025 by kamalyes, All Rights Reserved.
  */
@@ -34,7 +34,7 @@ type User struct {
 	Alive   *bool
 }
 
-func TestSafeAccessWithNestedStructs(t *testing.T) {
+func TestAccessWithNestedStructs(t *testing.T) {
 	alive := true
 	address := &Address{
 		City:  "New York",
@@ -46,7 +46,7 @@ func TestSafeAccessWithNestedStructs(t *testing.T) {
 		Address: address,
 		Alive:   &alive,
 	}
-	safe := Safe(user)
+	safe := New(user)
 
 	// 测试正常情况
 	assert.True(t, safe.Field("Name").IsValid())
@@ -71,7 +71,7 @@ func TestSafeAccessWithNestedStructs(t *testing.T) {
 	assert.False(t, safe.Field("Address").Field("NonExistent").IsValid())
 
 	// 测试 nil 值
-	safeNil := Safe(nil)
+	safeNil := New(nil)
 	assert.False(t, safeNil.IsValid())
 	assert.Equal(t, "", safeNil.String(""))
 	assert.Equal(t, 0, safeNil.Int(0))
@@ -82,7 +82,7 @@ func TestSafeAccessWithNestedStructs(t *testing.T) {
 
 	// 测试 Duration
 	duration := time.Duration(5 * time.Second)
-	safeDuration := Safe(duration)
+	safeDuration := New(duration)
 	assert.Equal(t, duration, safeDuration.Duration())
 
 	// 测试 OrElse
@@ -117,135 +117,135 @@ func TestSafeAccessWithNestedStructs(t *testing.T) {
 
 func TestInt64_AllCases(t *testing.T) {
 	t.Run("Int64正常转换", func(t *testing.T) {
-		s := Safe(int64(9223372036854775807))
+		s := New(int64(9223372036854775807))
 		assert.Equal(t, int64(9223372036854775807), s.Int64())
 	})
 
 	t.Run("Int64从字符串转换", func(t *testing.T) {
-		s := Safe("12345678901234")
+		s := New("12345678901234")
 		assert.Equal(t, int64(12345678901234), s.Int64())
 	})
 
 	t.Run("Int64无效值使用默认", func(t *testing.T) {
-		s := Safe("invalid")
+		s := New("invalid")
 		assert.Equal(t, int64(999), s.Int64(999))
 	})
 
-	t.Run("Int64无效SafeAccess使用默认", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+	t.Run("Int64无效Access使用默认", func(t *testing.T) {
+		s := &Access{valid: false}
 		assert.Equal(t, int64(777), s.Int64(777))
 	})
 }
 
 func TestInt32_AllCases(t *testing.T) {
 	t.Run("Int32正常转换", func(t *testing.T) {
-		s := Safe(int32(2147483647))
+		s := New(int32(2147483647))
 		assert.Equal(t, int32(2147483647), s.Int32())
 	})
 
 	t.Run("Int32从字符串转换", func(t *testing.T) {
-		s := Safe("12345")
+		s := New("12345")
 		assert.Equal(t, int32(12345), s.Int32())
 	})
 
 	t.Run("Int32无效值使用默认", func(t *testing.T) {
-		s := Safe("invalid")
+		s := New("invalid")
 		assert.Equal(t, int32(100), s.Int32(100))
 	})
 
-	t.Run("Int32无效SafeAccess", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+	t.Run("Int32无效Access", func(t *testing.T) {
+		s := &Access{valid: false}
 		assert.Equal(t, int32(0), s.Int32())
 	})
 }
 
 func TestUint_AllCases(t *testing.T) {
 	t.Run("Uint正常转换", func(t *testing.T) {
-		s := Safe(uint(42))
+		s := New(uint(42))
 		assert.Equal(t, uint(42), s.Uint())
 	})
 
 	t.Run("Uint从字符串转换", func(t *testing.T) {
-		s := Safe("999")
+		s := New("999")
 		assert.Equal(t, uint(999), s.Uint())
 	})
 
 	t.Run("Uint无效值使用默认", func(t *testing.T) {
-		s := Safe("invalid")
+		s := New("invalid")
 		assert.Equal(t, uint(555), s.Uint(555))
 	})
 
-	t.Run("Uint无效SafeAccess", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+	t.Run("Uint无效Access", func(t *testing.T) {
+		s := &Access{valid: false}
 		assert.Equal(t, uint(0), s.Uint())
 	})
 }
 
 func TestUint64_AllCases(t *testing.T) {
 	t.Run("Uint64正常转换", func(t *testing.T) {
-		s := Safe(uint64(18446744073709551615))
+		s := New(uint64(18446744073709551615))
 		assert.Equal(t, uint64(18446744073709551615), s.Uint64())
 	})
 
 	t.Run("Uint64从字符串转换", func(t *testing.T) {
-		s := Safe("123456789")
+		s := New("123456789")
 		assert.Equal(t, uint64(123456789), s.Uint64())
 	})
 
 	t.Run("Uint64无效值使用默认", func(t *testing.T) {
-		s := Safe("invalid")
+		s := New("invalid")
 		assert.Equal(t, uint64(888), s.Uint64(888))
 	})
 
-	t.Run("Uint64无效SafeAccess", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+	t.Run("Uint64无效Access", func(t *testing.T) {
+		s := &Access{valid: false}
 		assert.Equal(t, uint64(0), s.Uint64())
 	})
 }
 
 func TestFloat32_AllCases(t *testing.T) {
 	t.Run("Float32正常转换", func(t *testing.T) {
-		s := Safe(float32(3.14159))
+		s := New(float32(3.14159))
 		result := s.Float32()
 		assert.InDelta(t, 3.14159, result, 0.0001)
 	})
 
 	t.Run("Float32从字符串转换", func(t *testing.T) {
-		s := Safe("2.718")
+		s := New("2.718")
 		result := s.Float32()
 		assert.InDelta(t, 2.718, result, 0.001)
 	})
 
 	t.Run("Float32无效值使用默认", func(t *testing.T) {
-		s := Safe("invalid")
+		s := New("invalid")
 		assert.Equal(t, float32(1.5), s.Float32(1.5))
 	})
 
-	t.Run("Float32无效SafeAccess", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+	t.Run("Float32无效Access", func(t *testing.T) {
+		s := &Access{valid: false}
 		assert.Equal(t, float32(0), s.Float32())
 	})
 }
 
 func TestFloat64_AllCases(t *testing.T) {
 	t.Run("Float64正常转换", func(t *testing.T) {
-		s := Safe(float64(3.141592653589793))
+		s := New(float64(3.141592653589793))
 		assert.Equal(t, 3.141592653589793, s.Float64())
 	})
 
 	t.Run("Float64从字符串转换", func(t *testing.T) {
-		s := Safe("2.718281828")
+		s := New("2.718281828")
 		result := s.Float64()
 		assert.InDelta(t, 2.718281828, result, 0.0000001)
 	})
 
 	t.Run("Float64无效值使用默认", func(t *testing.T) {
-		s := Safe("invalid")
+		s := New("invalid")
 		assert.Equal(t, 9.99, s.Float64(9.99))
 	})
 
-	t.Run("Float64无效SafeAccess", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+	t.Run("Float64无效Access", func(t *testing.T) {
+		s := &Access{valid: false}
 		assert.Equal(t, 0.0, s.Float64())
 	})
 }
@@ -254,46 +254,46 @@ func TestFloat64_AllCases(t *testing.T) {
 
 func TestString_EdgeCases(t *testing.T) {
 	t.Run("String从各种类型转换", func(t *testing.T) {
-		assert.Equal(t, "123", Safe(123).String())
-		assert.Equal(t, "3.14", Safe(3.14).String())
-		assert.Equal(t, "true", Safe(true).String())
+		assert.Equal(t, "123", New(123).String())
+		assert.Equal(t, "3.14", New(3.14).String())
+		assert.Equal(t, "true", New(true).String())
 	})
 
 	t.Run("String空值处理", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		assert.Equal(t, "", s.String())
 		assert.Equal(t, "default", s.String("default"))
 	})
 
 	t.Run("String从nil转换", func(t *testing.T) {
-		s := Safe(nil)
+		s := New(nil)
 		assert.Equal(t, "", s.String())
 	})
 }
 
 func TestStringOr_AllCases(t *testing.T) {
 	t.Run("StringOr有效值", func(t *testing.T) {
-		s := Safe("hello")
+		s := New("hello")
 		assert.Equal(t, "hello", s.StringOr("default"))
 	})
 
 	t.Run("StringOr空字符串使用默认", func(t *testing.T) {
-		s := Safe("")
+		s := New("")
 		assert.Equal(t, "default", s.StringOr("default"))
 	})
 
 	t.Run("StringOr无效值使用默认", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		assert.Equal(t, "fallback", s.StringOr("fallback"))
 	})
 
 	t.Run("StringOr非字符串类型", func(t *testing.T) {
-		s := Safe(123)
+		s := New(123)
 		assert.Equal(t, "123", s.StringOr("default"))
 	})
 
 	t.Run("StringOr nil值", func(t *testing.T) {
-		s := Safe(nil)
+		s := New(nil)
 		assert.Equal(t, "fallback", s.StringOr("fallback"))
 	})
 }
@@ -301,32 +301,32 @@ func TestStringOr_AllCases(t *testing.T) {
 func TestDuration_AllCases(t *testing.T) {
 	t.Run("Duration正常时长", func(t *testing.T) {
 		d := 5 * time.Second
-		s := Safe(d)
+		s := New(d)
 		assert.Equal(t, d, s.Duration())
 	})
 
 	t.Run("Duration从字符串解析", func(t *testing.T) {
-		s := Safe("10s")
+		s := New("10s")
 		assert.Equal(t, 10*time.Second, s.Duration())
 	})
 
 	t.Run("Duration从整数转换", func(t *testing.T) {
-		s := Safe(1000000000) // 1秒的纳秒数
+		s := New(1000000000) // 1秒的纳秒数
 		assert.Equal(t, time.Second, s.Duration())
 	})
 
 	t.Run("Duration无效字符串使用默认", func(t *testing.T) {
-		s := Safe("invalid")
+		s := New("invalid")
 		assert.Equal(t, 3*time.Second, s.Duration(3*time.Second))
 	})
 
-	t.Run("Duration无效SafeAccess", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+	t.Run("Duration无效Access", func(t *testing.T) {
+		s := &Access{valid: false}
 		assert.Equal(t, time.Duration(0), s.Duration())
 	})
 
 	t.Run("Duration复杂时长", func(t *testing.T) {
-		s := Safe("1h30m45s")
+		s := New("1h30m45s")
 		expected := 1*time.Hour + 30*time.Minute + 45*time.Second
 		assert.Equal(t, expected, s.Duration())
 	})
@@ -336,21 +336,21 @@ func TestDuration_AllCases(t *testing.T) {
 
 func TestValue_AllCases(t *testing.T) {
 	t.Run("Value有效值", func(t *testing.T) {
-		s := Safe("test")
+		s := New("test")
 		val := s.Value()
 		assert.NotNil(t, val)
 		assert.Equal(t, "test", val)
 	})
 
 	t.Run("Value无效值", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		val := s.Value()
 		assert.Nil(t, val)
 	})
 
 	t.Run("Value复杂对象", func(t *testing.T) {
 		data := map[string]interface{}{"key": "value"}
-		s := Safe(data)
+		s := New(data)
 		val := s.Value()
 		assert.NotNil(t, val)
 		assert.Equal(t, data, val)
@@ -359,19 +359,19 @@ func TestValue_AllCases(t *testing.T) {
 
 func TestOrElse_AllCases(t *testing.T) {
 	t.Run("OrElse有效值不使用默认", func(t *testing.T) {
-		s := Safe(42)
+		s := New(42)
 		result := s.OrElse(100)
 		assert.Equal(t, 42, result.Int())
 	})
 
 	t.Run("OrElse无效值使用默认", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		result := s.OrElse("default")
 		assert.Equal(t, "default", result.String())
 	})
 
 	t.Run("OrElse链式调用", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		result := s.OrElse(999).OrElse(111)
 		assert.Equal(t, 999, result.Int())
 	})
@@ -379,7 +379,7 @@ func TestOrElse_AllCases(t *testing.T) {
 
 func TestMap_AllCases(t *testing.T) {
 	t.Run("Map有效转换", func(t *testing.T) {
-		s := Safe(10)
+		s := New(10)
 		result := s.Map(func(v interface{}) interface{} {
 			return v.(int) * 2
 		})
@@ -387,7 +387,7 @@ func TestMap_AllCases(t *testing.T) {
 	})
 
 	t.Run("Map无效值不执行", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		executed := false
 		result := s.Map(func(v interface{}) interface{} {
 			executed = true
@@ -398,7 +398,7 @@ func TestMap_AllCases(t *testing.T) {
 	})
 
 	t.Run("Map类型转换", func(t *testing.T) {
-		s := Safe("123")
+		s := New("123")
 		result := s.Map(func(v interface{}) interface{} {
 			return len(v.(string))
 		})
@@ -406,70 +406,70 @@ func TestMap_AllCases(t *testing.T) {
 	})
 }
 
-// ==================== SafeGetXXX函数测试 ====================
+// ==================== GetXXX函数测试 ====================
 
-func TestSafeGetString_AllCases(t *testing.T) {
-	t.Run("SafeGetString正常获取", func(t *testing.T) {
+func TestGetString_AllCases(t *testing.T) {
+	t.Run("GetString正常获取", func(t *testing.T) {
 		data := map[string]interface{}{"key": "value"}
-		assert.Equal(t, "value", SafeGetString(data, "key"))
+		assert.Equal(t, "value", GetString(data, "key"))
 	})
 
-	t.Run("SafeGetString键不存在", func(t *testing.T) {
+	t.Run("GetString键不存在", func(t *testing.T) {
 		data := map[string]interface{}{"key": "value"}
-		assert.Equal(t, "", SafeGetString(data, "missing"))
+		assert.Equal(t, "", GetString(data, "missing"))
 	})
 
-	t.Run("SafeGetString非字符串转换", func(t *testing.T) {
+	t.Run("GetString非字符串转换", func(t *testing.T) {
 		data := map[string]interface{}{"key": 123}
-		assert.Equal(t, "123", SafeGetString(data, "key"))
+		assert.Equal(t, "123", GetString(data, "key"))
 	})
 }
 
-func TestSafeGetBool_AllCases(t *testing.T) {
-	t.Run("SafeGetBool正常获取", func(t *testing.T) {
+func TestGetBool_AllCases(t *testing.T) {
+	t.Run("GetBool正常获取", func(t *testing.T) {
 		data := map[string]interface{}{"key": true}
-		assert.True(t, SafeGetBool(data, "key"))
+		assert.True(t, GetBool(data, "key"))
 	})
 
-	t.Run("SafeGetBool键不存在", func(t *testing.T) {
+	t.Run("GetBool键不存在", func(t *testing.T) {
 		data := map[string]interface{}{"key": true}
-		assert.False(t, SafeGetBool(data, "missing"))
+		assert.False(t, GetBool(data, "missing"))
 	})
 
-	t.Run("SafeGetBool从字符串转换", func(t *testing.T) {
+	t.Run("GetBool从字符串转换", func(t *testing.T) {
 		data := map[string]interface{}{"key": "true"}
-		assert.True(t, SafeGetBool(data, "key"))
+		assert.True(t, GetBool(data, "key"))
 	})
 
-	t.Run("SafeGetBool从整数转换", func(t *testing.T) {
+	t.Run("GetBool从整数转换", func(t *testing.T) {
 		data := map[string]interface{}{"key": 1}
-		assert.True(t, SafeGetBool(data, "key"))
+		assert.True(t, GetBool(data, "key"))
 	})
 }
 
-func TestSafeGetStringSlice_AllCases(t *testing.T) {
-	t.Run("SafeGetStringSlice正常获取", func(t *testing.T) {
+func TestGetStringSlice_AllCases(t *testing.T) {
+	t.Run("GetStringSlice正常获取", func(t *testing.T) {
 		data := map[string]interface{}{"key": []string{"a", "b", "c"}}
-		result := SafeGetStringSlice(data, "key")
+		result := GetStringSlice(data, "key")
 		assert.Equal(t, []string{"a", "b", "c"}, result)
 	})
 
-	t.Run("SafeGetStringSlice键不存在", func(t *testing.T) {
+	t.Run("GetStringSlice键不存在", func(t *testing.T) {
 		data := map[string]interface{}{"key": []string{"a"}}
-		result := SafeGetStringSlice(data, "missing")
+		result := GetStringSlice(data, "missing")
 		assert.Nil(t, result)
 	})
 
-	t.Run("SafeGetStringSlice从interface切片转换", func(t *testing.T) {
+	t.Run("GetStringSlice从interface切片转换", func(t *testing.T) {
 		data := map[string]interface{}{"key": []interface{}{"x", "y", "z"}}
-		result := SafeGetStringSlice(data, "key")
+		result := GetStringSlice(data, "key")
 		assert.Len(t, result, 3)
 		assert.Contains(t, result, "x")
 	})
 
-	t.Run("SafeGetStringSlice非切片类型", func(t *testing.T) {
+	t.Run("GetStringSlice非切片类型", func(t *testing.T) {
 		data := map[string]interface{}{"key": "not-a-slice"}
-		result := SafeGetStringSlice(data, "key")
+		result := GetStringSlice(data, "key")
 		assert.Nil(t, result)
 	})
 }
@@ -478,27 +478,27 @@ func TestSafeGetStringSlice_AllCases(t *testing.T) {
 
 func TestGetIntValue_AllCases(t *testing.T) {
 	t.Run("GetIntValue从int", func(t *testing.T) {
-		s := Safe(42)
+		s := New(42)
 		assert.Equal(t, 42, s.GetIntValue(0))
 	})
 
 	t.Run("GetIntValue从字符串", func(t *testing.T) {
-		s := Safe("123")
+		s := New("123")
 		assert.Equal(t, 123, s.GetIntValue(0))
 	})
 
 	t.Run("GetIntValue从float", func(t *testing.T) {
-		s := Safe(3.14)
+		s := New(3.14)
 		assert.Equal(t, 3, s.GetIntValue(0))
 	})
 
 	t.Run("GetIntValue无效值", func(t *testing.T) {
-		s := Safe("invalid")
+		s := New("invalid")
 		assert.Equal(t, 999, s.GetIntValue(999))
 	})
 
 	t.Run("GetIntValue从bool", func(t *testing.T) {
-		s := Safe(true)
+		s := New(true)
 		// bool无法直接转int，应该返回默认值
 		assert.Equal(t, 999, s.GetIntValue(999))
 	})
@@ -506,27 +506,27 @@ func TestGetIntValue_AllCases(t *testing.T) {
 
 func TestGetInt64Value_AllCases(t *testing.T) {
 	t.Run("GetInt64Value从int64", func(t *testing.T) {
-		s := Safe(int64(9223372036854775807))
+		s := New(int64(9223372036854775807))
 		assert.Equal(t, int64(9223372036854775807), s.GetInt64Value(0))
 	})
 
 	t.Run("GetInt64Value从字符串", func(t *testing.T) {
-		s := Safe("12345678901234")
+		s := New("12345678901234")
 		assert.Equal(t, int64(12345678901234), s.GetInt64Value(0))
 	})
 
 	t.Run("GetInt64Value从float", func(t *testing.T) {
-		s := Safe(3.99)
+		s := New(3.99)
 		assert.Equal(t, int64(3), s.GetInt64Value(0))
 	})
 
 	t.Run("GetInt64Value无效值", func(t *testing.T) {
-		s := Safe("invalid")
+		s := New("invalid")
 		assert.Equal(t, int64(888), s.GetInt64Value(888))
 	})
 
 	t.Run("GetInt64Value从int", func(t *testing.T) {
-		s := Safe(42)
+		s := New(42)
 		assert.Equal(t, int64(42), s.GetInt64Value(0))
 	})
 }
@@ -535,19 +535,19 @@ func TestGetInt64Value_AllCases(t *testing.T) {
 
 func TestAsFloat_EdgeCases(t *testing.T) {
 	t.Run("AsFloat无默认值", func(t *testing.T) {
-		s := Safe(3.14)
+		s := New(3.14)
 		result := AsFloat[float64](s, convert.RoundNone)
 		assert.Equal(t, 3.14, result)
 	})
 
 	t.Run("AsFloat无效值返回零值", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		result := AsFloat[float64](s, convert.RoundNone)
 		assert.Equal(t, 0.0, result)
 	})
 
 	t.Run("AsFloat类型转换失败使用默认", func(t *testing.T) {
-		s := Safe("invalid")
+		s := New("invalid")
 		result := AsFloat[float64](s, convert.RoundNone, 9.99)
 		assert.Equal(t, 9.99, result)
 	})
@@ -557,65 +557,65 @@ func TestAsFloat_EdgeCases(t *testing.T) {
 
 func TestIsNumber_EdgeCases(t *testing.T) {
 	t.Run("IsNumber无效值", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		assert.False(t, s.IsNumber())
 	})
 
 	t.Run("IsNumber各种整数类型", func(t *testing.T) {
-		assert.True(t, Safe(int8(1)).IsNumber())
-		assert.True(t, Safe(int16(1)).IsNumber())
-		assert.True(t, Safe(uint8(1)).IsNumber())
-		assert.True(t, Safe(uint16(1)).IsNumber())
-		assert.True(t, Safe(uint32(1)).IsNumber())
+		assert.True(t, New(int8(1)).IsNumber())
+		assert.True(t, New(int16(1)).IsNumber())
+		assert.True(t, New(uint8(1)).IsNumber())
+		assert.True(t, New(uint16(1)).IsNumber())
+		assert.True(t, New(uint32(1)).IsNumber())
 	})
 }
 
 func TestIsString_EdgeCases(t *testing.T) {
 	t.Run("IsString无效值", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		assert.False(t, s.IsString())
 	})
 
 	t.Run("IsString空字符串", func(t *testing.T) {
-		assert.True(t, Safe("").IsString())
+		assert.True(t, New("").IsString())
 	})
 }
 
 func TestIsBool_EdgeCases(t *testing.T) {
 	t.Run("IsBool无效值", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		assert.False(t, s.IsBool())
 	})
 
 	t.Run("IsBool true和false", func(t *testing.T) {
-		assert.True(t, Safe(true).IsBool())
-		assert.True(t, Safe(false).IsBool())
+		assert.True(t, New(true).IsBool())
+		assert.True(t, New(false).IsBool())
 	})
 }
 
 func TestIsSlice_EdgeCases(t *testing.T) {
 	t.Run("IsSlice无效值", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		assert.False(t, s.IsSlice())
 	})
 
 	t.Run("IsSlice各种切片类型", func(t *testing.T) {
-		assert.True(t, Safe([]int{}).IsSlice())
-		assert.True(t, Safe([]string{}).IsSlice())
-		assert.True(t, Safe([]interface{}{}).IsSlice())
+		assert.True(t, New([]int{}).IsSlice())
+		assert.True(t, New([]string{}).IsSlice())
+		assert.True(t, New([]interface{}{}).IsSlice())
 	})
 }
 
 func TestIsMap_EdgeCases(t *testing.T) {
 	t.Run("IsMap无效值", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		assert.False(t, s.IsMap())
 	})
 
 	t.Run("IsMap各种map类型", func(t *testing.T) {
-		assert.True(t, Safe(map[string]int{}).IsMap())
-		assert.True(t, Safe(map[string]interface{}{}).IsMap())
-		assert.True(t, Safe(map[int]string{}).IsMap())
+		assert.True(t, New(map[string]int{}).IsMap())
+		assert.True(t, New(map[string]interface{}{}).IsMap())
+		assert.True(t, New(map[int]string{}).IsMap())
 	})
 }
 
@@ -623,18 +623,18 @@ func TestIsMap_EdgeCases(t *testing.T) {
 
 func TestLen_EdgeCases(t *testing.T) {
 	t.Run("Len非容器类型", func(t *testing.T) {
-		s := Safe(123)
+		s := New(123)
 		assert.Equal(t, 0, s.Len())
 	})
 
 	t.Run("Len nil值", func(t *testing.T) {
-		s := Safe(nil)
+		s := New(nil)
 		assert.Equal(t, 0, s.Len())
 	})
 
 	t.Run("Len数组类型", func(t *testing.T) {
 		arr := [3]int{1, 2, 3}
-		s := Safe(arr)
+		s := New(arr)
 		assert.Equal(t, 3, s.Len())
 	})
 }
@@ -643,28 +643,28 @@ func TestLen_EdgeCases(t *testing.T) {
 
 func TestKeys_EdgeCases(t *testing.T) {
 	t.Run("Keys空map", func(t *testing.T) {
-		s := Safe(map[string]interface{}{})
+		s := New(map[string]interface{}{})
 		keys := s.Keys()
 		assert.NotNil(t, keys)
 		assert.Len(t, keys, 0)
 	})
 
 	t.Run("Keys无效值", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		assert.Nil(t, s.Keys())
 	})
 }
 
 func TestValues_EdgeCases(t *testing.T) {
 	t.Run("Values空map", func(t *testing.T) {
-		s := Safe(map[string]interface{}{})
+		s := New(map[string]interface{}{})
 		values := s.Values()
 		assert.NotNil(t, values)
 		assert.Len(t, values, 0)
 	})
 
 	t.Run("Values无效值", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		assert.Nil(t, s.Values())
 	})
 }
@@ -673,22 +673,22 @@ func TestValues_EdgeCases(t *testing.T) {
 
 func TestContains_EdgeCases(t *testing.T) {
 	t.Run("Contains空切片", func(t *testing.T) {
-		s := Safe([]int{})
+		s := New([]int{})
 		assert.False(t, s.Contains(1))
 	})
 
 	t.Run("Contains空map", func(t *testing.T) {
-		s := Safe(map[string]interface{}{})
+		s := New(map[string]interface{}{})
 		assert.False(t, s.Contains("key"))
 	})
 
 	t.Run("Contains非容器类型", func(t *testing.T) {
-		s := Safe(123)
+		s := New(123)
 		assert.False(t, s.Contains(123))
 	})
 
 	t.Run("Contains interface切片", func(t *testing.T) {
-		s := Safe([]interface{}{1, "test", true})
+		s := New([]interface{}{1, "test", true})
 		assert.True(t, s.Contains("test"))
 		assert.False(t, s.Contains("missing"))
 	})
@@ -698,19 +698,19 @@ func TestContains_EdgeCases(t *testing.T) {
 
 func TestIsEmpty_AllTypes(t *testing.T) {
 	t.Run("IsEmpty nil", func(t *testing.T) {
-		s := Safe(nil)
+		s := New(nil)
 		assert.True(t, s.IsEmpty())
 	})
 
 	t.Run("IsEmpty数组", func(t *testing.T) {
 		arr := [3]int{1, 2, 3}
-		s := Safe(arr)
+		s := New(arr)
 		// 数组类型会被认为是非容器，返回false
 		assert.False(t, s.IsEmpty())
 	})
 
 	t.Run("IsEmpty非容器类型", func(t *testing.T) {
-		s := Safe(123)
+		s := New(123)
 		assert.False(t, s.IsEmpty())
 	})
 }
@@ -719,7 +719,7 @@ func TestIsEmpty_AllTypes(t *testing.T) {
 
 func TestUnless_EdgeCases(t *testing.T) {
 	t.Run("Unless无效值", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		result := s.Unless(
 			func(v interface{}) bool { return false },
 			func(v interface{}) interface{} { return 100 },
@@ -728,7 +728,7 @@ func TestUnless_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("Unless条件为false执行", func(t *testing.T) {
-		s := Safe(10)
+		s := New(10)
 		result := s.Unless(
 			func(v interface{}) bool { return v.(int) < 5 },
 			func(v interface{}) interface{} { return v.(int) * 10 },
@@ -746,7 +746,7 @@ func TestField_EdgeCases(t *testing.T) {
 			Public  string
 			private string
 		}
-		s := Safe(TestStruct{Public: "visible", private: "hidden"})
+		s := New(TestStruct{Public: "visible", private: "hidden"})
 		assert.True(t, s.Field("Public").IsValid())
 		assert.False(t, s.Field("private").IsValid())
 	})
@@ -758,17 +758,17 @@ func TestField_EdgeCases(t *testing.T) {
 		type Outer struct {
 			Inner *Inner
 		}
-		s := Safe(Outer{Inner: nil})
+		s := New(Outer{Inner: nil})
 		assert.False(t, s.Field("Inner").IsValid())
 	})
 
 	t.Run("Field访问非结构体", func(t *testing.T) {
-		s := Safe("not a struct")
+		s := New("not a struct")
 		assert.False(t, s.Field("anything").IsValid())
 	})
 
 	t.Run("Field访问数组", func(t *testing.T) {
-		s := Safe([]int{1, 2, 3})
+		s := New([]int{1, 2, 3})
 		assert.False(t, s.Field("0").IsValid())
 	})
 }
@@ -778,7 +778,7 @@ func TestField_EdgeCases(t *testing.T) {
 func TestAt_EdgeCases(t *testing.T) {
 	t.Run("At空路径返回默认值", func(t *testing.T) {
 		data := map[string]interface{}{"key": "value"}
-		s := Safe(data)
+		s := New(data)
 		result := s.At("", "default-value")
 		// 空路径应该返回默认值
 		assert.True(t, result.IsValid())
@@ -793,7 +793,7 @@ func TestAt_EdgeCases(t *testing.T) {
 				},
 			},
 		}
-		s := Safe(data)
+		s := New(data)
 		result := s.At("level1.level2.missing.level4")
 		assert.False(t, result.IsValid())
 	})
@@ -802,7 +802,7 @@ func TestAt_EdgeCases(t *testing.T) {
 		data := map[string]interface{}{
 			"level1": "string-value",
 		}
-		s := Safe(data)
+		s := New(data)
 		result := s.At("level1.level2")
 		assert.False(t, result.IsValid())
 	})
@@ -812,7 +812,7 @@ func TestAt_EdgeCases(t *testing.T) {
 
 func TestAsSlice_EdgeCases(t *testing.T) {
 	t.Run("AsSlice空切片", func(t *testing.T) {
-		s := Safe([]int{})
+		s := New([]int{})
 		result, err := AsSlice[int](s)
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -820,7 +820,7 @@ func TestAsSlice_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("AsSlice混合数值类型转换", func(t *testing.T) {
-		s := Safe([]interface{}{1, "2", 3.0, "4"})
+		s := New([]interface{}{1, "2", 3.0, "4"})
 		result, err := AsSlice[int](s)
 		assert.NoError(t, err)
 		assert.Len(t, result, 4)
@@ -832,7 +832,7 @@ func TestAsSlice_EdgeCases(t *testing.T) {
 
 func TestAsFloatSlice_EdgeCases(t *testing.T) {
 	t.Run("AsFloatSlice空切片", func(t *testing.T) {
-		s := Safe([]float64{})
+		s := New([]float64{})
 		result, err := AsFloatSlice[float64](s, convert.RoundNone)
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -840,7 +840,7 @@ func TestAsFloatSlice_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("AsFloatSlice混合类型", func(t *testing.T) {
-		s := Safe([]interface{}{1, 2.5, "3.7"})
+		s := New([]interface{}{1, 2.5, "3.7"})
 		result, err := AsFloatSlice[float64](s, convert.RoundNone)
 		assert.NoError(t, err)
 		assert.Len(t, result, 3)
@@ -852,14 +852,14 @@ func TestAsFloatSlice_EdgeCases(t *testing.T) {
 
 func TestAsStringSlice_EdgeCases(t *testing.T) {
 	t.Run("AsStringSlice空切片", func(t *testing.T) {
-		s := Safe([]string{})
+		s := New([]string{})
 		result := s.AsStringSlice()
 		assert.NotNil(t, result)
 		assert.Len(t, result, 0)
 	})
 
 	t.Run("AsStringSlice非切片类型", func(t *testing.T) {
-		s := Safe("not a slice")
+		s := New("not a slice")
 		result := s.AsStringSlice()
 		assert.Nil(t, result)
 	})
@@ -869,26 +869,26 @@ func TestAsStringSlice_EdgeCases(t *testing.T) {
 
 func TestBool_EdgeCases(t *testing.T) {
 	t.Run("Bool从各种真值", func(t *testing.T) {
-		assert.True(t, Safe(1).Bool())
-		assert.True(t, Safe("true").Bool())
-		assert.True(t, Safe("1").Bool())
-		assert.True(t, Safe(true).Bool())
+		assert.True(t, New(1).Bool())
+		assert.True(t, New("true").Bool())
+		assert.True(t, New("1").Bool())
+		assert.True(t, New(true).Bool())
 	})
 
 	t.Run("Bool从各种假值", func(t *testing.T) {
-		assert.False(t, Safe(0).Bool())
-		assert.False(t, Safe("false").Bool())
-		assert.False(t, Safe("0").Bool())
-		assert.False(t, Safe(false).Bool())
+		assert.False(t, New(0).Bool())
+		assert.False(t, New("false").Bool())
+		assert.False(t, New("0").Bool())
+		assert.False(t, New(false).Bool())
 	})
 
 	t.Run("Bool无效值使用默认", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		assert.True(t, s.Bool(true))
 	})
 
 	t.Run("Bool假值但有默认", func(t *testing.T) {
-		s := Safe(false)
+		s := New(false)
 		assert.True(t, s.Bool(true))
 	})
 }
@@ -897,17 +897,17 @@ func TestBool_EdgeCases(t *testing.T) {
 
 func TestInt_EdgeCases(t *testing.T) {
 	t.Run("Int从负数", func(t *testing.T) {
-		s := Safe(-999)
+		s := New(-999)
 		assert.Equal(t, -999, s.Int())
 	})
 
 	t.Run("Int从大数", func(t *testing.T) {
-		s := Safe(2147483647)
+		s := New(2147483647)
 		assert.Equal(t, 2147483647, s.Int())
 	})
 
 	t.Run("Int无效转换使用默认", func(t *testing.T) {
-		s := Safe("not-a-number")
+		s := New("not-a-number")
 		assert.Equal(t, 777, s.Int(777))
 	})
 }
@@ -916,43 +916,43 @@ func TestInt_EdgeCases(t *testing.T) {
 
 func TestAs_GenericNumerical(t *testing.T) {
 	t.Run("As[int]正常转换", func(t *testing.T) {
-		s := Safe(42)
+		s := New(42)
 		result := As[int](s)
 		assert.Equal(t, 42, result)
 	})
 
 	t.Run("As[int64]从int转换", func(t *testing.T) {
-		s := Safe(100)
+		s := New(100)
 		result := As[int64](s)
 		assert.Equal(t, int64(100), result)
 	})
 
 	t.Run("As[uint]从int转换", func(t *testing.T) {
-		s := Safe(50)
+		s := New(50)
 		result := As[uint](s)
 		assert.Equal(t, uint(50), result)
 	})
 
 	t.Run("As[int32]从字符串转换", func(t *testing.T) {
-		s := Safe("123")
+		s := New("123")
 		result := As[int32](s)
 		assert.Equal(t, int32(123), result)
 	})
 
 	t.Run("As[int]使用默认值", func(t *testing.T) {
-		s := Safe("invalid")
+		s := New("invalid")
 		result := As[int](s, 999)
 		assert.Equal(t, 999, result)
 	})
 
 	t.Run("As[int]无效值返回零值", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		result := As[int](s)
 		assert.Equal(t, 0, result)
 	})
 
 	t.Run("As[uint64]大数转换", func(t *testing.T) {
-		s := Safe(uint64(18446744073709551615))
+		s := New(uint64(18446744073709551615))
 		result := As[uint64](s)
 		assert.Equal(t, uint64(18446744073709551615), result)
 	})
@@ -960,43 +960,43 @@ func TestAs_GenericNumerical(t *testing.T) {
 
 func TestAsFloat_GenericFloat(t *testing.T) {
 	t.Run("AsFloat[float64]正常转换", func(t *testing.T) {
-		s := Safe(3.14)
+		s := New(3.14)
 		result := AsFloat[float64](s, convert.RoundNone)
 		assert.Equal(t, 3.14, result)
 	})
 
 	t.Run("AsFloat[float32]从int转换", func(t *testing.T) {
-		s := Safe(42)
+		s := New(42)
 		result := AsFloat[float32](s, convert.RoundNone)
 		assert.Equal(t, float32(42.0), result)
 	})
 
 	t.Run("AsFloat[float64]从字符串转换", func(t *testing.T) {
-		s := Safe("3.14159")
+		s := New("3.14159")
 		result := AsFloat[float64](s, convert.RoundNone)
 		assert.InDelta(t, 3.14159, result, 0.00001)
 	})
 
 	t.Run("AsFloat[float64]四舍五入", func(t *testing.T) {
-		s := Safe("3.6")
+		s := New("3.6")
 		result := AsFloat[float64](s, convert.RoundNearest)
 		assert.Equal(t, 4.0, result)
 	})
 
 	t.Run("AsFloat[float64]向上取整", func(t *testing.T) {
-		s := Safe("3.1")
+		s := New("3.1")
 		result := AsFloat[float64](s, convert.RoundUp)
 		assert.Equal(t, 4.0, result)
 	})
 
 	t.Run("AsFloat[float64]向下取整", func(t *testing.T) {
-		s := Safe("3.9")
+		s := New("3.9")
 		result := AsFloat[float64](s, convert.RoundDown)
 		assert.Equal(t, 3.0, result)
 	})
 
 	t.Run("AsFloat[float32]使用默认值", func(t *testing.T) {
-		s := Safe("invalid")
+		s := New("invalid")
 		result := AsFloat[float32](s, convert.RoundNone, 1.23)
 		assert.Equal(t, float32(1.23), result)
 	})
@@ -1006,25 +1006,25 @@ func TestAsFloat_GenericFloat(t *testing.T) {
 
 func TestAsString(t *testing.T) {
 	t.Run("AsString从int转换", func(t *testing.T) {
-		s := Safe(123)
+		s := New(123)
 		result := s.AsString()
 		assert.Equal(t, "123", result)
 	})
 
 	t.Run("AsString从float转换", func(t *testing.T) {
-		s := Safe(3.14)
+		s := New(3.14)
 		result := s.AsString()
 		assert.Equal(t, "3.14", result)
 	})
 
 	t.Run("AsString从bool转换", func(t *testing.T) {
-		s := Safe(true)
+		s := New(true)
 		result := s.AsString()
 		assert.Equal(t, "true", result)
 	})
 
 	t.Run("AsString无效值", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		result := s.AsString()
 		assert.Equal(t, "", result)
 	})
@@ -1032,31 +1032,31 @@ func TestAsString(t *testing.T) {
 
 func TestAsBool(t *testing.T) {
 	t.Run("AsBool从bool转换", func(t *testing.T) {
-		s := Safe(true)
+		s := New(true)
 		assert.True(t, s.AsBool())
 	})
 
 	t.Run("AsBool从int转换", func(t *testing.T) {
-		s := Safe(1)
+		s := New(1)
 		assert.True(t, s.AsBool())
 
-		s = Safe(0)
+		s = New(0)
 		assert.False(t, s.AsBool())
 	})
 
 	t.Run("AsBool从字符串转换", func(t *testing.T) {
-		s := Safe("true")
+		s := New("true")
 		assert.True(t, s.AsBool())
 
-		s = Safe("false")
+		s = New("false")
 		assert.False(t, s.AsBool())
 
-		s = Safe("1")
+		s = New("1")
 		assert.True(t, s.AsBool())
 	})
 
 	t.Run("AsBool无效值", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		assert.False(t, s.AsBool())
 	})
 }
@@ -1067,7 +1067,7 @@ func TestAsJSON(t *testing.T) {
 			"name": "test",
 			"age":  30,
 		}
-		s := Safe(data)
+		s := New(data)
 		result, err := s.AsJSON(false)
 		assert.NoError(t, err)
 		assert.Contains(t, result, "test")
@@ -1078,7 +1078,7 @@ func TestAsJSON(t *testing.T) {
 		data := map[string]interface{}{
 			"key": "value",
 		}
-		s := Safe(data)
+		s := New(data)
 		result, err := s.AsJSON(true)
 		assert.NoError(t, err)
 		assert.Contains(t, result, "\n")
@@ -1086,7 +1086,7 @@ func TestAsJSON(t *testing.T) {
 	})
 
 	t.Run("AsJSON无效值", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		_, err := s.AsJSON(false)
 		assert.Error(t, err)
 	})
@@ -1096,34 +1096,34 @@ func TestAsJSON(t *testing.T) {
 
 func TestAsSlice_GenericNumerical(t *testing.T) {
 	t.Run("AsSlice[int]已存在切片", func(t *testing.T) {
-		s := Safe([]int{1, 2, 3, 4, 5})
+		s := New([]int{1, 2, 3, 4, 5})
 		result, err := AsSlice[int](s)
 		assert.NoError(t, err)
 		assert.Equal(t, []int{1, 2, 3, 4, 5}, result)
 	})
 
 	t.Run("AsSlice[int64]从字符串切片转换", func(t *testing.T) {
-		s := Safe([]string{"10", "20", "30"})
+		s := New([]string{"10", "20", "30"})
 		result, err := AsSlice[int64](s)
 		assert.NoError(t, err)
 		assert.Equal(t, []int64{10, 20, 30}, result)
 	})
 
 	t.Run("AsSlice[uint]从interface切片转换", func(t *testing.T) {
-		s := Safe([]interface{}{1, 2, 3})
+		s := New([]interface{}{1, 2, 3})
 		result, err := AsSlice[uint](s)
 		assert.NoError(t, err)
 		assert.Equal(t, []uint{1, 2, 3}, result)
 	})
 
 	t.Run("AsSlice[int]转换错误", func(t *testing.T) {
-		s := Safe([]string{"invalid", "data"})
+		s := New([]string{"invalid", "data"})
 		_, err := AsSlice[int](s)
 		assert.Error(t, err)
 	})
 
 	t.Run("AsSlice[int]无效值", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		_, err := AsSlice[int](s)
 		assert.Error(t, err)
 	})
@@ -1131,28 +1131,28 @@ func TestAsSlice_GenericNumerical(t *testing.T) {
 
 func TestAsFloatSlice(t *testing.T) {
 	t.Run("AsFloatSlice[float64]已存在切片", func(t *testing.T) {
-		s := Safe([]float64{1.1, 2.2, 3.3})
+		s := New([]float64{1.1, 2.2, 3.3})
 		result, err := AsFloatSlice[float64](s, convert.RoundNone)
 		assert.NoError(t, err)
 		assert.Equal(t, []float64{1.1, 2.2, 3.3}, result)
 	})
 
 	t.Run("AsFloatSlice[float32]从字符串切片转换", func(t *testing.T) {
-		s := Safe([]string{"1.5", "2.5", "3.5"})
+		s := New([]string{"1.5", "2.5", "3.5"})
 		result, err := AsFloatSlice[float32](s, convert.RoundNone)
 		assert.NoError(t, err)
 		assert.Equal(t, []float32{1.5, 2.5, 3.5}, result)
 	})
 
 	t.Run("AsFloatSlice[float64]四舍五入", func(t *testing.T) {
-		s := Safe([]string{"1.4", "2.6", "3.5"})
+		s := New([]string{"1.4", "2.6", "3.5"})
 		result, err := AsFloatSlice[float64](s, convert.RoundNearest)
 		assert.NoError(t, err)
 		assert.Equal(t, []float64{1.0, 3.0, 4.0}, result)
 	})
 
 	t.Run("AsFloatSlice[float64]从interface切片转换", func(t *testing.T) {
-		s := Safe([]interface{}{1, 2.5, 3})
+		s := New([]interface{}{1, 2.5, 3})
 		result, err := AsFloatSlice[float64](s, convert.RoundNone)
 		assert.NoError(t, err)
 		assert.Equal(t, []float64{1.0, 2.5, 3.0}, result)
@@ -1161,13 +1161,13 @@ func TestAsFloatSlice(t *testing.T) {
 
 func TestAsStringSlice(t *testing.T) {
 	t.Run("AsStringSlice已存在切片", func(t *testing.T) {
-		s := Safe([]string{"a", "b", "c"})
+		s := New([]string{"a", "b", "c"})
 		result := s.AsStringSlice()
 		assert.Equal(t, []string{"a", "b", "c"}, result)
 	})
 
 	t.Run("AsStringSlice从interface切片转换", func(t *testing.T) {
-		s := Safe([]interface{}{1, 2.5, true, "test"})
+		s := New([]interface{}{1, 2.5, true, "test"})
 		result := s.AsStringSlice()
 		assert.Len(t, result, 4)
 		assert.Contains(t, result, "1")
@@ -1175,7 +1175,7 @@ func TestAsStringSlice(t *testing.T) {
 	})
 
 	t.Run("AsStringSlice无效值", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		result := s.AsStringSlice()
 		assert.Nil(t, result)
 	})
@@ -1185,7 +1185,7 @@ func TestAsStringSlice(t *testing.T) {
 
 func TestMap_Generic(t *testing.T) {
 	t.Run("Map泛型转换", func(t *testing.T) {
-		s := Safe(10)
+		s := New(10)
 		result := Map[int, string](s, func(v int) string {
 			return convert.MustString(v * 2)
 		})
@@ -1194,7 +1194,7 @@ func TestMap_Generic(t *testing.T) {
 	})
 
 	t.Run("Map无效值", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		result := Map[int, string](s, func(v int) string {
 			return "test"
 		})
@@ -1202,7 +1202,7 @@ func TestMap_Generic(t *testing.T) {
 	})
 
 	t.Run("Map类型不匹配", func(t *testing.T) {
-		s := Safe("string")
+		s := New("string")
 		result := Map[int, string](s, func(v int) string {
 			return convert.MustString(v)
 		})
@@ -1212,21 +1212,21 @@ func TestMap_Generic(t *testing.T) {
 
 func TestFlatMap(t *testing.T) {
 	t.Run("FlatMap正常执行", func(t *testing.T) {
-		s := Safe(5)
-		result := s.FlatMap(func(v interface{}) *SafeAccess {
+		s := New(5)
+		result := s.FlatMap(func(v interface{}) *Access {
 			if num, ok := v.(int); ok {
-				return Safe(num * 3)
+				return New(num * 3)
 			}
-			return &SafeAccess{valid: false}
+			return &Access{valid: false}
 		})
 		assert.True(t, result.IsValid())
 		assert.Equal(t, 15, result.Int())
 	})
 
 	t.Run("FlatMap无效值", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
-		result := s.FlatMap(func(v interface{}) *SafeAccess {
-			return Safe(100)
+		s := &Access{valid: false}
+		result := s.FlatMap(func(v interface{}) *Access {
+			return New(100)
 		})
 		assert.False(t, result.IsValid())
 	})
@@ -1234,19 +1234,19 @@ func TestFlatMap(t *testing.T) {
 
 func TestOrDefault_Generic(t *testing.T) {
 	t.Run("OrDefault有效值", func(t *testing.T) {
-		s := Safe(42)
+		s := New(42)
 		result := OrDefault[int](s, 999)
 		assert.Equal(t, 42, result)
 	})
 
 	t.Run("OrDefault无效值使用默认", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		result := OrDefault[int](s, 999)
 		assert.Equal(t, 999, result)
 	})
 
 	t.Run("OrDefault类型不匹配使用默认", func(t *testing.T) {
-		s := Safe("string")
+		s := New("string")
 		result := OrDefault[int](s, 999)
 		assert.Equal(t, 999, result)
 	})
@@ -1254,7 +1254,7 @@ func TestOrDefault_Generic(t *testing.T) {
 
 func TestMust_Generic(t *testing.T) {
 	t.Run("Must正常获取值", func(t *testing.T) {
-		s := Safe(100)
+		s := New(100)
 		assert.NotPanics(t, func() {
 			result := Must[int](s)
 			assert.Equal(t, 100, result)
@@ -1262,14 +1262,14 @@ func TestMust_Generic(t *testing.T) {
 	})
 
 	t.Run("Must无效值panic", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		assert.Panics(t, func() {
 			Must[int](s)
 		})
 	})
 
 	t.Run("Must类型不匹配panic", func(t *testing.T) {
-		s := Safe("string")
+		s := New("string")
 		assert.Panics(t, func() {
 			Must[int](s)
 		})
@@ -1280,7 +1280,7 @@ func TestMust_Generic(t *testing.T) {
 
 func TestWhen(t *testing.T) {
 	t.Run("When条件为真执行", func(t *testing.T) {
-		s := Safe(10)
+		s := New(10)
 		result := s.When(
 			func(v interface{}) bool {
 				return v.(int) > 5
@@ -1293,7 +1293,7 @@ func TestWhen(t *testing.T) {
 	})
 
 	t.Run("When条件为假不执行", func(t *testing.T) {
-		s := Safe(3)
+		s := New(3)
 		result := s.When(
 			func(v interface{}) bool {
 				return v.(int) > 5
@@ -1306,7 +1306,7 @@ func TestWhen(t *testing.T) {
 	})
 
 	t.Run("When无效值", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		result := s.When(
 			func(v interface{}) bool { return true },
 			func(v interface{}) interface{} { return 100 },
@@ -1317,7 +1317,7 @@ func TestWhen(t *testing.T) {
 
 func TestUnless(t *testing.T) {
 	t.Run("Unless条件为假执行", func(t *testing.T) {
-		s := Safe(3)
+		s := New(3)
 		result := s.Unless(
 			func(v interface{}) bool {
 				return v.(int) > 5
@@ -1330,7 +1330,7 @@ func TestUnless(t *testing.T) {
 	})
 
 	t.Run("Unless条件为真不执行", func(t *testing.T) {
-		s := Safe(10)
+		s := New(10)
 		result := s.Unless(
 			func(v interface{}) bool {
 				return v.(int) > 5
@@ -1345,30 +1345,30 @@ func TestUnless(t *testing.T) {
 
 func TestIsEmpty(t *testing.T) {
 	t.Run("IsEmpty字符串", func(t *testing.T) {
-		assert.True(t, Safe("").IsEmpty())
-		assert.False(t, Safe("test").IsEmpty())
+		assert.True(t, New("").IsEmpty())
+		assert.False(t, New("test").IsEmpty())
 	})
 
 	t.Run("IsEmpty切片", func(t *testing.T) {
-		assert.True(t, Safe([]string{}).IsEmpty())
-		assert.False(t, Safe([]string{"a"}).IsEmpty())
+		assert.True(t, New([]string{}).IsEmpty())
+		assert.False(t, New([]string{"a"}).IsEmpty())
 	})
 
 	t.Run("IsEmpty map", func(t *testing.T) {
-		assert.True(t, Safe(map[string]interface{}{}).IsEmpty())
-		assert.False(t, Safe(map[string]interface{}{"key": "value"}).IsEmpty())
+		assert.True(t, New(map[string]interface{}{}).IsEmpty())
+		assert.False(t, New(map[string]interface{}{"key": "value"}).IsEmpty())
 	})
 
 	t.Run("IsEmpty无效值", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		assert.True(t, s.IsEmpty())
 	})
 }
 
 func TestIsNonEmpty(t *testing.T) {
 	t.Run("IsNonEmpty", func(t *testing.T) {
-		assert.True(t, Safe("test").IsNonEmpty())
-		assert.False(t, Safe("").IsNonEmpty())
+		assert.True(t, New("test").IsNonEmpty())
+		assert.False(t, New("").IsNonEmpty())
 	})
 }
 
@@ -1376,55 +1376,55 @@ func TestIsNonEmpty(t *testing.T) {
 
 func TestIsType_Generic(t *testing.T) {
 	t.Run("IsType匹配", func(t *testing.T) {
-		s := Safe(42)
+		s := New(42)
 		assert.True(t, IsType[int](s))
 		assert.False(t, IsType[string](s))
 	})
 
 	t.Run("IsType无效值", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		assert.False(t, IsType[int](s))
 	})
 }
 
 func TestIsNumber(t *testing.T) {
 	t.Run("IsNumber各种数值类型", func(t *testing.T) {
-		assert.True(t, Safe(42).IsNumber())
-		assert.True(t, Safe(int64(100)).IsNumber())
-		assert.True(t, Safe(uint(50)).IsNumber())
-		assert.True(t, Safe(3.14).IsNumber())
-		assert.True(t, Safe(float32(2.5)).IsNumber())
-		assert.False(t, Safe("123").IsNumber())
-		assert.False(t, Safe(true).IsNumber())
+		assert.True(t, New(42).IsNumber())
+		assert.True(t, New(int64(100)).IsNumber())
+		assert.True(t, New(uint(50)).IsNumber())
+		assert.True(t, New(3.14).IsNumber())
+		assert.True(t, New(float32(2.5)).IsNumber())
+		assert.False(t, New("123").IsNumber())
+		assert.False(t, New(true).IsNumber())
 	})
 }
 
 func TestIsString(t *testing.T) {
 	t.Run("IsString", func(t *testing.T) {
-		assert.True(t, Safe("test").IsString())
-		assert.False(t, Safe(123).IsString())
+		assert.True(t, New("test").IsString())
+		assert.False(t, New(123).IsString())
 	})
 }
 
 func TestIsBool(t *testing.T) {
 	t.Run("IsBool", func(t *testing.T) {
-		assert.True(t, Safe(true).IsBool())
-		assert.False(t, Safe(1).IsBool())
+		assert.True(t, New(true).IsBool())
+		assert.False(t, New(1).IsBool())
 	})
 }
 
 func TestIsSlice(t *testing.T) {
 	t.Run("IsSlice", func(t *testing.T) {
-		assert.True(t, Safe([]int{1, 2, 3}).IsSlice())
-		assert.True(t, Safe([]string{"a", "b"}).IsSlice())
-		assert.False(t, Safe(123).IsSlice())
+		assert.True(t, New([]int{1, 2, 3}).IsSlice())
+		assert.True(t, New([]string{"a", "b"}).IsSlice())
+		assert.False(t, New(123).IsSlice())
 	})
 }
 
 func TestIsMap(t *testing.T) {
 	t.Run("IsMap", func(t *testing.T) {
-		assert.True(t, Safe(map[string]interface{}{}).IsMap())
-		assert.False(t, Safe([]int{}).IsMap())
+		assert.True(t, New(map[string]interface{}{}).IsMap())
+		assert.False(t, New([]int{}).IsMap())
 	})
 }
 
@@ -1432,19 +1432,19 @@ func TestIsMap(t *testing.T) {
 
 func TestLen(t *testing.T) {
 	t.Run("Len字符串", func(t *testing.T) {
-		assert.Equal(t, 5, Safe("hello").Len())
+		assert.Equal(t, 5, New("hello").Len())
 	})
 
 	t.Run("Len切片", func(t *testing.T) {
-		assert.Equal(t, 3, Safe([]int{1, 2, 3}).Len())
+		assert.Equal(t, 3, New([]int{1, 2, 3}).Len())
 	})
 
 	t.Run("Len map", func(t *testing.T) {
-		assert.Equal(t, 2, Safe(map[string]interface{}{"a": 1, "b": 2}).Len())
+		assert.Equal(t, 2, New(map[string]interface{}{"a": 1, "b": 2}).Len())
 	})
 
 	t.Run("Len无效值", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		assert.Equal(t, 0, s.Len())
 	})
 }
@@ -1456,7 +1456,7 @@ func TestKeys(t *testing.T) {
 			"key2": "value2",
 			"key3": "value3",
 		}
-		s := Safe(m)
+		s := New(m)
 		keys := s.Keys()
 		assert.Len(t, keys, 3)
 		assert.Contains(t, keys, "key1")
@@ -1465,7 +1465,7 @@ func TestKeys(t *testing.T) {
 	})
 
 	t.Run("Keys非map返回nil", func(t *testing.T) {
-		s := Safe([]int{1, 2, 3})
+		s := New([]int{1, 2, 3})
 		assert.Nil(t, s.Keys())
 	})
 }
@@ -1476,13 +1476,13 @@ func TestValues(t *testing.T) {
 			"key1": 100,
 			"key2": "test",
 		}
-		s := Safe(m)
+		s := New(m)
 		values := s.Values()
 		assert.Len(t, values, 2)
 	})
 
 	t.Run("Values非map返回nil", func(t *testing.T) {
-		s := Safe(123)
+		s := New(123)
 		assert.Nil(t, s.Values())
 	})
 }
@@ -1493,25 +1493,25 @@ func TestContains(t *testing.T) {
 			"key1": "value1",
 			"key2": "value2",
 		}
-		s := Safe(m)
+		s := New(m)
 		assert.True(t, s.Contains("key1"))
 		assert.False(t, s.Contains("key3"))
 	})
 
 	t.Run("Contains在切片中", func(t *testing.T) {
-		s := Safe([]int{1, 2, 3, 4, 5})
+		s := New([]int{1, 2, 3, 4, 5})
 		assert.True(t, s.Contains(3))
 		assert.False(t, s.Contains(10))
 	})
 
 	t.Run("Contains在字符串切片中", func(t *testing.T) {
-		s := Safe([]string{"apple", "banana", "orange"})
+		s := New([]string{"apple", "banana", "orange"})
 		assert.True(t, s.Contains("banana"))
 		assert.False(t, s.Contains("grape"))
 	})
 
 	t.Run("Contains无效值", func(t *testing.T) {
-		s := &SafeAccess{valid: false}
+		s := &Access{valid: false}
 		assert.False(t, s.Contains("anything"))
 	})
 }
@@ -1527,7 +1527,7 @@ func TestComplexScenario_ChainOperations(t *testing.T) {
 			},
 		}
 
-		s := Safe(data)
+		s := New(data)
 
 		// 测试链式访问
 		age := As[int](s.Field("user").Field("age"))
@@ -1540,7 +1540,7 @@ func TestComplexScenario_ChainOperations(t *testing.T) {
 	})
 
 	t.Run("条件转换组合", func(t *testing.T) {
-		s := Safe(100)
+		s := New(100)
 		result := s.
 			When(func(v interface{}) bool {
 				return v.(int) > 50
@@ -1567,7 +1567,7 @@ func TestComplexScenario_DataTransform(t *testing.T) {
 			"features": []interface{}{"feature1", "feature2", "feature3"},
 		}
 
-		s := Safe(config)
+		s := New(config)
 
 		// 获取服务器配置
 		port := As[int](s.Field("server").Field("port"))
@@ -1593,7 +1593,7 @@ func TestComplexScenario_ErrorHandling(t *testing.T) {
 			"invalid": "not-a-number",
 		}
 
-		s := Safe(data)
+		s := New(data)
 
 		// 有效数据转换
 		validNum := As[int](s.Field("valid"))
@@ -1652,7 +1652,7 @@ func TestAudit_NoPanicOnHostileInput(t *testing.T) {
 						t.Errorf("panic: value=%T name=%q -> %v", v, n, r)
 					}
 				}()
-				a := Safe(v)
+				a := New(v)
 				_ = a.IsValid()
 				_ = a.Value()
 				f := a.Field(n)
@@ -1696,9 +1696,9 @@ func TestAudit_NoPanicOnMapHelpers(t *testing.T) {
 						t.Errorf("panic: map=%v key=%q -> %v", m, k, r)
 					}
 				}()
-				_ = SafeGetString(m, k)
-				_ = SafeGetBool(m, k)
-				_ = SafeGetStringSlice(m, k)
+				_ = GetString(m, k)
+				_ = GetBool(m, k)
+				_ = GetStringSlice(m, k)
 			}()
 		}
 	}

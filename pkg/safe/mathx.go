@@ -145,8 +145,8 @@ func NextPowerOfTwo(n int) int {
 	return n + 1
 }
 
-// SafeAdd 安全整数加法，防止溢出
-func SafeAdd(a, b int64) (int64, error) {
+// Add 安全整数加法，防止溢出
+func Add(a, b int64) (int64, error) {
 	if b > 0 && a > math.MaxInt64-b {
 		return 0, errors.New("integer overflow in addition")
 	}
@@ -156,8 +156,8 @@ func SafeAdd(a, b int64) (int64, error) {
 	return a + b, nil
 }
 
-// SafeSubtract 安全整数减法，防止溢出
-func SafeSubtract(a, b int64) (int64, error) {
+// Subtract 安全整数减法，防止溢出
+func Subtract(a, b int64) (int64, error) {
 	if b > 0 && a < math.MinInt64+b {
 		return 0, errors.New("integer underflow in subtraction")
 	}
@@ -167,8 +167,8 @@ func SafeSubtract(a, b int64) (int64, error) {
 	return a - b, nil
 }
 
-// SafeMultiply 安全整数乘法，防止溢出
-func SafeMultiply(a, b int64) (int64, error) {
+// Multiply 安全整数乘法，防止溢出
+func Multiply(a, b int64) (int64, error) {
 	if a == 0 || b == 0 {
 		return 0, nil
 	}
@@ -190,8 +190,8 @@ func SafeMultiply(a, b int64) (int64, error) {
 	return a * b, nil
 }
 
-// SafeDivide 安全整数除法，防止除零和溢出
-func SafeDivide(a, b int64) (int64, error) {
+// Divide 安全整数除法，防止除零和溢出
+func Divide(a, b int64) (int64, error) {
 	if b == 0 {
 		return 0, errors.New("division by zero")
 	}
@@ -201,16 +201,16 @@ func SafeDivide(a, b int64) (int64, error) {
 	return a / b, nil
 }
 
-// SafeModulo 安全取模运算，防止除零
-func SafeModulo(a, b int64) (int64, error) {
+// Modulo 安全取模运算，防止除零
+func Modulo(a, b int64) (int64, error) {
 	if b == 0 {
 		return 0, errors.New("modulo by zero")
 	}
 	return a % b, nil
 }
 
-// SafePower 安全幂运算，使用快速幂算法防止溢出
-func SafePower(base, exp int64) (int64, error) {
+// Power 安全幂运算，使用快速幂算法防止溢出
+func Power(base, exp int64) (int64, error) {
 	if exp < 0 {
 		return 0, errors.New("negative exponent not supported for integer power")
 	}
@@ -235,7 +235,7 @@ func SafePower(base, exp int64) (int64, error) {
 
 	for exp > 0 {
 		if exp%2 == 1 {
-			newResult, err := SafeMultiply(result, currentBase)
+			newResult, err := Multiply(result, currentBase)
 			if err != nil {
 				return 0, err
 			}
@@ -243,7 +243,7 @@ func SafePower(base, exp int64) (int64, error) {
 		}
 
 		if exp > 1 {
-			newBase, err := SafeMultiply(currentBase, currentBase)
+			newBase, err := Multiply(currentBase, currentBase)
 			if err != nil {
 				return 0, err
 			}
@@ -255,8 +255,8 @@ func SafePower(base, exp int64) (int64, error) {
 	return result, nil
 }
 
-// SafeSqrt 安全平方根计算，使用牛顿法
-func SafeSqrt(n float64) (float64, error) {
+// Sqrt 安全平方根计算，使用牛顿法
+func Sqrt(n float64) (float64, error) {
 	if n < 0 {
 		return 0, errors.New("square root of negative number")
 	}
@@ -273,8 +273,8 @@ func SafeSqrt(n float64) (float64, error) {
 	return result, nil
 }
 
-// SafeLog 安全对数计算
-func SafeLog(n, base float64) (float64, error) {
+// Log 安全对数计算
+func Log(n, base float64) (float64, error) {
 	if n <= 0 {
 		return 0, errors.New("logarithm of non-positive number")
 	}
@@ -290,8 +290,8 @@ func SafeLog(n, base float64) (float64, error) {
 	return result, nil
 }
 
-// SafeGCD 安全最大公约数计算，使用欧几里得算法
-func SafeGCD(a, b int64) int64 {
+// GCD 安全最大公约数计算，使用欧几里得算法
+func GCD(a, b int64) int64 {
 	// 处理负数
 	if a < 0 {
 		a = -a
@@ -307,15 +307,15 @@ func SafeGCD(a, b int64) int64 {
 	return a
 }
 
-// SafeLCM 安全最小公倍数计算
-func SafeLCM(a, b int64) (int64, error) {
+// LCM 安全最小公倍数计算
+func LCM(a, b int64) (int64, error) {
 	if a == 0 || b == 0 {
 		return 0, nil
 	}
 
-	gcd := SafeGCD(a, b)
+	gcd := GCD(a, b)
 	if gcd == 0 {
-		return 0, errors.New("invalid SafeGCD result")
+		return 0, errors.New("invalid GCD result")
 	}
 
 	// 防止溢出
@@ -328,7 +328,7 @@ func SafeLCM(a, b int64) (int64, error) {
 		absB = -b
 	}
 
-	result, err := SafeMultiply(absA/gcd, absB)
+	result, err := Multiply(absA/gcd, absB)
 	if err != nil {
 		return 0, err
 	}
@@ -377,7 +377,7 @@ func Fibonacci(n int) (int64, error) {
 
 	var a, b int64 = 0, 1
 	for i := 2; i <= n; i++ {
-		next, err := SafeAdd(a, b)
+		next, err := Add(a, b)
 		if err != nil {
 			return 0, err
 		}
@@ -401,29 +401,29 @@ func Factorial(n int) (*big.Int, error) {
 	return result, nil
 }
 
-// SafeAverage 安全平均值计算，防止溢出
-func SafeAverage(numbers []int64) (float64, error) {
+// Average 安全平均值计算，防止溢出
+func Average(numbers []int64) (float64, error) {
 	if len(numbers) == 0 {
 		return 0, errors.New("cannot calculate average of empty slice")
 	}
 
 	var sum int64 = 0
 	for i, num := range numbers {
-		newSum, err := SafeAdd(sum, num)
+		newSum, err := Add(sum, num)
 		if err != nil {
 			// 溢出后改用浮点累加，从当前下标接着算
 			//
 			// 原实现这里写的是 indexOf(numbers, num)，找的是该**值**首次出现的
 			// 位置而不是当前下标：当溢出的那个值在前面出现过，floatSum 里已经
 			// 累加过的前缀会被再加一遍
-			// 例如 SafeAverage([]int64{H, H})（H 为 MaxInt64/2+1000）会返回 1.5H
+			// 例如 Average([]int64{H, H})（H 为 MaxInt64/2+1000）会返回 1.5H
 			// 而正确答案是 H——50% 的误差，且不报错
 			//
 			// [EN] Switch to float accumulation and continue from the current
 			// index. The original used indexOf(numbers, num), the first index of
 			// that *value* rather than the current one: when the overflowing
 			// value also appears earlier, the prefix already in floatSum is
-			// added a second time. SafeAverage([]int64{H, H}) with H =
+			// added a second time. Average([]int64{H, H}) with H =
 			// MaxInt64/2+1000 returned 1.5H instead of H — a 50% error, silently
 			floatSum := float64(sum)
 			for j := i; j < len(numbers); j++ {
@@ -437,8 +437,8 @@ func SafeAverage(numbers []int64) (float64, error) {
 	return float64(sum) / float64(len(numbers)), nil
 }
 
-// SafeMax 安全获取最大值
-func SafeMax(numbers []int64) (int64, error) {
+// Max 安全获取最大值
+func Max(numbers []int64) (int64, error) {
 	if len(numbers) == 0 {
 		return 0, errors.New("cannot find max of empty slice")
 	}
@@ -453,8 +453,8 @@ func SafeMax(numbers []int64) (int64, error) {
 	return max, nil
 }
 
-// SafeMin 安全获取最小值
-func SafeMin(numbers []int64) (int64, error) {
+// Min 安全获取最小值
+func Min(numbers []int64) (int64, error) {
 	if len(numbers) == 0 {
 		return 0, errors.New("cannot find min of empty slice")
 	}
@@ -469,8 +469,8 @@ func SafeMin(numbers []int64) (int64, error) {
 	return min, nil
 }
 
-// SafeClamp 安全值范围限制
-func SafeClamp(value, min, max int64) (int64, error) {
+// Clamp 安全值范围限制
+func Clamp(value, min, max int64) (int64, error) {
 	if min > max {
 		return 0, errors.New("min cannot be greater than max")
 	}
@@ -485,8 +485,8 @@ func SafeClamp(value, min, max int64) (int64, error) {
 	return value, nil
 }
 
-// SafeAbs 安全绝对值计算，防止溢出
-func SafeAbs(n int64) (int64, error) {
+// Abs 安全绝对值计算，防止溢出
+func Abs(n int64) (int64, error) {
 	if n == math.MinInt64 {
 		return 0, errors.New("absolute value of MinInt64 causes overflow")
 	}

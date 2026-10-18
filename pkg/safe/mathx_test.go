@@ -367,7 +367,7 @@ func TestNextPowerOfTwo(t *testing.T) {
 	}
 }
 
-func TestSafeAdd(t *testing.T) {
+func TestAdd(t *testing.T) {
 	tests := []struct {
 		name      string
 		a, b      int64
@@ -400,7 +400,7 @@ func TestSafeAdd(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := SafeAdd(tt.a, tt.b)
+			result, err := Add(tt.a, tt.b)
 			if tt.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -411,7 +411,7 @@ func TestSafeAdd(t *testing.T) {
 	}
 }
 
-func TestSafeSubtract(t *testing.T) {
+func TestSubtract(t *testing.T) {
 	tests := []struct {
 		name      string
 		a, b      int64
@@ -427,7 +427,7 @@ func TestSafeSubtract(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := SafeSubtract(tt.a, tt.b)
+			result, err := Subtract(tt.a, tt.b)
 			if tt.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -438,7 +438,7 @@ func TestSafeSubtract(t *testing.T) {
 	}
 }
 
-func TestSafeMultiply(t *testing.T) {
+func TestMultiply(t *testing.T) {
 	tests := []struct {
 		name      string
 		a, b      int64
@@ -474,7 +474,7 @@ func TestSafeMultiply(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := SafeMultiply(tt.a, tt.b)
+			result, err := Multiply(tt.a, tt.b)
 			if tt.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -485,7 +485,7 @@ func TestSafeMultiply(t *testing.T) {
 	}
 }
 
-func TestSafeDivide(t *testing.T) {
+func TestDivide(t *testing.T) {
 	tests := []struct {
 		name      string
 		a, b      int64
@@ -500,7 +500,7 @@ func TestSafeDivide(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := SafeDivide(tt.a, tt.b)
+			result, err := Divide(tt.a, tt.b)
 			if tt.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -511,7 +511,7 @@ func TestSafeDivide(t *testing.T) {
 	}
 }
 
-func TestSafeModulo(t *testing.T) {
+func TestModulo(t *testing.T) {
 	tests := []struct {
 		name      string
 		a, b      int64
@@ -525,7 +525,7 @@ func TestSafeModulo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := SafeModulo(tt.a, tt.b)
+			result, err := Modulo(tt.a, tt.b)
 			if tt.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -536,7 +536,7 @@ func TestSafeModulo(t *testing.T) {
 	}
 }
 
-func TestSafePower(t *testing.T) {
+func TestPower(t *testing.T) {
 	tests := []struct {
 		name      string
 		base, exp int64
@@ -555,7 +555,7 @@ func TestSafePower(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := SafePower(tt.base, tt.exp)
+			result, err := Power(tt.base, tt.exp)
 			if tt.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -566,7 +566,7 @@ func TestSafePower(t *testing.T) {
 	}
 }
 
-func TestSafeSqrt(t *testing.T) {
+func TestSqrt(t *testing.T) {
 	tests := []struct {
 		name      string
 		input     float64
@@ -582,7 +582,7 @@ func TestSafeSqrt(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := SafeSqrt(tt.input)
+			result, err := Sqrt(tt.input)
 			if tt.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -593,7 +593,7 @@ func TestSafeSqrt(t *testing.T) {
 	}
 }
 
-func TestSafeLog(t *testing.T) {
+func TestLog(t *testing.T) {
 	tests := []struct {
 		name      string
 		n, base   float64
@@ -611,7 +611,7 @@ func TestSafeLog(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := SafeLog(tt.n, tt.base)
+			result, err := Log(tt.n, tt.base)
 			if tt.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -622,7 +622,7 @@ func TestSafeLog(t *testing.T) {
 	}
 }
 
-func TestSafeGCD(t *testing.T) {
+func TestGCD(t *testing.T) {
 	tests := []struct {
 		name     string
 		a, b     int64
@@ -682,13 +682,13 @@ func TestSafeGCD(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := SafeGCD(tt.a, tt.b)
+			result := GCD(tt.a, tt.b)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
-func TestSafeLCM(t *testing.T) {
+func TestLCM(t *testing.T) {
 	tests := []struct {
 		name      string
 		a, b      int64
@@ -702,7 +702,7 @@ func TestSafeLCM(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := SafeLCM(tt.a, tt.b)
+			result, err := LCM(tt.a, tt.b)
 			if tt.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -1061,7 +1061,7 @@ func TestFactorial(t *testing.T) {
 	}
 }
 
-func TestSafeAverage(t *testing.T) {
+func TestAverage(t *testing.T) {
 	tests := []struct {
 		name      string
 		input     []int64
@@ -1106,7 +1106,7 @@ func TestSafeAverage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := SafeAverage(tt.input)
+			result, err := Average(tt.input)
 			if tt.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -1117,7 +1117,7 @@ func TestSafeAverage(t *testing.T) {
 	}
 }
 
-func TestSafeMax(t *testing.T) {
+func TestMax(t *testing.T) {
 	tests := []struct {
 		name      string
 		input     []int64
@@ -1132,7 +1132,7 @@ func TestSafeMax(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := SafeMax(tt.input)
+			result, err := Max(tt.input)
 			if tt.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -1143,7 +1143,7 @@ func TestSafeMax(t *testing.T) {
 	}
 }
 
-func TestSafeMin(t *testing.T) {
+func TestMin(t *testing.T) {
 	tests := []struct {
 		name      string
 		input     []int64
@@ -1158,7 +1158,7 @@ func TestSafeMin(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := SafeMin(tt.input)
+			result, err := Min(tt.input)
 			if tt.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -1169,7 +1169,7 @@ func TestSafeMin(t *testing.T) {
 	}
 }
 
-func TestSafeClamp(t *testing.T) {
+func TestClamp(t *testing.T) {
 	tests := []struct {
 		name            string
 		value, min, max int64
@@ -1184,7 +1184,7 @@ func TestSafeClamp(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := SafeClamp(tt.value, tt.min, tt.max)
+			result, err := Clamp(tt.value, tt.min, tt.max)
 			if tt.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -1195,7 +1195,7 @@ func TestSafeClamp(t *testing.T) {
 	}
 }
 
-func TestSafeAbs(t *testing.T) {
+func TestAbs(t *testing.T) {
 	tests := []struct {
 		name      string
 		input     int64
@@ -1210,7 +1210,7 @@ func TestSafeAbs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := SafeAbs(tt.input)
+			result, err := Abs(tt.input)
 			if tt.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -1236,21 +1236,21 @@ func BenchmarkNextPowerOfTwo(b *testing.B) {
 	}
 }
 
-func BenchmarkSafeAdd(b *testing.B) {
+func BenchmarkAdd(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		SafeAdd(12345, 67890)
+		Add(12345, 67890)
 	}
 }
 
-func BenchmarkSafeMultiply(b *testing.B) {
+func BenchmarkMultiply(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		SafeMultiply(12345, 67890)
+		Multiply(12345, 67890)
 	}
 }
 
-func BenchmarkSafeGCD(b *testing.B) {
+func BenchmarkGCD(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		SafeGCD(123456, 789012)
+		GCD(123456, 789012)
 	}
 }
 
@@ -1266,9 +1266,9 @@ func BenchmarkFibonacci(b *testing.B) {
 	}
 }
 
-// SafeAccess新API的测试用例
+// Access新API的测试用例
 
-func TestSafeAccessAtMethods(t *testing.T) {
+func TestAccessAtMethods(t *testing.T) {
 	// 创建测试数据结构
 	type DatabaseConfig struct {
 		Host     string        `json:"host"`
@@ -1303,7 +1303,7 @@ func TestSafeAccessAtMethods(t *testing.T) {
 		},
 	}
 
-	safe := Safe(config)
+	safe := New(config)
 
 	t.Run("StringAt正常访问", func(t *testing.T) {
 		result := safe.StringAt("Database.Host", "unknown")
@@ -1365,7 +1365,7 @@ func TestSafeAccessAtMethods(t *testing.T) {
 	})
 }
 
-func TestSafeAccessAtMethodsWithMap(t *testing.T) {
+func TestAccessAtMethodsWithMap(t *testing.T) {
 	// 测试Map数据
 	mapData := map[string]interface{}{
 		"app": map[string]interface{}{
@@ -1384,7 +1384,7 @@ func TestSafeAccessAtMethodsWithMap(t *testing.T) {
 		},
 	}
 
-	safe := Safe(mapData)
+	safe := New(mapData)
 
 	t.Run("Map数据StringAt访问", func(t *testing.T) {
 		result := safe.StringAt("app.name", "Unknown")
@@ -1418,17 +1418,17 @@ func TestSafeAccessAtMethodsWithMap(t *testing.T) {
 	})
 }
 
-func TestSafeAccessAtMethodsEdgeCases(t *testing.T) {
+func TestAccessAtMethodsEdgeCases(t *testing.T) {
 	t.Run("空路径处理", func(t *testing.T) {
 		data := map[string]interface{}{"key": "value"}
-		safe := Safe(data)
+		safe := New(data)
 
 		result := safe.StringAt("", "default")
 		assert.Equal(t, "default", result)
 	})
 
 	t.Run("nil数据处理", func(t *testing.T) {
-		safe := Safe(nil)
+		safe := New(nil)
 
 		result := safe.StringAt("any.path", "default")
 		assert.Equal(t, "default", result)
@@ -1436,7 +1436,7 @@ func TestSafeAccessAtMethodsEdgeCases(t *testing.T) {
 
 	t.Run("单层路径访问", func(t *testing.T) {
 		data := map[string]interface{}{"key": "value"}
-		safe := Safe(data)
+		safe := New(data)
 
 		result := safe.StringAt("key", "default")
 		assert.Equal(t, "value", result)
@@ -1448,7 +1448,7 @@ func TestSafeAccessAtMethodsEdgeCases(t *testing.T) {
 				"field": "value",
 			},
 		}
-		safe := Safe(data)
+		safe := New(data)
 
 		result := safe.StringAt("normal.field", "default")
 		assert.Equal(t, "value", result)
@@ -1464,7 +1464,7 @@ func TestSafeAccessAtMethodsEdgeCases(t *testing.T) {
 				},
 			},
 		}
-		safe := Safe(data)
+		safe := New(data)
 
 		result := safe.StringAt("level1.level2.level3.value", "default")
 		assert.Equal(t, "deep-value", result)
@@ -1473,13 +1473,13 @@ func TestSafeAccessAtMethodsEdgeCases(t *testing.T) {
 
 // 性能测试
 
-func BenchmarkSafeAccessStringAt(b *testing.B) {
+func BenchmarkAccessStringAt(b *testing.B) {
 	data := map[string]interface{}{
 		"app": map[string]interface{}{
 			"name": "TestApp",
 		},
 	}
-	safe := Safe(data)
+	safe := New(data)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -1487,13 +1487,13 @@ func BenchmarkSafeAccessStringAt(b *testing.B) {
 	}
 }
 
-func BenchmarkSafeAccessTraditional(b *testing.B) {
+func BenchmarkAccessTraditional(b *testing.B) {
 	data := map[string]interface{}{
 		"app": map[string]interface{}{
 			"name": "TestApp",
 		},
 	}
-	safe := Safe(data)
+	safe := New(data)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -1556,16 +1556,16 @@ func TestAudit_NoPanicOnMathExtremes(t *testing.T) {
 						t.Errorf("panic: a=%d b=%d -> %v", a, b, r)
 					}
 				}()
-				_, _ = SafeAdd(a, b)
-				_, _ = SafeSubtract(a, b)
-				_, _ = SafeMultiply(a, b)
-				_, _ = SafeDivide(a, b)
-				_, _ = SafeModulo(a, b)
-				_, _ = SafePower(a, b)
-				_ = SafeGCD(a, b)
-				_, _ = SafeLCM(a, b)
-				_, _ = SafeClamp(a, b, b)
-				_, _ = SafeAbs(a)
+				_, _ = Add(a, b)
+				_, _ = Subtract(a, b)
+				_, _ = Multiply(a, b)
+				_, _ = Divide(a, b)
+				_, _ = Modulo(a, b)
+				_, _ = Power(a, b)
+				_ = GCD(a, b)
+				_, _ = LCM(a, b)
+				_, _ = Clamp(a, b, b)
+				_, _ = Abs(a)
 				_ = IsPrime(a)
 			}()
 		}
@@ -1577,8 +1577,8 @@ func TestAudit_NoPanicOnMathExtremes(t *testing.T) {
 					t.Errorf("panic: f=%v -> %v", f, r)
 				}
 			}()
-			_, _ = SafeSqrt(f)
-			_, _ = SafeLog(f, f)
+			_, _ = Sqrt(f)
+			_, _ = Log(f, f)
 		}()
 	}
 	for _, n := range []int{-1, 0, 1, 50, 100, 1000} {
@@ -1597,13 +1597,13 @@ func TestAudit_NoPanicOnMathExtremes(t *testing.T) {
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				t.Errorf("panic: SafeAverage/SafeMax/SafeMin on empty -> %v", r)
+				t.Errorf("panic: Average/Max/Min on empty -> %v", r)
 			}
 		}()
-		_, _ = SafeAverage(nil)
-		_, _ = SafeMax(nil)
-		_, _ = SafeMin(nil)
-		_, _ = SafeAverage([]int64{})
+		_, _ = Average(nil)
+		_, _ = Max(nil)
+		_, _ = Min(nil)
+		_, _ = Average([]int64{})
 	}()
 }
 
@@ -1611,28 +1611,28 @@ func TestAudit_NoPanicOnMathExtremes(t *testing.T) {
 //
 // 原实现用 indexOf(numbers, num) 定位回退起点，找的是该**值**首次出现的位置
 // 而不是当前下标当溢出的值在前面出现过，已累加的前缀会被再加一遍：
-// SafeAverage([]int64{H, H}) 返回 1.5H 而正确答案是 H，50% 的误差且不报错
+// Average([]int64{H, H}) 返回 1.5H 而正确答案是 H，50% 的误差且不报错
 func TestAverage_OverflowFallbackDoesNotDoubleCount(t *testing.T) {
 	H := int64(math.MaxInt64/2) + 1000 // 两个相加必溢出
 
-	got, err := SafeAverage([]int64{H, H})
+	got, err := Average([]int64{H, H})
 	require.NoError(t, err)
 	assert.InDelta(t, float64(H), got, float64(H)*1e-12,
 		"两个相同的数，平均值就该是它本身")
 
 	// 重复值出现在更靠前的位置时同样要正确
-	got, err = SafeAverage([]int64{H, -H, H, H})
+	got, err = Average([]int64{H, -H, H, H})
 	require.NoError(t, err)
 	assert.InDelta(t, float64(H)/2, got, float64(H)*1e-12)
 
 	// 不溢出的普通情形不受影响
-	got, err = SafeAverage([]int64{1, 2, 3, 4})
+	got, err = Average([]int64{1, 2, 3, 4})
 	require.NoError(t, err)
 	assert.InDelta(t, 2.5, got, 1e-12)
 
 	// 负向溢出同样走回退
 	L := int64(math.MinInt64/2) - 1000
-	got, err = SafeAverage([]int64{L, L})
+	got, err = Average([]int64{L, L})
 	require.NoError(t, err)
 	assert.InDelta(t, float64(L), got, -float64(L)*1e-12)
 }
