@@ -429,14 +429,26 @@ func (d *Delayer[T]) calculateDelay(attempt int) time.Duration {
 }
 
 // getExecutionContext 从对象池获取 ExecutionContext
+// 两条路都走对象池
+//
+// 原先 disableCallbacks 为真时直接 new 一个带新 map 的 context 并绕开池子，
+// 于是每个任务分配三个对象（map 的 hmap 与 bucket，加结构体本身）
+// 方向正好是反的：关掉回调本是为了快，却成了分配最多的那条路
+// 内存 profile 里 getExecutionContext 一个人占掉全部分配对象的 73.5%
+//
+// 注意：ctx 在任务返回后即被回收复用，taskFunc 不得把它存下来留到之后用
+// 这一点在启用回调时本来就成立（putExecutionContext 是 defer 调用的），
+// 现在两条路一致
+//
+// [EN] Both paths use the pool. With disableCallbacks set, this used to new up
+// a context with a fresh map and bypass the pool entirely, allocating three
+// objects per task — the map's hmap and bucket plus the struct itself. The
+// direction was backwards: disabling callbacks is meant to be the fast path, yet
+// it allocated the most, and a memory profile put getExecutionContext alone at
+// 73.5% of all allocated objects. Note that ctx is recycled once the task
+// returns, so taskFunc must not retain it — already true when callbacks are
+// enabled, and now consistent across both paths
 func (d *Delayer[T]) getExecutionContext() *ExecutionContext {
-	if d.disableCallbacks {
-		// 当回调被禁用时，返回一个简单的上下文
-		return &ExecutionContext{
-			Metadata: make(map[string]interface{}),
-		}
-	}
-
 	// 从对象池获取
 	ctx := d.callbackPool.Get().(*ExecutionContext)
 
@@ -454,9 +466,7 @@ func (d *Delayer[T]) getExecutionContext() *ExecutionContext {
 
 // putExecutionContext 归还 ExecutionContext 到对象池
 func (d *Delayer[T]) putExecutionContext(ctx *ExecutionContext) {
-	if !d.disableCallbacks {
-		d.callbackPool.Put(ctx)
-	}
+	d.callbackPool.Put(ctx)
 }
 
 // Close 关闭结果通道
@@ -482,6 +492,43 @@ func (d *Delayer[T]) safeChannelSend(result T) {
 }
 
 // Execute 执行延迟任务
+// reserveLocked 按已知的任务数为结果切片预留容量，调用方须持有 d.mu
+//
+// 这三个切片在构造时就定了容量，而任务数要等 WithTimes 之后才知道：
+// results 与 timers 建的是零容量，genericResults 固定留 100
+// 一万个任务因此要让 append 反复扩容重分配，每次都把已有元素整体搬一遍
+// 任务数在 Execute 开始时已经确定，这里一次留足
+//
+// 只扩不缩：Execute 可以被多次调用，缩容会把上一轮的结果丢掉
+//
+// [EN] The three slices get their capacity at construction, before WithTimes
+// makes the task count known: results and timers start empty and genericResults
+// is fixed at 100, so ten thousand tasks make append grow and copy repeatedly.
+// The count is settled by the time Execute starts, so reserve once here. Only
+// grows, never shrinks: Execute may be called more than once and shrinking
+// would discard the previous round's results
+func (d *Delayer[T]) reserveLocked() {
+	n := d.execCount
+	if n <= 0 {
+		return
+	}
+	if cap(d.results) < n {
+		grown := make([]*ExecutionResult, len(d.results), n)
+		copy(grown, d.results)
+		d.results = grown
+	}
+	if cap(d.timers) < n {
+		grown := make([]*time.Timer, len(d.timers), n)
+		copy(grown, d.timers)
+		d.timers = grown
+	}
+	if cap(d.genericResults) < n {
+		grown := make([]T, len(d.genericResults), n)
+		copy(grown, d.genericResults)
+		d.genericResults = grown
+	}
+}
+
 func (d *Delayer[T]) Execute() error {
 	if d.function == nil && d.functionNoError == nil && d.taskFunc == nil {
 		return fmt.Errorf("no function to execute")
@@ -491,6 +538,7 @@ func (d *Delayer[T]) Execute() error {
 	d.mu.Lock()
 	d.completionChan = make(chan struct{})
 	d.completionOnce = sync.Once{}
+	d.reserveLocked()
 	d.mu.Unlock()
 
 	// 执行延迟任务

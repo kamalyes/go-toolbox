@@ -818,15 +818,18 @@ func BenchmarkSliceContainsComparable(b *testing.B) {
 	}
 }
 
-// TestSliceContainsComparableLargeSlice 测试大数据切片走哈希查找分支（>1000 元素）
+// TestSliceContainsComparableLargeSlice 大切片上的查找
+//
+// 原先这里按长度分流，超过 1000 条走哈希查找；那条分支已删除（实测在任何
+// 情况下都比线性扫描慢数十倍且要 O(n) 内存），本用例改为验证大切片下
+// 线性查找的边界：末尾元素找得到、不存在的找不到
 func TestSliceContainsComparableLargeSlice(t *testing.T) {
-	// 构造 > 1000 元素的切片，触发 containsComparableHash 分支
 	large := make([]int, 2000)
 	for i := range large {
 		large[i] = i
 	}
 
-	// 存在的元素（位于末尾，验证哈希查找能找到）
+	// 末尾元素：线性扫描的最坏位置
 	assert.True(t, SliceContainsComparable(large, 1999))
 	// 不存在的元素
 	assert.False(t, SliceContainsComparable(large, 99999))
@@ -893,17 +896,35 @@ func randNumericalLargeSlice[T int](largeSize ...int) []T {
 }
 
 // 基准测试 SliceMinMax
+// 基准 fixture 一律在计时循环外构造
+//
+// 原先这些基准把 randNumericalLargeSlice、逐元素覆写、randInt 都放在
+// for i := 0; i < b.N; i++ 里，于是量到的几乎全是建数据的开销而不是被测函数：
+// SliceContains20000 建一个两万元素的切片、再逐个覆写，然后只做一次查找，
+// SliceRemoveEmpty 每轮把九千个 int 装箱成 interface{}，那 8772 次分配
+// 全是基准自己的
+// 在这种基准上做优化，看到的数字与被测代码基本无关
+//
+// [EN] Fixtures are built outside the timed loop. These benchmarks used to
+// construct their data inside `for i := 0; i < b.N; i++`, so what was measured
+// was almost entirely the setup rather than the function under test:
+// SliceContains20000 built a 20000-element slice and overwrote every element
+// for a single lookup, and SliceRemoveEmpty boxed nine thousand ints into
+// interface{} each round — those 8772 allocations were the benchmark's own.
+// Optimising against such a benchmark tells you almost nothing about the code
+
 func BenchmarkSliceMinMax(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		list := randNumericalLargeSlice()
-		minMaxFunc := func(a, b int) int {
-			if a < b {
-				return a
-			}
-			return b
+	list := randNumericalLargeSlice()
+	minMaxFunc := func(a, b int) int {
+		if a < b {
+			return a
 		}
-		_, err := SliceMinMax(list, minMaxFunc)
-		if err != nil {
+		return b
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := SliceMinMax(list, minMaxFunc); err != nil {
 			b.Fatalf("expected no error, got %v", err)
 		}
 	}
@@ -911,117 +932,122 @@ func BenchmarkSliceMinMax(b *testing.B) {
 
 // 基准测试 SliceDiffSet
 func BenchmarkSliceDiffSet(b *testing.B) {
-
+	arr1 := randNumericalLargeSlice(200)
+	arr2 := randNumericalLargeSlice(200)
+	for i := 0; i < len(arr2); i++ {
+		arr2[i] = i + len(arr1)/2 // 使得部分重叠
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		arr1 := randNumericalLargeSlice(200)
-		arr2 := randNumericalLargeSlice(200)
-
-		for i := 0; i < len(arr2); i++ {
-			arr2[i] = i + len(arr1)/2 // 使得部分重叠
-		}
 		_ = SliceDiffSetSorted(arr1, arr2)
 	}
 }
 
 // 基准测试 SliceUnion
 func BenchmarkSliceUnion(b *testing.B) {
+	arr1 := randNumericalLargeSlice(200)
+	arr2 := randNumericalLargeSlice(200)
+	for i := 0; i < len(arr1); i++ {
+		arr2[i] = i + len(arr1)/2 // 使得部分重叠
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		arr1 := randNumericalLargeSlice(200)
-		arr2 := randNumericalLargeSlice(200)
-
-		for i := 0; i < len(arr1); i++ {
-			arr2[i] = i + len(arr1)/2 // 使得部分重叠
-		}
-
 		_ = SliceUnion(arr1, arr2)
 	}
 }
 
 // 基准测试 SliceContains = 300
 func BenchmarkSliceContains300(b *testing.B) {
-
+	intSlice := randNumericalLargeSlice(300)
+	for i := 0; i < len(intSlice); i++ {
+		intSlice[i] = i + len(intSlice)/2 // 使得部分重叠
+	}
+	element := randInt(len(intSlice)/2, len(intSlice)*2) // 测试查找的元素
+	b.ReportAllocs()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		intSlice := randNumericalLargeSlice(300)
-
-		for i := 0; i < len(intSlice); i++ {
-			intSlice[i] = i + len(intSlice)/2 // 使得部分重叠
-		}
-
-		element := randInt(len(intSlice)/2, len(intSlice)*2) // 测试查找的元素
 		_ = SliceContains(intSlice, element)
 	}
 }
 
 // 基准测试 SliceContains = 3000
 func BenchmarkSliceContains3000(b *testing.B) {
-
+	intSlice := randNumericalLargeSlice(3000)
+	for i := 0; i < len(intSlice); i++ {
+		intSlice[i] = i + len(intSlice)/2 // 使得部分重叠
+	}
+	element := randInt(len(intSlice)/2, len(intSlice)*2) // 测试查找的元素
+	b.ReportAllocs()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		intSlice := randNumericalLargeSlice(3000)
-
-		for i := 0; i < len(intSlice); i++ {
-			intSlice[i] = i + len(intSlice)/2 // 使得部分重叠
-		}
-
-		element := randInt(len(intSlice)/2, len(intSlice)*2) // 测试查找的元素
 		_ = SliceContains(intSlice, element)
 	}
 }
 
 // 基准测试 SliceContains > 3000
 func BenchmarkSliceContains20000(b *testing.B) {
+	intSlice := randNumericalLargeSlice(20000)
+	for i := 0; i < len(intSlice); i++ {
+		intSlice[i] = i + len(intSlice)/2 // 使得部分重叠
+	}
+	element := randInt(len(intSlice)/2, len(intSlice)*2) // 测试查找的元素
+	b.ReportAllocs()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		intSlice := randNumericalLargeSlice(20000)
-
-		for i := 0; i < len(intSlice); i++ {
-			intSlice[i] = i + len(intSlice)/2 // 使得部分重叠
-		}
-
-		element := randInt(len(intSlice)/2, len(intSlice)*2) // 测试查找的元素
-
 		_ = SliceContains(intSlice, element)
 	}
 }
 
 // 基准测试 SliceHasDuplicates
 func BenchmarkSliceHasDuplicates(b *testing.B) {
+	intSlice := randNumericalLargeSlice(20000)
+	b.ReportAllocs()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		intSlice := randNumericalLargeSlice(20000)
 		_ = SliceHasDuplicates(intSlice)
 	}
 }
 
 // 基准测试 SliceRemoveEmpty
 func BenchmarkSliceRemoveEmpty(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		defaultSliceSize := 10000
-		intSlice := make([]interface{}, defaultSliceSize)
-		for i := 0; i < defaultSliceSize; i++ {
-			if i%10 == 0 {
-				intSlice[i] = nil // 每10个元素放一个空值
-			} else {
-				intSlice[i] = i
-			}
+	const defaultSliceSize = 10000
+	intSlice := make([]interface{}, defaultSliceSize)
+	for i := 0; i < defaultSliceSize; i++ {
+		if i%10 == 0 {
+			intSlice[i] = nil // 每10个元素放一个空值
+		} else {
+			intSlice[i] = i
 		}
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
 		_ = SliceRemoveEmpty(intSlice)
 	}
 }
 
 // 基准测试 SliceRemoveDuplicates
 func BenchmarkSliceRemoveDuplicates(b *testing.B) {
+	intSlice := randNumericalLargeSlice()
+	b.ReportAllocs()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		intSlice := randNumericalLargeSlice()
 		_ = SliceRemoveDuplicates(intSlice)
 	}
 }
 
 // 基准测试 SliceRemoveZero
 func BenchmarkSliceRemoveZero(b *testing.B) {
+	const defaultSliceSize = 1000
+	arr := make([]int, defaultSliceSize)
+	for i := 0; i < defaultSliceSize; i++ {
+		arr[i] = i % 10 // 生成一些零值
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		defaultSliceSize := 1000
-		arr := make([]int, defaultSliceSize)
-		for i := 0; i < defaultSliceSize; i++ {
-			arr[i] = i % 10 // 生成一些零值
-		}
 		_ = SliceRemoveZero(arr)
 	}
 }

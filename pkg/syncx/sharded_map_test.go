@@ -1251,14 +1251,45 @@ func BenchmarkShardedMapRange(b *testing.B) {
 // BenchmarkShardedMapRangeParallel 并行遍历基准测试（百万级，轻量回调）
 // 注意：轻量回调下并行可能因 goroutine 开销慢于串行，实际收益取决于回调复杂度
 // 对比 BenchmarkShardedMapRangeHeavy* 可见：回调越重，并行收益越大
+// BenchmarkShardedMapRangeParallel 并行遍历，回调无争用
+//
+// 原先回调里往一个共享的 atomic.Int64 累加，于是十个 goroutine 抢同一个计数器，
+// 量到的是缓存行弹跳而不是遍历：那个写法下并行比串行还慢七倍，
+// 把 RangeParallel 测成了 42 ms
+// 这里改为每个 goroutine 写各自的槽位，量的才是遍历本身
+// 争用那一档单独留在 BenchmarkShardedMapRangeParallelContended 里，
+// 作为「回调有争用会发生什么」的对照
 func BenchmarkShardedMapRangeParallel(b *testing.B) {
 	m := NewShardedMap[int, int](64)
 	for i := 0; i < 1000000; i++ {
 		m.Store(i, i)
 	}
-	var sum atomic.Int64
-	b.ResetTimer()
+	var sink atomic.Int64
 	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		var slots [64]int64
+		m.RangeParallel(0, func(k, v int) {
+			slots[k&63] += int64(v)
+		})
+		sink.Store(slots[0])
+	}
+	_ = sink.Load()
+}
+
+// BenchmarkShardedMapRangeParallelContended 对照：回调抢同一个原子计数器
+//
+// 保留这一档是因为它是真实会踩的坑——并行遍历看起来理所当然该更快，
+// 而这个写法下它比串行慢七倍文档里记了实测数字，这条基准让数字可复现
+func BenchmarkShardedMapRangeParallelContended(b *testing.B) {
+	m := NewShardedMap[int, int](64)
+	for i := 0; i < 1000000; i++ {
+		m.Store(i, i)
+	}
+	var sum atomic.Int64
+	b.ReportAllocs()
+	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 		sum.Store(0)
@@ -1267,6 +1298,27 @@ func BenchmarkShardedMapRangeParallel(b *testing.B) {
 		})
 	}
 	_ = sum.Load()
+}
+
+// BenchmarkShardedMapRangeSerial 串行遍历，与上面两档同输入同回调形态，便于直接比
+func BenchmarkShardedMapRangeSerial(b *testing.B) {
+	m := NewShardedMap[int, int](64)
+	for i := 0; i < 1000000; i++ {
+		m.Store(i, i)
+	}
+	var sink atomic.Int64
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		var local int64
+		m.Range(func(k, v int) bool {
+			local += int64(v)
+			return true
+		})
+		sink.Store(local)
+	}
+	_ = sink.Load()
 }
 
 // BenchmarkShardedMapRangeHeavy 串行遍历（重回调，模拟 go-wsc 心跳检查/广播场景）

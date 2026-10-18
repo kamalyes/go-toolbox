@@ -245,44 +245,37 @@ func SliceContains[T types.Ordered](slice []T, element T) bool {
 // SliceContainsComparable 检查切片中是否包含某个元素（支持 comparable 类型）
 // 适用于枚举、字符串、结构体等任意 comparable 类型
 //
-// 性能策略：
-//   - 切片长度 <= 1000：线性查找，利用 CPU 缓存局部性，无额外内存分配
-//   - 切片长度 > 1000：构建哈希集合查找，O(n) 构建 + O(1) 查找
-//     适用于超长切片中 element 位于末尾的场景，避免线性扫描的常数开销
+// 一律线性查找，零分配
 //
-// 注意：对于单次查找，线性查找通常更快（无 map 分配开销）；
-// 仅在切片很大且 element 倾向于位于末尾时，哈希查找才有收益
+// 原先按长度分流：超过 1000 条就先把整个切片灌进 map 再查一次
+// 那条分支在任何情况下都更慢，包括它本想优化的最坏情况（元素不存在或在末尾）——
+// 线性扫描是 n 次比较，建 map 是 n 次插入，后者单次成本高出一个量级，
+// 而「O(1) 查找」只省下最后那一次比较
+// 实测（Apple M4，元素不存在）：
+//
+//	规模      线性              哈希
+//	1000      232.7 ns / 0 B    7141 ns / 36 KB / 5 allocs
+//	20000     4546 ns / 0 B     182821 ns / 591 KB / 65 allocs
+//	200000    45520 ns / 0 B    2096300 ns / 4.7 MB / 513 allocs
+//
+// map 只在同一切片上反复查找时才划算，而本函数每次调用都要重建它，
+// 调用方若要多次查找，应当自己建一次集合复用
+//
+// [EN] Always a linear scan, with no allocation. The length-based split that
+// loaded slices over 1000 elements into a map first was slower in every case,
+// including the worst case it meant to improve: a linear scan is n comparisons
+// while building the map is n insertions, each an order of magnitude dearer,
+// and the O(1) lookup only saves the final comparison. A map pays off only
+// across repeated lookups on the same slice, which this function cannot do
+// since it rebuilds one per call; callers needing many lookups should build a
+// set once themselves
 func SliceContainsComparable[T comparable](slice []T, element T) bool {
-	length := len(slice)
-
-	switch {
-	case length <= 1000:
-		// 对于小于等于 1000 条数据，直接遍历切片
-		return containsComparableLinear(slice, element)
-	default:
-		// 大数据，使用哈希表
-		return containsComparableHash(slice, element)
-	}
-}
-
-// containsComparableLinear 线性查找（comparable 约束，比 types.Ordered 更宽）
-func containsComparableLinear[T comparable](slice []T, element T) bool {
 	for i := range slice {
 		if slice[i] == element {
-			return true // 找到元素，返回 true
+			return true
 		}
 	}
-	return false // 未找到元素，返回 false
-}
-
-// containsComparableHash 哈希表查找（预分配容量，避免扩容 rehash）
-func containsComparableHash[T comparable](slice []T, element T) bool {
-	elementMap := make(map[T]struct{}, len(slice))
-	for i := range slice {
-		elementMap[slice[i]] = struct{}{}
-	}
-	_, found := elementMap[element]
-	return found
+	return false
 }
 
 // SliceHasDuplicates 检查切片中是否存在重复元素
@@ -295,6 +288,29 @@ func containsComparableHash[T comparable](slice []T, element T) bool {
 //  1. 跨 chunk 的重复检测不到（每个 goroutine 只检查自己 chunk 内的重复）
 //  2. 共享 map 写入有 race（len(m) 读取未加锁）
 //  3. 小切片 goroutine 启动开销远大于直接计算
+//
+// 预分配到整个切片长度是刻意的，不要「顺手改掉」
+//
+// 看上去它抵消了提前退出的收益——重复出现在第 101 个元素时，仍为两万个槽位
+// 付了钱实测过三种写法（Apple M4，两万个 int）：
+//
+//	形状            预分配              不给提示            上限 1024
+//	第101个重复      44669 ns / 591 KB   2301 ns / 4.4 KB    3217 ns / 37 KB
+//	最后一个重复     244265 ns / 591 KB  601343 ns / 1183 KB 576321 ns / 1145 KB
+//	无重复          243984 ns / 591 KB  598450 ns / 1183 KB 578225 ns / 1145 KB
+//
+// 没有普遍更优的选择：提前退出的场景不给提示快 19 倍，而要扫完全程的场景
+// 预分配快 2.5 倍且内存只要一半（后者的代价是 map 从小长到两万要反复 rehash）
+// 本函数的典型用途是校验输入「有重复就拒绝」，合法数据里没有重复，
+// 因此扫完全程才是常态，按它来取舍
+// 调用方若明知多半有重复且只关心有无，自己用不给提示的 map 更划算
+//
+// [EN] Pre-sizing to the full length is deliberate. It looks as though it
+// cancels the early exit, and three variants were measured: with no size hint
+// an early duplicate is 19x faster, but a full scan is 2.5x slower and uses
+// twice the memory, since the map has to rehash its way up from nothing. This
+// function is typically used to validate input and reject duplicates, so valid
+// data has none and the full scan is the common case; the trade follows that
 func SliceHasDuplicates[T comparable](slice []T) bool {
 	seen := make(map[T]struct{}, len(slice))
 	for i := range slice {
