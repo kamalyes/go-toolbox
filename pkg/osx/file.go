@@ -12,19 +12,15 @@ package osx
 
 import (
 	"bytes"
-	"encoding/hex"
 	"fmt"
-	"hash"
 	"image"
 	"image/jpeg"
 	"image/png"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/kamalyes/go-toolbox/pkg/mathx"
-	"github.com/kamalyes/go-toolbox/pkg/sign"
 )
 
 // GetDirFiles 获取指定目录及其子目录下的所有文件路径
@@ -161,40 +157,6 @@ func FileExists(file string) bool {
 // FileNameWithoutExt 返回不带扩展名的文件名
 func FileNameWithoutExt(file string) string {
 	return strings.TrimSuffix(file, filepath.Ext(file))
-}
-
-// ComputeHashes 计算文件的多种哈希值，优化为只读一次文件
-func ComputeHashes(filePath string) (map[sign.HashCryptoFunc]string, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	// 创建哈希实例
-	hashes := map[sign.HashCryptoFunc]hash.Hash{}
-	for algo, constructor := range sign.SupportHMACCryptoFunc {
-		hashes[algo] = constructor()
-	}
-
-	// 构造 MultiWriter 写入多个哈希器
-	writers := make([]io.Writer, 0, len(hashes))
-	for _, h := range hashes {
-		writers = append(writers, h)
-	}
-	multiWriter := io.MultiWriter(writers...)
-
-	// 读取文件一次，写入所有哈希器
-	if _, err := io.Copy(multiWriter, file); err != nil {
-		return nil, err
-	}
-
-	results := make(map[sign.HashCryptoFunc]string, len(hashes))
-	for algo, h := range hashes {
-		results[algo] = hex.EncodeToString(h.Sum(nil))
-	}
-
-	return results, nil
 }
 
 // FindFiles 查找匹配 glob 模式的文件，支持 ** 通配符用于递归匹配

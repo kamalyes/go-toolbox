@@ -11,18 +11,7 @@ package types
 import (
 	"reflect"
 	"strings"
-
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/wrapperspb"
 )
-
-// ProtoMessageType protobuf 消息类型
-var ProtoMessageType = reflect.TypeOf((*proto.Message)(nil)).Elem()
-
-// IsProtoMessageType 判断类型是否实现 proto.Message 接口
-func IsProtoMessageType(t reflect.Type) bool {
-	return t != nil && t.Implements(ProtoMessageType)
-}
 
 // IsExportedField 判断结构体字段是否可按 JSON 规则参与导出处理
 func IsExportedField(field reflect.StructField) bool {
@@ -84,75 +73,14 @@ func EnsureStructDefaults(v reflect.Value) {
 		field := v.Field(i)
 		if field.Kind() == reflect.Ptr && field.IsNil() {
 			fieldType := t.Field(i)
-			if IsProtoMessageType(fieldType.Type) {
-				field.Set(reflect.New(fieldType.Type.Elem()))
-			} else if fieldType.Type.Elem().Kind() == reflect.Struct {
+			// proto 消息指针的 Elem 本身就是 struct，与下面的分支完全等价，
+			// 因此不需要为了识别 proto 而在此引入 protobuf 依赖
+			// [EN] A proto message pointer's Elem is already a struct, so the struct
+			// branch below covers it identically; no protobuf import needed here
+			if fieldType.Type.Elem().Kind() == reflect.Struct {
 				field.Set(reflect.New(fieldType.Type.Elem()))
 			}
 		}
-	}
-}
-
-// NewProtoMessage 创建 protobuf 消息实例
-func NewProtoMessage[T proto.Message]() T {
-	var zero T
-	t := reflect.TypeOf(zero).Elem()
-	return reflect.New(t).Interface().(T)
-}
-
-// UnwrapPBValue 解包 protobuf wrapper 类型，返回底层值
-// 支持 wrapperspb 全部 9 种类型：String, Bool, Int32, Int64, UInt32, UInt64, Float, Double, Bytes
-// 如果 wrapper 为 nil 或 typed nil，返回 nil
-// 如果不是 wrapper 类型，返回原始值
-func UnwrapPBValue(iface interface{}) interface{} {
-	switch v := iface.(type) {
-	case *wrapperspb.StringValue:
-		if v != nil {
-			return v.Value
-		}
-		return nil
-	case *wrapperspb.BoolValue:
-		if v != nil {
-			return v.Value
-		}
-		return nil
-	case *wrapperspb.Int32Value:
-		if v != nil {
-			return v.Value
-		}
-		return nil
-	case *wrapperspb.Int64Value:
-		if v != nil {
-			return v.Value
-		}
-		return nil
-	case *wrapperspb.UInt32Value:
-		if v != nil {
-			return v.Value
-		}
-		return nil
-	case *wrapperspb.UInt64Value:
-		if v != nil {
-			return v.Value
-		}
-		return nil
-	case *wrapperspb.FloatValue:
-		if v != nil {
-			return v.Value
-		}
-		return nil
-	case *wrapperspb.DoubleValue:
-		if v != nil {
-			return v.Value
-		}
-		return nil
-	case *wrapperspb.BytesValue:
-		if v != nil {
-			return v.Value
-		}
-		return nil
-	default:
-		return iface
 	}
 }
 

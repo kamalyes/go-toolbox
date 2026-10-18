@@ -13,9 +13,6 @@ package safe
 
 import (
 	"time"
-
-	"google.golang.org/protobuf/types/known/timestamppb"
-	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 // Ptr 通用指针安全转换
@@ -25,14 +22,6 @@ func Ptr[T any, R any](src *T, f func(T) R) *R {
 	}
 	r := f(*src)
 	return &r
-}
-
-// TimeToTimestampPB 安全转换 *time.Time 到 *timestamppb.Timestamp
-func TimeToTimestampPB(src *time.Time) *timestamppb.Timestamp {
-	if src == nil {
-		return nil
-	}
-	return timestamppb.New(*src)
 }
 
 // StringPtr 安全转换 *string 到 string（空字符串）
@@ -115,46 +104,6 @@ func DurationPtr(src *time.Duration) time.Duration {
 	return *src
 }
 
-// StringToPB 安全转换 *string 到 wrapperspb.StringValue
-func StringToPB(src *string) *wrapperspb.StringValue {
-	if src == nil {
-		return nil
-	}
-	return wrapperspb.String(*src)
-}
-
-// BoolToPB 安全转换 *bool 到 wrapperspb.BoolValue
-func BoolToPB(src *bool) *wrapperspb.BoolValue {
-	if src == nil {
-		return nil
-	}
-	return wrapperspb.Bool(*src)
-}
-
-// Int32ToPB 安全转换 *int32 到 wrapperspb.Int32Value
-func Int32ToPB(src *int32) *wrapperspb.Int32Value {
-	if src == nil {
-		return nil
-	}
-	return wrapperspb.Int32(*src)
-}
-
-// Int64ToPB 安全转换 *int64 到 wrapperspb.Int64Value
-func Int64ToPB(src *int64) *wrapperspb.Int64Value {
-	if src == nil {
-		return nil
-	}
-	return wrapperspb.Int64(*src)
-}
-
-// DoubleToPB 安全转换 *float64 到 wrapperspb.DoubleValue
-func DoubleToPB(src *float64) *wrapperspb.DoubleValue {
-	if src == nil {
-		return nil
-	}
-	return wrapperspb.Double(*src)
-}
-
 // BytesPtr 安全转换 *[]byte 到 []byte（空切片）
 func BytesPtr(src *[]byte) []byte {
 	if src == nil {
@@ -171,60 +120,6 @@ func PtrKV[K comparable, V any](src *KV[K, V]) KV[K, V] {
 		return make(KV[K, V])
 	}
 	return *src
-}
-
-// PtrToTime 安全转换 *timestamppb.Timestamp 到 *time.Time
-func PtrToTime(src *timestamppb.Timestamp) *time.Time {
-	if src == nil {
-		return nil
-	}
-	t := src.AsTime()
-	return &t
-}
-
-// PtrToString 安全转换 *wrapperspb.StringValue 到 *string
-func PtrToString(src *wrapperspb.StringValue) *string {
-	if src == nil {
-		return nil
-	}
-	s := src.GetValue()
-	return &s
-}
-
-// PtrToBool 安全转换 *wrapperspb.BoolValue 到 *bool
-func PtrToBool(src *wrapperspb.BoolValue) *bool {
-	if src == nil {
-		return nil
-	}
-	b := src.GetValue()
-	return &b
-}
-
-// PtrToInt32 安全转换 *wrapperspb.Int32Value 到 *int32
-func PtrToInt32(src *wrapperspb.Int32Value) *int32 {
-	if src == nil {
-		return nil
-	}
-	i := src.GetValue()
-	return &i
-}
-
-// PtrToInt64 安全转换 *wrapperspb.Int64Value 到 *int64
-func PtrToInt64(src *wrapperspb.Int64Value) *int64 {
-	if src == nil {
-		return nil
-	}
-	i := src.GetValue()
-	return &i
-}
-
-// PtrToDouble 安全转换 *wrapperspb.DoubleValue 到 *float64
-func PtrToDouble(src *wrapperspb.DoubleValue) *float64 {
-	if src == nil {
-		return nil
-	}
-	f := src.GetValue()
-	return &f
 }
 
 // PtrToBytes 安全转换 *[]byte 到 *[]byte

@@ -18,9 +18,10 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/kamalyes/go-argus"
+	"github.com/kamalyes/go-toolbox/pkg/protox"
 	"github.com/kamalyes/go-toolbox/pkg/stringx"
 	"github.com/kamalyes/go-toolbox/pkg/types"
-	"github.com/kamalyes/go-argus"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -558,7 +559,7 @@ func asProtoMessage(v reflect.Value, createIfNil bool) (proto.Message, bool) {
 
 	switch v.Kind() {
 	case reflect.Ptr:
-		if types.IsProtoMessageType(v.Type()) {
+		if protox.IsProtoMessageType(v.Type()) {
 			if v.IsNil() {
 				if !createIfNil {
 					return nil, true
@@ -568,7 +569,7 @@ func asProtoMessage(v reflect.Value, createIfNil bool) (proto.Message, bool) {
 			return v.Interface().(proto.Message), true
 		}
 	case reflect.Struct:
-		if types.IsProtoMessageType(reflect.PointerTo(v.Type())) && v.CanAddr() {
+		if protox.IsProtoMessageType(reflect.PointerTo(v.Type())) && v.CanAddr() {
 			return v.Addr().Interface().(proto.Message), true
 		}
 	case reflect.Interface:
@@ -617,11 +618,11 @@ func markProtoJSONTypeSeen(t reflect.Type, seen map[reflect.Type]bool) bool {
 }
 
 func needsProtoJSONPtr(t reflect.Type, seen map[reflect.Type]bool) bool {
-	return types.IsProtoMessageType(t) || needsProtoJSONSeen(t.Elem(), seen)
+	return protox.IsProtoMessageType(t) || needsProtoJSONSeen(t.Elem(), seen)
 }
 
 func needsProtoJSONStruct(t reflect.Type, seen map[reflect.Type]bool) bool {
-	if types.IsProtoMessageType(reflect.PointerTo(t)) {
+	if protox.IsProtoMessageType(reflect.PointerTo(t)) {
 		return true
 	}
 	return needsProtoJSONFields(t, seen)

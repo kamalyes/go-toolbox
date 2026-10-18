@@ -21,7 +21,6 @@ import (
 
 	validator "github.com/kamalyes/go-argus"
 	"github.com/kamalyes/go-toolbox/pkg/types"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // MustString 强制转为字符串
@@ -79,8 +78,11 @@ func convertPtrToString(val reflect.Value, timeLayout ...string) string {
 		return ""
 	}
 
-	// 处理 *timestamppb.Timestamp
-	if ts, ok := val.Interface().(*timestamppb.Timestamp); ok {
+	// 处理 *timestamppb.Timestamp：用鸭子类型断言，避免为一个分支把整个
+	// protobuf 引入 convert（convert 被 mathx/random/contextx 等基础包依赖）
+	// [EN] Duck-typed assertion instead of importing protobuf for a single branch;
+	// convert is depended on by many foundational packages
+	if ts, ok := val.Interface().(interface{ AsTime() time.Time }); ok {
 		return formatTime(ts.AsTime(), timeLayout...)
 	}
 
