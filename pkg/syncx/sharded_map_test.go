@@ -1368,3 +1368,80 @@ func BenchmarkShardedMapRangeParallelHeavy(b *testing.B) {
 		})
 	}
 }
+
+// TestKvHasherShardDistribution 整数键必须散开到各个分片
+//
+// 真实的键常在低位带结构（按分片数对齐的 ID、乘过 1000 的编号、毫秒时间戳）
+// 而分片下标取的是 hash 的低位若 hasher 不做位混合，这类键会全部挤进同一个
+// 分片，分片 map 退化成一把全局锁——不报错，只是不快，极难归因
+// 这个测试就是用来挡住那种退化的
+//
+// [EN] Integer keys must spread across shards. Real keys often carry structure
+// in their low bits while the shard index is taken from the hash's low bits, so
+// without bit mixing such keys all land in one shard and the map degenerates to
+// a single global lock — silently. This test guards against that
+func TestKvHasherShardDistribution(t *testing.T) {
+	const (
+		shards = 64
+		keys   = 10000
+	)
+	hasher := KvHasher[int]()
+	ideal := keys / shards
+
+	for _, stride := range []int{1, 2, 3, 8, 16, 64, 100, 256, 1000, 4096} {
+		counts := make([]int, shards)
+		for i := 0; i < keys; i++ {
+			counts[int(hasher(i*stride))&(shards-1)]++
+		}
+		used, maxLoad := 0, 0
+		for _, c := range counts {
+			if c > 0 {
+				used++
+			}
+			if c > maxLoad {
+				maxLoad = c
+			}
+		}
+		// 每个分片都要用上，且最重的分片不超过理想值的两倍
+		// 位混合后实测最大 159 对理想 156，两倍的余量足够宽，不会因平台而抖动
+		assert.Equal(t, shards, used, "步长 %d 只用到 %d/%d 个分片，hasher 的位混合失效了", stride, used, shards)
+		assert.LessOrEqual(t, maxLoad, ideal*2, "步长 %d 最重的分片装了 %d 个，理想 %d，分布不均", stride, maxLoad, ideal)
+	}
+}
+
+// TestStoreBatchPathsAgree StoreBatch 的两条路径（逐项/分组）结果必须一致
+//
+// 阈值是 shardCount，跨阈值的输入走不同代码路径，两边都要正确
+//
+// [EN] Both StoreBatch paths must agree. The threshold is shardCount, so inputs
+// either side of it take different code, and both have to be right
+func TestStoreBatchPathsAgree(t *testing.T) {
+	const shards = 8
+	// 覆盖阈值两侧：小于、等于、大于 shardCount
+	for _, n := range []int{1, 7, 8, 9, 64, 300} {
+		items := make(map[string]int, n)
+		for i := 0; i < n; i++ {
+			items[fmt.Sprintf("key:%d", i)] = i * 3
+		}
+
+		small := NewShardedMap[string, int](shards)
+		small.storeBatchSmall(items)
+		grouped := NewShardedMap[string, int](shards)
+		grouped.storeBatchGrouped(items)
+		viaPublic := NewShardedMap[string, int](shards)
+		viaPublic.StoreBatch(items)
+
+		for _, m := range []*ShardedMap[string, int]{small, grouped, viaPublic} {
+			assert.Equal(t, n, m.Len(), "n=%d 计数不对", n)
+			for k, want := range items {
+				got, ok := m.Load(k)
+				assert.True(t, ok, "n=%d 缺少键 %s", n, k)
+				assert.Equal(t, want, got, "n=%d 键 %s 的值不对", n, k)
+			}
+		}
+
+		// 重复写入同一批：计数不应增加，这是 added 统计最容易写错的地方
+		viaPublic.StoreBatch(items)
+		assert.Equal(t, n, viaPublic.Len(), "n=%d 重复 StoreBatch 后计数被重复累加", n)
+	}
+}

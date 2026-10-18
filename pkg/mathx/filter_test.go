@@ -388,3 +388,36 @@ func TestFindUpdateGeneric(t *testing.T) {
 	val := dataMap["item1"]
 	assert.Equal(t, 2, val.Count, "Count 应该增加到 2")
 }
+
+// TestFilterStrategy_NilPredicateSemantics nil 谓词的语义：视为 true
+//
+// and/or 两个策略原先共用一个通用辅助，nil 谓词在那里被显式当作 true 处理
+// 改为直写循环后这条语义藏在 `pred != nil &&` 与 `pred == nil ||` 的写法里，
+// 一旦有人「顺手」把条件写反，nil 谓词就会从「不影响结果」变成「否决一切」，
+// 而这不会有任何编译错误
+func TestFilterStrategy_NilPredicateSemantics(t *testing.T) {
+	type row struct{ n int }
+	data := []row{{1}, {2}, {3}}
+
+	truthy := func(r row) bool { return r.n >= 2 }
+	falsy := func(r row) bool { return false }
+
+	// and：nil 视为 true，不短路，结果由其余谓词决定
+	assert.Equal(t, []row{{2}, {3}},
+		NewSliceFilter(data).UseAnd().Condition(nil, truthy).Result())
+	assert.Empty(t,
+		NewSliceFilter(data).UseAnd().Condition(nil, falsy).Result())
+	// 全是 nil 时 and 全部命中
+	assert.Len(t, NewSliceFilter(data).UseAnd().Condition(nil, nil).Result(), 3)
+
+	// or：nil 视为 true，立即短路，因此全部命中
+	assert.Len(t, NewSliceFilter(data).UseOr().Condition(nil, falsy).Result(), 3)
+	assert.Len(t, NewSliceFilter(data).UseOr().Condition(falsy, nil).Result(), 3)
+	// or 不含 nil 时按谓词走
+	assert.Equal(t, []row{{2}, {3}},
+		NewSliceFilter(data).UseOr().Condition(falsy, truthy).Result())
+	assert.Empty(t, NewSliceFilter(data).UseOr().Condition(falsy).Result())
+
+	// 无谓词：全部命中
+	assert.Len(t, NewSliceFilter(data).Result(), 3)
+}
