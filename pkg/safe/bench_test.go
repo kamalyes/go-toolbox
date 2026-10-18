@@ -1,10 +1,10 @@
-/**
+/*
  * @Author: kamalyes 501893067@qq.com
- * @Date: 2025-03-09 17:20:11
+ * @Date: 2025-12-30 08:51:03
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2025-03-09 17:20:11
- * @FilePath: \go-toolbox\pkg\safe\temporal_hasher_bench_test.go
- * @Description: 临时哈希生成器性能测试
+ * @LastEditTime: 2025-12-30 09:50:16
+ * @FilePath: \go-toolbox\pkg\safe\bench_test.go
+ * @Description: 常驻基准 - 安全访问、字段名归一化、时间窗哈希与数值兜底
  *
  * Copyright (c) 2025 by kamalyes, All Rights Reserved.
  */
@@ -14,6 +14,8 @@ package safe
 import (
 	"testing"
 	"time"
+
+	"github.com/kamalyes/go-toolbox/pkg/stringx"
 )
 
 var (
@@ -206,4 +208,59 @@ func BenchmarkTemporalHasher_ParallelWithMap(b *testing.B) {
 			benchTemporalHashResult = hasher.HashMap(kvMap)
 		}
 	})
+}
+
+// ——— Field 热路径：原名命中、变体命中、未命中与 nil 链路 ———
+
+type benchProfile struct{ Avatar string }
+type benchUser struct {
+	Name    string
+	Profile *benchProfile
+}
+
+var benchFieldMap = map[string]interface{}{"user_name": "kamalyes", "age": 33}
+var benchFieldStruct = &benchUser{Name: "kamalyes", Profile: &benchProfile{Avatar: "a.png"}}
+
+func BenchmarkField_MapExactHit(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = Safe(benchFieldMap).Field("user_name").String()
+	}
+}
+func BenchmarkField_MapVariantHit(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = Safe(benchFieldMap).Field("userName").String()
+	}
+}
+func BenchmarkField_MapMiss(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = Safe(benchFieldMap).Field("nope").String()
+	}
+}
+func BenchmarkField_StructExactHit(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = Safe(benchFieldStruct).Field("Name").String()
+	}
+}
+func BenchmarkField_StructChain(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = Safe(benchFieldStruct).Field("Profile").Field("Avatar").String()
+	}
+}
+func BenchmarkField_NilChain(b *testing.B) {
+	var u *benchUser
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = Safe(u).Field("Profile").Field("Avatar").String()
+	}
+}
+func BenchmarkField_NormalizeFieldName(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = stringx.NormalizeFieldName("UserName")
+	}
 }

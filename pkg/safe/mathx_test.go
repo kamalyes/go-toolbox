@@ -3,7 +3,7 @@
  * @Date: 2025-11-16 22:55:55
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2025-11-16 22:55:55
- * @FilePath: \go-toolbox\safe\mathx_test.go
+ * @FilePath: \go-toolbox\pkg\safe\mathx_test.go
  * @Description: 安全数学工具函数的测试文件
  *
  * Copyright (c) 2025 by kamalyes, All Rights Reserved.
@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFastHash(t *testing.T) {
@@ -1541,4 +1542,97 @@ func TestHashToInt64(t *testing.T) {
 		result := HashToInt64([]string{"a", "b"}, "")
 		assert.GreaterOrEqual(t, result, int64(0))
 	})
+}
+
+// ——— 恶意输入审计：本库的承诺是「不崩」，任何 panic 都是缺陷 ———
+
+func TestAudit_NoPanicOnMathExtremes(t *testing.T) {
+	vals := []int64{0, 1, -1, math.MaxInt64, math.MinInt64, math.MaxInt32, math.MinInt32}
+	for _, a := range vals {
+		for _, b := range vals {
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						t.Errorf("panic: a=%d b=%d -> %v", a, b, r)
+					}
+				}()
+				_, _ = SafeAdd(a, b)
+				_, _ = SafeSubtract(a, b)
+				_, _ = SafeMultiply(a, b)
+				_, _ = SafeDivide(a, b)
+				_, _ = SafeModulo(a, b)
+				_, _ = SafePower(a, b)
+				_ = SafeGCD(a, b)
+				_, _ = SafeLCM(a, b)
+				_, _ = SafeClamp(a, b, b)
+				_, _ = SafeAbs(a)
+				_ = IsPrime(a)
+			}()
+		}
+	}
+	for _, f := range []float64{0, -1, 1, math.Inf(1), math.Inf(-1), math.NaN(), math.MaxFloat64} {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Errorf("panic: f=%v -> %v", f, r)
+				}
+			}()
+			_, _ = SafeSqrt(f)
+			_, _ = SafeLog(f, f)
+		}()
+	}
+	for _, n := range []int{-1, 0, 1, 50, 100, 1000} {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Errorf("panic: n=%d -> %v", n, r)
+				}
+			}()
+			_ = NextPowerOfTwo(n)
+			_, _ = Fibonacci(n)
+			_, _ = Factorial(n)
+			_ = ShortHashWithLength("x", n)
+		}()
+	}
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("panic: SafeAverage/SafeMax/SafeMin on empty -> %v", r)
+			}
+		}()
+		_, _ = SafeAverage(nil)
+		_, _ = SafeMax(nil)
+		_, _ = SafeMin(nil)
+		_, _ = SafeAverage([]int64{})
+	}()
+}
+
+// TestAverage_OverflowFallbackDoesNotDoubleCount 溢出回退不得重复累加前缀
+//
+// 原实现用 indexOf(numbers, num) 定位回退起点，找的是该**值**首次出现的位置
+// 而不是当前下标当溢出的值在前面出现过，已累加的前缀会被再加一遍：
+// SafeAverage([]int64{H, H}) 返回 1.5H 而正确答案是 H，50% 的误差且不报错
+func TestAverage_OverflowFallbackDoesNotDoubleCount(t *testing.T) {
+	H := int64(math.MaxInt64/2) + 1000 // 两个相加必溢出
+
+	got, err := SafeAverage([]int64{H, H})
+	require.NoError(t, err)
+	assert.InDelta(t, float64(H), got, float64(H)*1e-12,
+		"两个相同的数，平均值就该是它本身")
+
+	// 重复值出现在更靠前的位置时同样要正确
+	got, err = SafeAverage([]int64{H, -H, H, H})
+	require.NoError(t, err)
+	assert.InDelta(t, float64(H)/2, got, float64(H)*1e-12)
+
+	// 不溢出的普通情形不受影响
+	got, err = SafeAverage([]int64{1, 2, 3, 4})
+	require.NoError(t, err)
+	assert.InDelta(t, 2.5, got, 1e-12)
+
+	// 负向溢出同样走回退
+	L := int64(math.MinInt64/2) - 1000
+	got, err = SafeAverage([]int64{L, L})
+	require.NoError(t, err)
+	assert.InDelta(t, float64(L), got, -float64(L)*1e-12)
 }

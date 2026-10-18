@@ -32,37 +32,60 @@ func MergeWithDefaults[T any](st *T, defaultSts ...*T) *T {
 
 	for _, defaultConfig := range defaultSts {
 		if defaultConfig != nil {
-			mergeStruct(result, reflect.ValueOf(defaultConfig).Elem())
+			mergeStruct(result, reflect.ValueOf(defaultConfig).Elem(), 0)
 		}
 	}
 
 	return result.Addr().Interface().(*T)
 }
 
+// maxMergeDepth 合并递归的深度上限
+//
+// 指针字段可以指回自己：`type Node struct{ Next *Node }` 且 Next 指向自身时，
+// mergeStruct → mergeField → mergePtr → mergeField 会无限递归并爆栈，
+// 而爆栈是 fatal error，recover 接不住——对一个以「程序别崩」为全部卖点的库
+// 来说这是最不能留的一种缺陷
+//
+// 真实配置结构体的嵌套深度个位数即够，64 既远大于实际需要，也远低于会出问题的量级
+// 超过上限就停下不再往下合并，保留目标端现值，而不是崩掉
+//
+// [EN] A pointer field can point back at itself: with
+// `type Node struct{ Next *Node }` and Next set to the node itself,
+// mergeStruct -> mergeField -> mergePtr -> mergeField recurses forever and
+// overflows the stack, which is a fatal error that recover cannot catch — the
+// least acceptable kind of defect in a library whose entire promise is that
+// your program does not blow up. Real configuration structs nest only a few
+// levels, so 64 is far above what is needed and far below what breaks. Past the
+// limit merging simply stops and the destination keeps its current value
+const maxMergeDepth = 64
+
 // mergeStruct 递归合并结构体字段
-func mergeStruct(target, source reflect.Value) {
+func mergeStruct(target, source reflect.Value, depth int) {
+	if depth > maxMergeDepth {
+		return
+	}
 	for i := 0; i < target.NumField(); i++ {
 		field := target.Field(i)
 		sourceField := source.Field(i)
 
 		if field.CanSet() {
-			mergeField(field, sourceField)
+			mergeField(field, sourceField, depth+1)
 		}
 	}
 }
 
 // mergeField 合并单个字段
-func mergeField(field, defaultField reflect.Value) {
-	if !defaultField.IsValid() {
+func mergeField(field, defaultField reflect.Value, depth int) {
+	if !defaultField.IsValid() || depth > maxMergeDepth {
 		return
 	}
 
 	switch field.Kind() {
 	case reflect.Ptr:
-		mergePtr(field, defaultField)
+		mergePtr(field, defaultField, depth)
 
 	case reflect.Struct:
-		mergeStruct(field, defaultField)
+		mergeStruct(field, defaultField, depth)
 
 	case reflect.Slice:
 		mergeSlice(field, defaultField)
@@ -88,13 +111,13 @@ func mergeField(field, defaultField reflect.Value) {
 }
 
 // mergePtr 合并指针类型
-func mergePtr(field, defaultField reflect.Value) {
+func mergePtr(field, defaultField reflect.Value, depth int) {
 	if field.IsNil() {
 		if !defaultField.IsNil() {
 			field.Set(defaultField)
 		}
 	} else if !defaultField.IsNil() {
-		mergeField(field.Elem(), defaultField.Elem())
+		mergeField(field.Elem(), defaultField.Elem(), depth+1)
 	}
 }
 

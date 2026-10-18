@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-08-03 22:19:05
+ * @LastEditTime: 2025-12-23 11:52:30
  * @FilePath: \go-toolbox\pkg\desensitize\constants.go
  * @Description:
  *

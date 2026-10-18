@@ -323,20 +323,39 @@ func ToPascalCase(s string) string {
 		return s
 	}
 
-	// 如果包含下划线、连字符或空格，先分割处理
+	// 如果包含下划线、连字符或空格，按分隔符分段
+	//
+	// 原先 ReplaceAll 两遍把 - 和空格折成 _，再 Split 出整个分段切片，
+	// 一次转换要三次分配；改为单遍扫描直接定位每段起止，只留 Builder 一次
+	// 调用方若在热路径上逐个试命名变体，省下的是数倍
+	//
+	// [EN] Previously ReplaceAll ran twice to fold - and spaces into _, then
+	// Split materialised the whole segment slice: three allocations per
+	// conversion. This walks the string once to find each segment's bounds,
+	// leaving only the Builder's allocation
 	if strings.ContainsAny(s, "_- ") {
-		// 统一替换为下划线再分割
-		normalized := strings.ReplaceAll(strings.ReplaceAll(s, "-", "_"), " ", "_")
-		parts := strings.Split(normalized, "_")
 		var builder strings.Builder
-		for _, part := range parts {
-			if len(part) > 0 {
-				// 首字母大写，其余小写
-				builder.WriteRune(unicode.ToUpper(rune(part[0])))
-				if len(part) > 1 {
-					builder.WriteString(strings.ToLower(part[1:]))
-				}
+		builder.Grow(len(s))
+		for i := 0; i < len(s); {
+			// 跳过连续分隔符，等价于 Split 后丢弃空分段
+			if c := s[i]; c == '_' || c == '-' || c == ' ' {
+				i++
+				continue
 			}
+			j := i
+			for j < len(s) {
+				if c := s[j]; c == '_' || c == '-' || c == ' ' {
+					break
+				}
+				j++
+			}
+			// 首字节按字节取 rune 后大写，与原实现 rune(part[0]) 一致
+			builder.WriteRune(unicode.ToUpper(rune(s[i])))
+			if j-i > 1 {
+				// ToLower 对已是小写的 ASCII 段直接返回原串，不额外分配
+				builder.WriteString(strings.ToLower(s[i+1 : j]))
+			}
+			i = j
 		}
 		return builder.String()
 	}
@@ -358,8 +377,11 @@ func ToSnakeCase(s string) string {
 		return s
 	}
 
-	// 预分配：最坏情况每个字符前加一个下划线
-	result := make([]byte, 0, len(s)*2)
+	// Builder 的 String() 是零拷贝转换，而 make([]byte)+string(result) 要分配两次
+	// [EN] Builder.String() converts without copying, whereas make([]byte)
+	// followed by string(result) allocates twice
+	var result strings.Builder
+	result.Grow(len(s) + len(s)/2)
 	lastIsUnderscore := false
 
 	for i := 0; i < len(s); i++ {
@@ -367,8 +389,8 @@ func ToSnakeCase(s string) string {
 		// 将连字符和空格都转换为下划线
 		if r == '-' || r == ' ' {
 			// 避免连续的下划线
-			if len(result) > 0 && !lastIsUnderscore {
-				result = append(result, '_')
+			if result.Len() > 0 && !lastIsUnderscore {
+				result.WriteByte('_')
 				lastIsUnderscore = true
 			}
 			continue
@@ -379,21 +401,21 @@ func ToSnakeCase(s string) string {
 			if i > 0 {
 				prevRune := rune(s[i-1])
 				if !unicode.IsUpper(prevRune) && prevRune != '_' && prevRune != ' ' && prevRune != '-' {
-					if len(result) > 0 && !lastIsUnderscore {
-						result = append(result, '_')
+					if result.Len() > 0 && !lastIsUnderscore {
+						result.WriteByte('_')
 						lastIsUnderscore = true
 					}
 				}
 			}
-			result = append(result, byte(unicode.ToLower(r)))
+			result.WriteByte(byte(unicode.ToLower(r)))
 			lastIsUnderscore = false
 		} else {
-			result = append(result, s[i])
+			result.WriteByte(s[i])
 			lastIsUnderscore = false
 		}
 	}
 
-	return string(result)
+	return result.String()
 }
 
 // ToCamelCase 将字符串转换为驼峰命名法（首字母小写，例如：userName）
@@ -415,41 +437,64 @@ func ToKebabCase(s string) string {
 // NormalizeFieldName 规范化字段名，返回所有可能的命名风格变体
 // 支持的输入格式：camelCase, PascalCase, snake_case, kebab-case
 // 返回顺序：原始名称、PascalCase、camelCase、snake_case、kebab-case
+//
+// 重复的变体会被跳过原先逐项手写去重条件，kebab 只和原名、snake 比，
+// 于是 "X1" 这类输入会得到 ["X1","x1","x1"]——调用方按变体逐个查找时，
+// 同一个名字要查两遍，map 多一次哈希，结构体多一次 FieldByName 全字段扫描
+//
+// [EN] Duplicate variants are skipped. The original hand-wrote its dedup
+// conditions and compared kebab case only against the original and snake case,
+// so an input like "X1" produced ["X1","x1","x1"] and a caller iterating the
+// variants looked the same name up twice
 func NormalizeFieldName(fieldName string) []string {
 	if fieldName == "" {
 		return []string{}
 	}
+	return AppendFieldNameVariants(make([]string, 0, MaxFieldNameVariants), fieldName)
+}
 
-	variants := make([]string, 0, 5)
+// MaxFieldNameVariants 变体个数上限：原始名称加四种命名风格
+const MaxFieldNameVariants = 5
 
-	// 原始名称
-	variants = append(variants, fieldName)
-
-	// 转换为 PascalCase (首字母大写的驼峰)
-	pascalCase := ToPascalCase(fieldName)
-	if pascalCase != fieldName {
-		variants = append(variants, pascalCase)
+// AppendFieldNameVariants 把字段名的各种命名风格变体追加到 dst，返回追加后的切片
+//
+// 顺序与 NormalizeFieldName 一致，dst 为空时第一个元素就是原始名称
+// 供调用方用栈上数组承接，避免为一个用完即弃的切片分配：
+//
+//	var buf [stringx.MaxFieldNameVariants]string
+//	for _, name := range stringx.AppendFieldNameVariants(buf[:0], fieldName) {
+//	    ...
+//	}
+//
+// pkg/safe 的链式取值就在热路径上这么用：先按原名直取，未命中才算变体
+//
+// [EN] Appends the naming-style variants of a field name to dst in the same
+// order as NormalizeFieldName, letting callers back dst with a stack array
+// instead of allocating a slice they discard immediately. pkg/safe's chained
+// access uses it exactly that way on its hot path
+func AppendFieldNameVariants(dst []string, fieldName string) []string {
+	if fieldName == "" {
+		return dst
 	}
 
-	// 转换为 camelCase (首字母小写的驼峰)
-	camelCase := ToCamelCase(fieldName)
-	if camelCase != fieldName && camelCase != pascalCase {
-		variants = append(variants, camelCase)
+	base := len(dst)
+	add := func(v string) {
+		for _, seen := range dst[base:] {
+			if seen == v {
+				return
+			}
+		}
+		dst = append(dst, v)
 	}
 
-	// 转换为 snake_case
+	add(fieldName)
+	add(ToPascalCase(fieldName))
+	add(ToCamelCase(fieldName))
 	snakeCase := ToSnakeCase(fieldName)
-	if snakeCase != fieldName {
-		variants = append(variants, snakeCase)
-	}
-
-	// 转换为 kebab-case
-	kebabCase := ToKebabCase(fieldName)
-	if kebabCase != fieldName && kebabCase != snakeCase {
-		variants = append(variants, kebabCase)
-	}
-
-	return variants
+	add(snakeCase)
+	// ToKebabCase 会把 ToSnakeCase 再跑一遍，这里直接从上面的结果推出来
+	add(strings.ReplaceAll(snakeCase, "_", "-"))
+	return dst
 }
 
 func ToInt(s string) (int, error) {

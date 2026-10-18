@@ -24,7 +24,7 @@ var (
 	ErrTimeout   = errors.New("function execution timeout")
 	ErrFunIsNil  = errors.New("fn cannot be nil")
 	ErrLockIsNil = errors.New("lock cannot be nil")
-	ErrPanic = fmt.Sprintf("panic recovered")
+	ErrPanic     = "panic recovered"
 )
 
 // Runner 是一个支持泛型的任务执行器，

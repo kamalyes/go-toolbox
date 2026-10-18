@@ -239,13 +239,13 @@ func TestTemporalHasher_MultipleTimeWindows(t *testing.T) {
 
 			// 生成多个时间窗口的哈希
 			hashes := make([]string, tt.windowCount)
-			for i := range tt.windowCount {
+			for i := 0; i < tt.windowCount; i++ {
 				t := baseTime.Add(time.Duration(i) * tt.window)
 				hashes[i] = hasher.HashAt(t, parts...)
 			}
 
 			// 验证不同时间窗口生成不同哈希
-			for i := range tt.windowCount {
+			for i := 0; i < tt.windowCount; i++ {
 				for j := i + 1; j < tt.windowCount; j++ {
 					assert.NotEqual(t, hashes[i], hashes[j],
 						"窗口%d和窗口%d应该生成不同哈希", i, j)
@@ -253,7 +253,7 @@ func TestTemporalHasher_MultipleTimeWindows(t *testing.T) {
 			}
 
 			// 验证每个窗口内的一致性
-			for i := range tt.windowCount {
+			for i := 0; i < tt.windowCount; i++ {
 				windowStart := baseTime.Add(time.Duration(i) * tt.window)
 				windowMid := windowStart.Add(tt.window / 2)
 				windowEnd := windowStart.Add(tt.window - time.Second)
@@ -266,5 +266,32 @@ func TestTemporalHasher_MultipleTimeWindows(t *testing.T) {
 				assert.Equal(t, hashStart, hashEnd, "窗口%d内结束时间应该一致", i)
 			}
 		})
+	}
+}
+
+// ——— 恶意输入审计：本库的承诺是「不崩」，任何 panic 都是缺陷 ———
+
+func TestAudit_NoPanicOnTemporalHasherOptions(t *testing.T) {
+	for _, w := range []time.Duration{-time.Hour, 0, time.Nanosecond, time.Hour} {
+		for _, l := range []int{-5, 0, 1, 64, 1000} {
+			for _, sep := range []string{"", "|", "very-long-separator"} {
+				func() {
+					defer func() {
+						if r := recover(); r != nil {
+							t.Errorf("panic: w=%v l=%d sep=%q -> %v", w, l, sep, r)
+						}
+					}()
+					h := NewTemporalHasher(WithWindow(w), WithLength(l), WithSeparator(sep))
+					_ = h.Hash()
+					_ = h.Hash("a", "")
+					_ = h.HashMap(nil)
+					_ = h.HashMap(map[string]string{"": ""})
+					_ = h.IsExpired("", "a")
+					_ = h.IsExpiredMap("x", nil)
+					_ = h.Window()
+					_ = h.Length()
+				}()
+			}
+		}
 	}
 }

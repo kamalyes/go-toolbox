@@ -121,19 +121,3 @@ func PtrKV[K comparable, V any](src *KV[K, V]) KV[K, V] {
 	}
 	return *src
 }
-
-// PtrToBytes 安全转换 *[]byte 到 *[]byte
-func PtrToBytes(src *[]byte) *[]byte {
-	if src == nil {
-		return nil
-	}
-	return src
-}
-
-// PtrKVToSafe 安全转换 *KV[K, V] 到 *KV[K, V]
-func PtrKVToSafe[K comparable, V any](src *KV[K, V]) *KV[K, V] {
-	if src == nil {
-		return nil
-	}
-	return src
-}

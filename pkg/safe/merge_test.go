@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // 测试用的结构体
@@ -361,4 +362,115 @@ func TestMergeWithDefaultsMultipleDefaults(t *testing.T) {
 	assert.Equal(t, 8080, result.Port, "Expected Port=8080")
 	assert.True(t, result.Enabled, "Expected Enabled=true")
 	assert.Len(t, result.Tags, 1, "Expected 1 tag")
+}
+
+// cycleNode 自引用结构，用于验证合并不会无限递归
+type cycleNode struct {
+	Name string
+	Next *cycleNode
+}
+
+// TestMergeWithDefaults_SelfReferencingDoesNotOverflow 自引用结构不得爆栈
+//
+// 修复前：mergeStruct → mergeField → mergePtr → mergeField 沿着 Next 无限下探，
+// 以 fatal error: stack overflow 结束而爆栈是 fatal error，recover 接不住，
+// 对一个以「程序别崩」为全部卖点的库来说是最不能留的缺陷
+func TestMergeWithDefaults_SelfReferencingDoesNotOverflow(t *testing.T) {
+	a := &cycleNode{}
+	a.Next = a
+	d := &cycleNode{Name: "default"}
+	d.Next = d
+
+	require.NotPanics(t, func() {
+		got := MergeWithDefaults(a, d)
+		assert.Equal(t, "default", got.Name, "顶层零值字段仍要取到默认值")
+	})
+}
+
+// TestMergeWithDefaults_MutualReferenceDoesNotOverflow 互相指向的两个节点同样不得爆栈
+func TestMergeWithDefaults_MutualReferenceDoesNotOverflow(t *testing.T) {
+	x := &cycleNode{}
+	y := &cycleNode{Name: "y"}
+	x.Next = y
+	y.Next = x
+	d := &cycleNode{Name: "d"}
+	d.Next = d
+
+	require.NotPanics(t, func() {
+		got := MergeWithDefaults(x, d)
+		assert.Equal(t, "d", got.Name)
+	})
+}
+
+// TestMergeWithDefaults_DeepButFiniteStillMerges 深度在上限之内时必须照常合并
+//
+// 深度上限是为了挡住环，不能把正常的深层嵌套一起挡掉
+func TestMergeWithDefaults_DeepButFiniteStillMerges(t *testing.T) {
+	build := func(depth int, leaf string) *cycleNode {
+		head := &cycleNode{}
+		cur := head
+		for i := 1; i < depth; i++ {
+			cur.Next = &cycleNode{}
+			cur = cur.Next
+		}
+		cur.Name = leaf
+		return head
+	}
+
+	// 上限 64，取 8 层：远在上限之内，最深一层也应被合并到
+	target := build(8, "")
+	def := build(8, "deep")
+
+	require.NotPanics(t, func() {
+		got := MergeWithDefaults(target, def)
+		cur := got
+		for i := 1; i < 8; i++ {
+			require.NotNil(t, cur.Next, "第 %d 层指针不该为 nil", i)
+			cur = cur.Next
+		}
+		assert.Equal(t, "deep", cur.Name, "上限之内的深层字段必须照常合并")
+	})
+}
+
+// TestMergeWithDefaults_NumericKinds 各数值种类的零值都要能被默认值填上
+//
+// mergeUint 与 mergeFloat 此前没有任何测试覆盖：
+// 合并漏掉某一类字段不会报错，只会让该字段静默停在零值
+func TestMergeWithDefaults_NumericKinds(t *testing.T) {
+	type numeric struct {
+		I   int
+		I8  int8
+		I16 int16
+		I32 int32
+		I64 int64
+		U   uint
+		U8  uint8
+		U16 uint16
+		U32 uint32
+		U64 uint64
+		F32 float32
+		F64 float64
+		B   bool
+		S   string
+	}
+
+	def := &numeric{
+		I: 1, I8: 2, I16: 3, I32: 5, I64: 6,
+		U: 7, U8: 8, U16: 9, U32: 10, U64: 11,
+		F32: 1.5, F64: 2.5, B: true, S: "s",
+	}
+
+	got := MergeWithDefaults(&numeric{}, def)
+	assert.Equal(t, *def, *got, "全零值的目标应被默认值整体填满")
+
+	// 已设过的字段不被覆盖，逐类型各验一个
+	set := &numeric{I: 100, U: 200, F64: 3.5, B: true, S: "keep"}
+	got = MergeWithDefaults(set, def)
+	assert.Equal(t, 100, got.I)
+	assert.Equal(t, uint(200), got.U)
+	assert.Equal(t, 3.5, got.F64)
+	assert.Equal(t, "keep", got.S)
+	// 零值字段仍取默认
+	assert.Equal(t, uint8(8), got.U8)
+	assert.Equal(t, float32(1.5), got.F32)
 }

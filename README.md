@@ -213,14 +213,14 @@ if err != nil {
 ```go
 import "github.com/kamalyes/go-toolbox/pkg/retry"
 
-err := retry.Do(
-    func() error {
+err := retry.NewRetry().
+    SetAttemptCount(3).
+    SetInterval(time.Second).
+    SetBackoffMultiplier(2).
+    SetJitter(true).
+    Do(func() error {
         return callRemoteAPI()
-    },
-    retry.Attempts(3),
-    retry.Delay(time.Second),
-    retry.Exponential(),
-)
+    })
 ```
 
 #### 🔢 数学计算与三元运算

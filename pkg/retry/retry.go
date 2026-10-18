@@ -33,7 +33,7 @@
 *   - 资源竞争：减少对有限资源的争抢
 *
 * 使用示例:
-*   retry.NewRetry().
+*   retry.New().
 *       SetAttemptCount(5).
 *       SetInterval(100 * time.Millisecond).
 *       SetBackoffMultiplier(2.0).
@@ -86,7 +86,7 @@ type ErrCallbackFunc func(nowAttemptCount, remainCount int, err error, funcName 
 // SuccessCallbackFunc 是成功回调函数类型
 type SuccessCallbackFunc func(funcName ...string)
 
-// NewRetry 创建一个重试器，返回一个 Retry 实例
+// New 创建一个重试器，返回一个 Retry 实例
 func NewRetry() *Retry {
 	return NewRetryWithCtx(context.Background())
 }
@@ -186,7 +186,7 @@ func (r *Retry) SetConditionFunc(fn func(error) bool) *Retry {
 
 // GetCaller 获取调用者信息
 func (r *Retry) GetCaller() string {
-	return syncx.WithLockReturnValue(&r.mu, func() string {
+	return syncx.WithRLockReturnValue(&r.mu, func() string {
 		return r.caller
 	})
 }
@@ -261,26 +261,128 @@ func (r *Retry) GetContext() context.Context {
 	})
 }
 
+// callerSkip Do 入口推断调用者时要跳过的栈帧数
+//
+// 这个数字必须由测试钉住，不能靠推算：它取决于 Do 到 runtime.Caller 之间的
+// 调用层数，任何在中间增删一层函数的重构都会让它失准
+// 当前链路为 Do → syncx.WithLockReturnValue → 闭包 → osx.GetRuntimeCaller
+// → (*RunTimeCaller).init → runtime.Caller
+//
+// 栈帧数错了不会报错，只会把调用者记成本包自己的内部函数——
+// 错误回调里打出来的 caller 从此指向错误的地方，而没人会立刻发现
+// TestDo_CallerPointsAtCallSite 断言它指向真实调用点
+//
+// [EN] This number must be pinned by a test rather than reasoned about: it
+// depends on how many frames sit between Do and runtime.Caller, so any
+// refactor that adds or removes a layer invalidates it. A wrong count fails
+// silently, recording one of this package's own internals as the caller
+const callerSkip = 5
+
+// retrierConfig Do 开始时对配置的一次快照
+//
+// 重试循环只读这份快照，不再回头碰 Retry：中途改配置不会让同一次 Do
+// 的前后几次尝试用上不同的参数
+type retrierConfig struct {
+	ctx               context.Context
+	caller            string
+	attemptCount      int
+	interval          time.Duration
+	maxInterval       time.Duration
+	backoffMultiplier float64
+	jitter            bool
+	jitterPercent     float64
+	errCallFun        ErrCallbackFunc
+	successCallFun    SuccessCallbackFunc
+	conditionFunc     func(error) bool
+}
+
 // Do 为 Retry 结构体定义执行函数，执行指定函数 f
+//
+// 锁只用来快照配置，重试循环、被重试的函数与每次退避 sleep 都在锁外执行
+//
+// 原先整个 Do 包在写锁里，带来三个问题：
+//  1. 被重试的函数在持锁状态下运行，而 sync.Mutex 不可重入——函数里只要读一下
+//     自己的 Retry（打日志时读 attemptCount 这种很自然的写法）就直接死锁
+//  2. 锁跨越每次退避 sleep，并发的 Get* 要等整个重试窗口，带退避可达数秒
+//  3. 同一个 Retry 上的两次 Do 完全串行，第二次要等第一次把重试全跑完
+//
+// [EN] The lock now only snapshots the configuration; the retry loop, the
+// retried function and every backoff sleep run outside it. Wrapping all of Do in
+// the write lock caused three problems: the retried function ran while holding a
+// non-reentrant mutex, so reading its own Retry (as one naturally does when
+// logging attemptCount) deadlocked outright; the lock spanned every backoff
+// sleep, blocking concurrent Get* for the whole retry window; and two Do calls
+// on one Retry serialised completely
 func (r *Retry) Do(fn DoFun) (err error) {
-	return syncx.WithLockReturnValue(&r.mu, func() error {
-		r.caller = mathx.IfDo(r.caller == "", func() string {
-			caller := osx.GetRuntimeCaller(7)
-			defer caller.Release()
-			return caller.String()
-		}, r.caller)
+	cfg := syncx.WithLockReturnValue(&r.mu, func() retrierConfig {
+		if r.caller == "" {
+			caller := osx.GetRuntimeCaller(callerSkip)
+			r.caller = caller.String()
+			caller.Release()
+		}
 		// 确保尝试次数为正数
 		r.attemptCount = mathx.IF(r.attemptCount < 1, 1, r.attemptCount)
 		// 默认抖动百分比 20%
 		jitterPercent := mathx.IF(r.jitterPercent == 0 && r.jitter, 0.2, r.jitterPercent)
-		return doRetryWithCondition(r.ctx, r.attemptCount, r.interval, r.maxInterval, r.backoffMultiplier, r.jitter, jitterPercent, fn, r.errCallFun, r.successCallFun, r.conditionFunc, r.caller)
+		return retrierConfig{
+			ctx:               r.ctx,
+			caller:            r.caller,
+			attemptCount:      r.attemptCount,
+			interval:          r.interval,
+			maxInterval:       r.maxInterval,
+			backoffMultiplier: r.backoffMultiplier,
+			jitter:            r.jitter,
+			jitterPercent:     jitterPercent,
+			errCallFun:        r.errCallFun,
+			successCallFun:    r.successCallFun,
+			conditionFunc:     r.conditionFunc,
+		}
 	})
+
+	return doRetryWithCondition(cfg.ctx, cfg.attemptCount, cfg.interval, cfg.maxInterval,
+		cfg.backoffMultiplier, cfg.jitter, cfg.jitterPercent, fn,
+		cfg.errCallFun, cfg.successCallFun, cfg.conditionFunc, cfg.caller)
+}
+
+// 这里用写锁而不是「稳态走读锁」的快路，是量过之后的选择
+//
+// 规范化只有首次 Do 需要，看起来之后每次都只是读，适合读锁试过之后反而更慢：
+// 无争用时 RWMutex 的 RLock 比 Lock 更贵，而并发的瓶颈本来就是 readerCount
+// 的缓存行弹跳，换读锁避不开既然买不到东西，就不留那层复杂度，
+// 也不留一条「多一帧」的栈帧风险
+//
+// [EN] The write lock is a measured choice, not an oversight. Normalisation is
+// only needed on the first Do, so a read-locked fast path looks right; it was
+// tried and came out slower. An uncontended RWMutex RLock costs more than Lock,
+// and the parallel bottleneck is cache-line bouncing on readerCount, which a
+// read lock does not avoid. Buying nothing, the complexity is not kept
+
+// attemptOnce 执行一次尝试，并把 panic 转成这一次的错误
+//
+// 原先 defer syncx.RecoverToError(&err, nil) 直接写在重试循环体内defer 注册在**函数**上
+// 而不是每轮迭代上，于是 panic 会一路退出 doRetryWithCondition——
+// AttemptCount(3) 下第一次 panic 就收工，剩下两次根本没跑
+//
+// 而 panic 本来已经被吞成 error 返回给调用方了，等于「既不让你看见 panic，
+// 也不替你重试」，两边的好处都没拿到defer 写在循环里说明本意就是每次尝试
+// 各兜一次，这里用一层函数把它落实
+//
+// [EN] The recover used to be deferred inside the retry loop body, but defer
+// registers on the function rather than the iteration, so a panic unwound all of
+// doRetryWithCondition: with AttemptCount(3) the first panic ended the run and
+// the remaining two attempts never happened. The panic was already being
+// swallowed into a returned error, so the caller neither saw the panic nor got
+// the retry — the worst of both. Placing the recover inside its own function
+// makes the loop's evident intent actually hold
+func attemptOnce(fn DoFun) (err error) {
+	defer syncx.RecoverToError(&err, nil)
+	return fn()
 }
 
 // doRetryWithCondition 内部函数，定义了重试操作，执行指定次数的尝试
-func doRetryWithCondition(ctx context.Context, attemptCount int, interval, maxInterval time.Duration, backoffMultiplier float64, jitter bool, jitterPercent float64, fn DoFun, errCallFun ErrCallbackFunc, successCallFun SuccessCallbackFunc, conditionFunc func(error) bool, funcName ...string) (err error) {
+func doRetryWithCondition(ctx context.Context, attemptCount int, interval, maxInterval time.Duration, backoffMultiplier float64, jitter bool, jitterPercent float64, fn DoFun, errCallFun ErrCallbackFunc, successCallFun SuccessCallbackFunc, conditionFunc func(error) bool, caller string) (err error) {
 	var (
-		fName           = mathx.IF(len(funcName) > 0, funcName[0], "") // 获取函数名称
+		fName           = caller // 调用者名称
 		nowAttemptCount int
 		currentInterval = interval // 当前重试间隔
 	)
@@ -292,10 +394,7 @@ func doRetryWithCondition(ctx context.Context, attemptCount int, interval, maxIn
 		case <-ctx.Done():
 			return ctx.Err() // 如果上下文被取消，返回错误
 		default:
-			// 捕获 panic（使用 syncx 封装）
-			defer syncx.RecoverToError(&err, nil)
-
-			if err = fn(); err == nil { // 执行传入的函数
+			if err = attemptOnce(fn); err == nil { // 执行传入的函数
 				if successCallFun != nil {
 					successCallFun(fName) // 调用成功回调函数
 				}
@@ -309,6 +408,20 @@ func doRetryWithCondition(ctx context.Context, attemptCount int, interval, maxIn
 
 			if errCallFun != nil {
 				errCallFun(nowAttemptCount, attemptCount-nowAttemptCount, err, fName) // 调用错误回调函数
+			}
+
+			// 最后一次尝试失败后不再等待
+			//
+			// 原先每次失败都睡，包括最后一次：后面已经没有「下一次」可等了，
+			// 那一觉纯粹让调用方晚拿到错误，最多晚一个 maxInterval，
+			// 上限设得大时尤其明显
+			//
+			// [EN] No wait after the final attempt. Every failure used to sleep,
+			// the last one included, but there is no next attempt to wait for:
+			// that sleep only delays the caller's error by up to one
+			// maxInterval, which is most visible when the cap is set high
+			if nowAttemptCount >= attemptCount {
+				return err
 			}
 
 			// 等待指定的间隔时间

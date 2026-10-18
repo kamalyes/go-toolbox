@@ -3,8 +3,8 @@
  * @Date: 2025-02-28 00:00:00
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2026-05-13 22:56:07
- * @FilePath: \go-toolbox\pkg\serializer\json_test.go
- * @Description: 对象解析和转换工具
+ * @FilePath: \go-toolbox\pkg\safe\struct_tags.go
+ * @Description: 结构体 tag 解析与字段别名归一化
  *
  * Copyright (c) 2025 by kamalyes, All Rights Reserved.
  */

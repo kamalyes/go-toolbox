@@ -315,7 +315,7 @@ func SafeLCM(a, b int64) (int64, error) {
 
 	gcd := SafeGCD(a, b)
 	if gcd == 0 {
-		return 0, errors.New("invalid GCD result")
+		return 0, errors.New("invalid SafeGCD result")
 	}
 
 	// 防止溢出
@@ -408,13 +408,26 @@ func SafeAverage(numbers []int64) (float64, error) {
 	}
 
 	var sum int64 = 0
-	for _, num := range numbers {
+	for i, num := range numbers {
 		newSum, err := SafeAdd(sum, num)
 		if err != nil {
-			// 如果溢出，使用浮点数计算
+			// 溢出后改用浮点累加，从当前下标接着算
+			//
+			// 原实现这里写的是 indexOf(numbers, num)，找的是该**值**首次出现的
+			// 位置而不是当前下标：当溢出的那个值在前面出现过，floatSum 里已经
+			// 累加过的前缀会被再加一遍
+			// 例如 SafeAverage([]int64{H, H})（H 为 MaxInt64/2+1000）会返回 1.5H
+			// 而正确答案是 H——50% 的误差，且不报错
+			//
+			// [EN] Switch to float accumulation and continue from the current
+			// index. The original used indexOf(numbers, num), the first index of
+			// that *value* rather than the current one: when the overflowing
+			// value also appears earlier, the prefix already in floatSum is
+			// added a second time. SafeAverage([]int64{H, H}) with H =
+			// MaxInt64/2+1000 returned 1.5H instead of H — a 50% error, silently
 			floatSum := float64(sum)
-			for i := indexOf(numbers, num); i < len(numbers); i++ {
-				floatSum += float64(numbers[i])
+			for j := i; j < len(numbers); j++ {
+				floatSum += float64(numbers[j])
 			}
 			return floatSum / float64(len(numbers)), nil
 		}
@@ -422,16 +435,6 @@ func SafeAverage(numbers []int64) (float64, error) {
 	}
 
 	return float64(sum) / float64(len(numbers)), nil
-}
-
-// indexOf 辅助函数：查找元素在切片中的索引
-func indexOf(slice []int64, item int64) int {
-	for i, v := range slice {
-		if v == item {
-			return i
-		}
-	}
-	return -1
 }
 
 // SafeMax 安全获取最大值

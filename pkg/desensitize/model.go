@@ -2,7 +2,7 @@
  * @Author: kamalyes 501893067@qq.com
  * @Date: 2023-07-28 00:50:58
  * @LastEditors: kamalyes 501893067@qq.com
- * @LastEditTime: 2024-12-19 08:15:19
+ * @LastEditTime: 2025-12-23 11:52:30
  * @FilePath: \go-toolbox\pkg\desensitize\model.go
  * @Description:
  *

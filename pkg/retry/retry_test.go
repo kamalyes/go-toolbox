@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // 测试尝试次数
@@ -851,4 +852,157 @@ func TestRetryContextTimeoutDuringExecution(t *testing.T) {
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
 	// 不应该完成所有10次尝试
 	assert.True(t, atomic.LoadInt32(&counter) < 10)
+}
+
+// TestDo_CallerPointsAtCallSite 自动推断的 caller 必须指向真实调用点
+//
+// callerSkip 这个栈帧数错了不会报错，只会把调用者记成库自己的内部函数，
+// 错误回调里打出来的位置从此指向错误的地方，而没人会立刻发现
+// 任何改动 Do 到 runtime.Caller 之间调用层数的重构都会让这条变红
+func TestDo_CallerPointsAtCallSite(t *testing.T) {
+	r := NewRetry().SetAttemptCount(1).SetInterval(time.Millisecond)
+	_ = r.Do(func() error { return errors.New("boom") })
+
+	caller := r.GetCaller()
+	assert.Contains(t, caller, "TestDo_CallerPointsAtCallSite",
+		"应指向调用 Do 的测试函数，实际为 %q", caller)
+	assert.Contains(t, caller, "retry_test.go", "应指向调用点所在文件")
+	assert.NotContains(t, caller, "inlined.go", "不应指向库自己的内部实现")
+}
+
+// TestDo_RetriedFuncMayTouchItsOwnRetrier 被重试的函数可以读自己的 Retry
+//
+// 原先 Do 整个包在写锁里，被重试的函数在持锁状态下运行，而 sync.Mutex 不可重入：
+// 函数里只要读一下 attemptCount（打日志时很自然的写法）就直接死锁
+// 这条用超时兜底，死锁时会以超时失败而不是把整个测试进程挂住
+func TestDo_RetriedFuncMayTouchItsOwnRetrier(t *testing.T) {
+	done := make(chan error, 1)
+	go func() {
+		r := NewRetry().SetAttemptCount(2).SetInterval(time.Millisecond)
+		done <- r.Do(func() error {
+			_ = r.GetAttemptCount()
+			_ = r.GetCaller()
+			_ = r.GetInterval()
+			return errors.New("boom")
+		})
+	}()
+
+	select {
+	case err := <-done:
+		assert.Error(t, err, "两次尝试都失败应返回错误")
+	case <-time.After(3 * time.Second):
+		t.Fatal("死锁：被重试的函数读自己的 Retry 时卡住")
+	}
+}
+
+// TestDo_ConcurrentDoOnSameRetrierDoesNotSerialize 同一个 Retry 上的并发 Do 不应互相等待
+//
+// 锁跨越退避 sleep 时，第二次 Do 要等第一次把整个重试窗口跑完
+func TestDo_ConcurrentDoOnSameRetrierDoesNotSerialize(t *testing.T) {
+	r := NewRetry().SetAttemptCount(3).SetInterval(80 * time.Millisecond)
+
+	start := time.Now()
+	var wg sync.WaitGroup
+	for i := 0; i < 3; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = r.Do(func() error { return errors.New("boom") })
+		}()
+	}
+	wg.Wait()
+	elapsed := time.Since(start)
+
+	// 单次重试窗口约 2 次间隔 = 160ms串行化会变成三倍（约 480ms）
+	assert.Less(t, elapsed, 400*time.Millisecond,
+		"三个并发 Do 耗时 %v，接近串行化的三倍说明锁仍跨越了退避", elapsed)
+}
+
+// TestDo_PanicIsRetriedPerAttempt panic 按「这一次尝试失败」处理，并继续重试
+//
+// 原先 defer syncx.RecoverToError(&err, nil) 写在重试循环体内，而 defer 注册在函数上
+// 不是迭代上，于是第一次 panic 就把整个 doRetryWithCondition 退掉：
+// AttemptCount(3) 实际只跑了一次
+func TestDo_PanicIsRetriedPerAttempt(t *testing.T) {
+	attempts := 0
+	r := NewRetry().SetAttemptCount(3).SetInterval(time.Millisecond)
+	err := r.Do(func() error {
+		attempts++
+		if attempts == 1 {
+			panic("boom on first attempt")
+		}
+		return nil
+	})
+
+	assert.NoError(t, err, "第二次尝试成功，整体应成功")
+	assert.Equal(t, 2, attempts, "第一次 panic 后应继续重试，而不是直接收工")
+}
+
+// TestDo_AllAttemptsPanic 每次都 panic 时跑完全部次数并返回最后一次的错误
+func TestDo_AllAttemptsPanic(t *testing.T) {
+	attempts := 0
+	r := NewRetry().SetAttemptCount(3).SetInterval(time.Millisecond)
+	err := r.Do(func() error {
+		attempts++
+		panic(errors.New("always boom"))
+	})
+
+	require.Error(t, err)
+	assert.Equal(t, "always boom", err.Error(), "error 型 panic 值应原样返回")
+	assert.Equal(t, 3, attempts, "应跑满 AttemptCount 次")
+}
+
+// TestDo_NonErrorPanicBecomesError 非 error 的 panic 值被包成 error
+func TestDo_NonErrorPanicBecomesError(t *testing.T) {
+	r := NewRetry().SetAttemptCount(1).SetInterval(time.Millisecond)
+
+	err := r.Do(func() error { panic("string panic") })
+	require.Error(t, err)
+	assert.Equal(t, "string panic", err.Error())
+
+	err = r.Do(func() error { panic(42) })
+	require.Error(t, err)
+	assert.Equal(t, "panic occurred", err.Error(), "既非 error 也非 string 时给固定文案")
+}
+
+// TestDo_PanicDoesNotEscapeToCaller panic 不得穿透到调用方
+//
+// 这是这个库最该守住的一条：重试器的意义就是把失败挡在里面
+func TestDo_PanicDoesNotEscapeToCaller(t *testing.T) {
+	r := NewRetry().SetAttemptCount(2).SetInterval(time.Millisecond)
+	assert.NotPanics(t, func() {
+		_ = r.Do(func() error { panic("must not escape") })
+	})
+}
+
+// TestDo_NoWaitAfterFinalAttempt 最后一次尝试失败后不再等待
+//
+// 原先每次失败都睡，包括最后一次：调用方拿到错误要晚一个间隔，
+// 上限设得大时这段纯等待很可观
+func TestDo_NoWaitAfterFinalAttempt(t *testing.T) {
+	const interval = 120 * time.Millisecond
+
+	start := time.Now()
+	attempts := 0
+	err := NewRetry().SetAttemptCount(2).SetInterval(interval).
+		Do(func() error { attempts++; return errors.New("boom") })
+	elapsed := time.Since(start)
+
+	require.Error(t, err)
+	assert.Equal(t, 2, attempts)
+	// 两次尝试之间睡一次 = 120ms若最后一次也睡则是 240ms
+	assert.Less(t, elapsed, 2*interval,
+		"耗时 %v 接近两个间隔，说明最后一次失败后仍在等待", elapsed)
+	assert.GreaterOrEqual(t, elapsed, interval, "两次尝试之间仍应等待一个间隔")
+}
+
+// TestDo_SingleAttemptDoesNotWait 只尝试一次时完全不等待
+func TestDo_SingleAttemptDoesNotWait(t *testing.T) {
+	start := time.Now()
+	err := NewRetry().SetAttemptCount(1).SetInterval(300 * time.Millisecond).
+		Do(func() error { return errors.New("boom") })
+
+	require.Error(t, err)
+	assert.Less(t, time.Since(start), 100*time.Millisecond,
+		"只有一次尝试，没有「下一次」可等")
 }

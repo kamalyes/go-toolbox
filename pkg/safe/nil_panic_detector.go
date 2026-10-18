@@ -280,7 +280,7 @@ func (d *NilPanicDetector) GenerateReport() string {
 // GetFixSuggestions 获取修复建议
 func (d *NilPanicDetector) GetFixSuggestions() []string {
 	suggestions := []string{
-		"1. 使用 goconfig.Safe() 进行安全访问",
+		"1. 使用 goconfig.New() 进行安全访问",
 		"2. 使用 goconfig.SafeConfig() 进行配置专用安全访问",
 		"3. 在指针解引用前添加 nil 检查",
 		"4. 使用 v, ok := m[key] 形式进行map访问",

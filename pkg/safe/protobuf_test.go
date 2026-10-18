@@ -96,20 +96,27 @@ func TestPtrKV(t *testing.T) {
 	assert.Equal(t, KV[string, int]{}, PtrKV[string, int](nil))
 }
 
-func TestPtrToBytes(t *testing.T) {
-	bytes := []byte{1, 2, 3}
-	result := PtrToBytes(&bytes)
-	assert.NotNil(t, result)
-	assert.Equal(t, bytes, *result)
+// ——— 恶意输入审计：本库的承诺是「不崩」，任何 panic 都是缺陷 ———
 
-	assert.Nil(t, PtrToBytes(nil))
-}
-
-func TestPtrKVToSafe(t *testing.T) {
-	kv := KV[string, int]{"key": 1}
-	result := PtrKVToSafe(&kv) // 显式指定类型参数
-	assert.NotNil(t, result)
-	assert.Equal(t, kv, *result)
-
-	assert.Nil(t, PtrKVToSafe[string, int](nil)) // 显式指定类型参数
+func TestAudit_NoPanicOnPtrHelpers(t *testing.T) {
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("panic: ptr helpers -> %v", r)
+			}
+		}()
+		_ = StringPtr(nil)
+		_ = IntPtr(nil)
+		_ = BoolPtr(nil)
+		_ = Float32Ptr(nil)
+		_ = Float64Ptr(nil)
+		_ = UintPtr(nil)
+		_ = Int32Ptr(nil)
+		_ = Int64Ptr(nil)
+		_ = DurationPtr(nil)
+		_ = BytesPtr(nil)
+		_ = SlicePtr[int](nil)
+		_ = PtrKV[string, int](nil)
+		_ = Ptr[int, string](nil, func(i int) string { return "x" })
+	}()
 }

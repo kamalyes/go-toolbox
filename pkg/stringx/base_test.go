@@ -12,7 +12,9 @@ package stringx
 
 import (
 	"fmt"
+	"strings"
 	"testing"
+	"unicode"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -266,4 +268,112 @@ func TestNormalizeDirectionEdgeCases(t *testing.T) {
 		result := NormalizeSQLDirection("", "DESC")
 		assert.Equal(t, "DESC", result)
 	})
+}
+
+// legacyToPascalCase 单遍改写之前的实现，仅供差分比对
+func legacyToPascalCase(s string) string {
+	if s == "" {
+		return s
+	}
+	if strings.ContainsAny(s, "_- ") {
+		normalized := strings.ReplaceAll(strings.ReplaceAll(s, "-", "_"), " ", "_")
+		parts := strings.Split(normalized, "_")
+		var builder strings.Builder
+		for _, part := range parts {
+			if len(part) > 0 {
+				builder.WriteRune(unicode.ToUpper(rune(part[0])))
+				if len(part) > 1 {
+					builder.WriteString(strings.ToLower(part[1:]))
+				}
+			}
+		}
+		return builder.String()
+	}
+	if unicode.IsLower(rune(s[0])) {
+		return string(unicode.ToUpper(rune(s[0]))) + s[1:]
+	}
+	return s
+}
+
+// TestToPascalCase_MatchesLegacy 单遍实现与原 ReplaceAll+Split 实现结果必须一致
+//
+// 分隔符处理最容易走形：连续分隔符、首尾分隔符，以及按字节取首字符这件事
+// 任一处偏差都会让按变体查找的调用方少一条命中路径，而那是静默失败
+func TestToPascalCase_MatchesLegacy(t *testing.T) {
+	inputs := []string{
+		"", "a", "A", "_", "-", " ", "__", "--", "  ", "_-", "- ",
+		"a_b", "a-b", "a b", "A_B", "a__b", "a--b", "a  b", "a_-b", "a -b",
+		"_a", "a_", "_a_", "-a-", " a ", "__a__",
+		"user_name", "user-name", "user name", "USER_NAME", "User-Name",
+		"userName", "UserName", "URLPath", "HTTP_server", "id_1", "x_1_y",
+		"中文_字段", "_中文", "中文 name", "ab_CD_ef", "a_B_c",
+	}
+	for _, in := range inputs {
+		assert.Equal(t, legacyToPascalCase(in), ToPascalCase(in),
+			"输入 %q 的 PascalCase 结果与原实现不一致", in)
+	}
+}
+
+// legacyNormalizeFieldName 去重修正之前的实现，仅供差分比对
+func legacyNormalizeFieldName(fieldName string) []string {
+	if fieldName == "" {
+		return []string{}
+	}
+	variants := make([]string, 0, 5)
+	variants = append(variants, fieldName)
+	pascalCase := ToPascalCase(fieldName)
+	if pascalCase != fieldName {
+		variants = append(variants, pascalCase)
+	}
+	camelCase := ToCamelCase(fieldName)
+	if camelCase != fieldName && camelCase != pascalCase {
+		variants = append(variants, camelCase)
+	}
+	snakeCase := ToSnakeCase(fieldName)
+	if snakeCase != fieldName {
+		variants = append(variants, snakeCase)
+	}
+	kebabCase := ToKebabCase(fieldName)
+	if kebabCase != fieldName && kebabCase != snakeCase {
+		variants = append(variants, kebabCase)
+	}
+	return variants
+}
+
+// TestNormalizeFieldName_MatchesLegacyAfterDedup 新实现等于原实现去重后的结果
+//
+// 少一个变体就是少一条命中路径，而那种失败是静默的，所以逐个输入比对
+func TestNormalizeFieldName_MatchesLegacyAfterDedup(t *testing.T) {
+	dedup := func(in []string) []string {
+		out := make([]string, 0, len(in))
+		for _, v := range in {
+			dup := false
+			for _, u := range out {
+				if u == v {
+					dup = true
+					break
+				}
+			}
+			if !dup {
+				out = append(out, v)
+			}
+		}
+		return out
+	}
+
+	inputs := []string{
+		"", "a", "A", "_", "-", " ", "__", "ab", "AB", "aB", "Ab",
+		"userName", "UserName", "user_name", "user-name", "USER_NAME",
+		"user name", "User Name", "userNAME", "URLPath", "HTTPServer",
+		"id", "ID", "iD", "x1", "X1", "a_b-c d", "trailing_", "_leading",
+		"中文字段", "mixed中文Name", "a__b", "a--b", "a  b",
+	}
+	for _, in := range inputs {
+		assert.Equal(t, dedup(legacyNormalizeFieldName(in)), NormalizeFieldName(in),
+			"输入 %q 的变体列表与原实现（去重后）不一致", in)
+	}
+
+	// "X1" 原实现本有重复项，现应被去掉
+	assert.Equal(t, []string{"X1", "x1"}, NormalizeFieldName("X1"))
+	assert.Len(t, legacyNormalizeFieldName("X1"), 3, "原实现确实多一个重复项")
 }

@@ -13,12 +13,13 @@ package safe
 
 import (
 	"fmt"
-	"github.com/kamalyes/go-toolbox/pkg/convert"
-	"github.com/kamalyes/go-toolbox/pkg/stringx"
-	"github.com/kamalyes/go-toolbox/pkg/types"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/kamalyes/go-toolbox/pkg/convert"
+	"github.com/kamalyes/go-toolbox/pkg/stringx"
+	"github.com/kamalyes/go-toolbox/pkg/types"
 )
 
 type SafeAccess struct {
@@ -26,7 +27,7 @@ type SafeAccess struct {
 	valid bool
 }
 
-// Safe 创建安全访问装饰器
+// New 创建安全访问装饰器
 func Safe(v interface{}) *SafeAccess {
 	return &SafeAccess{
 		value: v,
@@ -34,64 +35,92 @@ func Safe(v interface{}) *SafeAccess {
 	}
 }
 
+// invalidAccess 所有「取不到」路径共用的实例
+//
+// SafeAccess 构造后不再被改写（只有读方法），因此同一个实例可以被任意多条链共享，
+// 省掉每次未命中的一次分配——而未命中在 nil 链路上恰恰是最常走的路
+//
+// [EN] Shared by every "not found" path. An SafeAccess is never written to after
+// construction (its methods only read), so one instance can be shared by any
+// number of chains, saving an allocation on each miss — and a miss is exactly
+// what a nil chain hits most
+var invalidAccess = &SafeAccess{valid: false}
+
 // Field 安全访问字段，支持链式调用
 // 支持多种命名风格：camelCase, PascalCase, snake_case, kebab-case
+//
+// 先按调用方给的原名直取，未命中才去算命名风格变体：
+// 原名命中是最常见的情形，而算变体要做四次字符串转换并各分配一次，
+// 让命中路径免掉这笔开销比优化未命中路径划算得多
+//
+// [EN] The caller's own spelling is tried first and the naming-style variants
+// are only computed on a miss. Hitting on the given name is the common case,
+// while building variants means four string conversions with an allocation
+// each, so sparing the hit path that cost matters more than tuning the miss path
 func (s *SafeAccess) Field(fieldName string) *SafeAccess {
 	if !s.valid || s.value == nil {
-		return &SafeAccess{valid: false}
+		return invalidAccess
 	}
 
 	// 首先检查是否是 map[string]interface{}
 	if m, ok := s.value.(map[string]interface{}); ok {
-		// 尝试所有可能的字段名变体
-		variants := stringx.NormalizeFieldName(fieldName)
-		for _, variant := range variants {
-			if value, exists := m[variant]; exists && value != nil {
-				return &SafeAccess{
-					value: value,
-					valid: true,
-				}
+		if value, exists := m[fieldName]; exists && value != nil {
+			return &SafeAccess{value: value, valid: true}
+		}
+		var buf [stringx.MaxFieldNameVariants]string
+		variants := stringx.AppendFieldNameVariants(buf[:0], fieldName)
+		// 从下标 1 起：variants[0] 是原名，上面已经试过
+		// 字段名为空时变体列表为空，用下标循环而不是 variants[1:]，后者会越界
+		for i := 1; i < len(variants); i++ {
+			if value, exists := m[variants[i]]; exists && value != nil {
+				return &SafeAccess{value: value, valid: true}
 			}
 		}
-		return &SafeAccess{valid: false}
+		return invalidAccess
 	}
 
 	rv := reflect.ValueOf(s.value)
 	if rv.Kind() == reflect.Ptr {
 		if rv.IsNil() {
-			return &SafeAccess{valid: false}
+			return invalidAccess
 		}
 		rv = rv.Elem()
 	}
 
 	if rv.Kind() != reflect.Struct {
-		return &SafeAccess{valid: false}
+		return invalidAccess
 	}
 
-	// 尝试所有可能的字段名变体
-	variants := stringx.NormalizeFieldName(fieldName)
-	for _, variant := range variants {
-		field := rv.FieldByName(variant)
-		if field.IsValid() && field.CanInterface() {
-			// 如果是指针类型且为nil
-			if field.Kind() == reflect.Ptr && field.IsNil() {
-				return &SafeAccess{valid: false}
-			}
-
-			// 如果是指针类型且不为nil，解引用获取实际值
-			fieldValue := field.Interface()
-			if field.Kind() == reflect.Ptr && !field.IsNil() {
-				fieldValue = field.Elem().Interface()
-			}
-
-			return &SafeAccess{
-				value: fieldValue,
-				valid: true,
-			}
+	if got, ok := structField(rv, fieldName); ok {
+		return got
+	}
+	var buf [stringx.MaxFieldNameVariants]string
+	variants := stringx.AppendFieldNameVariants(buf[:0], fieldName)
+	for i := 1; i < len(variants); i++ {
+		if got, ok := structField(rv, variants[i]); ok {
+			return got
 		}
 	}
 
-	return &SafeAccess{valid: false}
+	return invalidAccess
+}
+
+// structField 按名字取结构体字段，取不到或不可读时 ok 为 false
+//
+// 指针字段为 nil 时视为取不到：继续往下链式取值只会得到零值，
+// 这正是本库要替调用方省掉的那一层 if
+func structField(rv reflect.Value, name string) (*SafeAccess, bool) {
+	field := rv.FieldByName(name)
+	if !field.IsValid() || !field.CanInterface() {
+		return nil, false
+	}
+	if field.Kind() == reflect.Ptr {
+		if field.IsNil() {
+			return invalidAccess, true
+		}
+		return &SafeAccess{value: field.Elem().Interface(), valid: true}, true
+	}
+	return &SafeAccess{value: field.Interface(), valid: true}, true
 }
 
 // Bool 获取布尔值，如果无效则返回默认值
@@ -329,7 +358,7 @@ func (s *SafeAccess) Map(fn func(interface{}) interface{}) *SafeAccess {
 // Filter 过滤值（类似JavaScript的filter）
 func (s *SafeAccess) Filter(predicate func(interface{}) bool) *SafeAccess {
 	if !s.valid || !predicate(s.value) {
-		return &SafeAccess{valid: false}
+		return invalidAccess
 	}
 	return s
 }
@@ -363,7 +392,7 @@ func SafeGetStringSlice(m map[string]interface{}, key string) []string {
 		if slice, ok := v.([]interface{}); ok {
 			result := make([]string, 0, len(slice))
 			for _, item := range slice {
-				// 使用convert.MustString进行类型转换
+				// 使用MustString进行类型转换
 				result = append(result, convert.MustString(item))
 			}
 			return result
@@ -390,7 +419,7 @@ func (s *SafeAccess) At(fieldPath string, defaultValue ...interface{}) *SafeAcce
 		if len(defaultValue) > 0 {
 			return Safe(defaultValue[0])
 		}
-		return &SafeAccess{valid: false}
+		return invalidAccess
 	}
 
 	// 支持路径访问，如 "Config.Database.Host"
@@ -644,7 +673,7 @@ func Map[T any, R any](s *SafeAccess, fn func(T) R) *SafeAccess {
 	if val, ok := s.value.(T); ok {
 		return Safe(fn(val))
 	}
-	return &SafeAccess{valid: false}
+	return invalidAccess
 }
 
 // FlatMap 扁平化映射
