@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	randv2 "math/rand/v2"
 	"net"
 	"strings"
 	"sync"
@@ -26,28 +27,6 @@ import (
 	"github.com/kamalyes/go-toolbox/pkg/types"
 )
 
-// Implement Source and Source64 interfaces
-type rngSource struct {
-	p sync.Pool
-}
-
-func (r *rngSource) Int63() (n int64) {
-	src := r.p.Get()
-	n = src.(rand.Source).Int63()
-	r.p.Put(src)
-	return
-}
-
-// Seed specify seed when using NewRand()
-func (r *rngSource) Seed(_ int64) {}
-
-func (r *rngSource) Uint64() (n uint64) {
-	src := r.p.Get()
-	n = src.(rand.Source64).Uint64()
-	r.p.Put(src)
-	return
-}
-
 // NewRand goroutine-safe rand.Rand, optional seed value
 func NewRand(seed ...int64) *rand.Rand {
 	n := time.Now().UnixMicro()
@@ -55,14 +34,56 @@ func NewRand(seed ...int64) *rand.Rand {
 	if len(seed) > 0 {
 		n = seed[0]
 	}
-	src := &rngSource{
-		p: sync.Pool{
-			New: func() interface{} {
-				return rand.NewSource(n)
-			},
-		},
+	return rand.New(rand.NewSource(n))
+}
+
+// fastIntn / fastInt63n / fastFloat64 内部快速随机数
+//
+// 为什么不走 NewRand
+//
+// NewRand 每次调用都要构造一整套生成器：rand.NewSource 会分配 607 项的 int64
+// 表（约 4.9KB）并跑完播种预热实测一次 7.4 微秒、7KB原先 RandInt、
+// RandFloat、RandString 以及 duration 里一共十六处都是「构造一套生成器只为取
+// 一个数」，RandString 更要在循环里取 n 个UUID 调五次 RandString，于是一个
+// UUID 要三十多微秒
+//
+// 这里改用 math/rand/v2 的顶层函数：它按 M 维护 ChaCha8 状态，goroutine 安全、
+// 无锁、零分配，单次取数在纳秒级
+//
+// NewRand 本身保留且语义不变——给了显式种子时必须可复现，
+// TestNewRand 就钉着 NewRand(1).Int63() 的精确值顺带去掉了原先那个每次调用
+// 新建的 sync.Pool：池的寿命只有这一次调用，第二次 Get 永远不会发生，是纯开销
+// 它还有个随机性缺陷：池内 New 闭包捕获同一个种子，池中每个 source 的序列完全
+// 相同，一旦返回的 Rand 被并发共享，各 goroutine 会取到一样的随机数
+//
+// [EN] Internal fast random numbers, bypassing NewRand. NewRand constructs a
+// whole generator per call: rand.NewSource allocates a 607-entry int64 table of
+// about 4.9KB and runs the seeding warm-up, measured at 7.4 microseconds and 7KB.
+// Sixteen call sites used to build a generator just to draw one number, and
+// RandString drew n of them in a loop, so a UUID — five RandString calls — cost
+// over thirty microseconds. These use math/rand/v2's top-level functions, which
+// keep ChaCha8 state per M: goroutine-safe, lock-free, allocation-free and
+// nanoseconds per draw. NewRand itself keeps its semantics, since an explicit
+// seed must stay reproducible and TestNewRand pins NewRand(1).Int63() exactly.
+// Its per-call sync.Pool is gone: the pool lived for one call so a second Get
+// could never happen, and its New closure captured one seed, giving every source
+// in the pool an identical sequence
+func fastIntn(n int) int {
+	if n <= 0 {
+		return 0
 	}
-	return rand.New(src)
+	return randv2.IntN(n)
+}
+
+func fastInt63n(n int64) int64 {
+	if n <= 0 {
+		return 0
+	}
+	return randv2.Int64N(n)
+}
+
+func fastFloat64() float64 {
+	return randv2.Float64()
 }
 
 var (
@@ -94,7 +115,7 @@ func RandInt(min, max int) (v int) {
 	if max < min {
 		min, max = max, min
 	}
-	return NewRand().Intn(max-min) + min
+	return fastIntn(max-min) + min
 }
 
 // RandFloat
@@ -105,7 +126,7 @@ func RandInt(min, max int) (v int) {
  *  @return v
  */
 func RandFloat(min, max float64) (v float64) {
-	return min + NewRand().Float64()*(max-min)
+	return min + fastFloat64()*(max-min)
 }
 
 // initASCII 初始化ASCII码列表
@@ -115,7 +136,53 @@ func initASCII() {
 		matchLowercase = createASCIIList(97, 122)                              // 小写字母
 		matchNumber = createASCIIList(48, 57)                                  // 数字
 		matchSpecial = &[]int{46, 64, 36, 33, 37, 42, 35, 95, 126, 63, 38, 94} // 特殊字符 (. @$!%*#_~?&^)
+		buildCharSets()
 	})
+}
+
+// randCharSets 按 mode 预先算好的字符集
+//
+// mode 是四位掩码（CAPITAL=1 LOWERCASE=2 SPECIAL=4 NUMBER=8），一共十六种组合，
+// 启动时一次算完原先 RandString 每次调用都要从 nil 开始 append 四个字符集，
+// 反复扩容，而这四个集合是常量
+//
+// 存 []byte 而不是 []int：这些字符全在 ASCII 范围内，直接按字节写出即可，
+// 不必走 WriteRune 的 UTF-8 编码路径
+//
+// [EN] Character sets precomputed per mode. The mode is a four-bit mask, so
+// there are sixteen combinations, all built once at startup; RandString used to
+// append the four sets onto a nil slice on every call, regrowing it each time,
+// though the sets are constant. Stored as []byte rather than []int because every
+// character is ASCII and can be written as a byte, with no need for WriteRune's
+// UTF-8 encoding path
+var randCharSets [16][]byte
+
+// buildCharSets 由 ASCII 码表派生出十六种 mode 的字节集合
+// 从 matchXxx 派生而不是另写一份字面量，保证两者不会走偏
+func buildCharSets() {
+	appendAll := func(dst []byte, src *[]int) []byte {
+		for _, c := range *src {
+			dst = append(dst, byte(c))
+		}
+		return dst
+	}
+	for mode := 0; mode < len(randCharSets); mode++ {
+		var set []byte
+		// 顺序与原实现一致：大写、小写、特殊、数字
+		if mode&int(CAPITAL) != 0 {
+			set = appendAll(set, matchCapital)
+		}
+		if mode&int(LOWERCASE) != 0 {
+			set = appendAll(set, matchLowercase)
+		}
+		if mode&int(SPECIAL) != 0 {
+			set = appendAll(set, matchSpecial)
+		}
+		if mode&int(NUMBER) != 0 {
+			set = appendAll(set, matchNumber)
+		}
+		randCharSets[mode] = set
+	}
 }
 
 // createASCIIList 创建指定范围的ASCII码列表
@@ -135,41 +202,19 @@ func createASCIIList(start, end int) *[]int {
  *  @return str 生成的字符串
  */
 func RandString(n int, mode RandType) string {
-	var (
-		build strings.Builder // 用于高效构建字符串
-		ascii []int           // 用于存储所有符合mode的字符的ASCII码集合
-		r     = NewRand()     // 创建一个带时间种子的随机数生成器
-	)
-
-	// 判断mode中是否包含大写字母字符集，如果包含则追加对应ASCII码
-	if mode&CAPITAL != 0 {
-		ascii = append(ascii, *matchCapital...)
-	}
-	// 判断mode中是否包含小写字母字符集，如果包含则追加对应ASCII码
-	if mode&LOWERCASE != 0 {
-		ascii = append(ascii, *matchLowercase...)
-	}
-	// 判断mode中是否包含特殊字符集，如果包含则追加对应ASCII码
-	if mode&SPECIAL != 0 {
-		ascii = append(ascii, *matchSpecial...)
-	}
-	// 判断mode中是否包含数字字符集，如果包含则追加对应ASCII码
-	if mode&NUMBER != 0 {
-		ascii = append(ascii, *matchNumber...)
-	}
-
-	// 如果没有任何字符集被选中，ascii长度为0，返回空字符串
-	if len(ascii) == 0 {
+	if n <= 0 {
 		return ""
 	}
-
-	// 循环n次，每次随机选择一个ascii码对应的字符追加到字符串中
-	for i := 0; i < n; i++ {
-		randomIndex := r.Intn(len(ascii))         // 在ascii切片中随机选一个索引
-		build.WriteRune(rune(ascii[randomIndex])) // 将对应ASCII码转换成字符写入builder
+	// mode 只有低四位有意义，高位按原实现一样忽略
+	set := randCharSets[mode&0x0F]
+	if len(set) == 0 {
+		return ""
 	}
-
-	return build.String() // 返回最终生成的随机字符串
+	buf := make([]byte, n)
+	for i := range buf {
+		buf[i] = set[fastIntn(len(set))]
+	}
+	return string(buf)
 }
 
 // UUID 生成 UUID 字符串

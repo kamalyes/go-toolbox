@@ -35,7 +35,7 @@ func RandDuration(min, max time.Duration) time.Duration {
 		min, max = max, min
 	}
 	diff := max - min
-	return min + time.Duration(NewRand().Int63n(int64(diff)))
+	return min + time.Duration(fastInt63n(int64(diff)))
 }
 
 // RandTimeBetween 生成指定时间范围内的随机时间点
@@ -63,7 +63,7 @@ func RandTimeBetween(start, end time.Time) time.Time {
 		return start
 	}
 	diff := end.Sub(start)
-	randDuration := time.Duration(NewRand().Int63n(int64(diff)))
+	randDuration := time.Duration(fastInt63n(int64(diff)))
 	return start.Add(randDuration)
 }
 
@@ -138,7 +138,7 @@ func RandDate(startDate, endDate time.Time) time.Time {
 		return start
 	}
 
-	randDays := NewRand().Intn(days + 1)
+	randDays := fastIntn(days + 1)
 	return start.Add(time.Duration(randDays) * 24 * time.Hour)
 }
 
@@ -151,7 +151,7 @@ func RandDate(startDate, endDate time.Time) time.Time {
 //	weekday := random.RandWeekday()
 //	fmt.Println(weekday) // 输出: Monday, Tuesday, 等等
 func RandWeekday() time.Weekday {
-	return time.Weekday(NewRand().Intn(7))
+	return time.Weekday(fastIntn(7))
 }
 
 // RandMonth 生成随机的月份
@@ -163,7 +163,7 @@ func RandWeekday() time.Weekday {
 //	month := random.RandMonth()
 //	fmt.Println(month) // 输出: January, February, 等等
 func RandMonth() time.Month {
-	return time.Month(NewRand().Intn(12) + 1)
+	return time.Month(fastIntn(12) + 1)
 }
 
 // RandHour 生成随机的小时数（0-23）
@@ -175,7 +175,7 @@ func RandMonth() time.Month {
 //	hour := random.RandHour()
 //	fmt.Println(hour) // 输出: 0-23 之间的数字
 func RandHour() int {
-	return NewRand().Intn(24)
+	return fastIntn(24)
 }
 
 // RandMinute 生成随机的分钟数（0-59）
@@ -187,7 +187,7 @@ func RandHour() int {
 //	minute := random.RandMinute()
 //	fmt.Println(minute) // 输出: 0-59 之间的数字
 func RandMinute() int {
-	return NewRand().Intn(60)
+	return fastIntn(60)
 }
 
 // RandSecond 生成随机的秒数（0-59）
@@ -199,7 +199,7 @@ func RandMinute() int {
 //	second := random.RandSecond()
 //	fmt.Println(second) // 输出: 0-59 之间的数字
 func RandSecond() int {
-	return NewRand().Intn(60)
+	return fastIntn(60)
 }
 
 // RandTimeOfDay 生成当天的随机时间点
@@ -254,5 +254,5 @@ func RandUnixTimestamp(minTimestamp, maxTimestamp int64) int64 {
 		minTimestamp, maxTimestamp = maxTimestamp, minTimestamp
 	}
 	diff := maxTimestamp - minTimestamp
-	return minTimestamp + NewRand().Int63n(diff+1)
+	return minTimestamp + fastInt63n(diff+1)
 }

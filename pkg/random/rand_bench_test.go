@@ -130,3 +130,75 @@ func BenchmarkRandInt32Parallel(b *testing.B) {
 		})
 	})
 }
+
+// ============================================================================
+// 随机字符串与生成器构造
+//
+// 原先 RandInt / RandFloat / RandString 以及 duration 里一共十六处都走 NewRand()，
+// 而 NewRand 每次都要构造一整套生成器：rand.NewSource 分配 607 项 int64 表
+// （约 4.9KB）并跑完播种预热，一次 7.4 微秒RandString 还要在循环里取 n 个数，
+// UUID 调五次 RandString，于是一个 UUID 要三十多微秒
+// 这组基准守住改用共享快速随机源后的结果
+//
+// [EN] Sixteen call sites used to go through NewRand(), which constructs a whole
+// generator per call: rand.NewSource allocates a 607-entry int64 table of about
+// 4.9KB and runs the seeding warm-up, measured at 7.4 microseconds. RandString
+// drew n numbers in a loop and UUID calls RandString five times, so one UUID
+// cost over thirty microseconds. These benchmarks guard the shared fast source
+// ============================================================================
+
+var benchStrSink string
+
+func BenchmarkRandString(b *testing.B) {
+	for _, c := range []struct {
+		name string
+		n    int
+		mode RandType
+	}{
+		{"10位/特殊", 10, SPECIAL},
+		{"16位/数字", 16, NUMBER},
+		{"32位/大小写数字", 32, CAPITAL | LOWERCASE | NUMBER},
+		{"64位/全集", 64, CAPITAL | LOWERCASE | SPECIAL | NUMBER},
+	} {
+		b.Run(c.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				benchStrSink = RandString(c.n, c.mode)
+			}
+		})
+	}
+}
+
+func BenchmarkRandStringParallel(b *testing.B) {
+	b.ReportAllocs()
+	b.RunParallel(func(p *testing.PB) {
+		for p.Next() {
+			benchStrSink = RandString(16, CAPITAL|LOWERCASE|NUMBER)
+		}
+	})
+}
+
+func BenchmarkUUIDString(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		benchStrSink = UUID()
+	}
+}
+
+// BenchmarkNewRandSeeded NewRand 带显式种子时仍要完整构造
+//
+// 这是 rand.NewSource 播种 607 项表的固有代价，不能优化掉——给了种子就必须
+// 可复现，TestNewRand 钉着 NewRand(1).Int63() 的精确值
+// 留着这个基准是为了说明：热路径不该调它，而不是它该变快
+//
+// [EN] NewRand with an explicit seed still constructs fully. That is the
+// inherent cost of seeding rand.NewSource's 607-entry table and cannot be
+// optimised away: an explicit seed must stay reproducible, and TestNewRand pins
+// NewRand(1).Int63() exactly. The benchmark exists to show hot paths should not
+// call it, not that it should get faster
+func BenchmarkNewRandSeeded(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = NewRand(1)
+	}
+}

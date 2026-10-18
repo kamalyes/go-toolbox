@@ -12,6 +12,8 @@ package osx
 
 import (
 	"os"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -438,4 +440,171 @@ func TestGetDatacenterId_Consistency(t *testing.T) {
 
 	assert.Equal(t, id1, id2)
 	assert.Equal(t, id2, id3)
+}
+
+// ============================================================================
+// 调用栈信息：skip 语义与分配
+// ============================================================================
+
+// TestRuntimeCallerSkipMapping 钉住 skip 各取值归属到哪一层
+//
+// init 内部由 runtime.Caller 换成了 runtime.Callers，而 runtime.Callers 的第 0 帧
+// 是它自己，两者的 skip 相差一这个差一错不会报任何错，只会把调用点静默指偏，
+// 下游（如 retry 的 callerSkip）全靠这个映射对齐，所以必须钉住
+//
+// [EN] Pins which frame each skip value lands on. init switched from
+// runtime.Caller to runtime.Callers, whose frame 0 is itself, so the two skip
+// values differ by one. That off-by-one raises no error and merely misreports
+// the call site silently, and downstreams such as retry's callerSkip are aligned
+// against this mapping
+func TestRuntimeCallerSkipMapping(t *testing.T) {
+	// skip=1 指向 GetRuntimeCaller 自身
+	c1 := GetRuntimeCaller(1)
+	assert.Equal(t, "GetRuntimeCaller", c1.FuncName, "skip=1 应指向 GetRuntimeCaller")
+	assert.True(t, strings.HasSuffix(c1.File, "base.go"), "skip=1 应落在 base.go，实得 %s", c1.File)
+	c1.Release()
+
+	// skip=2 指向本测试函数，也就是真正的调用点
+	_, wantFile, wantLine, _ := runtime.Caller(0)
+	c2 := GetRuntimeCaller(2)
+	assert.Equal(t, "TestRuntimeCallerSkipMapping", c2.FuncName, "skip=2 应指向调用者")
+	assert.Equal(t, wantFile, c2.File)
+	assert.InDelta(t, wantLine, c2.Line, 3, "行号应落在本测试函数内")
+	c2.Release()
+}
+
+// TestRuntimeCallerNoAlloc 取调用栈信息不应再分配
+//
+// 原先用 runtime.Caller，它内部走 CallersFrames，每次 248 字节、2 次分配——
+// 对象池省下的几十字节相比之下无关紧要，分配其实全在那里
+//
+// [EN] Resolving caller information must not allocate. The previous
+// runtime.Caller went through CallersFrames at 248 bytes and two allocations per
+// call, dwarfing the few dozen bytes the object pool saves
+func TestRuntimeCallerNoAlloc(t *testing.T) {
+	// 预热：让对象池与各类表都就位
+	for i := 0; i < 100; i++ {
+		GetRuntimeCaller(1).Release()
+	}
+	allocs := testing.AllocsPerRun(200, func() {
+		c := GetRuntimeCaller(1)
+		c.Release()
+	})
+	assert.Zero(t, allocs, "GetRuntimeCaller 应零分配，实测每次 %.1f 次", allocs)
+}
+
+// TestHostNameCached 主机名应只读一次系统调用
+//
+// [EN] The hostname must be read from the OS only once
+func TestHostNameCached(t *testing.T) {
+	first, err := GetHostName()
+	assert.NoError(t, err)
+	assert.NotEmpty(t, first)
+
+	// 缓存命中后不应再分配
+	allocs := testing.AllocsPerRun(200, func() {
+		_, _ = GetHostName()
+	})
+	assert.Zero(t, allocs, "GetHostName 命中缓存后应零分配，实测 %.1f", allocs)
+
+	second, err := GetHostName()
+	assert.NoError(t, err)
+	assert.Equal(t, first, second, "两次结果必须一致")
+
+	safe1 := SafeGetHostName()
+	safe2 := SafeGetHostName()
+	assert.Equal(t, safe1, safe2, "SafeGetHostName 两次结果必须一致")
+	assert.Zero(t, testing.AllocsPerRun(200, func() { _ = SafeGetHostName() }),
+		"SafeGetHostName 命中缓存后应零分配")
+}
+
+// ============================================================================
+// 基准：原先这个包一个基准也没有
+// ============================================================================
+
+var (
+	benchStr string
+	benchI64 int64
+	benchInt int
+)
+
+func BenchmarkOsx(b *testing.B) {
+	b.Run("GetHostName", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			benchStr, _ = GetHostName()
+		}
+	})
+	b.Run("SafeGetHostName", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			benchStr = SafeGetHostName()
+		}
+	})
+	b.Run("GetWorkerId", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			benchI64 = GetWorkerId()
+		}
+	})
+	b.Run("GetDatacenterId", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			benchI64 = GetDatacenterId()
+		}
+	})
+	b.Run("GetServerNode", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			benchStr = GetServerNode()
+		}
+	})
+	b.Run("HashUnixMicroCipherText", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			benchStr = HashUnixMicroCipherText()
+		}
+	})
+	b.Run("StableHashSlot", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			benchInt = StableHashSlot("user:12345:profile", 0, 1023)
+		}
+	})
+	b.Run("GetRuntimeCaller", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			c := GetRuntimeCaller(2)
+			benchStr = c.File
+			c.Release()
+		}
+	})
+	b.Run("GetRuntimeCaller并发", func(b *testing.B) {
+		b.ReportAllocs()
+		b.RunParallel(func(p *testing.PB) {
+			for p.Next() {
+				c := GetRuntimeCaller(2)
+				benchStr = c.File
+				c.Release()
+			}
+		})
+	})
+	b.Run("Getenv", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			benchStr = Getenv("PATH", "")
+		}
+	})
+	b.Run("JoinPaths", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			benchStr = JoinPaths("/api/v1", "users/list")
+		}
+	})
+	b.Run("ParseUrlPath", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			benchStr = ParseUrlPath("https://example.com/a/b/c?x=1")
+		}
+	})
 }
