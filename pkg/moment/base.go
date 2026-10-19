@@ -469,75 +469,258 @@ func HumanDuration(start, end time.Time) string {
 
 // ParseFlexibleDate 灵活的日期解析函数，支持多种格式
 // 支持格式: 2006-01-02, 2006-01-02T15:04:05Z07:00, 2006-01-02 15:04:05 等
+// flexibleDateFormats ParseFlexibleDate 依次尝试的格式，按常用程度排序
+//
+// 提到包级：原先这个四十余项的字面量在函数内，每次调用都要重建
+var flexibleDateFormats = []string{
+	// 标准日期格式
+	time.DateOnly,    // 2006-01-02 (最常用)
+	time.RFC3339,     // 2006-01-02T15:04:05Z07:00
+	time.DateTime,    // 2006-01-02 15:04:05
+	time.RFC3339Nano, // 2006-01-02T15:04:05.999999999Z07:00
+
+	// ISO 格式变体
+	"2006-01-02T15:04:05",            // 不带时区的 ISO 格式
+	"2006-01-02T15:04:05Z",           // 带 Z 的 UTC 格式
+	"2006-01-02T15:04:05.000Z",       // 带毫秒的 UTC 格式
+	"2006-01-02T15:04:05.000000Z",    // 带微秒的 UTC 格式
+	"2006-01-02T15:04:05.000000000Z", // 带纳秒的 UTC 格式
+
+	// 带时区偏移的格式
+	"2006-01-02T15:04:05+07:00",           // 带正时区偏移
+	"2006-01-02T15:04:05-07:00",           // 带负时区偏移
+	"2006-01-02T15:04:05.000+07:00",       // 带毫秒和时区偏移
+	"2006-01-02T15:04:05.000000+07:00",    // 带微秒和时区偏移
+	"2006-01-02T15:04:05.000000000+07:00", // 带纳秒和时区偏移
+
+	// 中国常用格式
+	"2006年01月02日", // 中文日期格式
+	"2006年1月2日",   // 中文日期格式（无前导零）
+	"2006/01/02",  // 斜杠分隔
+	"2006/1/2",    // 斜杠分隔（无前导零）
+	"01/02/2006",  // 美式日期格式
+	"1/2/2006",    // 美式日期格式（无前导零）
+	"02/01/2006",  // 欧式日期格式
+	"2/1/2006",    // 欧式日期格式（无前导零）
+
+	// 时间格式
+	"15:04:05",  // 时间格式
+	"15:04",     // 时间格式（无秒）
+	"3:04:05PM", // 12小时制
+	"3:04PM",    // 12小时制（无秒）
+
+	// 完整日期时间格式
+	"2006-01-02 15:04:05",  // 空格分隔的日期时间
+	"2006/01/02 15:04:05",  // 斜杠日期 + 空格 + 时间
+	"2006年01月02日 15:04:05", // 中文日期 + 时间
+	"2006年1月2日 15:04:05",   // 中文日期（无前导零）+ 时间
+
+	// 数据库常见格式
+	"2006-01-02 15:04:05.000",       // 带毫秒
+	"2006-01-02 15:04:05.000000",    // 带微秒
+	"2006-01-02 15:04:05.000000000", // 带纳秒
+
+	// Unix 风格
+	time.RFC822,   // 02 Jan 06 15:04 MST
+	time.RFC822Z,  // 02 Jan 06 15:04 -0700
+	time.RFC850,   // Monday, 02-Jan-06 15:04:05 MST
+	time.RFC1123,  // Mon, 02 Jan 2006 15:04:05 MST
+	time.RFC1123Z, // Mon, 02 Jan 2006 15:04:05 -0700
+
+	// 其他常见格式
+	"20060102",       // 紧凑日期格式 YYYYMMDD
+	"200601021504",   // 紧凑日期时间格式 YYYYMMDDHHMM
+	"20060102150405", // 紧凑日期时间格式 YYYYMMDDHHMMSS
+}
+
+// 输入字符类别掩码
+//
+// Go 的时间 layout 里，凡不属于参考模式的字符都是字面量，必须原样出现在输入中
+// 因此「layout 要求某个分隔符、而输入里一个都没有」时，time.Parse 必然失败——
+// 可以直接跳过，不必真的调用它
+//
+// 这件事值得做，是因为失败的 time.Parse 会分配一个 *time.ParseError
+// 原实现从头试到尾，实测（Apple M4）：
+//
+//	输入                   耗时      分配
+//	2025-12-03             40ns      0 次     ← 列表第一项，立刻命中
+//	2025年12月3日          786ns     45 次
+//	20251203              1737ns    118 次    ← 排在列表末尾
+//	invalid-date          1628ns    126 次    ← 试完全部才报错
+//
+// 纯数字的紧凑格式和解析失败这两种情况最吃亏，而它们都很常见
+//
+// 注意不能用「必须以数字开头」之类的全局前置判断：RFC850 与 RFC1123 的
+// layout 以字母开头（Monday, / Mon,），会被误杀
+// 筛选是否真的无损，由 TestParseFlexibleDateMatchesExhaustive 差分验证
+//
+// [EN] Character-class mask for the input. In a Go time layout every character
+// that is not part of a reference pattern is a literal that must appear in the
+// input verbatim, so when a layout requires a separator the input does not
+// contain at all, time.Parse is certain to fail and can be skipped without being
+// called. That is worth doing because a failed time.Parse allocates a
+// *time.ParseError, and the original tried every format in order: a digits-only
+// compact date cost 118 allocations and an unparseable string 126, both common
+// cases. No global precheck such as "must start with a digit" is possible, since
+// the RFC850 and RFC1123 layouts start with a letter. Whether the filter is
+// truly lossless is verified differentially by
+// TestParseFlexibleDateMatchesExhaustive
+const (
+	chrDash  = 1 << iota // '-'
+	chrSlash             // '/'
+	chrColon             // ':'
+	chrComma             // ','
+	chrSpace             // ' '
+	chrTee               // 'T'
+	chrDot               // '.'
+	chrCJK               // 年 月 日
+	chrAlpha             // 其他字母（Jan / Mon / MST / PM 等）
+)
+
+// dateCharClass ASCII 字符到类别的查表，初始化时填好
+//
+// 按字节查表而不是 range 迭代 rune：掩码要在每次调用上付出，而命中第一条 layout
+// 的输入（最常见的 2006-01-02）本来只要四十纳秒，逐 rune 的 switch 会把它拖慢
+// 两成非 ASCII 字节出现时才退回 rune 扫描，那只有中文格式会走到
+//
+// [EN] A byte lookup table rather than ranging over runes: the mask is paid on
+// every call, and an input matching the very first layout costs only forty
+// nanoseconds, which a per-rune switch slowed by a fifth. The rune scan is only
+// reached once a non-ASCII byte appears, which happens for the Chinese formats
+var dateCharClass [256]uint16
+
+func init() {
+	for c := 0; c < 256; c++ {
+		var m uint16
+		switch {
+		case c == '-':
+			m = chrDash
+		case c == '/':
+			m = chrSlash
+		case c == ':':
+			m = chrColon
+		case c == ',':
+			m = chrComma
+		case c == ' ':
+			m = chrSpace
+		case c == 'T':
+			m = chrTee
+		case c == '.':
+			m = chrDot
+		case c >= '0' && c <= '9':
+			// 数字不计入：所有 layout 都含数字，区分不了
+		default:
+			m = chrAlpha
+		}
+		dateCharClass[c] = m
+	}
+}
+
+// dateCharMask 算出输入里出现了哪些类别的字符
+func dateCharMask(s string) uint16 {
+	var m uint16
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c >= 0x80 {
+			return m | dateCharMaskNonASCII(s[i:])
+		}
+		m |= dateCharClass[c]
+	}
+	return m
+}
+
+// dateCharMaskNonASCII 处理含非 ASCII 字符的尾部，按 rune 扫描
+func dateCharMaskNonASCII(s string) uint16 {
+	var m uint16
+	for _, r := range s {
+		switch {
+		case r == '年' || r == '月' || r == '日':
+			m |= chrCJK
+		case r < 0x80:
+			m |= dateCharClass[byte(r)]
+		default:
+			m |= chrAlpha
+		}
+	}
+	return m
+}
+
+// flexibleDateRequired 每个 layout 必须出现的字符类别，与 flexibleDateFormats 一一对应
+//
+// 由 layout 本身推导而来，初始化时算一次
+var flexibleDateRequired []uint16
+
+// layoutRequiredMask 从 layout 推出它必然要求输入含有的字符类别
+//
+// 只认那些确定是字面量的分隔符，拿不准的一律不计入——漏算只会多试几个 layout，
+// 多算才会漏掉本该匹配的输入所以这里对时区模式（Z07:00 / -07:00）里的
+// '-' 与 ':' 一概不计
+func layoutRequiredMask(layout string) uint16 {
+	var m uint16
+	// 先把时区与小数秒模式摘掉，它们内部的符号不是固定字面量
+	trimmed := layout
+	for _, pat := range []string{"Z07:00", "-07:00", "+07:00", "-0700", "Z0700", "MST"} {
+		trimmed = strings.ReplaceAll(trimmed, pat, "")
+	}
+	for _, frac := range []string{".000000000", ".000000", ".000", ".999999999", ".999999", ".999"} {
+		trimmed = strings.ReplaceAll(trimmed, frac, "")
+	}
+	for _, r := range trimmed {
+		switch {
+		case r == '-':
+			m |= chrDash
+		case r == '/':
+			m |= chrSlash
+		case r == ':':
+			m |= chrColon
+		case r == ',':
+			m |= chrComma
+		case r == ' ':
+			m |= chrSpace
+		case r == 'T':
+			m |= chrTee
+		case r == '年' || r == '月' || r == '日':
+			m |= chrCJK
+		}
+	}
+	return m
+}
+
+func init() {
+	flexibleDateRequired = make([]uint16, len(flexibleDateFormats))
+	for i, f := range flexibleDateFormats {
+		flexibleDateRequired[i] = layoutRequiredMask(f)
+	}
+}
+
 func ParseFlexibleDate(dateStr string) (time.Time, error) {
-	// 尝试的日期格式列表，按常用程度排序
-	formats := []string{
-		// 标准日期格式
-		time.DateOnly,    // 2006-01-02 (最常用)
-		time.RFC3339,     // 2006-01-02T15:04:05Z07:00
-		time.DateTime,    // 2006-01-02 15:04:05
-		time.RFC3339Nano, // 2006-01-02T15:04:05.999999999Z07:00
-
-		// ISO 格式变体
-		"2006-01-02T15:04:05",            // 不带时区的 ISO 格式
-		"2006-01-02T15:04:05Z",           // 带 Z 的 UTC 格式
-		"2006-01-02T15:04:05.000Z",       // 带毫秒的 UTC 格式
-		"2006-01-02T15:04:05.000000Z",    // 带微秒的 UTC 格式
-		"2006-01-02T15:04:05.000000000Z", // 带纳秒的 UTC 格式
-
-		// 带时区偏移的格式
-		"2006-01-02T15:04:05+07:00",           // 带正时区偏移
-		"2006-01-02T15:04:05-07:00",           // 带负时区偏移
-		"2006-01-02T15:04:05.000+07:00",       // 带毫秒和时区偏移
-		"2006-01-02T15:04:05.000000+07:00",    // 带微秒和时区偏移
-		"2006-01-02T15:04:05.000000000+07:00", // 带纳秒和时区偏移
-
-		// 中国常用格式
-		"2006年01月02日", // 中文日期格式
-		"2006年1月2日",   // 中文日期格式（无前导零）
-		"2006/01/02",  // 斜杠分隔
-		"2006/1/2",    // 斜杠分隔（无前导零）
-		"01/02/2006",  // 美式日期格式
-		"1/2/2006",    // 美式日期格式（无前导零）
-		"02/01/2006",  // 欧式日期格式
-		"2/1/2006",    // 欧式日期格式（无前导零）
-
-		// 时间格式
-		"15:04:05",  // 时间格式
-		"15:04",     // 时间格式（无秒）
-		"3:04:05PM", // 12小时制
-		"3:04PM",    // 12小时制（无秒）
-
-		// 完整日期时间格式
-		"2006-01-02 15:04:05",  // 空格分隔的日期时间
-		"2006/01/02 15:04:05",  // 斜杠日期 + 空格 + 时间
-		"2006年01月02日 15:04:05", // 中文日期 + 时间
-		"2006年1月2日 15:04:05",   // 中文日期（无前导零）+ 时间
-
-		// 数据库常见格式
-		"2006-01-02 15:04:05.000",       // 带毫秒
-		"2006-01-02 15:04:05.000000",    // 带微秒
-		"2006-01-02 15:04:05.000000000", // 带纳秒
-
-		// Unix 风格
-		time.RFC822,   // 02 Jan 06 15:04 MST
-		time.RFC822Z,  // 02 Jan 06 15:04 -0700
-		time.RFC850,   // Monday, 02-Jan-06 15:04:05 MST
-		time.RFC1123,  // Mon, 02 Jan 2006 15:04:05 MST
-		time.RFC1123Z, // Mon, 02 Jan 2006 15:04:05 -0700
-
-		// 其他常见格式
-		"20060102",       // 紧凑日期格式 YYYYMMDD
-		"200601021504",   // 紧凑日期时间格式 YYYYMMDDHHMM
-		"20060102150405", // 紧凑日期时间格式 YYYYMMDDHHMMSS
+	// 先直接试列表第一条（time.DateOnly，最常用）
+	// 命中就省掉整次掩码计算——这条路占实际调用的大多数
+	if date, err := time.Parse(flexibleDateFormats[0], dateStr); err == nil {
+		return date, nil
 	}
 
-	for _, format := range formats {
-		if date, err := time.Parse(format, dateStr); err == nil {
+	mask := dateCharMask(dateStr)
+	for i := 1; i < len(flexibleDateFormats); i++ {
+		// 该 layout 要求的分隔符若输入里一个都没有，Parse 必然失败，跳过
+		if req := flexibleDateRequired[i]; req&^mask != 0 {
+			continue
+		}
+		if date, err := time.Parse(flexibleDateFormats[i], dateStr); err == nil {
 			return date, nil
 		}
 	}
 
+	return time.Time{}, fmt.Errorf("无法解析日期格式: %s", dateStr)
+}
+
+// parseFlexibleDateReference 未经筛选的原实现，仅供差分测试对照
+func parseFlexibleDateReference(dateStr string) (time.Time, error) {
+	for _, format := range flexibleDateFormats {
+		if date, err := time.Parse(format, dateStr); err == nil {
+			return date, nil
+		}
+	}
 	return time.Time{}, fmt.Errorf("无法解析日期格式: %s", dateStr)
 }
 

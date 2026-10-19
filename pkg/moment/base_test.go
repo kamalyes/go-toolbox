@@ -1394,3 +1394,58 @@ func TestCompactFormatEdgeCases(t *testing.T) {
 		})
 	}
 }
+
+// TestParseFlexibleDateMatchesExhaustive 掩码预筛必须不改变任何输入的结果
+//
+// 预筛跳过了一部分 layout，如果跳错了，表现是「某种格式突然解析不了」——
+// 不报错、只在特定输入上失败，极难归因所以这里拿未经筛选的原实现做对照，
+// 用每个 layout 自己格式化出来的字符串、各种畸形输入、以及边界值全量比对
+//
+// [EN] The mask prefilter must not change the result for any input. It skips
+// layouts, and a wrong skip shows up as "some format suddenly stops parsing" —
+// no error, just a failure on particular inputs, which is very hard to
+// attribute. This compares against the unfiltered original over strings produced
+// by every layout itself, plus malformed inputs and boundary values
+func TestParseFlexibleDateMatchesExhaustive(t *testing.T) {
+	// 用每个 layout 自己格式化若干时刻，确保每条 layout 都被覆盖到
+	times := []time.Time{
+		time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
+		time.Date(2026, 12, 31, 23, 59, 59, 123456789, time.UTC),
+		time.Date(1999, 6, 15, 12, 0, 0, 0, time.FixedZone("CST", 8*3600)),
+		time.Date(2000, 2, 29, 0, 0, 0, 0, time.UTC),
+	}
+	var inputs []string
+	for _, layout := range flexibleDateFormats {
+		for _, tm := range times {
+			inputs = append(inputs, tm.Format(layout))
+		}
+	}
+	// 畸形与边界输入
+	inputs = append(inputs,
+		"", " ", "x", "invalid-date", "not a date at all",
+		"2026", "2026-", "2026-13-01", "2026-01-32", "0000-00-00",
+		"20261301", "2026010", "202601021", "99999999",
+		"2026年", "2026年13月", "年月日",
+		"12:60:00", "25:00", "13:04PM", "0:00AM",
+		"2026/13/01", "2026-01-02T", "2026-01-02T99:99:99",
+		"Mon, 02 Jan 2026 15:04:05", "Monday, 02-Jan-26 15:04:05",
+		"----", "::::", "////", ",,,,", "....", "TTTT",
+		"2026-01-02 15:04:05.1", "2026-01-02 15:04:05.123456789012",
+		"\t2026-01-02", "2026-01-02\n", "２０２６－０１－０２",
+	)
+
+	for _, in := range inputs {
+		wantT, wantErr := parseFlexibleDateReference(in)
+		gotT, gotErr := ParseFlexibleDate(in)
+
+		assert.Equal(t, wantErr != nil, gotErr != nil,
+			"输入 %q 的成败判定不一致：原实现 err=%v，预筛后 err=%v", in, wantErr, gotErr)
+		if wantErr == nil && gotErr == nil {
+			assert.True(t, wantT.Equal(gotT),
+				"输入 %q 解析结果不一致：原实现 %v，预筛后 %v", in, wantT, gotT)
+			assert.Equal(t, wantT.Location().String(), gotT.Location().String(),
+				"输入 %q 时区不一致", in)
+		}
+	}
+	t.Logf("已比对 %d 个输入，覆盖 %d 条 layout", len(inputs), len(flexibleDateFormats))
+}
