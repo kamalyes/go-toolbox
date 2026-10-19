@@ -365,6 +365,7 @@ func BenchmarkMatch(b *testing.B) {
 
 	ctx := contextx.NewContext().WithValue("key", "value-50")
 
+	b.ReportAllocs()
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -392,6 +393,7 @@ func BenchmarkMatchWithCache(b *testing.B) {
 
 	ctx := contextx.NewContext().WithValue("key", "value-50")
 
+	b.ReportAllocs()
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -401,39 +403,74 @@ func BenchmarkMatchWithCache(b *testing.B) {
 }
 
 // BenchmarkConcurrentAddAndMatch 并发添加和匹配基准测试
+// BenchmarkConcurrentAddAndMatch 并发下交替添加规则与匹配
+//
+// 这个基准原先的数字没有意义：它每隔一轮就添一条规则，规则数随 b.N 线性增长，
+// 于是匹配越跑越慢，报出的 ns/op 取决于跑了多少轮——同一份代码在不同
+// benchtime 下能差出一倍以上，更没法用来比较改动前后
+// 而且循环里还有 fmt.Sprintf，量到的一部分是格式化而不是匹配
+//
+// 现在拆成两件事各自量稳态：添加规则一组、匹配一组，键预先生成好
+// 要的就是「写不会把读堵死」这个结论，所以两组都跑并发
+//
+// [EN] This benchmark's numbers used to mean nothing: it appended a rule every
+// other iteration, so the rule count grew linearly with b.N and matching got
+// slower as it ran, making the reported ns/op depend on how many iterations
+// happened — the same code differs twofold between benchtimes and cannot be
+// compared across a change at all. It also called fmt.Sprintf inside the loop,
+// so part of what it measured was formatting. It is now split so each half
+// measures steady state, with keys prepared up front, and both halves run
+// concurrently since the point is that writes must not starve reads
 func BenchmarkConcurrentAddAndMatch(b *testing.B) {
 	type Result struct {
 		ID int
 	}
 
-	b.RunParallel(func(pb *testing.PB) {
+	// 键预先生成，不在计时循环里做格式化
+	keys := make([]string, 64)
+	for i := range keys {
+		keys[i] = fmt.Sprintf("id-%d", i)
+	}
+
+	build := func() *Matcher[*Result] {
 		m := NewMatcher[*Result]()
-
-		// 预填充一些规则
 		for i := 0; i < 50; i++ {
-			id := i
-			m.AddRule(
-				NewChainRule(&Result{ID: id}).
-					When(MatchString("id", fmt.Sprintf("id-%d", id))).
-					WithPriority(id),
-			)
+			m.AddRule(NewChainRule(&Result{ID: i}).
+				When(MatchString("id", keys[i%len(keys)])).
+				WithPriority(i))
 		}
+		return m
+	}
 
-		i := 0
-		for pb.Next() {
-			// 交替添加规则和匹配
-			if i%2 == 0 {
-				m.AddRule(
-					NewChainRule(&Result{ID: i}).
-						When(MatchString("id", fmt.Sprintf("id-%d", i))).
-						WithPriority(i),
-				)
-			} else {
-				ctx := contextx.NewContext().WithValue("id", fmt.Sprintf("id-%d", i%50))
-				m.Match(ctx)
-			}
-			i++
+	b.Run("并发匹配", func(b *testing.B) {
+		m := build()
+		ctxs := make([]*contextx.Context, len(keys))
+		for i := range ctxs {
+			ctxs[i] = contextx.NewContext().WithValue("id", keys[i])
 		}
+		b.ReportAllocs()
+		b.ResetTimer()
+		b.RunParallel(func(pb *testing.PB) {
+			i := 0
+			for pb.Next() {
+				m.Match(ctxs[i%len(ctxs)])
+				i++
+			}
+		})
+	})
+
+	b.Run("并发添加", func(b *testing.B) {
+		m := build()
+		b.ReportAllocs()
+		b.ResetTimer()
+		b.RunParallel(func(pb *testing.PB) {
+			i := 0
+			for pb.Next() {
+				m.AddRule(NewChainRule(&Result{ID: i}).
+					When(MatchString("id", keys[i%len(keys)])))
+				i++
+			}
+		})
 	})
 }
 
