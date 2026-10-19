@@ -12,6 +12,9 @@
 package zipx
 
 import (
+	"bytes"
+	"compress/gzip"
+	"compress/zlib"
 	"strings"
 	"testing"
 
@@ -200,4 +203,130 @@ func TestCompressResult_StringFormat(t *testing.T) {
 	assert.Contains(t, str, "10.00") // Ratio percentage
 	assert.Contains(t, str, "bytes") // 单位
 	assert.Contains(t, str, "Ratio") // 字段名
+}
+
+// ============================================================================
+// 压缩级别
+// ============================================================================
+
+// TestCompressLevelRoundTrip 每个级别压出来的数据都要能解回原样
+func TestCompressLevelRoundTrip(t *testing.T) {
+	payloads := [][]byte{
+		[]byte(""),
+		[]byte("x"),
+		[]byte(`{"id":918273,"user":"kamalyes","email":"sun@example.com","active":true}`),
+		bytes.Repeat([]byte("2026-10-18 21:00:03 INFO handler=GetUser status=200\n"), 200),
+	}
+	for level := MinCompressLevel; level <= MaxCompressLevel; level++ {
+		for i, data := range payloads {
+			gz, err := GzipCompressWithLevel(data, level)
+			if !assert.NoError(t, err, "gzip 级别 %d 载荷 %d", level, i) {
+				continue
+			}
+			back, err := GzipDecompress(gz)
+			assert.NoError(t, err, "gzip 解压 级别 %d 载荷 %d", level, i)
+			assert.Equal(t, data, back, "gzip 往返不一致 级别 %d 载荷 %d", level, i)
+
+			zl, err := ZlibCompressWithLevel(data, level)
+			if !assert.NoError(t, err, "zlib 级别 %d 载荷 %d", level, i) {
+				continue
+			}
+			zback, err := ZlibDecompress(zl)
+			assert.NoError(t, err, "zlib 解压 级别 %d 载荷 %d", level, i)
+			assert.Equal(t, data, zback, "zlib 往返不一致 级别 %d 载荷 %d", level, i)
+		}
+	}
+}
+
+// TestCompressLevelRejectsOutOfRange 越界级别必须报错而不是静默回落
+func TestCompressLevelRejectsOutOfRange(t *testing.T) {
+	for _, level := range []int{MinCompressLevel - 1, MaxCompressLevel + 1, -100, 100} {
+		_, err := GzipCompressWithLevel([]byte("x"), level)
+		assert.Error(t, err, "gzip 级别 %d 应报错", level)
+		_, err = ZlibCompressWithLevel([]byte("x"), level)
+		assert.Error(t, err, "zlib 级别 %d 应报错", level)
+	}
+}
+
+// TestCompressDefaultUnchanged 默认级别的输出不得因这次改造而变化
+//
+// 输出字节是可观察的：别处可能按长度做了断言或容量规划，默认级别只能保持
+// DefaultCompression要换取速度得显式调用 WithLevel
+//
+// [EN] Output at the default level must not shift. Compressed bytes are
+// observable, so the default stays at DefaultCompression; trading size for speed
+// is an explicit WithLevel call
+func TestCompressDefaultUnchanged(t *testing.T) {
+	data := []byte(`{"id":918273,"user":"kamalyes","email":"sun@example.com","active":true}`)
+
+	a, err := GzipCompress(data)
+	assert.NoError(t, err)
+	b, err := GzipCompressWithLevel(data, gzip.DefaultCompression)
+	assert.NoError(t, err)
+	assert.Equal(t, a, b, "GzipCompress 必须等价于 DefaultCompression")
+
+	c, err := ZlibCompress(data)
+	assert.NoError(t, err)
+	d, err := ZlibCompressWithLevel(data, zlib.DefaultCompression)
+	assert.NoError(t, err)
+	assert.Equal(t, c, d, "ZlibCompress 必须等价于 DefaultCompression")
+}
+
+// TestCompressPoolsArePerLevel 各级别的池不得相互串用
+//
+// writer 的级别在构造时固定，Reset 不能改级别一旦共用一个池，取到的 writer
+// 级别就是随机的，输出大小会随运行时机漂移，而数据仍能正常解压——不会报错，
+// 只是压缩率时好时坏，极难归因
+//
+// [EN] The per-level pools must not be shared. A writer's level is fixed at
+// construction and Reset cannot change it, so one shared pool would hand back
+// writers of arbitrary level: output size would drift with timing while the data
+// still decompressed fine — no error, just an inconsistent ratio that is very
+// hard to attribute
+func TestCompressPoolsArePerLevel(t *testing.T) {
+	data := bytes.Repeat([]byte("2026-10-18 21:00:03 INFO handler=GetUser status=200\n"), 200)
+
+	// 交替使用两个级别多轮，每轮的输出大小都必须与该级别首轮一致
+	fast, err := GzipCompressWithLevel(data, gzip.BestSpeed)
+	assert.NoError(t, err)
+	best, err := GzipCompressWithLevel(data, gzip.BestCompression)
+	assert.NoError(t, err)
+	assert.NotEqual(t, len(fast), len(best), "这份载荷上两个级别的体积应当不同，否则本测试无效")
+
+	for i := 0; i < 20; i++ {
+		f, err := GzipCompressWithLevel(data, gzip.BestSpeed)
+		assert.NoError(t, err)
+		assert.Equal(t, len(fast), len(f), "第 %d 轮 BestSpeed 体积漂移，池被串用了", i)
+
+		bst, err := GzipCompressWithLevel(data, gzip.BestCompression)
+		assert.NoError(t, err)
+		assert.Equal(t, len(best), len(bst), "第 %d 轮 BestCompression 体积漂移，池被串用了", i)
+	}
+}
+
+// BenchmarkCompressByLevel 各级别的速度，小载荷下 Reset 的占比见 base.go
+func BenchmarkCompressByLevel(b *testing.B) {
+	small := []byte(`{"id":918273,"user":"kamalyes","email":"sun@example.com","active":true}`)
+	large := bytes.Repeat([]byte("2026-10-18 21:00:03 INFO handler=GetUser status=200\n"), 2000)
+
+	for _, c := range []struct {
+		name string
+		data []byte
+	}{{"小70B", small}, {"大100KB", large}} {
+		for _, l := range []struct {
+			name  string
+			level int
+		}{{"BestSpeed", gzip.BestSpeed}, {"Default", gzip.DefaultCompression}, {"BestCompression", gzip.BestCompression}} {
+			b.Run("Gzip/"+c.name+"/"+l.name, func(b *testing.B) {
+				b.ReportAllocs()
+				b.SetBytes(int64(len(c.data)))
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					if _, err := GzipCompressWithLevel(c.data, l.level); err != nil {
+						b.Fatal(err)
+					}
+				}
+			})
+		}
+	}
 }

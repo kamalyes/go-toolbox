@@ -36,12 +36,10 @@ var (
 			return new(bytes.Buffer)
 		},
 	}
-	// zlibWriterPool 复用 zlib.Writer，避免每次压缩都分配新对象
-	zlibWriterPool = sync.Pool{
-		New: func() interface{} {
-			return zlib.NewWriter(nil)
-		},
-	}
+	// zlibWriterPools 按压缩级别分开复用 zlib.Writer
+	// writer 的级别在构造时固定，Reset 不能改级别，所以每个级别各备一个池
+	// 级别的速度与体积取舍见 base.go 的「压缩级别」一节
+	zlibWriterPools [levelPoolCount]sync.Pool
 	// zlibReaderPool 复用 zlib 解压 reader（通过 zlib.Resetter 接口），避免每次解压都分配新对象
 	// zlib.Reader 未导出，但 NewReader 返回的 io.ReadCloser 实现了 zlib.Resetter 接口
 	zlibReaderPool = sync.Pool{
@@ -59,19 +57,46 @@ var (
 )
 
 // ZlibCompress 压缩数据
+// init 为每个压缩级别准备 zlib.Writer 池
+func init() {
+	for i := 0; i < levelPoolCount; i++ {
+		level := i + MinCompressLevel
+		zlibWriterPools[i].New = func() interface{} {
+			// 级别已由 compressLevelIndex 校验过，这里不会出错
+			w, _ := zlib.NewWriterLevel(nil, level)
+			return w
+		}
+	}
+}
+
 func ZlibCompress(data []byte) ([]byte, error) {
+	return ZlibCompressWithLevel(data, zlib.DefaultCompression)
+}
+
+// ZlibCompressWithLevel 按指定压缩级别进行 zlib 压缩
+//
+// level 取值与 compress/flate 一致：BestSpeed(1) 到 BestCompression(9)，
+// 另可取 DefaultCompression(-1)、NoCompression(0) 与 HuffmanOnly(-2)
+// 小载荷下换到 BestSpeed 可快约五倍而体积几乎不变，原因与实测见 base.go
+func ZlibCompressWithLevel(data []byte, level int) ([]byte, error) {
+	idx, err := compressLevelIndex(level)
+	if err != nil {
+		return nil, err
+	}
+
 	buf := zlibBuffer.Get().(*bytes.Buffer)
 	defer zlibBuffer.Put(buf)
 	buf.Reset()
 
-	writer := zlibWriterPool.Get().(*zlib.Writer)
+	pool := &zlibWriterPools[idx]
+	writer := pool.Get().(*zlib.Writer)
 	writer.Reset(buf) // zlib.Writer 支持 Reset，可安全复用
 	closed := false
 	defer func() {
 		if !closed {
 			writer.Close()
 		}
-		zlibWriterPool.Put(writer)
+		pool.Put(writer)
 	}()
 
 	if _, err := writer.Write(data); err != nil {

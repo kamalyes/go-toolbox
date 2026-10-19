@@ -27,16 +27,21 @@ const (
 )
 
 var (
-	gzipWriter sync.Pool // gzip.Writer 的对象池
-	gzipReader sync.Pool // gzip.Reader 的对象池
-	gzipBuffer sync.Pool // bytes.Buffer 的对象池
+	gzipWriterPools [levelPoolCount]sync.Pool // 按压缩级别分开的 gzip.Writer 对象池
+	gzipReader      sync.Pool                 // gzip.Reader 的对象池
+	gzipBuffer      sync.Pool                 // bytes.Buffer 的对象池
 )
 
 func init() {
 	// 初始化对象池
-	gzipWriter = sync.Pool{New: func() interface{} {
-		return gzip.NewWriter(nil) // 创建新的 gzip.Writer
-	}}
+	for i := 0; i < levelPoolCount; i++ {
+		level := i + MinCompressLevel
+		gzipWriterPools[i].New = func() interface{} {
+			// 级别已由 compressLevelIndex 校验过，这里不会出错
+			w, _ := gzip.NewWriterLevel(nil, level)
+			return w
+		}
+	}
 	gzipReader = sync.Pool{New: func() interface{} {
 		return new(gzip.Reader) // 创建新的 gzip.Reader
 	}}
@@ -46,19 +51,37 @@ func init() {
 }
 
 // GzipCompress 使用 gzip 压缩数据
+//
+// 级别为 DefaultCompression若载荷只有几十到几百字节，GzipCompressWithLevel
+// 配 BestSpeed 可快约五倍而体积几乎不变，原因见本文件「压缩级别」一节
 func GzipCompress(data []byte) ([]byte, error) {
+	return GzipCompressWithLevel(data, gzip.DefaultCompression)
+}
+
+// GzipCompressWithLevel 按指定压缩级别进行 gzip 压缩
+//
+// level 取值与 compress/flate 一致：BestSpeed(1) 到 BestCompression(9)，
+// 另可取 DefaultCompression(-1)、NoCompression(0) 与 HuffmanOnly(-2)
+// 级别之间的速度与体积实测见本文件「压缩级别」一节
+func GzipCompressWithLevel(data []byte, level int) ([]byte, error) {
+	idx, err := compressLevelIndex(level)
+	if err != nil {
+		return nil, err
+	}
+
 	buf := gzipBuffer.Get().(*bytes.Buffer) // 从对象池获取 bytes.Buffer
 	buf.Reset()                             // 重置缓冲区以避免数据污染
 	defer gzipBuffer.Put(buf)               // 使用完后将缓冲区放回池中
 
-	writer := gzipWriter.Get().(*gzip.Writer) // 从对象池获取 gzip.Writer
-	writer.Reset(buf)                         // 将 writer 绑定到缓冲区
-	closed := false                           // 标记是否已关闭，避免 double-Close
+	pool := &gzipWriterPools[idx]
+	writer := pool.Get().(*gzip.Writer) // 从该级别的对象池获取 gzip.Writer
+	writer.Reset(buf)                   // 将 writer 绑定到缓冲区
+	closed := false                     // 标记是否已关闭，避免 double-Close
 	defer func() {
 		if !closed {
 			writer.Close() // 确保异常路径下 writer 也被关闭
 		}
-		gzipWriter.Put(writer)
+		pool.Put(writer)
 	}()
 
 	if _, err := writer.Write(data); err != nil {
