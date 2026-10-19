@@ -105,8 +105,18 @@ func FromAcceptLanguageSource(ctx context.Context, r *http.Request, key string) 
 // ExtractLanguage 快捷函数：使用默认配置提取语言
 // 优先级：Query(lang/language) → Header(X-Language) → Cookie(language) → Accept-Language → "en"
 func ExtractLanguage(r *http.Request) string {
-	return NewLanguageExtractor("en").Extract(r)
+	return defaultLanguageExtractor.Extract(r)
 }
+
+// defaultLanguageExtractor 便捷函数共用的默认提取器
+//
+// 这份配置是只读的，没必要每次调用都新建一个——原先 ExtractLanguage 每次都要
+// 构造 LanguageExtractor 连同它的两个切片字段
+//
+// [EN] Shared by the convenience functions. The configuration is read-only, so
+// there is no reason to build one per call as ExtractLanguage used to, along with
+// its two slice fields
+var defaultLanguageExtractor = NewLanguageExtractor("en")
 
 // ExtractLanguageWithDefault 快捷函数：使用指定默认语言提取
 func ExtractLanguageWithDefault(r *http.Request, defaultLang string) string {

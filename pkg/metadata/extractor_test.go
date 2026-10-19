@@ -15,6 +15,7 @@ import (
 	"crypto/tls"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -318,4 +319,65 @@ func TestMetadataExtractor(t *testing.T) {
 	extractor = NewMetadataExtractor(ctx, req) // 重新创建实例
 	extractor.Default(TestDefaultValue)
 	assert.Equal(t, TestDefaultValue, extractor.Get(), "所有来源均未提取到值时应该返回默认值")
+}
+
+// TestQueryGetMatchesStdlib 手写的查询串扫描必须与 url.Values.Get 完全一致
+//
+// FromQuerySource 原先走 r.URL.Query()，那会把整个查询串解析成一张 map；改为
+// 线性扫描后语义必须分毫不差，否则表现为「某些参数取不到」——不报错，只在特定
+// 查询串上失效，极难归因
+//
+// 覆盖：普通键值、重复键取第一个、空值、无等号、连续与首尾的 &、加号代表空格、
+// 百分号编码的键与值、非法编码（标准库会跳过该对）、中文、以及键名本身含编码
+//
+// [EN] The hand-written query scan must match url.Values.Get exactly.
+// FromQuerySource used to call r.URL.Query(), which parses the whole string into
+// a map; after switching to a linear scan the semantics have to be identical, or
+// the symptom is "some parameters cannot be read" — no error, just a failure on
+// particular query strings, which is very hard to attribute
+func TestQueryGetMatchesStdlib(t *testing.T) {
+	queries := []string{
+		"",
+		"lang=zh-CN",
+		"a=1&b=2&c=3",
+		"lang=zh&lang=en",
+		"lang=",
+		"lang",
+		"&lang=zh&",
+		"&&lang=zh&&",
+		"lang=zh+CN",
+		"lang=zh%2DCN",
+		"la%6Eg=zh",
+		"lang=%E4%B8%AD%E6%96%87",
+		"lang=%ZZ",
+		"la%ZZng=zh",
+		"lang=a=b",
+		"=zh",
+		"lang=zh&other=%ZZ",
+		"other=%ZZ&lang=zh",
+		"LANG=zh",
+		"lang=zh;language=en",
+		"language=en&lang=zh",
+		"lang=%2B%20%26",
+	}
+	keys := []string{"lang", "language", "a", "LANG", "", "other", "l"}
+
+	for _, q := range queries {
+		values, _ := url.ParseQuery(q)
+		for _, k := range keys {
+			want := values.Get(k)
+			got := queryGet(q, k)
+			assert.Equal(t, want, got,
+				"查询串 %q 取键 %q：标准库 %q，手写 %q", q, k, want, got)
+		}
+	}
+}
+
+// TestFromQuerySourceNilSafe 请求或 URL 为空时不应 panic
+func TestFromQuerySourceNilSafe(t *testing.T) {
+	assert.Equal(t, "", FromQuerySource(context.Background(), nil, "lang"))
+	assert.NotPanics(t, func() {
+		r := &http.Request{}
+		_ = FromQuerySource(context.Background(), r, "lang")
+	})
 }

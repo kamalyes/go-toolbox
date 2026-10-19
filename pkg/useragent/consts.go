@@ -238,3 +238,79 @@ var StabilizeUserAgents = map[DeviceType][]string{
 		"Mozilla/5.0 (Linux; Android 14; SM-G998B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 T7/14.3 baidubrowser/13.23.5.10",                                     // 百度浏览器 (Android)
 	},
 }
+
+// 渲染引擎
+const (
+	EngineBlink   = "Blink"   // Chrome / Edge / Opera 等 Chromium 系
+	EngineWebKit  = "WebKit"  // Safari 及 iOS 上的全部浏览器
+	EngineGecko   = "Gecko"   // Firefox
+	EngineTrident = "Trident" // 旧版 IE
+	EnginePresto  = "Presto"  // 旧版 Opera
+)
+
+// 端内浏览器（WebView）宿主应用
+//
+// 这些应用内置的 WebView 在 UA 里保留了 Safari / Chrome 的标识，所以仅看
+// Browser 字段无法区分其限制与真浏览器不同（下载、新开窗口、部分 API 不可用），
+// 前端常需据此降级，因此单独识别
+//
+// [EN] These apps' embedded WebViews keep the Safari or Chrome markers in their
+// UA, so the Browser field alone cannot tell them apart. Their restrictions
+// differ from a real browser — downloads, opening windows and some APIs are
+// unavailable — and front ends routinely need to degrade accordingly, so they
+// are detected separately
+const (
+	InAppWeChat    = "WeChat"    // 微信
+	InAppWeCom     = "WeCom"     // 企业微信
+	InAppAlipay    = "Alipay"    // 支付宝
+	InAppDingTalk  = "DingTalk"  // 钉钉
+	InAppFeishu    = "Feishu"    // 飞书
+	InAppQQ        = "QQ"        // QQ
+	InAppWeibo     = "Weibo"     // 微博
+	InAppDouyin    = "Douyin"    // 抖音
+	InAppKuaishou  = "Kuaishou"  // 快手
+	InAppXiaohongs = "RedNote"   // 小红书
+	InAppBaiduApp  = "BaiduApp"  // 百度 App
+	InAppTaobao    = "Taobao"    // 手机淘宝
+	InAppJD        = "JD"        // 京东
+	InAppMeituan   = "Meituan"   // 美团
+	InAppLine      = "Line"      // Line
+	InAppFacebook  = "Facebook"  // Facebook App
+	InAppInstagram = "Instagram" // Instagram
+	InAppTwitter   = "Twitter"   // Twitter / X
+	InAppSnapchat  = "Snapchat"  // Snapchat
+	InAppElectron  = "Electron"  // Electron 桌面应用
+)
+
+// 非浏览器 HTTP 客户端
+//
+// 与爬虫分开：爬虫是抓取行为，这些是程序化调用（SDK、命令行、测试工具）
+// 服务端常需据此区分「真人访问」与「接口调用」
+//
+// [EN] Kept apart from bots: a bot is crawling behaviour while these are
+// programmatic callers — SDKs, command-line tools, test clients. Servers
+// routinely need to tell a human visit from an API call
+const (
+	ClientCurl       = "curl"
+	ClientWget       = "wget"
+	ClientOkHttp     = "OkHttp"
+	ClientPython     = "python-requests"
+	ClientPostman    = "Postman"
+	ClientInsomnia   = "Insomnia"
+	ClientJava       = "Java"
+	ClientGoHTTP     = "Go-http-client"
+	ClientAxios      = "axios"
+	ClientNodeFetch  = "node-fetch"
+	ClientApacheHTTP = "Apache-HttpClient"
+	ClientRestSharp  = "RestSharp"
+	ClientPHP        = "PHP"
+	ClientRuby       = "Ruby"
+)
+
+// CPU 架构
+const (
+	ArchX8664 = "x86_64" // 64 位 x86
+	ArchX86   = "x86"    // 32 位 x86
+	ArchARM64 = "arm64"  // 64 位 ARM
+	ArchARM   = "arm"    // 32 位 ARM
+)

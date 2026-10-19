@@ -13,12 +13,41 @@ package metadata
 import (
 	"context"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/kamalyes/go-toolbox/pkg/netx"
 	"github.com/kamalyes/go-toolbox/pkg/useragent"
 )
 
 // ExtractRequestMetadata 从 HTTP 请求中提取所有元数据
+// 头部键名一律写成 Go 的规范形式
+//
+// http.Header.Get 会先把键名过一遍 textproto.CanonicalMIMEHeaderKey，而该函数的
+// 规范形式是「按连字符分段、每段首字母大写其余小写」所以 X-Request-ID 并不规范，
+// 规范形式是 X-Request-Id；CF-Ray 要写成 Cf-Ray，Sec-WebSocket-Key 要写成
+// Sec-Websocket-Key非规范的键名会让 Get 每次都分配一个规范化后的字符串副本
+//
+// 两种写法取到的值完全相同（Get 两边都会规范化），差的只是开销实测：
+//
+//	Get("X-Request-ID")  45.0ns / 16B / 1 次分配
+//	Get("X-Request-Id")  15.7ns /  0B / 0 次
+//
+// 本函数要读三十多个头部，原先有十五个键名不规范，于是每次请求白付十五次分配
+//
+// # Cf-Ipcountry 这类写法看着像拼错，其实是规范形式，不要「修正」回去
+//
+// [EN] Header keys are written in Go's canonical form throughout. http.Header.Get
+// passes the key through textproto.CanonicalMIMEHeaderKey, whose canonical form
+// upper-cases the first letter of each dash-separated token and lower-cases the
+// rest, so X-Request-ID is not canonical — X-Request-Id is — and CF-Ray must be
+// written Cf-Ray. A non-canonical key makes Get allocate a canonicalised copy on
+// every call. Both spellings read the same value since Get canonicalises either
+// way; only the cost differs, measured at 45.0ns with one allocation against
+// 15.7ns with none. This function reads over thirty headers and fifteen of its
+// keys were non-canonical, so every request paid fifteen needless allocations.
+// Spellings like Cf-Ipcountry look like typos but are the canonical form and
+// should not be "corrected" back
 func ExtractRequestMetadata(r *http.Request) *RequestMetadata {
 	userAgent := r.Header.Get("User-Agent")
 
@@ -44,7 +73,7 @@ func ExtractRequestMetadata(r *http.Request) *RequestMetadata {
 
 		// 代理和转发信息
 		XForwardedFor:   r.Header.Get("X-Forwarded-For"),
-		XRealIP:         r.Header.Get("X-Real-IP"),
+		XRealIP:         r.Header.Get("X-Real-Ip"),
 		XForwardedProto: r.Header.Get("X-Forwarded-Proto"),
 		XForwardedHost:  r.Header.Get("X-Forwarded-Host"),
 		XForwardedPort:  r.Header.Get("X-Forwarded-Port"),
@@ -55,22 +84,22 @@ func ExtractRequestMetadata(r *http.Request) *RequestMetadata {
 		Accept:         r.Header.Get("Accept"),
 
 		// WebSocket 协议信息
-		SecWebSocketKey:        r.Header.Get("Sec-WebSocket-Key"),
-		SecWebSocketVersion:    r.Header.Get("Sec-WebSocket-Version"),
-		SecWebSocketProtocol:   r.Header.Get("Sec-WebSocket-Protocol"),
-		SecWebSocketExtensions: r.Header.Get("Sec-WebSocket-Extensions"),
+		SecWebSocketKey:        r.Header.Get("Sec-Websocket-Key"),
+		SecWebSocketVersion:    r.Header.Get("Sec-Websocket-Version"),
+		SecWebSocketProtocol:   r.Header.Get("Sec-Websocket-Protocol"),
+		SecWebSocketExtensions: r.Header.Get("Sec-Websocket-Extensions"),
 
 		// 连接信息
 		Connection: r.Header.Get("Connection"),
 		Upgrade:    r.Header.Get("Upgrade"),
 
 		// CDN 和安全信息
-		CFRay:          r.Header.Get("CF-Ray"),
-		CFConnectingIP: r.Header.Get("CF-Connecting-IP"),
-		CFIPCountry:    r.Header.Get("CF-IPCountry"),
-		XRequestID:     r.Header.Get("X-Request-ID"),
-		XCorrelationID: r.Header.Get("X-Correlation-ID"),
-		XDeviceID:      r.Header.Get("X-Device-ID"),
+		CFRay:          r.Header.Get("Cf-Ray"),
+		CFConnectingIP: r.Header.Get("Cf-Connecting-Ip"),
+		CFIPCountry:    r.Header.Get("Cf-Ipcountry"),
+		XRequestID:     r.Header.Get("X-Request-Id"),
+		XCorrelationID: r.Header.Get("X-Correlation-Id"),
+		XDeviceID:      r.Header.Get("X-Device-Id"),
 
 		// 缓存和条件请求
 		CacheControl:    r.Header.Get("Cache-Control"),
@@ -78,10 +107,10 @@ func ExtractRequestMetadata(r *http.Request) *RequestMetadata {
 		IfModifiedSince: r.Header.Get("If-Modified-Since"),
 
 		// 客户端提示信息
-		SecCHUA:         r.Header.Get("Sec-CH-UA"),
-		SecCHUAMobile:   r.Header.Get("Sec-CH-UA-Mobile"),
-		SecCHUAPlatform: r.Header.Get("Sec-CH-UA-Platform"),
-		DNT:             r.Header.Get("DNT"),
+		SecCHUA:         r.Header.Get("Sec-Ch-Ua"),
+		SecCHUAMobile:   r.Header.Get("Sec-Ch-Ua-Mobile"),
+		SecCHUAPlatform: r.Header.Get("Sec-Ch-Ua-Platform"),
+		DNT:             r.Header.Get("Dnt"),
 	}
 
 	// TLS 信息
@@ -222,9 +251,78 @@ func FromContextSource(ctx context.Context, r *http.Request, key string) string 
 }
 
 // FromQuerySource 从 URL query 参数中提取值
+//
+// 直接扫原始查询串，不走 r.URL.Query()
+//
+// r.URL.Query() 会把整个查询串解析成一张 url.Values（map[string][]string），
+// 每个键一次调用就建一张 map而取语言要查 lang 与 language 两个键，于是同一个
+// 查询串每次请求要解析两遍、建两张 map
+// 这里按 url.ParseQuery 的规则线性扫一遍，首个匹配即返回，不分配 map
+//
+// 语义与 url.Values.Get 对齐：按 & 切分、按首个 = 切分、键与值都要经过
+// QueryUnescape、解码失败的那一对跳过（ParseQuery 会记录错误但不收录该对）、
+// 多个同名键取第一个这几条由 TestQueryGetMatchesStdlib 差分验证
+//
+// [EN] Scans the raw query string instead of going through r.URL.Query(), which
+// parses the whole string into a url.Values map — one map per call, and looking
+// up a language checks both lang and language, so the same query string was
+// parsed twice per request. This walks it once by url.ParseQuery's rules and
+// returns the first match without allocating a map. The semantics match
+// url.Values.Get — split on &, split on the first =, unescape both key and
+// value, skip a pair that fails to unescape as ParseQuery does, and take the
+// first of several same-named keys — all verified differentially by
+// TestQueryGetMatchesStdlib
 func FromQuerySource(ctx context.Context, r *http.Request, key string) string {
-	if r != nil {
-		return r.URL.Query().Get(key)
+	if r == nil || r.URL == nil {
+		return ""
+	}
+	return queryGet(r.URL.RawQuery, key)
+}
+
+// queryGet 从原始查询串里取 key 的第一个值，语义同 url.Values.Get
+func queryGet(raw, key string) string {
+	for raw != "" {
+		var pair string
+		if i := strings.IndexByte(raw, '&'); i >= 0 {
+			pair, raw = raw[:i], raw[i+1:]
+		} else {
+			pair, raw = raw, ""
+		}
+		if pair == "" {
+			continue
+		}
+		// Go 1.17 起 url.ParseQuery 不再把分号当分隔符，而是把含分号的整对丢弃
+		// （检查是在按 = 切分之前做的，所以值里带分号同样会被丢弃）
+		// 这条是差分测试抓出来的：lang=zh;language=en 在标准库下取不到值
+		//
+		// [EN] Since Go 1.17 url.ParseQuery no longer treats a semicolon as a
+		// separator and discards the whole pair containing one — the check
+		// happens before splitting on =, so a semicolon in the value counts too.
+		// The differential test caught this: lang=zh;language=en yields nothing
+		// from the standard library
+		if strings.IndexByte(pair, ';') >= 0 {
+			continue
+		}
+		rawKey, rawVal := pair, ""
+		if i := strings.IndexByte(pair, '='); i >= 0 {
+			rawKey, rawVal = pair[:i], pair[i+1:]
+		}
+		// 绝大多数键名不含百分号编码，先按原样比一次，省掉解码
+		if rawKey != key {
+			if !strings.ContainsAny(rawKey, "%+") {
+				continue
+			}
+			k, err := url.QueryUnescape(rawKey)
+			if err != nil || k != key {
+				continue
+			}
+		}
+		v, err := url.QueryUnescape(rawVal)
+		if err != nil {
+			// ParseQuery 遇到无法解码的值会跳过这一对，这里保持一致
+			continue
+		}
+		return v
 	}
 	return ""
 }

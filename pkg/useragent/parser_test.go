@@ -11,6 +11,7 @@
 package useragent
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -464,3 +465,164 @@ func BenchmarkParseParallel(b *testing.B) {
 		}
 	})
 }
+
+// TestEngineDerivation 引擎由浏览器与系统推出，不额外扫字符串
+//
+// iOS 上所有浏览器都必须用系统 WebKit（App Store 规则），所以 iOS 上的 Chrome
+// 也是 WebKit 而不是 Blink——这条最容易写错
+func TestEngineDerivation(t *testing.T) {
+	cases := []struct {
+		name, ua, wantBrowser, wantEngine string
+	}{
+		{"Chrome 桌面", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36", Chrome, EngineBlink},
+		{"Edge", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0", Edge, EngineBlink},
+		{"Firefox", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0", Firefox, EngineGecko},
+		{"Safari macOS", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15", Safari, EngineWebKit},
+		{"iOS Chrome 仍是 WebKit", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/131.0.0.0 Mobile/15E148 Safari/604.1", Safari, EngineWebKit},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			p := Parse(c.ua)
+			assert.Equal(t, c.wantBrowser, p.Browser, "浏览器")
+			assert.Equal(t, c.wantEngine, p.Engine, "引擎")
+		})
+	}
+}
+
+// TestInAppDetection 端内浏览器识别
+//
+// 这些 UA 里都带着 Safari 或 Chrome 的标识，仅看 Browser 字段分不出来，
+// 所以必须单独识别顺序也要紧：企业微信的 UA 同时含 wxwork 与 micromessenger
+func TestInAppDetection(t *testing.T) {
+	cases := []struct {
+		name, ua, want string
+	}{
+		{"微信", "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.44(0x18002c2b) NetType/WIFI Language/zh_CN", InAppWeChat},
+		{"企业微信优先于微信", "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/7.0.1 wxwork/4.1.6", InAppWeCom},
+		{"支付宝", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 AliApp(AP/10.5.80) AlipayClient/10.5.80", InAppAlipay},
+		{"钉钉", "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 DingTalk/7.0.0 AliApp(DingTalk/7.0.0)", InAppDingTalk},
+		{"抖音", "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/131.0.0.0 Mobile Safari/537.36 aweme_27.5.0 BytedanceWebview/d8a21c6", InAppDouyin},
+		{"微博", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Weibo (iPhone15,2__weibo__14.3.0__iphone__os17.1.0)", InAppWeibo},
+		{"Electron 桌面应用", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) MyApp/1.0.0 Chrome/120.0.0.0 Electron/28.0.0 Safari/537.36", InAppElectron},
+		{"普通浏览器不是端内", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36", ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			p := Parse(c.ua)
+			assert.Equal(t, c.want, p.InApp(), "宿主应用")
+			assert.Equal(t, c.want != "", p.IsInApp(), "IsInApp")
+			// 端内 UA 若本身带着浏览器标识，那个信息不该被端内识别盖掉
+			//
+			// 并非所有端内 UA 都带：钉钉与微博的 iOS WebView UA 里既没有 safari
+			// 也没有 chrome，Browser 为空是正确结果，不是漏判
+			if strings.Contains(strings.ToLower(c.ua), "safari") ||
+				strings.Contains(strings.ToLower(c.ua), "chrome") {
+				assert.NotEmpty(t, p.Browser, "带浏览器标识的端内 UA 仍应识别出底层浏览器")
+			}
+		})
+	}
+}
+
+// TestHTTPClientDetection 非浏览器客户端识别
+func TestHTTPClientDetection(t *testing.T) {
+	cases := []struct {
+		ua, want string
+	}{
+		{"curl/8.4.0", ClientCurl},
+		{"Wget/1.21.4", ClientWget},
+		{"okhttp/4.12.0", ClientOkHttp},
+		{"python-requests/2.31.0", ClientPython},
+		{"PostmanRuntime/7.35.0", ClientPostman},
+		{"Go-http-client/1.1", ClientGoHTTP},
+		{"Java/17.0.9", ClientJava},
+		{"axios/1.6.2", ClientAxios},
+		{"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36", ""},
+	}
+	for _, c := range cases {
+		p := Parse(c.ua)
+		assert.Equal(t, c.want, p.HTTPClient(), "UA=%s", c.ua)
+		assert.Equal(t, c.want != "", p.IsHTTPClient(), "UA=%s", c.ua)
+	}
+}
+
+// TestArchDetection 架构只反映 UA 的字面内容
+func TestArchDetection(t *testing.T) {
+	cases := []struct {
+		ua, want string
+	}{
+		{"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", ArchX8664},
+		{"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36", ArchX8664},
+		{"Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36", ArchX8664},
+		{"Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36", ArchARM64},
+		{"Mozilla/5.0 (Linux; Android 13; armv8l) AppleWebKit/537.36", ArchARM},
+		{"Mozilla/5.0 (X11; Linux i686) AppleWebKit/537.36", ArchX86},
+		{"curl/8.4.0", ""},
+	}
+	for _, c := range cases {
+		assert.Equal(t, c.want, Parse(c.ua).Arch(), "UA=%s", c.ua)
+	}
+}
+
+// TestExtensionMethodsNilSafe 空指针与空 UA 下所有扩展方法都不应 panic
+func TestExtensionMethodsNilSafe(t *testing.T) {
+	var p *ParsedUserAgent
+	assert.NotPanics(t, func() {
+		_ = p.InApp()
+		_ = p.IsInApp()
+		_ = p.HTTPClient()
+		_ = p.IsHTTPClient()
+		_ = p.Arch()
+		_ = p.IsDesktop()
+		_ = p.IsIOS()
+		_ = p.IsAndroid()
+		_ = p.IsWindows()
+		_ = p.IsMacOS()
+		_ = p.IsChromium()
+	})
+	empty := Parse("")
+	assert.NotPanics(t, func() {
+		_ = empty.InApp()
+		_ = empty.HTTPClient()
+		_ = empty.Arch()
+	})
+}
+
+// BenchmarkExtensionMethods 按需方法的开销，说明为何不放进 Parse
+//
+// 这三项各要在 UA 里逐个找关键词，每个关键词都是一次全串扫描若在 Parse 里
+// 一并扫完，光端内那张二十项的表就要多付约四百纳秒
+func BenchmarkExtensionMethods(b *testing.B) {
+	p := Parse(benchUASamples[0])
+	wechat := Parse("Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.44")
+
+	b.Run("InApp/未命中", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			benchStr2 = p.InApp()
+		}
+	})
+	b.Run("InApp/命中微信", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			benchStr2 = wechat.InApp()
+		}
+	})
+	b.Run("HTTPClient/未命中", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			benchStr2 = p.HTTPClient()
+		}
+	})
+	b.Run("Arch", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			benchStr2 = p.Arch()
+		}
+	})
+}
+
+var benchStr2 string

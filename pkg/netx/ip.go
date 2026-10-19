@@ -109,7 +109,7 @@ func GetClientIP(r *http.Request) string {
 	}
 
 	// 2. 尝试从 X-Real-IP 头获取
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+	if xri := r.Header.Get("X-Real-Ip"); xri != "" {
 		return NormalizeIP(strings.TrimSpace(xri))
 	}
 

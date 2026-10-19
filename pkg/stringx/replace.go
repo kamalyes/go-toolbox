@@ -13,6 +13,7 @@ package stringx
 import (
 	"regexp"
 	"strings"
+	"sync"
 	"unicode/utf8"
 )
 
@@ -63,10 +64,51 @@ func ReplaceWithIndex(str string, startIndex int, endIndex int, replacedStr stri
 	return string(runes[:startIndex]) + RepeatByLength(replacedStr, replaceCount) + string(runes[endIndex:])
 }
 
+// regexCache 已编译正则的缓存，按模式串缓存
+//
+// 模式是调用方在运行期传进来的，没法在包级预编译，但同一个模式通常会被反复使用
+// （循环里脱敏、按同一规则批量替换），而 regexp.MustCompile 要走完整的编译流程，
+// 比一次匹配贵得多
+//
+// 用 sync.Map 而不是 map 加锁：这里是读多写极少的典型形态，模式集合在程序跑起来
+// 之后基本固定下来
+//
+// 注意缓存不设上限如果模式是由不可信输入拼出来的，缓存会随之无限增长；这种用法
+// 本身就不该把外部输入当正则（既有正则注入风险，也有灾难性回溯风险），调用方应当
+// 只传自己代码里写死的模式
+//
+// [EN] A cache of compiled regexps keyed by the pattern string. The pattern
+// arrives at run time so it cannot be compiled at package level, yet the same
+// pattern is typically used over and over — masking inside a loop, batch
+// replacement by one rule — and MustCompile runs a full compilation, far dearer
+// than a single match. sync.Map rather than a mutex-guarded map because this is
+// the classic read-mostly shape, with the set of patterns settling once the
+// program is running. The cache is unbounded: if patterns are built from
+// untrusted input it will grow without limit, but that usage is wrong to begin
+// with — treating external input as a regexp invites both injection and
+// catastrophic backtracking — and callers should pass only patterns written in
+// their own code
+var regexCache sync.Map // map[string]*regexp.Regexp
+
+// cachedRegex 取已编译的正则，未缓存则编译并存入
+//
+// 与 regexp.MustCompile 一样在模式非法时 panic，保持 ReplaceWithMatcher 的既有行为
+func cachedRegex(pattern string) *regexp.Regexp {
+	if v, ok := regexCache.Load(pattern); ok {
+		return v.(*regexp.Regexp)
+	}
+	re := regexp.MustCompile(pattern)
+	// 并发下可能有多个 goroutine 同时编译同一个模式，存入时谁先谁后无所谓：
+	// 编译结果是等价的，*Regexp 本身也可并发使用
+	actual, _ := regexCache.LoadOrStore(pattern, re)
+	return actual.(*regexp.Regexp)
+}
+
 // ReplaceWithMatcher 通过正则表达式替换字符串
+//
+// 正则会按模式串缓存，同一模式只编译一次，原因见 regexCache
 func ReplaceWithMatcher(str string, regex string, replaceFun func(string) string) string {
-	re := regexp.MustCompile(regex)
-	return re.ReplaceAllStringFunc(str, replaceFun)
+	return cachedRegex(regex).ReplaceAllStringFunc(str, replaceFun)
 }
 
 // ReplaceWithMatcherChain 通过正则表达式替换字符串（链式调用）
