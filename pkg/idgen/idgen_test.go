@@ -17,7 +17,6 @@ import (
 	"regexp"
 	"strconv"
 	"sync"
-	"syscall"
 	"testing"
 	"time"
 
@@ -994,12 +993,6 @@ func TestSnowflakeClockRegression(t *testing.T) {
 // 序列号耗尽后的等待：只量 CPU 占用，不断言
 // ============================================================================
 
-func processCPUTime() time.Duration {
-	var ru syscall.Rusage
-	_ = syscall.Getrusage(syscall.RUSAGE_SELF, &ru)
-	return time.Duration(ru.Utime.Nano() + ru.Stime.Nano())
-}
-
 // TestWaitStrategyCPUCost 打印等待期间的 CPU 占用，供改动等待策略时对照
 //
 // 不做断言：CPU 比例随机器与负载波动，断了只会变成假红
@@ -1018,6 +1011,15 @@ func TestWaitStrategyCPUCost(t *testing.T) {
 	}{
 		{"Snowflake", 40000, NewSnowflakeGenerator(1, 1).Generate},
 		{"ShortFlake", 600, NewShortFlakeGenerator(1).Generate},
+	}
+	if !cpuTimeSupported {
+		// Windows 上没有 getrusage 的等价物，这里只是打印观测值、不做断言，
+		// 所以跳过而不是另找一套平台相关的实现
+		//
+		// [EN] There is no getrusage equivalent on Windows, and this test only
+		// logs observations without asserting, so it skips rather than growing a
+		// second platform-specific implementation
+		t.Skip("当前平台取不到进程 CPU 时间，跳过")
 	}
 	for _, c := range cases {
 		c.gen() // 预热，让首个毫秒窗口对齐
