@@ -471,3 +471,73 @@ func TestCircuitRecordFailureInOpenState(t *testing.T) {
 	assert.Equal(t, prevFailures, atomic.LoadInt32(&cb.failures))
 	assert.Equal(t, StateOpen, cb.GetState())
 }
+
+// ============================================================================
+// 基准：这个包原先一个基准也没有
+//
+// 熔断器在每个调用路径上，又天然被多协程调用，所以并发形态必须一起量——
+// 成功路径原先每次都写一次 failures 计数，串行只要 3.25ns，十协程却要 48.9ns，
+// 差了十五倍，而那次写在稳态下是多余的（见 RecordSuccess 的说明）
+//
+// [EN] This package had no benchmarks. A breaker sits on every call path and is
+// called from many goroutines by nature, so the concurrent shape has to be
+// measured too: the success path used to write the failure counter every time,
+// costing 3.25ns serially but 48.9ns at ten-way concurrency, and that write is
+// redundant in steady state
+// ============================================================================
+
+var (
+	benchErr  error
+	benchBool bool
+)
+
+func BenchmarkCircuitExecute(b *testing.B) {
+	c := New("bench", Config{})
+	ok := func() error { return nil }
+
+	b.Run("成功/串行", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			benchErr = c.Execute(ok)
+		}
+	})
+	b.Run("成功/并发", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		b.RunParallel(func(p *testing.PB) {
+			for p.Next() {
+				benchErr = c.Execute(ok)
+			}
+		})
+	})
+	b.Run("AllowRequest/并发", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		b.RunParallel(func(p *testing.PB) {
+			for p.Next() {
+				benchBool = c.AllowRequest()
+			}
+		})
+	})
+}
+
+func BenchmarkLimiterAllow(b *testing.B) {
+	l := NewLimiter(1000000, 1000000)
+	b.Run("串行", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			benchBool = l.Allow()
+		}
+	})
+	b.Run("并发", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		b.RunParallel(func(p *testing.PB) {
+			for p.Next() {
+				benchBool = l.Allow()
+			}
+		})
+	})
+}

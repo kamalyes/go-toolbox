@@ -124,7 +124,33 @@ func (c *Circuit) RecordSuccess() {
 
 	switch state {
 	case StateClosed:
-		atomic.StoreInt32(&c.failures, 0)
+		// 先读再写：稳态下 failures 本来就是 0，不该每次成功都写一遍
+		//
+		// 原子写会让其他核上这条缓存行失效，而成功是生产里的绝大多数调用，
+		// 于是缓存行在各核之间反复弹跳实测（Apple M4）Execute 串行 3.25ns，
+		// 十协程并发 48.9ns，差了十五倍——瓶颈不是指令数而是缓存一致性流量
+		// 改成先读：未被修改的缓存行以共享态命中本地，不产生任何一致性流量，
+		// 稳态下成功路径变成纯读
+		//
+		// 顺带一个好处：原先无条件归零会把并发的 RecordFailure 刚加上的计数
+		// 抹掉；现在读到 0 就不写，那次失败得以保留两种写法本就都是有损计数，
+		// 但保留失败记录更符合熔断器的本意
+		//
+		// [EN] Read before writing: in steady state failures is already zero, so
+		// it should not be written on every success. An atomic store invalidates
+		// the cache line on every other core, and success is the overwhelming
+		// majority of calls in production, so the line bounces between cores.
+		// Measured, Execute costs 3.25ns serially and 48.9ns at ten-way
+		// concurrency, a fifteenfold difference — the bottleneck is coherence
+		// traffic, not instruction count. A load on an unmodified line hits the
+		// local cache in shared state and generates no traffic at all, leaving
+		// the success path read-only in steady state. It also stops the
+		// unconditional reset from wiping out a failure a concurrent
+		// RecordFailure has just counted; both forms are lossy by design, but
+		// keeping the failure is truer to what a breaker is for
+		if atomic.LoadInt32(&c.failures) != 0 {
+			atomic.StoreInt32(&c.failures, 0)
+		}
 	case StateHalfOpen:
 		successes := atomic.AddInt32(&c.successes, 1)
 		if successes >= c.halfOpenSuccesses {
