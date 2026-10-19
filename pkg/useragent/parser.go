@@ -53,6 +53,78 @@ var browserRules = []struct {
 	{"safari", Safari, mustCompile(`version/(\d+)`)},
 }
 
+// 以下三张表原先写在各自的函数体内，每次 Parse 都要重建一遍
+//
+// osRules 与 browserRules 当初已经提到包级（注释写着「避免循环内重复编译」），
+// 这三张被漏掉了其中两张还是 map 字面量：map 是可变引用类型，编译器无法把它
+// 放进静态数据，每次调用都要分配桶并逐个插入键
+//
+// 更要紧的是 map 换成了有序切片：Go 遍历 map 的顺序是随机的，而这里的循环是
+// 「谁先匹配上就用谁」一个 UA 若同时含 "sm-" 与 "samsung"（三星设备的 UA 常
+// 同时出现型号与品牌），或 iPad 在桌面模式下同时含 "ipad" 与 "macintosh"，
+// 那么 Device 字段会在多次调用之间随机变化——不报错，只是同一个 UA 有时得到
+// 这个值有时得到那个值顺序按源码里原本的书写次序固定下来，那个次序本身读起来
+// 就是有意安排的（具体型号在前、通用品牌在后）
+//
+// [EN] These three tables used to sit inside their functions and were rebuilt on
+// every Parse. osRules and browserRules had already been hoisted — their comment
+// says it is to avoid recompiling inside the loop — and these were missed. Two of
+// them were map literals, and a map is a mutable reference type the compiler
+// cannot place in static data, so every call allocated buckets and inserted each
+// key. More importantly the maps became ordered slices: Go iterates a map in
+// random order while these loops take the first match, so a UA containing both
+// "sm-" and "samsung", or an iPad in desktop mode containing both "ipad" and
+// "macintosh", would set the Device field to a value that varied between calls —
+// no error, just the same input giving different answers. The order is fixed to
+// the one the source already used, which reads as deliberate: specific models
+// first, generic brands after
+
+// botRules 爬虫识别规则（按优先级排序，更具体的放在前面，通用关键词最后）
+var botRules = []struct {
+	keyword string
+	name    string
+}{
+	{"googlebot", Googlebot},                     // Google 搜索爬虫
+	{"bingbot", Bingbot},                         // Bing 搜索爬虫
+	{"yandexbot", YandexBot},                     // Yandex 搜索爬虫
+	{"baiduspider", BotBaidu},                    // 百度搜索爬虫
+	{"slurp", BotYahoo},                          // Yahoo 搜索爬虫
+	{"twitterbot", Twitterbot},                   // Twitter 爬虫
+	{"facebookexternalhit", FacebookExternalHit}, // Facebook 外链爬虫
+	{"applebot", Applebot},                       // Apple 搜索爬虫
+	{"spider", BotSpider},                        // 通用爬虫
+	{"crawler", BotCrawler},                      // 通用爬虫
+	{"bot", BotGeneric},                          // 通用爬虫 (必须放在最后)
+}
+
+// windowsVersions Windows 版本映射（按版本号降序，必须先匹配更具体的）
+var windowsVersions = []struct {
+	kw, version string
+}{
+	{"windows nt 10.0", "10"},
+	{"windows nt 6.3", "8.1"},
+	{"windows nt 6.2", "8"},
+	{"windows nt 6.1", "7"},
+	{"windows nt 6.0", "Vista"},
+	{"windows nt 5", "XP"},
+}
+
+// vendorRules 设备厂商识别规则（具体型号前缀在前，通用品牌名在后）
+var vendorRules = []struct {
+	kw, vendor string
+}{
+	{"iphone", VendorApple},
+	{"ipad", VendorApple},
+	{"macintosh", VendorApple},
+	{"sm-", VendorSamsung},
+	{"samsung", VendorSamsung},
+	{"huawei", VendorHuawei},
+	{"honor", VendorHonor},
+	{"xiaomi", VendorXiaomi},
+	{"oppo", VendorOPPO},
+	{"vivo", VendorVivo},
+}
+
 // ParsedUserAgent 解析后的 User-Agent 信息
 type ParsedUserAgent struct {
 	Raw            string `json:"raw"`                // 原始 User-Agent 字符串
@@ -98,23 +170,7 @@ func Parse(ua string) *ParsedUserAgent {
 func (p *ParsedUserAgent) parseBot(s string) {
 	// 常见爬虫关键词映射 (按优先级排序,更具体的放在前面)
 	// 注意: 必须先检查具体的爬虫名称,再检查通用关键词
-	bots := []struct {
-		keyword string
-		name    string
-	}{
-		{"googlebot", Googlebot},                     // Google 搜索爬虫
-		{"bingbot", Bingbot},                         // Bing 搜索爬虫
-		{"yandexbot", YandexBot},                     // Yandex 搜索爬虫
-		{"baiduspider", BotBaidu},                    // 百度搜索爬虫
-		{"slurp", BotYahoo},                          // Yahoo 搜索爬虫
-		{"twitterbot", Twitterbot},                   // Twitter 爬虫
-		{"facebookexternalhit", FacebookExternalHit}, // Facebook 外链爬虫
-		{"applebot", Applebot},                       // Apple 搜索爬虫
-		{"spider", BotSpider},                        // 通用爬虫
-		{"crawler", BotCrawler},                      // 通用爬虫
-		{"bot", BotGeneric},                          // 通用爬虫 (必须放在最后)
-	}
-	for _, b := range bots {
+	for _, b := range botRules {
 		if strings.Contains(s, b.keyword) {
 			p.IsBot, p.BotName, p.DeviceType = true, b.name, DeviceBot
 			return
@@ -125,18 +181,9 @@ func (p *ParsedUserAgent) parseBot(s string) {
 // parseOS 解析操作系统信息
 // 识别 Windows, macOS, iOS, Android, Linux 等主流操作系统
 func (p *ParsedUserAgent) parseOS(s string) {
-	// Windows 版本映射表
-	winVer := map[string]string{
-		"windows nt 10.0": "10",
-		"windows nt 6.3":  "8.1",
-		"windows nt 6.2":  "8",
-		"windows nt 6.1":  "7",
-		"windows nt 6.0":  "Vista",
-		"windows nt 5":    "XP",
-	}
-	for k, v := range winVer {
-		if strings.Contains(s, k) {
-			p.OS, p.OSVersion = Windows, v
+	for _, w := range windowsVersions {
+		if strings.Contains(s, w.kw) {
+			p.OS, p.OSVersion = Windows, w.version
 			return
 		}
 	}
@@ -188,24 +235,10 @@ func (p *ParsedUserAgent) parseDevice(s string) {
 		p.IsMobile = false
 	}
 
-	// 设备厂商映射
-	vendors := map[string]string{
-		"iphone":    VendorApple,   // iPhone
-		"ipad":      VendorApple,   // iPad
-		"macintosh": VendorApple,   // Mac
-		"sm-":       VendorSamsung, // 三星 (SM- 开头的设备型号)
-		"samsung":   VendorSamsung, // 三星
-		"huawei":    VendorHuawei,  // 华为
-		"honor":     VendorHonor,   // 荣耀
-		"xiaomi":    VendorXiaomi,  // 小米
-		"oppo":      VendorOPPO,    // OPPO
-		"vivo":      VendorVivo,    // Vivo
-	}
-
-	for k, v := range vendors {
-		if strings.Contains(s, k) {
-			p.DeviceVendor = v
-			p.Device = k
+	for _, v := range vendorRules {
+		if strings.Contains(s, v.kw) {
+			p.DeviceVendor = v.vendor
+			p.Device = v.kw
 			return
 		}
 	}
