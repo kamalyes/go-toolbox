@@ -200,6 +200,27 @@ func (m *Matcher[T]) Match(ctx *contextx.Context) (T, bool) {
 	}
 
 	// 尝试从缓存获取
+	//
+	// 这里没有 single-flight：冷启动时并发的未命中会各自走一遍 executeMatch
+	//
+	// 这是有意的取舍谓词是幂等的，重复执行只浪费一次计算；而加 single-flight
+	// 要在这条热路径上多一把锁或一个 per-key 的 once，为一次性的冷启动常驻付这个
+	// 代价不划算如果将来有调用方把昂贵操作（比如查库）写进谓词，那就该在那一侧
+	// 自己做去重，而不是让匹配器为所有人加锁
+	//
+	// 注意这会让「并发冷启动时谓词执行几次」变成调度相关的量
+	// TestConcurrentCacheAccess 原先就是断言了一个具体次数才变得不稳定的，
+	// 现在拆成了预热后确定性断言与冷启动只断言上界两个测试
+	//
+	// [EN] There is no single-flight here: on a cold start, concurrent misses
+	// each run executeMatch. That is deliberate — the predicates are idempotent
+	// so a duplicate run only wastes one evaluation, while single-flight would
+	// put a lock or a per-key once permanently on this hot path to save a one-off
+	// cold start. A caller who puts something expensive such as a database query
+	// in a predicate should deduplicate on their side rather than make the
+	// matcher lock for everyone. Note this makes the number of predicate runs
+	// during a concurrent cold start scheduling-dependent, which is what made
+	// TestConcurrentCacheAccess flaky when it asserted an exact count
 	if result, matched, found := m.tryGetFromCache(ctx); found {
 		m.updateStatsForCacheHit(matched)
 		return result, matched

@@ -201,7 +201,30 @@ func TestMatchWithCache(t *testing.T) {
 	t.Logf("Cache test stats: %+v", stats2)
 }
 
-// TestConcurrentCacheAccess 并发缓存访问测试
+// TestConcurrentCacheAccess 缓存预热后的并发读
+//
+// 原先这个测试是不稳定的：它让一千个 goroutine 同时冷启动，再断言谓词最多执行
+// 十次而缓存没有 single-flight，冷启动时每个未命中的 goroutine 都会各自执行
+// 一次谓词，到底几次全看调度，十这个数字是拍出来的
+// 实测本机连跑八次得到 4 到 14 次，其中一次就超了；CI 上 macos-14 带覆盖率插桩时
+// 达到 40——插桩让一切变慢，冷缓存的窗口变宽，挤进去的 goroutine 就更多
+// 同一个任务里不带覆盖率的那一步是通过的，正是这个差别
+//
+// 现在把它拆成两件事各自确定地验证这一个只管预热之后：缓存已就绪时，并发读
+// 不应再触发任何一次谓词执行——这才是「并发缓存访问」要验的东西，且是确定的
+//
+// [EN] This test used to be flaky: it started a thousand goroutines cold and
+// then asserted the predicate ran at most ten times. The cache has no
+// single-flight, so on a cold start every goroutine that misses runs the
+// predicate itself, and how many that is depends entirely on scheduling — ten
+// was an arbitrary number. Measured locally it ranged from 4 to 14 over eight
+// runs, one of which exceeded the bound, and on CI's macos-14 runner under
+// coverage instrumentation it reached 40: instrumentation slows everything down,
+// widening the window in which the cache is still cold. The same job's
+// uninstrumented step passed, which is exactly that difference. It is now split
+// in two, and this half covers only the warmed case, where concurrent reads must
+// trigger no further predicate runs at all — which is what "concurrent cache
+// access" means to verify, and is deterministic
 func TestConcurrentCacheAccess(t *testing.T) {
 	type Result struct {
 		Count int
@@ -210,10 +233,74 @@ func TestConcurrentCacheAccess(t *testing.T) {
 	var callCount atomic.Int64
 
 	m := NewMatcher[*Result]().EnableCache(time.Second)
-
-	// 添加规则，计数调用次数
 	m.AddRule(
-		NewChainRule(&Result{Count: int(callCount.Add(1))}).
+		NewChainRule(&Result{Count: 1}).
+			When(func(ctx *contextx.Context) bool {
+				callCount.Add(1)
+				return contextx.Get[string](ctx, "key") == "test"
+			}).
+			WithPriority(100),
+	)
+
+	ctx := contextx.NewContext().WithValue("key", "test")
+
+	// 先单线程预热，让缓存就绪
+	if _, matched := m.Match(ctx); !matched {
+		t.Fatal("预热这一次就应该匹配上")
+	}
+	warm := callCount.Load()
+	assert.Equal(t, int64(1), warm, "预热应只执行一次谓词")
+
+	const goroutines = 1000
+	var wg sync.WaitGroup
+	start := time.Now()
+	for i := 0; i < goroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, matched := m.Match(ctx); !matched {
+				t.Error("并发读缓存时没有匹配上")
+			}
+		}()
+	}
+	wg.Wait()
+	elapsed := time.Since(start)
+
+	stats := m.Stats()
+	t.Logf("并发读缓存：%d 个 goroutine 用时 %v，命中 %v 次，未命中 %v 次",
+		goroutines, elapsed, stats["cache_hits"], stats["cache_misses"])
+
+	assert.Equal(t, warm, callCount.Load(),
+		"缓存预热后并发读不应再执行谓词，实得 %d 次", callCount.Load())
+}
+
+// TestConcurrentCacheColdStart 冷启动时并发未命中的重复执行
+//
+// 缓存没有 single-flight，所以冷启动时并发的未命中会各自执行一次谓词这是已知
+// 行为而不是缺陷：谓词是幂等的，而加 single-flight 要在热路径上多一把锁或一个
+// per-key 的 once，为一次性的冷启动付这个代价不值得
+//
+// 因此这里不去断言一个具体次数（那就是原先那个测试不稳定的根源），只断言两件
+// 确定的事：不放大（不超过每个 goroutine 一次），以及缓存确实在起作用
+// （远低于 goroutine 数）
+//
+// [EN] With no single-flight, concurrent misses on a cold start each run the
+// predicate. That is known behaviour rather than a defect: the predicates are
+// idempotent, and single-flight would cost a lock or a per-key once on the hot
+// path to save a one-off cold start. So this asserts nothing about an exact
+// count — which is what made the original flaky — only two things that do hold:
+// no amplification beyond one run per goroutine, and that the cache is working
+// at all, keeping the count far below the goroutine count
+func TestConcurrentCacheColdStart(t *testing.T) {
+	type Result struct {
+		Count int
+	}
+
+	var callCount atomic.Int64
+
+	m := NewMatcher[*Result]().EnableCache(time.Second)
+	m.AddRule(
+		NewChainRule(&Result{Count: 1}).
 			When(func(ctx *contextx.Context) bool {
 				callCount.Add(1)
 				return contextx.Get[string](ctx, "key") == "test"
@@ -222,11 +309,9 @@ func TestConcurrentCacheAccess(t *testing.T) {
 	)
 
 	const goroutines = 1000
-	var wg sync.WaitGroup
 	ctx := contextx.NewContext().WithValue("key", "test")
 
-	start := time.Now()
-
+	var wg sync.WaitGroup
 	for i := 0; i < goroutines; i++ {
 		wg.Add(1)
 		go func() {
@@ -234,20 +319,16 @@ func TestConcurrentCacheAccess(t *testing.T) {
 			m.Match(ctx)
 		}()
 	}
-
 	wg.Wait()
-	elapsed := time.Since(start)
 
-	stats := m.Stats()
-	t.Logf("Concurrent cache test:")
-	t.Logf("  Goroutines: %d", goroutines)
-	t.Logf("  Duration: %v", elapsed)
-	t.Logf("  Cache hits: %d", stats["cache_hits"])
-	t.Logf("  Cache misses: %d", stats["cache_misses"])
-	t.Logf("  Call count: %d", callCount.Load())
+	n := callCount.Load()
+	t.Logf("冷启动并发：%d 个 goroutine 共执行谓词 %d 次", goroutines, n)
 
-	// 应该只有第一次调用匹配函数，其他都是缓存命中
-	assert.LessOrEqual(t, callCount.Load(), int64(10), "Cache not working properly")
+	assert.GreaterOrEqual(t, n, int64(1), "至少要执行一次")
+	assert.LessOrEqual(t, n, int64(goroutines),
+		"每个 goroutine 最多执行一次，实得 %d 次说明出现了放大", n)
+	assert.Less(t, n, int64(goroutines/10),
+		"缓存应当把执行次数压到远低于 goroutine 数，实得 %d 次", n)
 }
 
 // TestMiddleware 中间件测试
