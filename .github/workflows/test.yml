@@ -19,7 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         go-version: [1.23.x, 1.24.x]
-        platform: [ubuntu-latest, windows-latest, macos-latest, macos-14]
+        platform: [ubuntu-latest, windows-latest, macos-latest, macos-15]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Fetch Repository
