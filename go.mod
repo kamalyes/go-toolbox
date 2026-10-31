@@ -5,7 +5,7 @@ go 1.23.0
 require (
 	github.com/disintegration/imaging v1.6.2
 	github.com/google/uuid v1.6.0
-	github.com/kamalyes/go-argus v0.4.0
+	github.com/kamalyes/go-argus v0.5.0
 	github.com/stretchr/testify v1.12.1
 	google.golang.org/protobuf v1.36.10
 )
