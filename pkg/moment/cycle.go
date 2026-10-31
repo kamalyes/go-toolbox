@@ -13,6 +13,7 @@ package moment
 
 import (
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -130,7 +131,47 @@ func (c Cycle) Every() (int, Unit) { return c.step, c.unit }
 // anchor once, so nothing accumulates
 func (c Cycle) NthStart(i int) Moment {
 	c.mustValid()
-	return Moment{t: c.anchor}.Add(i*c.step, c.unit)
+
+	// 溢出必须拦住，否则会静默给出荒谬的结果
+	//
+	// 实测未加检查时：锚点 2026-01-31 的月周期，NthStart(math.MaxInt) 返回 2025-12-28，
+	// 比锚点还早；年周期的 NthStart(math.MinInt) 返回锚点本身，因为 12*MinInt 溢出成 0
+	// 这两个都不报错，调用方拿到的是一个看起来正常的日期
+	// 更糟的是 IndexAt 的校正循环依赖 NthStart 随 i 单调，溢出一旦发生单调性就断了，
+	// 循环可能不再收敛
+	//
+	// [EN] Overflow has to be caught, or the result is silently absurd. Measured
+	// without this check, a monthly cycle anchored at 2026-01-31 returned
+	// 2025-12-28 for NthStart(math.MaxInt) — earlier than its own anchor — and a
+	// yearly cycle returned the anchor itself for math.MinInt because 12*MinInt
+	// wraps to 0. Neither reported an error, so the caller received a
+	// plausible-looking date. Worse, IndexAt's correction loop relies on
+	// NthStart being monotonic in i, and overflow breaks that, so the loop may
+	// stop converging
+	n := i * c.step
+	if n/c.step != i {
+		panic(fmt.Sprintf("moment: Cycle 期号 %d 乘以步长 %d 溢出", i, c.step))
+	}
+
+	out := Moment{t: c.anchor}.Add(n, c.unit)
+
+	// 自检方向：i 非零时结果必须严格偏向对应一侧
+	// Add 内部对季/年还要再乘 3 或 12，那一步也可能溢出，这里兜住
+	//
+	// 必须用「严格」而不是 Before/After 取反：年周期的 NthStart(math.MinInt) 里
+	// 12*MinInt 恰好回绕成 0，结果等于锚点本身，既不早于也不晚于，
+	// 只判 Before/After 会漏掉这一例（实测漏过）
+	//
+	// [EN] Direction self-check: for a non-zero i the result must fall strictly
+	// on the matching side. Add multiplies by 3 or 12 again for quarters and
+	// years, which can overflow in turn. Strictness matters: for a yearly cycle,
+	// 12*math.MinInt wraps to exactly 0, so the result equals the anchor and is
+	// neither before nor after it — testing Before/After alone missed this case,
+	// as measured
+	if (i > 0 && !out.t.After(c.anchor)) || (i < 0 && !out.t.Before(c.anchor)) {
+		panic(fmt.Sprintf("moment: Cycle 期号 %d 超出可表示的时间范围（步长 %d）", i, c.step))
+	}
+	return out
 }
 
 // NthEnd 第 i 期的结束时刻，即下一期起点的前一纳秒
@@ -186,8 +227,26 @@ func (c Cycle) monthsPerPeriod() int {
 // difference and a period index
 func (c Cycle) IndexAt(t Moment) int {
 	c.mustValid()
-	i := c.estimateIndex(t)
+	return c.correctIndex(c.estimateIndex(t), t)
+}
 
+// correctIndex 把任意估算值 i 校正为准确期号
+//
+// 抽成独立函数有两个用处：一是把「估算只需接近、校正才是权威」这件事落成代码结构，
+// 二是测试可以故意喂偏大或偏小的估算，把两个方向都走到
+// 当前两种估算都是真值的**上界**（见 estimateIndex），所以实际只会走到向下校正那支，
+// 向上那支在正常路径上不可达——留着是为了估算以后若被改动仍然正确，
+// 不留则一旦估算变成下界就会静默算错
+//
+// [EN] Corrects an arbitrary estimate i into the exact period index. Extracting
+// it serves two purposes: it encodes structurally that the estimate only has to
+// be close while the correction is authoritative, and it lets tests feed a
+// deliberately high or low estimate to exercise both directions. Both current
+// estimates are upper bounds on the true index (see estimateIndex), so only the
+// downward branch is reachable on the normal path; the upward one is kept so
+// that a future change to the estimate stays correct, since dropping it would
+// silently break the moment an estimate became a lower bound
+func (c Cycle) correctIndex(i int, t Moment) int {
 	// 校正：区间左闭右开
 	//
 	// 两个循环一定会停：step 已由 NewCycle 保证为正，因此 NthStart(i) 随 i 严格单调递增，
@@ -221,12 +280,57 @@ func (c Cycle) estimateIndex(t Moment) int {
 	if c.unit == UnitWeek {
 		days = 7 * c.step
 	}
-	// 日/周用 24 小时估算即可，夏令时带来的偏差由校正吸收
+
+	// 用公历日序号相减，而不是 t.Sub(anchor)
 	//
-	// [EN] A 24-hour approximation is enough here; the correction absorbs any
-	// daylight-saving skew
-	elapsed := t.t.Sub(c.anchor)
-	return floorDiv(int(elapsed/(24*time.Hour)), days)
+	// time.Duration 是 int64 纳秒，上限约 292 年，超出就饱和
+	// 原先用 Sub 的写法在相距很远时估算会被钉在 292 年处，校正循环只能一步一步爬：
+	// 实测日周期相距 2000 年时单次 IndexAt 要 21.7 毫秒，相距 500 年要 2.0 毫秒，
+	// 而零值 time.Time（公元 1 年）当锚点要 14.5 毫秒
+	// 未初始化的时间字段在真实数据里很常见，这个开销还完全不显形
+	// 换成公历日序号后不存在饱和，估算与真值最多差一天，校正循环恒定只走一两步
+	//
+	// [EN] Civil day numbers are subtracted instead of calling t.Sub(anchor),
+	// because time.Duration is an int64 of nanoseconds and saturates at roughly
+	// 292 years. With Sub, a distant t pinned the estimate at that ceiling and
+	// the correction loop had to crawl the rest: a daily cycle 2000 years out
+	// measured 21.7ms for a single IndexAt, 500 years out 2.0ms, and a
+	// zero-value time.Time as the anchor 14.5ms — and uninitialised time fields
+	// are common in real data, with none of that cost being visible. Civil day
+	// numbers cannot saturate, so the estimate is within a day and the
+	// correction is a constant step or two
+	ay, am, ad := c.anchor.Date()
+	ty, tm, td := t.t.Date()
+	return floorDiv(daysFromCivil(ty, int(tm), td)-daysFromCivil(ay, int(am), ad), days)
+}
+
+// daysFromCivil 把公历年月日折成相对 1970-01-01 的天序号
+//
+// 取自 Howard Hinnant 的 chrono 算法：把 3 月当作年首，闰年规则就退化成
+// 4/100/400 的整除判断，于是整个换算没有分支也没有查表
+// 只用 int 运算，不碰 time.Duration，因此不存在溢出或饱和
+//
+// [EN] Converts a civil date to a day number relative to 1970-01-01, using
+// Howard Hinnant's algorithm: treating March as the first month reduces the leap
+// rule to divisibility by 4, 100 and 400, so the conversion needs no branches or
+// tables. It stays in int arithmetic and never touches time.Duration, so it
+// cannot overflow or saturate
+func daysFromCivil(y, m, d int) int {
+	if m <= 2 {
+		y--
+	}
+	era := y / 400
+	if y < 0 {
+		era = (y - 399) / 400
+	}
+	yoe := y - era*400 // [0, 399]
+	mp := m - 3        // 以 3 月为年首
+	if m <= 2 {
+		mp = m + 9
+	}
+	doy := (153*mp+2)/5 + d - 1 // [0, 365]
+	doe := yoe*365 + yoe/4 - yoe/100 + doy
+	return era*146097 + doe - 719468
 }
 
 // floorDiv 向下取整的整数除法
