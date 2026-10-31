@@ -94,6 +94,40 @@ ua.IsCrOS()      // bool
 | `BotName` | `string` | `bot_name,omitempty` | 爬虫名称（仅 IsBot=true 时有值） |
 | `IsMobile` | `bool` | `is_mobile` | 是否移动设备（平板时为 false） |
 | `IsTablet` | `bool` | `is_tablet` | 是否平板 |
+| `Engine` | `string` | `engine,omitempty` | 渲染引擎：`Blink`/`WebKit`/`Gecko`/`Trident`/`Presto`，由浏览器与 OS 推导（iOS 一律 WebKit） |
+
+### ParsedUserAgent 方法（按需计算，不缓存）
+
+这些方法不在 `Parse` 时计算，调用才算；也不把结果写回结构体
+
+| 方法 | 签名 | 说明 |
+|---|---|---|
+| `InApp` | `func() string` | 端内浏览器名，非端内返回 `""`；20 个常量见 `InApp*` |
+| `IsInApp` | `func() bool` | 等价于 `InApp() != ""` |
+| `HTTPClient` | `func() string` | 命令行/库 UA 名（curl、wget、Postman、Go-http-client 等），非此类返回 `""` |
+| `IsHTTPClient` | `func() bool` | 等价于 `HTTPClient() != ""` |
+| `Arch` | `func() string` | CPU 架构，取自 Raw 的关键字：`ArchX8664`/`ArchARM64`/`ArchARM`/`ArchX86` 等，判不出返回 `""` |
+| `IsDesktop` | `func() bool` | 是否桌面端 |
+| `IsChromium` | `func() bool` | 等价于 `Engine == EngineBlink` |
+| `IsIOS` | `func() bool` | 是否 iOS |
+| `IsAndroid` | `func() bool` | 是否 Android |
+| `IsWindows` | `func() bool` | 是否 Windows |
+| `IsMacOS` | `func() bool` | 是否 macOS |
+
+> **这些方法属于 `*ParsedUserAgent`（`Parse` 的返回值），不是生成器 `UserAgent`。**
+> 两个类型都有 `IsIOS`/`IsMacOS`/`IsWindows`/`IsAndroid` 同名方法，但判定来源不同：
+> `ParsedUserAgent` 看解析结果，`UserAgent` 看生成器内部的 `oS` 字段
+
+```go
+p := useragent.Parse(uaString)
+if p.IsInApp() {
+    log.Printf("端内浏览器: %s", p.InApp())   // 例如 WeChat / DingTalk
+}
+if p.IsHTTPClient() {
+    return  // curl / Postman 之类，不是真实用户
+}
+log.Printf("引擎=%s 架构=%s 桌面端=%v", p.Engine, p.Arch(), p.IsDesktop())
+```
 
 ### UserAgent 生成器方法
 
@@ -227,3 +261,8 @@ ua.IsCrOS()      // bool
 - `Is*` 系列方法基于生成器内部 `oS` 字段，使用 `checkOS` 进行完全匹配 + 模糊匹配（`strings.Contains`），与 `Parse` 的解析逻辑相互独立
 - `RgType` 是随机类型枚举（`int`），**不是正则类型**
 - `DeviceType` 是 `int` 枚举（用于 `GenerateStabilize` 入参），与 `ParsedUserAgent.DeviceType`（`string`）是不同的概念
+- `InApp`/`HTTPClient`/`Arch` 刻意不在 `Parse` 里预先算、也不缓存：端内规则表有 25 条，
+  一次未命中的 `InApp()` 扫描成本与整个 `Parse` 相当，而多数调用方根本不关心端内身份；
+  不缓存则是不想给解析结果引入可变状态与并发写
+- 端内规则按顺序匹配，专有标识必须排在通用标识之前（例如 `dingtalk` 在 `aliapp` 之前），
+  否则钉钉会被认成支付宝；规则表是有序切片而非 map，因为 map 迭代顺序随机会让结果漂移

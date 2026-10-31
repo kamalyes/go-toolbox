@@ -50,7 +50,7 @@ s := syncx.NewSet[string]()
 | 导出名称 | 签名 | 说明 |
 |---|---|---|
 | `WithRLock` | `func(lock, operation)` | 加读锁执行代码块 |
-| `WithRUnlockThenRLock` | `func(lock, operation)` | 先解锁再加读锁执行 |
+| `WithRUnlockThenLock` | `func(lock RLocker, operation func())` | 先释放读锁、执行 operation、再重新加读锁 |
 | `WithRLockReturn[T]` | `func(lock, operation) (T, error)` | 加读锁执行并返回结果 |
 | `WithRLockReturnValue[T]` | `func(lock, operation) T` | 加读锁执行并仅返回值 |
 | `WithRLockReturnWithE[T,E]` | `func(lock, operation) (T, E)` | 加读锁执行返回自定义错误类型 |
@@ -228,6 +228,8 @@ s := syncx.NewSet[string]()
 
 **Map[K,V]**: `CompareAndDelete`, `CompareAndSwap`, `Delete`, `Load`, `LoadAndDelete`, `LoadOrStore`, `Range`, `Size`, `Clear`, `Keys`, `Values`, `Store`, `Swap`, `Equals`, `Clone`, `Filter`, `FilterKeys`, `FilterMap`, `ForEach`, `DeleteIf`, `Any`, `All`, `Count`, `IsEmpty`, `ToMap`, `FromMap`, `Update`, `GetOrStore`, `GetOrCompute`
 
+**ShardedMap[K,V]**: `Store`, `StoreBatch`, `Load`, `LoadOrStore`, `LoadAndDelete`, `Delete`, `CompareAndSwap`, `CompareAndDelete`, `Swap`, `Has`, `Len`, `Keys`, `Values`, `Count`, `Range`, `RangeParallel`, `Clear`, `ClearHalf`, `WithShardLock`, `WithShardRLock`
+
 **Set[K]**: `Add`, `Has`, `Delete`, `AddAll`, `HasAll`, `DeleteAll`, `Size`, `Clear`, `Elements`, `IsEmpty`
 
 **WorkerPool**: `Submit`, `SubmitNonBlocking`, `Wait`, `Close`, `GetQueueSize`, `GetWorkerCount`, `IsClosed`
@@ -252,3 +254,20 @@ s := syncx.NewSet[string]()
 - `SafeGo` 必须配合 `Recover` 或 `RecoverToError` 选项使用才能真正捕获panic
 - `Map` 和 `Set` 的迭代回调中不要再操作自身，否则可能死锁
 - `WorkerPool` 关闭后再提交任务会返回 `ErrClosed`
+
+## ShardedMap 的两个坑
+
+**整数键必须经过混淆，否则分片会退化。** `KvHasher` 对整数键不是直接取模，而是先乘以
+`0x9E3779B97F4A7C15` 再取**高** 32 位。取低位等于没混淆：乘法的进位只向左走，
+所以乘积第 i 位只依赖输入的第 0 到 i 位，低位带不走高位的信息
+实测步长为 64 的一万个整数键，不混淆时全部落进 64 个分片中的 1 个，等于退化成一把全局锁
+
+**`StoreBatch` 的分组阈值是 `shardCount`，不是越大越好。** 分组省下的是「多个元素落在
+同一分片时的重复加锁」，只有 `len(items)` 明显超过 `shardCount` 才划得来；低于这个数时
+多数分片只有一个元素，一次锁都省不下，反而白付分组的记账开销
+所以实现按 `len(items) <= shardCount` 分流到逐个 `Store` 与计数排序分组两条路径
+
+另外记一条**负面结论，不要再试**：按「哪个分片元素少就往哪发」做负载均衡放置，
+需要额外索引且破坏了「键决定分片」的定位性，实测并发写入比按键哈希慢约 7 倍
+（10 协程 96.9ns 对 13.4ns），串行也更慢（20.6ns 对 17.8ns）
+

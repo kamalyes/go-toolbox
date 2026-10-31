@@ -86,7 +86,6 @@ go monitor.Start(ctx, 5*time.Second)
 | `RemoveIfExist` | `func(filename string) error` | 文件存在则删除 |
 | `FileExists` | `func(file string) bool` | 判断文件是否存在 |
 | `FileNameWithoutExt` | `func(file string) string` | 获取无扩展名的文件名 |
-| `ComputeHashes` | `func(filePath string) (map[sign.HashCryptoFunc]string, error)` | 计算文件多种哈希（一次性读取） |
 
 ### 环境变量（env.go）
 
@@ -202,7 +201,8 @@ go monitor.Start(ctx, 5*time.Second)
 - `GetServerNode` 返回原始节点名称（Pod名称），用于链路追踪；与 `GetWorkerId` 区别在于保留原文不取模
 - `GetRuntimeCaller` 返回 `*RunTimeCaller`（来自sync.Pool），使用完必须调用 `Release()` 归还
 - `Command` 返回 `([]byte, error)`，错误信息包含stderr内容
-- `ComputeHashes` 使用 `sign.HashCryptoFunc` 作为map键，依赖 `sign.SupportHMACCryptoFunc` 注册的哈希构造器
+- 文件多哈希计算是 `sign.ComputeHashes`（`func(filePath string) (map[sign.HashCryptoFunc]string, error)`），
+  不在本包；它以 `sign.HashCryptoFunc` 为 map 键，依赖 `sign.SupportHMACCryptoFunc` 注册的哈希构造器
 - `SaveImage` 的 `quality` 参数仅对JPEG有效，BMP编码未实现会返回错误
 - `MkdirTemp` 失败时调用 `log.Fatalln` 直接退出程序
 - `NewMonitor(threshold)` 是简化版（单一Critical阈值，checkOnce=true），`NewAdvancedMonitor` 需通过 `AddThreshold` 添加阈值

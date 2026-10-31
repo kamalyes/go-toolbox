@@ -82,9 +82,6 @@ val, ok := mathx.NewIFChain[int]().When(x > 0).ThenReturn(1).When(x < 0).ThenRet
 | `IfSafeKey[K,V]` | `func(m map[K]V, key K, defaultVal V) V` | 安全键访问，不存在返回默认值 |
 | `DefaultIfNilPtr[T]` | `func(param *T, defaultValue T) *T` | nil 指针返回指向默认值的指针 |
 | `IfNotNil[T]` | `func(val *T, defaultVal T) T` | 非 nil 指针返回解引用值 |
-| `IfProtoTimeOr` | `func(protoTime *timestamppb.Timestamp, duration time.Duration) time.Time` | proto 时间戳转 time.Time |
-| `IfProtoTimeOrPtr` | `func(protoTime *timestamppb.Timestamp, duration time.Duration) *time.Time` | proto 时间戳转 *time.Time |
-| `IfTimeToProto` | `func(t *time.Time, duration time.Duration) *timestamppb.Timestamp` | time.Time 转 proto 时间戳 |
 
 #### validator 系列条件判断
 
@@ -400,3 +397,18 @@ val, ok := mathx.NewIFChain[int]().When(x > 0).ThenReturn(1).When(x < 0).ThenRet
 - `Clone` 深拷贝使用 `seen map` 避免循环引用，需传入 `map[uintptr]interface{}` 参数
 - 通用 nil/零值/函数类型判断优先放在 `types` 与 `go-argus`（validator），`mathx` 只保留条件表达式语义
 - 链式构建器 `IFChainBuilder` 首个匹配条件执行后，后续条件自动跳过
+
+## proto 时间条件函数已移至 pkg/protox
+
+`IfProtoTimeOr`、`IfProtoTimeOrPtr`、`IfTimeToProto` 签名未变，只换了包名
+
+```go
+import "github.com/kamalyes/go-toolbox/pkg/protox"
+
+t  := protox.IfProtoTimeOr(pbTime, time.Hour)      // func(*timestamppb.Timestamp, time.Duration) time.Time
+tp := protox.IfProtoTimeOrPtr(pbTime, time.Hour)   // func(*timestamppb.Timestamp, time.Duration) *time.Time
+pb := protox.IfTimeToProto(&now, time.Hour)        // func(*time.Time, time.Duration) *timestamppb.Timestamp
+```
+
+搬走的理由与 safe/types 一致：mathx 被大量包引用，不该因为三个函数就让所有调用方
+编译 `google.golang.org/protobuf`

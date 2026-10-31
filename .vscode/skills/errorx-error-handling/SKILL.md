@@ -386,5 +386,6 @@ if collector.HasErrors() {
 - `RetryableError.GetRetryAfter` 使用指数退避（`RetryAfter * 2^CurrentRetry`）
 - `ErrorChain.AddError` 会通过 `runtime.Caller` 自动记录调用位置
 - `Must`/`MustNot` 会触发 panic，仅用于不可恢复的错误场景
-- `Recover` 会捕获 panic 并转为 `InternalError`
+- `Recover` 捕获 panic 后分两种情况：panic 值本身是 `error` 就原样返回，
+  否则用 `NewInternalError("panic recovered: ...")` 包装；没有 panic 时返回 nil
 - `IsNetworkError` 同时检查 `ErrTypeNetworkError`、`ErrTypeConnectionLost`、`ErrTypeConnectionTimeout` 三种类型

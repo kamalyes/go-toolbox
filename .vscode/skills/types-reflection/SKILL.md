@@ -5,9 +5,15 @@ description: 类型与反射工具，提供 proto.Message 类型判断、JSON/go
 
 # types - 类型与反射工具
 
-提供通用类型判断、反射辅助、JSON/gorm/protobuf tag 解析、protobuf wrapper 解包、模型字段 key 解析、类型兼容性检查、数值类型约束与切片/Map/KV 泛型工具
+提供通用类型判断、反射辅助、JSON/gorm/protobuf tag 解析、模型字段 key 解析、类型兼容性检查、数值类型约束与切片/Map/KV 泛型工具
 
 > 历史的 `IsNil`、`IsCEmpty`、`IsFuncType`、`DerefValue`、`GetReflectKind`、`IsWholeNumber` 等通用判断能力已迁移到 `go-argus`（`validator` 包），`Ptr` 类能力在 `safe` 包
+>
+> **直接依赖 protobuf 的四个符号已移至 `pkg/protox`**：`ProtoMessageType`、`IsProtoMessageType`、
+> `NewProtoMessage[T]`、`UnwrapPBValue`
+> 本包保留的 protobuf 相关能力只是 **tag 文本解析**（`ExtractPBTagValue`、`ResolvePBKey`），
+> 它们只认字符串，不 import protobuf
+> 这样 `pkg/types` 的依赖图里就没有 `google.golang.org/protobuf`，而 types 几乎被所有包引用
 
 ## 快速开始
 
@@ -44,20 +50,29 @@ chunks := types.Chunk([]int{1, 2, 3, 4}, 2) // [[1,2],[3,4]]
 
 | 导出名称 | 签名 | 说明 |
 |---|---|---|
-| `ProtoMessageType` | `reflect.Type`（变量） | protobuf 消息接口类型（`*proto.Message` 的 Elem） |
-| `IsProtoMessageType` | `func(t reflect.Type) bool` | 判断类型是否实现 `proto.Message` |
 | `IsExportedField` | `func(field reflect.StructField) bool` | 判断字段是否可导出处理（PkgPath=="" 或匿名字段） |
 | `ExtractJSONKey` | `func(fieldType reflect.StructField) string` | 从 json tag 中提取字段名（无显式名返回空串） |
 | `JSONFieldName` | `func(fieldType reflect.StructField) string` | 获取 JSON 字段名，无显式名称时返回 Go 字段名 |
 | `HasJSONTagOption` | `func(fieldType reflect.StructField, options ...string) bool` | 判断 json tag 是否包含指定选项（如 `omitempty`、`omitzero`） |
 | `EnsureStructDefaults` | `func(v reflect.Value)` | 初始化结构体中的 protobuf 指针 / 结构体指针字段 |
-| `NewProtoMessage[T]` | `func() T` | 创建新的 protobuf 消息实例（约束 `T proto.Message`） |
-| `UnwrapPBValue` | `func(iface interface{}) interface{}` | 解包 protobuf wrapper 类型，支持 wrapperspb 全部 9 种；非 wrapper 返回原值 |
 | `ResolveModelKey` | `func(fieldType reflect.StructField) string` | 解析 Model 字段 key：gorm column > json tag > 字段名 |
 | `ExtractGormColumn` | `func(tag string) string` | 从 gorm tag 中提取 column 名 |
 | `ResolvePBKey` | `func(fieldType reflect.StructField) string` | 解析 PB 字段 key：protobuf tag name > json tag > 字段名 |
 | `ExtractPBTagValue` | `func(tag string, key string) string` | 从 protobuf tag 中提取指定键的值（如 `name`、`json_name`） |
 | `UnwrapModelValue` | `func(iface interface{}) interface{}` | 解引用指针类型返回底层值；非指针或 nil 返回原值 |
+
+#### 已移至 pkg/protox（签名未变，只换包名）
+
+```go
+import "github.com/kamalyes/go-toolbox/pkg/protox"
+```
+
+| 原 `types.` | 现 `protox.` | 签名 |
+|---|---|---|
+| `ProtoMessageType` | `protox.ProtoMessageType` | `reflect.Type`（变量），`*proto.Message` 的 Elem |
+| `IsProtoMessageType` | `protox.IsProtoMessageType` | `func(t reflect.Type) bool` |
+| `NewProtoMessage[T]` | `protox.NewProtoMessage[T]` | `func[T proto.Message]() T` |
+| `UnwrapPBValue` | `protox.UnwrapPBValue` | `func(iface interface{}) interface{}`，解包 wrapperspb 全部 9 种 |
 
 ### Kind 与数值类型
 

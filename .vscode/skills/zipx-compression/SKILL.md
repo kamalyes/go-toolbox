@@ -60,7 +60,8 @@ decompressed, err := zipx.GzipSmartDecompress(prefixed)
 
 | 导出名称 | 签名 | 说明 |
 |---|---|---|
-| `GzipCompress` | `func(data []byte) ([]byte, error)` | Gzip 压缩 |
+| `GzipCompress` | `func(data []byte) ([]byte, error)` | Gzip 压缩（级别 `DefaultCompression`） |
+| `GzipCompressWithLevel` | `func(data []byte, level int) ([]byte, error)` | 指定压缩级别的 Gzip 压缩 |
 | `GzipCompressWithInfo` | `func(data []byte) (*CompressResult, error)` | Gzip 压缩并返回统计信息 |
 | `GzipDecompress` | `func(compressedData []byte) ([]byte, error)` | Gzip 解压 |
 | `MultiGZipCompress` | `func(data []byte, times int) ([]byte, error)` | 多级 Gzip 压缩（压缩 times 次） |
@@ -83,7 +84,8 @@ decompressed, err := zipx.GzipSmartDecompress(prefixed)
 
 | 导出名称 | 签名 | 说明 |
 |---|---|---|
-| `ZlibCompress` | `func(data []byte) ([]byte, error)` | Zlib 压缩 |
+| `ZlibCompress` | `func(data []byte) ([]byte, error)` | Zlib 压缩（级别 `DefaultCompression`） |
+| `ZlibCompressWithLevel` | `func(data []byte, level int) ([]byte, error)` | 指定压缩级别的 Zlib 压缩 |
 | `ZlibCompressWithInfo` | `func(data []byte) (*CompressResult, error)` | Zlib 压缩并返回统计信息 |
 | `ZlibDecompress` | `func(compressedData []byte) ([]byte, error)` | Zlib 解压 |
 | `MultiZlibCompress` | `func(data []byte, times int) ([]byte, error)` | 多级 Zlib 压缩（压缩 times 次） |
@@ -110,6 +112,8 @@ decompressed, err := zipx.GzipSmartDecompress(prefixed)
 | `GzipPrefixLen` | `len("GZIP:")` = 5 | int | Gzip 前缀长度 |
 | `ZlibPrefix` | `"ZLIB:"` | string | Zlib 数据前缀标识 |
 | `ZlibPrefixLen` | `len("ZLIB:")` = 5 | int | Zlib 前缀长度 |
+| `MinCompressLevel` | `-2` | int | 最小级别，即 `flate.HuffmanOnly`（只做 Huffman 编码，不找匹配） |
+| `MaxCompressLevel` | `9` | int | 最大级别，即 `flate.BestCompression` |
 
 ### 类型与方法
 
@@ -139,3 +143,19 @@ decompressed, err := zipx.GzipSmartDecompress(prefixed)
 - 对象压缩/解压使用 `encoding/json` 进行序列化，要求对象可被 `json.Marshal` / `json.Unmarshal` 处理
 - 内部使用 `sync.Pool` 复用 `gzip.Writer`/`gzip.Reader`/`zlib.Writer`/`zlib.Reader`/`bytes.Buffer`，返回的字节切片均为副本，避免数据竞争
 - `CompressResult.Ratio` 在原始大小为 0 时为 0；`SavedPercent` 在原始大小为 0 时返回 0
+
+## 压缩级别怎么选
+
+`level` 取值与 `compress/flate` 一致：`BestSpeed`(1) 到 `BestCompression`(9)，
+另可取 `DefaultCompression`(-1)、`NoCompression`(0)、`HuffmanOnly`(-2)
+超出 `[MinCompressLevel, MaxCompressLevel]` 会返回错误，不会静默夹取
+
+**小载荷请显式用 `BestSpeed`。** 原因不是压缩本身，而是 `flate.Writer.Reset`：
+在级别 2 到 9 上，Reset 会清零 `hashHead` 与 `hashPrev` 两张表（各 32768 项，
+合计约 256 KB 的 memset），这个开销与载荷大小无关
+几十到几百字节的载荷因此可能大部分时间都花在 Reset 上，而体积几乎没有变化
+级别 0、1 和 -2 不走这条路径，没有这个台阶
+
+对象池按级别分开（`levelPoolCount` 个），所以混用级别不会互相污染，
+但每个用到的级别都会各自驻留一组 writer
+

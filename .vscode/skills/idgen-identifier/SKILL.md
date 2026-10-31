@@ -231,3 +231,41 @@ spanID := idgen.FormatSpanID(uuid)   // "550e8400e29b41d4"
 - Numeric 的 `CounterStore` 实现需保证 `Increment` 原子性，建议对 key 设置 TTL（如 48 小时）
 - 所有生成器均采用零分配优化（stack buffer），适合高并发场景
 - 各生成器的 `GenerateRequestID` 均带原子计数器后缀，可按请求顺序排序
+
+## 配置式构造与取值上限
+
+`NewSnowflakeGenerator(workerID, datacenterID)` 与 `NewShortFlakeGenerator(nodeID)`
+会把超范围的 ID **按位折叠**（例如 `workerID & 0x1F`），这意味着配置成 32 与 0 的两台机器
+会发出完全相同的 ID，而且不报错
+要让越界变成显式失败，用配置式构造并先 `Validate`：
+
+```go
+cfg := idgen.SnowflakeConfig{WorkerID: 3, DatacenterID: 1}
+if err := cfg.Validate(); err != nil {
+    log.Fatal(err)   // 越界在这里就暴露，而不是上线后撞 ID
+}
+g := idgen.NewSnowflakeGeneratorWithConfig(cfg)
+```
+
+| 导出名称 | 类型/签名 | 说明 |
+|---|---|---|
+| `SnowflakeConfig` | struct | 字段 `WorkerID`、`DatacenterID`、`Epoch` |
+| `SnowflakeConfig.Validate` | `func() error` | 超出上限返回错误，不折叠 |
+| `NewSnowflakeGeneratorWithConfig` | `func(cfg SnowflakeConfig) *SnowflakeGenerator` | 配置式构造 |
+| `ShortFlakeConfig` | struct | 字段 `NodeID`、`Epoch` |
+| `DefaultShortFlakeConfig` | `func() ShortFlakeConfig` | 默认配置 |
+| `ShortFlakeConfig.Validate` | `func() error` | 超出上限返回错误 |
+| `NewShortFlakeGeneratorWithConfig` | `func(cfg ShortFlakeConfig) *ShortFlakeGenerator` | 配置式构造 |
+
+| 上限常量 | 值 | 含义 |
+|---|---|---|
+| `SnowflakeMaxWorkerID` | `31` | 工作机器 ID 上限（含），5 位 |
+| `SnowflakeMaxDatacenterID` | `31` | 数据中心 ID 上限（含），5 位 |
+| `SnowflakeSequencePerMilli` | `4096` | 同一毫秒内可发的 ID 数，12 位 |
+| `ShortFlakeMaxNodeID` | `63` | 节点 ID 上限（含），6 位 |
+| `ShortFlakeSequencePerMilli` | `64` | 同一毫秒内可发的 ID 数，6 位 |
+
+**时钟回拨已被夹住**：两个生成器都会把回拨后的时间戳钳到上一次发号的毫秒，
+而不是拿更小的时间戳去发号——后者会把已经发过的 ID 再发一遍
+同一毫秒内序列号用尽时睡到下一毫秒，不再忙等
+

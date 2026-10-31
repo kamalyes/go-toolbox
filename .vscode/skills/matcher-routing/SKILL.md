@@ -17,8 +17,7 @@ import "github.com/kamalyes/go-toolbox/pkg/matcher"
 ```go
 m := matcher.NewMatcher[string]()
 m.AddRule(matcher.NewChainRule("admin").When(matcher.MatchPrefix("path", "admin")))
-ctx := contextx.New(context.Background())
-contextx.Set(ctx, "path", "/admin/dashboard")
+ctx := contextx.NewContext().WithValue("path", "/admin/dashboard")
 result, ok := m.Match(ctx)
 ```
 
