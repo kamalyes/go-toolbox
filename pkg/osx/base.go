@@ -12,8 +12,10 @@ package osx
 
 import (
 	"bytes"
+	cryptorand "crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
@@ -153,16 +155,56 @@ func SafeGetHostName() string {
 	return safe
 }
 
-// HashUnixMicroCipherText 生成基于时间戳和主机名的哈希密文
+// idPrefix 是本进程的随机前缀，进程启动时取一次
+//
+// 用 crypto/rand 只在初始化付一次代价，比原先每次调用都取主机名再做哈希更省也更随机：
+// 不同主机、同一主机的不同进程、以及重启前后都不会撞上
+// [EN] A per-process random prefix taken once at start-up. Paying crypto/rand a single time
+// is both cheaper and more random than hashing the hostname on every call: it separates
+// hosts, separate processes on one host, and the same process across restarts
+var idPrefix = func() [8]byte {
+	var b [8]byte
+	if _, err := cryptorand.Read(b[:]); err != nil {
+		// 取不到系统随机源时退到时间戳，仍然满足「进程间不同」
+		// [EN] If the system source is unavailable, fall back to the clock, which still
+		// separates processes
+		binary.BigEndian.PutUint64(b[:], uint64(time.Now().UnixNano()))
+	}
+	return b
+}()
+
+// idCounter 保证同一进程内严格不重复，并发安全
+var idCounter atomic.Uint64
+
+// HashUnixMicroCipherText 生成 32 位小写 hex 的进程内唯一标识
+//
+// 输出格式是契约的一部分：调用方（go-rpc-gateway 的 trace id 与 request id）把它当
+// OpenTelemetry trace id 用，宽度必须是 32 位小写 hex，所以这里只换算法不换格式
+//
+// 原实现是 MD5(主机名 + RandString(10,4) + 微秒时间戳)，每次调用要付
+// 一次主机名查询、十次随机取字符、一次 fmt.Sprintf、一次 MD5、一次 hex 编码
+// 那个 MD5 并不提供任何安全属性：RandString 走 math/rand/v2，本来就不是密码学安全的，
+// 所以哈希这一层是纯开销，换掉不损失任何现有性质
+//
+// 另外原实现靠随机串区分「同一微秒内的两次调用」，而网关每个请求正好要调两次
+// （trace id 与 request id），改用原子计数器之后这件事从概率保证变成确定保证
+//
+// [EN] The output format is part of the contract: callers use it as an OpenTelemetry trace
+// id, so the algorithm changes and the shape does not. The previous implementation hashed the
+// hostname, ten random characters and a microsecond timestamp, paying a hostname lookup, ten
+// random draws, a Sprintf, an MD5 and a hex encode per call. That MD5 carried no security
+// property, because the random source is math/rand/v2 and was never cryptographic, so the
+// hash was pure cost. The previous version also relied on randomness to separate two calls
+// within the same microsecond, which is exactly what the gateway does for every request; an
+// atomic counter turns that from a probabilistic guarantee into a certain one
 func HashUnixMicroCipherText() string {
-	var (
-		nowUnixMicro = time.Now().UnixMicro()
-		hostName     = SafeGetHostName()
-		randStr      = random.RandString(10, 4)
-		plainText    = fmt.Sprintf("%s%s%d", hostName, randStr, nowUnixMicro)
-		cipherText   = stringx.CalculateMD5Hash(plainText)
-	)
-	return cipherText
+	var raw [16]byte
+	copy(raw[:8], idPrefix[:])
+	binary.BigEndian.PutUint64(raw[8:], idCounter.Add(1))
+
+	var out [32]byte
+	hex.Encode(out[:], raw[:])
+	return string(out[:])
 }
 
 // GetWorkerId 获取唯一的 Worker ID (智能增强版)
