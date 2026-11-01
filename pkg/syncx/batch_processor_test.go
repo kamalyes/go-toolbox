@@ -226,7 +226,19 @@ func TestBatchProcessor_SubmitBlocking_ContextTimeout(t *testing.T) {
 	// 填满队列
 	require.True(t, p.Submit(1))
 
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	const ctxTimeout = 50 * time.Millisecond
+
+	// 下界留出时钟精度余量：Windows 的单调时钟粒度最粗到 15.6ms，time.Since 会把一次
+	// 真实等满的 50ms 量成 49.389ms（实测），卡死在 >= 50ms 会把时钟分辨率当成代码缺陷
+	// 本测试要证的是「等到 ctx 超时才返回」而不是「立刻返回」，9 成的下界足以区分这两者
+	// [EN] The lower bound carries a clock-resolution margin: Windows monotonic clock
+	// granularity reaches 15.6ms, so time.Since measures a genuinely full 50ms wait as
+	// 49.389ms (observed in CI), and a hard >= 50ms turns clock resolution into a defect.
+	// What this test must prove is that the call waited for the context instead of returning
+	// at once, and a bound at nine tenths separates those two outcomes
+	minWait := ctxTimeout * 9 / 10
+
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
 
 	start := time.Now()
@@ -234,7 +246,7 @@ func TestBatchProcessor_SubmitBlocking_ContextTimeout(t *testing.T) {
 	elapsed := time.Since(start)
 
 	require.False(t, ok, "ctx 超时后应返回 false")
-	assert.GreaterOrEqual(t, elapsed, 50*time.Millisecond, "应该等待到 ctx 超时才返回")
+	assert.GreaterOrEqual(t, elapsed, minWait, "应该等待到 ctx 超时才返回，实际只等了 %s", elapsed)
 }
 
 // ============================================================================
