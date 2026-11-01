@@ -14,6 +14,7 @@ package matcher
 import (
 	"regexp"
 	"strings"
+	"sync"
 )
 
 // PathMatcherType 路径匹配器类型
@@ -107,14 +108,58 @@ func (pm *PathMatcher) Match(path string) bool {
 	}
 }
 
+// globMatcherCache 按 glob 模式缓存已编译的匹配器
+//
+// MatchPathGlob 原先每次调用都走 NewPathMatcher，也就是每次都把 glob 转成正则、
+// 再 regexp.Compile 一遍 而调用方的典型形态是在请求路径上按一张配置好的模式表
+// 逐项匹配，于是同一批模式每个请求都要重新编译一轮
+//
+// 实测 go-rpc-gateway 的访问日志中间件：默认 6 条 SkipPaths 让单个请求产生
+// 375 次分配，其中 80% 落在 regexp.compile 里 同仓的限流与白名单中间件
+// 经 MatchPathWithMethod 走同一条路，同样每请求重编译
+//
+// 以模式串为键是安全的，不会无界增长：模式来自配置，是有界集合；
+// 被匹配的 path 来自请求（可被外部控制），但它是匹配的输入而不是缓存的键
+//
+// PathMatcher 构造后不可变，唯一的方法 Match 只读字段，且 *regexp.Regexp 本身
+// 并发安全，所以缓存项可以跨 goroutine 共享
+//
+// [EN] Compiled matchers cached by glob pattern
+// MatchPathGlob used to call NewPathMatcher every time, converting the glob to a regex
+// and compiling it again on each call, while the typical caller matches a request path
+// against a configured table of patterns, recompiling that whole batch per request
+// Measured in go-rpc-gateway's access-log middleware, the six default SkipPaths produced
+// 375 allocations per request with 80% of them inside regexp.compile, and the rate-limit
+// and whitelist middlewares reach the same code through MatchPathWithMethod
+// Keying by pattern cannot grow without bound: patterns come from configuration and form
+// a bounded set, while the matched path is externally controlled but is the input rather
+// than the key
+// A PathMatcher is immutable once built and its only method reads fields, and
+// *regexp.Regexp is itself safe for concurrent use, so entries are shared across goroutines
+var globMatcherCache sync.Map // map[string]*PathMatcher，编译失败时存 nil
+
 // MatchPathGlob Glob 模式匹配路径（支持 * 和 ? 通配符，* 可匹配 /）
 // 示例: MatchPathGlob("/api/v1/resource", "/api/*") => true
+// 同一个模式只编译一次，之后命中缓存
+//
+// [EN] A given pattern is compiled once and served from cache afterwards
 func MatchPathGlob(path, pattern string) bool {
 	if pattern == path {
 		return true
 	}
-	pm, err := NewPathMatcher(PathMatchGlob, pattern)
-	if err != nil {
+	cached, ok := globMatcherCache.Load(pattern)
+	if !ok {
+		// 编译失败也入缓存（存 nil）：否则一条写错的配置会让每个请求都重试编译
+		// [EN] A failed compile is cached as nil too, or one malformed config entry would
+		// retry the compile on every request
+		var value any
+		if pm, err := NewPathMatcher(PathMatchGlob, pattern); err == nil {
+			value = pm
+		}
+		cached, _ = globMatcherCache.LoadOrStore(pattern, value)
+	}
+	pm, _ := cached.(*PathMatcher)
+	if pm == nil {
 		return false
 	}
 	return pm.Match(path)
