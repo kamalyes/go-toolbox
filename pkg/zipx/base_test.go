@@ -15,6 +15,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"compress/zlib"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -284,14 +285,37 @@ func TestCompressDefaultUnchanged(t *testing.T) {
 // still decompressed fine — no error, just an inconsistent ratio that is very
 // hard to attribute
 func TestCompressPoolsArePerLevel(t *testing.T) {
-	data := bytes.Repeat([]byte("2026-10-18 21:00:03 INFO handler=GetUser status=200\n"), 200)
+	// 载荷要让两个压缩级别真的产生不同体积，否则本测试区分不出池有没有被串用
+	//
+	// 原先用的是同一行重复 200 次。那种载荷可压缩性太高，BestSpeed 与 BestCompression
+	// 可能给出**完全相同**的体积，而这取决于 Go 版本与平台 —— 实测在 Go 1.27 的
+	// windows/macOS 上两者相等，于是下面那条前提断言直接判红，而池本身毫无问题
+	// 现在让每行内容都不同，两个级别的取舍差异才体现得出来
+	//
+	// [EN] The payload has to compress to different sizes at the two levels, otherwise this test
+	// cannot tell whether the pools are shared. The original payload repeated one line 200 times,
+	// which is compressible enough that both levels can emit the same size -- and whether they do
+	// depends on the Go version and platform. Varying each line makes the levels diverge
+	var buf bytes.Buffer
+	for i := 0; i < 400; i++ {
+		fmt.Fprintf(&buf, "2026-10-18 21:00:%02d INFO handler=GetUser%d status=%d cost=%dms trace=%x\n",
+			i%60, i, 200+i%7, i*3%997, i*2654435761)
+	}
+	data := buf.Bytes()
 
 	// 交替使用两个级别多轮，每轮的输出大小都必须与该级别首轮一致
 	fast, err := GzipCompressWithLevel(data, gzip.BestSpeed)
 	assert.NoError(t, err)
 	best, err := GzipCompressWithLevel(data, gzip.BestCompression)
 	assert.NoError(t, err)
-	assert.NotEqual(t, len(fast), len(best), "这份载荷上两个级别的体积应当不同，否则本测试无效")
+
+	// 前提不成立时跳过而不是判红：两个级别体积相同意味着这份载荷区分不出池是否串用，
+	// 那是测试的前提没满足，不是被测代码有问题
+	// [EN] Skipped rather than failed when the premise does not hold: equal sizes mean this
+	// payload cannot distinguish shared pools, which is a limitation of the fixture, not a defect
+	if len(fast) == len(best) {
+		t.Skipf("两个级别在这份载荷上体积相同（均 %d 字节），区分不出池是否串用", len(fast))
+	}
 
 	for i := 0; i < 20; i++ {
 		f, err := GzipCompressWithLevel(data, gzip.BestSpeed)

@@ -820,8 +820,12 @@ func TestJSONMarshal_InvalidValue(t *testing.T) {
 // TestJSONFieldInfo_UnexportedField 测试 jsonFieldInfo 处理未导出字段
 func TestJSONFieldInfo_UnexportedField(t *testing.T) {
 	type withUnexported struct {
-		Public  string `json:"public"`
-		private string `json:"private"`
+		Public string `json:"public"`
+		// 不带 json tag：jsonFieldInfo 先判导出性就直接 return，未导出字段根本读不到 tag，
+		// 所以这里挂 tag 既测不到额外分支，又会被 go vet 的 structtag 当成笔误拦下
+		// [EN] Deliberately untagged: jsonFieldInfo returns on the exportedness check before it
+		// ever reads the tag, so a tag here exercises nothing and only trips vet's structtag check
+		private string
 	}
 	// 设置一个私有字段的值
 	v := withUnexported{Public: "p", private: "secret"}

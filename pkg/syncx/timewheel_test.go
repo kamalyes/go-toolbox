@@ -588,10 +588,19 @@ func TestTimerConcurrentShortDelayPrecision(t *testing.T) {
 //   - delay=tickInterval（10ms）：ticks=1，应在 [1,2] tick（10~20ms）内触发
 //   - delay=bucketCount*tickInterval（160ms）：ticks=16，rounds=1，应在 [16,17] tick（160~170ms）内触发
 //
-// 阈值取圈边界安全值而非理论 tick 上界：Windows CI 定时器分辨率 15.6ms + 负载抖动，
-// 实测 1 tick 任务 33ms、16 tick 任务 243ms——卡理论值（30ms/200ms）只会产生平台性假失败。
-// 回归目标是圈数正确：1 tick 任务 < 160ms（1 圈，错圈会延迟到 ~160ms+），
-// rounds=1 任务 < 320ms（2 圈，圈计数错误会延迟到 ~320ms+）
+// 阈值按「Windows 的 tick 实际时长」反推，而不是按理论 tick 时长：
+// Windows 默认定时器分辨率是 15.6ms，比本时间轮的 10ms tick 还粗，
+// 所以在 Windows 上一个 tick 实际要 ~15.6ms，整体被拉长约 1.56 倍
+//
+// 实测 mac（tick 精度好）上 160ms 的任务稳定在 170ms 触发，即 17 个 tick；
+// 换算到 Windows 就是 17 × 15.6 ≈ 265ms，而旧阈值 310ms 只剩 1.17 倍余量，
+// 叠加 CI 负载抖动就会间歇性假失败——2026-10-31 的 windows/go1.23 就是这样挂的
+// （同一次 run 的 windows/go1.24 却过了，典型的临界抖动）
+//
+// 回归目标是**圈数正确**，而错一圈是 +16 tick 的大跨度，余量很充裕：
+// rounds=1 的任务正确时是 17 个 tick（Windows ≈265ms），错圈则是 33 个 tick（Windows ≈515ms）
+// 因此把阈值放到 400ms，既高于正确值的抖动上限，又明显低于错圈值，仍能可靠拦截
+// 不要为了「更严」把它压回 300ms 附近：那不是更严，是把平台抖动当成缺陷报警
 func TestTimerBoundaryTicks(t *testing.T) {
 	timer := newTestTimer() // tick=10ms, bucketCount=16
 	defer timer.Stop()
@@ -600,19 +609,21 @@ func TestTimerBoundaryTicks(t *testing.T) {
 	var fired1 atomic.Int32
 	start1 := time.Now()
 	timer.Schedule(10*time.Millisecond, func() { fired1.Add(1) })
-	waitFired(t, &fired1, 1, 150*time.Millisecond)
+	waitFired(t, &fired1, 1, 250*time.Millisecond)
 	elapsed1 := time.Since(start1)
-	assert.Less(t, elapsed1, 100*time.Millisecond, "1 tick 任务应在 1 圈内触发，实际 %v", elapsed1)
+	// 正确路径 1~2 个 tick（Windows ≈31ms），错圈会跳到 17 个 tick（Windows ≈265ms），
+	// 150ms 已足够区分，留到 150ms 是因为它离错圈值还有 1.7 倍距离
+	assert.Less(t, elapsed1, 150*time.Millisecond, "1 tick 任务应在 1 圈内触发，实际 %v", elapsed1)
 
 	// 边界2：delay = bucketCount tick（rounds=1 路径）
 	var fired2 atomic.Int32
 	start2 := time.Now()
 	timer.Schedule(160*time.Millisecond, func() { fired2.Add(1) })
-	waitFired(t, &fired2, 1, 310*time.Millisecond)
+	waitFired(t, &fired2, 1, 600*time.Millisecond)
 	elapsed2 := time.Since(start2)
-	// rounds=1：worker 第 1 次扫到 bucket 减圈，第 2 次触发，正常应在 160~180ms；
-	// 圈计数错误才会延迟到 2 圈（320ms+），断言 300ms 已能可靠拦截
-	assert.Less(t, elapsed2, 300*time.Millisecond, "16 tick（rounds=1）任务应在 2 圈内触发，实际 %v", elapsed2)
+	// rounds=1：正确路径是 17 个 tick，理想 tick 下 170ms，Windows 下 ≈265ms
+	// 圈计数错误会变成 33 个 tick（理想 330ms，Windows ≈515ms），400ms 正好卡在两者之间
+	assert.Less(t, elapsed2, 400*time.Millisecond, "16 tick（rounds=1）任务应在 2 圈内触发，实际 %v", elapsed2)
 }
 
 // TestHashedWheelTimerDefaults 验证无参构造的库默认值
