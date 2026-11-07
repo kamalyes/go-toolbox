@@ -54,11 +54,12 @@ func amapSig(params url.Values, sig string) (sn string) {
 	// 按顺序对参数进行拼接
 	var build strings.Builder
 	for j, key := range keys {
-		if j == 0 {
-			build.WriteString(key + "=" + params.Get(key))
-		} else {
-			build.WriteString("&" + key + "=" + params.Get(key))
+		if j > 0 {
+			build.WriteString("&")
 		}
+		build.WriteString(key)
+		build.WriteString("=")
+		build.WriteString(params.Get(key))
 	}
 	// 拼接数字秘钥
 	build.WriteString(sig)
