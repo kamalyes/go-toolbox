@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kamalyes/go-argus"
+	validator "github.com/kamalyes/go-toolbox/pkg/argus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -49,6 +49,15 @@ const (
 type RsaKeySize int
 
 const (
+	// RsaKeySize512 已经生成不出密钥：go 指令升到 1.25 后 GODEBUG rsa1024min 默认为 1，
+	// crypto/rsa.GenerateKey 对小于 1024 位的长度直接返回错误
+	// 常量保留只为不破坏下游编译，要恢复旧行为得显式设 GODEBUG=rsa1024min=0
+	//
+	// Deprecated: 512 位密钥不安全，crypto/rsa 自 Go 1.24 起拒绝生成，请改用 RsaKeySize2048
+	//
+	// [EN] Kept only so downstream code still compiles: with the go directive at 1.25 the
+	// rsa1024min GODEBUG defaults to 1 and crypto/rsa refuses anything below 1024 bits,
+	// so generating with this size always fails unless GODEBUG=rsa1024min=0 is set
 	RsaKeySize512  RsaKeySize = 512
 	RsaKeySize1024 RsaKeySize = 1024
 	RsaKeySize2048 RsaKeySize = 2048

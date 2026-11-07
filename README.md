@@ -15,7 +15,6 @@
 [![提交记录](https://img.shields.io/github/last-commit/kamalyes/go-toolbox)](https://github.com/kamalyes/go-toolbox/commits/master)
 
 [![代码覆盖率](https://codecov.io/gh/kamalyes/go-toolbox/branch/master/graph/badge.svg)](https://codecov.io/gh/kamalyes/go-toolbox)
-[![Go 报告卡](https://goreportcard.com/badge/github.com/kamalyes/go-toolbox)](https://goreportcard.com/report/github.com/kamalyes/go-toolbox)
 [![Go 版本](https://img.shields.io/github/go-mod/go-version/kamalyes/go-toolbox)](https://golang.org/)
 [![文档](https://pkg.go.dev/badge/github.com/kamalyes/go-toolbox.svg)](https://pkg.go.dev/github.com/kamalyes/go-toolbox)
 
@@ -104,7 +103,7 @@ graph TB
 |------|----------|----------|
 | [🔢 mathx](pkg/mathx) | 数学计算增强、三元运算符 | 数据分析、算法实现、条件判断 |
 | [🔐 sign](pkg/sign) | 加密签名工具 | 安全认证、数据完整性 |
-| [✅ validator](pkg/validator) | 数据验证器 | 表单验证、参数检查 |
+| [✅ argus](pkg/argus) | 零依赖结构体标签校验器，126 条内置规则、9 种语言 i18n | 表单验证、参数检查、网关校验 |
 
 ### 🔀 并发工具类
 
@@ -124,11 +123,69 @@ graph TB
 | [⚡ idgen](pkg/idgen) | 高性能 ID 生成器 | TraceID、分布式 ID、链路追踪 |
 | [🚦 queue](pkg/queue) | 队列数据结构 | 任务处理、消息队列 |
 
+## 🧩 可选子模块（按需引入）
+
+核心模块 `github.com/kamalyes/go-toolbox` 的 `require` 块只有测试用的 testify，**编译闭包中没有任何三方依赖**
+需要 protobuf、YAML、图像处理、OpenTelemetry 这类能力时，单独引入对应的嵌套子模块
+
+| 子模块 | 携带的三方依赖 | 提供的能力 |
+|--------|----------------|------------|
+| [pkg/pbmo](pkg/pbmo) | `google.golang.org/protobuf` | PB ↔ Model 批量转换 |
+| [pkg/protox](pkg/protox) | `google.golang.org/protobuf` | protobuf 反射与 wrapper 解包 |
+| [pkg/pbjson](pkg/pbjson) | `google.golang.org/protobuf` | protobuf JSON 编解码，并为 serializer 装配 protobuf 感知 |
+| [pkg/imgix](pkg/imgix) | `disintegration/imaging`、`fogleman/gg` | 图像处理与绘制 |
+| [pkg/yamlx](pkg/yamlx) | `gopkg.in/yaml.v3` | YAML ↔ JSON 转换 |
+| [pkg/i18n/yamlloader](pkg/i18n/yamlloader) | `gopkg.in/yaml.v3` | i18n 的 YAML 词条加载器 |
+| [pkg/logger/otelgrpc](pkg/logger/otelgrpc) | `otel/trace`、`google.golang.org/grpc` | 为 logger 装配 OTel span 与 gRPC metadata 的 trace 传播 |
+| [pkg/sign/bcryptx](pkg/sign/bcryptx) | `golang.org/x/crypto` | bcrypt 口令哈希 |
+
+`pbmo`、`protox`、`imgix`、`i18n/yamlloader` 的 import 路径不变，仅拆成了独立 module，`go get` 时单独取即可：
+
+```bash
+go get -u github.com/kamalyes/go-toolbox/pkg/pbmo
+```
+
+### 装配可选能力
+
+两处能力在核心中留了注册接缝，空导入对应子模块即自动装配，不装配时退化为标准库行为而非报错：
+
+```go
+import (
+    // 让 logger 的 trace_id 优先取自 OTel span，并支持经 gRPC metadata 跨节点传播
+    // 不装配时 trace_id 仅从 ctx.Value("trace_id") 读取
+    _ "github.com/kamalyes/go-toolbox/pkg/logger/otelgrpc"
+
+    // 让 serializer.JSONMarshal / JSONUnmarshal 正确处理 protobuf 消息
+    // 不装配时两者对任何类型都按 encoding/json 处理
+    _ "github.com/kamalyes/go-toolbox/pkg/pbjson"
+)
+```
+
+也可自行实现接缝，核心不绑定任何具体实现：`logger.RegisterContextBridge` 接收 `logger.ContextBridge`（含
+`TraceIDFromContext`、`ValueFromIncoming`、`InjectOutgoing` 三个函数字段），`serializer.RegisterProtoJSONCodec`
+接收 `serializer.ProtoJSONCodec`（含 `IsMessageType`、`Marshal`、`Unmarshal` 三个函数字段），两者都应在 init 阶段调用
+
+### 符号迁移对照
+
+| 原符号 | 现位置 |
+|--------|--------|
+| `sign.GenerateFromPassword`、`sign.CompareHashAndPassword` | `bcryptx.GenerateFromPassword`、`bcryptx.CompareHashAndPassword` |
+| `(*sign.EncryptedDecoder).DecodeProtoJSONTo` 方法 | `pbjson.DecodeProtoJSONTo(d, ciphertext, target)` 函数 |
+| `sign.DecodeProtoJSON` | `pbjson.DecodeProtoJSON` |
+| `serializer.ProtoJSONMarshal`、`serializer.ProtoJSONUnmarshal` | `pbjson.ProtoJSONMarshal`、`pbjson.ProtoJSONUnmarshal` |
+| `serializer.LenientProtoJSONUnmarshal`、`serializer.LenientProtoJSONOptions` | `pbjson.LenientProtoJSONUnmarshal`、`pbjson.LenientProtoJSONOptions` |
+| `convert.YAMLToJSON`、`JSONToYAML`、`YAMLStringToJSON`、`JSONStringToYAML`、`YAMLToInterface`、`YAMLToMap`、`InterfaceToYAML`、`MapToYAML`、`UnmarshalYAML`、`MarshalYAML` | `yamlx` 下同名函数 |
+
+`convert.ConvertError`、`convert.UnmarshalJSON`、`convert.MarshalJSON` 仍在 `pkg/convert`，未随 YAML 迁出
+`pkg/sign` 的 SHA3 已由 `golang.org/x/crypto/sha3` 换为标准库 `crypto/sha3`，`pkg/uuid` 改为基于 `crypto/rand`
+自行生成 RFC 4122 v4，输出形态不变（32 位小写十六进制，不含连字符）
+`pkg/json` 移除了 `sonic`、`go_json`、`jsoniter` 三个 build tag 后端，统一使用标准库 `encoding/json`
+
 ## 🚀 快速开始
 
 ### 环境要求
 
-- Go 1.20+
+- Go 1.25+
 
 ### 安装
 

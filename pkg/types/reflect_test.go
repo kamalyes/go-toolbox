@@ -15,7 +15,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 type jsonTagTestStruct struct {
@@ -157,16 +156,6 @@ func TestEnsureStructDefaults(t *testing.T) {
 		v := reflect.ValueOf(42)
 		// 不应 panic
 		EnsureStructDefaults(v)
-	})
-
-	t.Run("初始化 nil proto 指针字段", func(t *testing.T) {
-		type S struct {
-			PB *wrapperspb.StringValue
-		}
-		s := &S{}
-		v := reflect.ValueOf(s).Elem()
-		EnsureStructDefaults(v)
-		assert.NotNil(t, s.PB)
 	})
 
 	t.Run("初始化 nil 结构体指针字段", func(t *testing.T) {

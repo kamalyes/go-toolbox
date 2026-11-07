@@ -15,10 +15,9 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha3"
 	"encoding/base64"
 	"errors"
-
-	"golang.org/x/crypto/sha3"
 )
 
 // GenerateByteKey 生成一个指定字节的密钥

@@ -3,7 +3,7 @@
  * @Date: 2024-11-13 15:55:18
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2024-11-13 15:55:18
- * @FilePath: \go-toolbox\internal\kv.go
+ * @FilePath: \go-toolbox\pkg\types\kv.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.

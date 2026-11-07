@@ -15,8 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"google.golang.org/protobuf/types/known/timestamppb"
-
 	"github.com/stretchr/testify/assert"
 )
 
@@ -567,26 +565,6 @@ func TestMustToNumberSliceTableDriven(t *testing.T) {
 			}
 		})
 	}
-}
-
-// TestMustStringWithProtobufTimestamp 测试 protobuf Timestamp 转换
-func TestMustStringWithProtobufTimestamp(t *testing.T) {
-	// 创建一个 protobuf Timestamp (2024-01-01 12:00:00 UTC)
-	pbTime := timestamppb.New(time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC))
-
-	// 默认格式 (RFC3339)
-	result := MustString(pbTime)
-	assert.Equal(t, "2024-01-01T12:00:00Z", result)
-
-	// 自定义格式
-	customLayout := "2006-01-02 15:04:05"
-	result2 := MustString(pbTime, customLayout)
-	assert.Equal(t, "2024-01-01 12:00:00", result2)
-
-	// 测试 nil protobuf Timestamp
-	var nilPbTime *timestamppb.Timestamp
-	result3 := MustString(nilPbTime)
-	assert.Equal(t, "", result3) // nil 转换为 ""，而不是 "null"
 }
 
 // TestMustStringWithCustomTimeLayout 测试自定义时间格式

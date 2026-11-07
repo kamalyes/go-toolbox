@@ -3,7 +3,7 @@
  * @Date: 2025-12-30 00:00:00
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2025-12-30 15:15:56
- * @FilePath: \go-stress\go-toolbox\pkg\sign\generator_test.go
+ * @FilePath: \go-toolbox\pkg\sign\generator_test.go
  * @Description: 签名生成器测试
  *
  * Copyright (c) 2025 by kamalyes, All Rights Reserved.

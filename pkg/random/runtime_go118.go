@@ -6,7 +6,7 @@
  * @Date: 2024-08-03 21:32:26
  * @LastEditors: kamalyes 501893067@qq.com
  * @LastEditTime: 2024-08-03 21:55:06
- * @FilePath: \go-toolbox\pkg\random\runtime_go_119.go
+ * @FilePath: \go-toolbox\pkg\random\runtime_go118.go
  * @Description:
  *
  * Copyright (c) 2024 by kamalyes, All Rights Reserved.

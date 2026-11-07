@@ -18,12 +18,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/kamalyes/go-argus"
-	"github.com/kamalyes/go-toolbox/pkg/protox"
+	validator "github.com/kamalyes/go-toolbox/pkg/argus"
 	"github.com/kamalyes/go-toolbox/pkg/stringx"
 	"github.com/kamalyes/go-toolbox/pkg/types"
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 )
 
 const DefaultJSONText = "{}"
@@ -125,7 +122,7 @@ func marshalJSONReflect(v reflect.Value) ([]byte, error) {
 		if msg == nil {
 			return []byte("null"), nil
 		}
-		return protojson.Marshal(msg)
+		return marshalProtoJSON(msg)
 	}
 
 	switch v.Kind() {
@@ -539,12 +536,16 @@ func scanJSONNull(v reflect.Value) error {
 	return nil
 }
 
-func unmarshalProtoJSON(data []byte, msg proto.Message) error {
-	if err := protojson.Unmarshal(data, msg); err != nil {
+func unmarshalProtoJSON(data []byte, msg any) error {
+	c := protoJSONCodec.Load()
+	if c == nil || c.Unmarshal == nil {
+		return NewJSONProtoCodecMissingError()
+	}
+	if err := c.Unmarshal(data, msg); err != nil {
 		var wrapped map[string]json.RawMessage
 		if json.Unmarshal(data, &wrapped) == nil {
 			if value, ok := wrapped["Data"]; ok && len(value) > 0 && !validator.IsJSONNull(value) {
-				return protojson.Unmarshal(value, msg)
+				return c.Unmarshal(value, msg)
 			}
 		}
 		return err
@@ -552,25 +553,25 @@ func unmarshalProtoJSON(data []byte, msg proto.Message) error {
 	return nil
 }
 
-func asProtoMessage(v reflect.Value, createIfNil bool) (proto.Message, bool) {
+func asProtoMessage(v reflect.Value, createIfNil bool) (any, bool) {
 	if !v.IsValid() {
 		return nil, false
 	}
 
 	switch v.Kind() {
 	case reflect.Ptr:
-		if protox.IsProtoMessageType(v.Type()) {
+		if isProtoMessageType(v.Type()) {
 			if v.IsNil() {
 				if !createIfNil {
 					return nil, true
 				}
 				v.Set(reflect.New(v.Type().Elem()))
 			}
-			return v.Interface().(proto.Message), true
+			return v.Interface(), true
 		}
 	case reflect.Struct:
-		if protox.IsProtoMessageType(reflect.PointerTo(v.Type())) && v.CanAddr() {
-			return v.Addr().Interface().(proto.Message), true
+		if isProtoMessageType(reflect.PointerTo(v.Type())) && v.CanAddr() {
+			return v.Addr().Interface(), true
 		}
 	case reflect.Interface:
 		if !v.IsNil() {
@@ -618,11 +619,11 @@ func markProtoJSONTypeSeen(t reflect.Type, seen map[reflect.Type]bool) bool {
 }
 
 func needsProtoJSONPtr(t reflect.Type, seen map[reflect.Type]bool) bool {
-	return protox.IsProtoMessageType(t) || needsProtoJSONSeen(t.Elem(), seen)
+	return isProtoMessageType(t) || needsProtoJSONSeen(t.Elem(), seen)
 }
 
 func needsProtoJSONStruct(t reflect.Type, seen map[reflect.Type]bool) bool {
-	if protox.IsProtoMessageType(reflect.PointerTo(t)) {
+	if isProtoMessageType(reflect.PointerTo(t)) {
 		return true
 	}
 	return needsProtoJSONFields(t, seen)

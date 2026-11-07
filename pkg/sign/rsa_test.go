@@ -31,9 +31,13 @@ import (
 // 辅助函数：生成 RSA 密钥对并进行有效性断言
 func generateAndAssertRsaKeyPair(size RsaKeySize, t *testing.T) *RsaKeyPair {
 	keyPair, err := GenerateRsaKeyPair(size)
-	assert.NoError(t, err, "生成 RSA 密钥对时发生错误")
-	assert.NotNil(t, keyPair.PrivateKey, "私钥应不为 nil")
-	assert.NotNil(t, keyPair.PublicKey, "公钥应不为 nil")
+	// 用 require 而不是 assert：生成失败时 keyPair 为 nil，继续取 PrivateKey 会 panic，
+	// 把整个包的其余用例一起带走，看到的是栈而不是那条真正的断言失败
+	// [EN] require, not assert: on failure keyPair is nil and reading PrivateKey would panic
+	// and take the rest of the package down with it, hiding the assertion that actually failed
+	require.NoError(t, err, "生成 RSA 密钥对时发生错误")
+	require.NotNil(t, keyPair.PrivateKey, "私钥应不为 nil")
+	require.NotNil(t, keyPair.PublicKey, "公钥应不为 nil")
 	return keyPair
 }
 
@@ -154,10 +158,25 @@ func TestEncryptRandSalt(t *testing.T) {
 
 // 测试生成 RSA 密钥对
 func TestGenerateRsaKeyPair(t *testing.T) {
-	keySizes := []RsaKeySize{RsaKeySize512, RsaKeySize1024, RsaKeySize2048, RsaKeySize4096}
+	keySizes := []RsaKeySize{RsaKeySize1024, RsaKeySize2048, RsaKeySize4096}
 	for _, size := range keySizes {
 		generateAndAssertRsaKeyPair(size, t)
 	}
+}
+
+// 测试 512 位密钥已经生成不出来
+//
+// go 指令升到 1.25 后 GODEBUG rsa1024min 默认为 1，crypto/rsa 对小于 1024 位的长度
+// 直接返回错误，RsaKeySize512 只剩错误路径
+// 断言这条错误而不是把它从用例里删掉：常量哪天被移除、或默认值再变，这里会先提醒
+//
+// [EN] Pins that 512-bit keys can no longer be generated: with the go directive at 1.25
+// the rsa1024min GODEBUG defaults to 1 and crypto/rsa rejects anything below 1024 bits,
+// so asserting the error keeps the behaviour visible instead of dropping the case
+func TestGenerateRsaKeyPairTooSmall(t *testing.T) {
+	keyPair, err := GenerateRsaKeyPair(RsaKeySize512)
+	assert.Error(t, err, "512 位密钥应被 crypto/rsa 拒绝")
+	assert.Nil(t, keyPair, "出错时不应返回密钥对")
 }
 
 // 测试导出 RSA 私钥和公钥为 PEM 格式

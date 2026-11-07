@@ -31,6 +31,7 @@ var (
 	ErrJSONExpectedObjectNext         = errors.New("serializer json: expected ',' or '}' after object value")
 	ErrJSONExpectedArrayNext          = errors.New("serializer json: expected ',' or ']' after array item")
 	ErrJSONMapKeyUnsupported          = errors.New("serializer json: proto-aware map only supports string keys")
+	ErrJSONProtoCodecMissing          = errors.New("serializer json: proto-aware json requires a registered ProtoJSONCodec, import github.com/kamalyes/go-toolbox/pkg/pbjson")
 )
 
 // NewJSONNilTargetError 创建 JSON 反序列化目标为空错误
@@ -146,6 +147,16 @@ func NewJSONItemError(index int, err error) error {
 // NewJSONKeyError 包装 map 键对应值的 JSON 错误，保留键上下文
 func NewJSONKeyError(key string, err error) error {
 	return fmt.Errorf(jsonKeyErrorFormat, key, err)
+}
+
+// NewJSONProtoCodecMissingError 创建未装配 protobuf JSON 编解码器错误
+func NewJSONProtoCodecMissingError() error {
+	return ErrJSONProtoCodecMissing
+}
+
+// IsJSONProtoCodecMissingError 判断错误是否为未装配 protobuf JSON 编解码器
+func IsJSONProtoCodecMissingError(err error) bool {
+	return errors.Is(err, ErrJSONProtoCodecMissing)
 }
 
 // NewJSONArrayTooLongError 创建 JSON 数组长度超过目标数组长度错误

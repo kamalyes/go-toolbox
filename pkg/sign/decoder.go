@@ -15,9 +15,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 )
 
 // ErrMissingAESKey 缺少AES密钥
@@ -114,43 +111,10 @@ func (d *EncryptedDecoder) DecodeJSONTo(ciphertext []byte, target any) ([]byte, 
 	return plainText, nil
 }
 
-// DecodeProtoJSONTo 解密Proto JSON到目标
-func (d *EncryptedDecoder) DecodeProtoJSONTo(ciphertext []byte, target proto.Message) ([]byte, error) {
-	plainText, err := d.Decrypt(ciphertext)
-	if err != nil {
-		return nil, err
-	}
-	if target == nil {
-		return nil, errors.New("proto target is required")
-	}
-	if err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(plainText, target); err != nil {
-		return nil, fmt.Errorf("decode proto json payload: %w", err)
-	}
-	return plainText, nil
-}
-
 // DecodeJSON 解密JSON
 func DecodeJSON[T any](d *EncryptedDecoder, ciphertext []byte) (*Decoded[T], error) {
 	var payload T
 	plainText, err := d.DecodeJSONTo(ciphertext, &payload)
-	if err != nil {
-		return nil, err
-	}
-	return &Decoded[T]{
-		Ciphertext: append([]byte(nil), ciphertext...),
-		Plaintext:  plainText,
-		Payload:    payload,
-	}, nil
-}
-
-// DecodeProtoJSON 解密Proto JSON
-func DecodeProtoJSON[T proto.Message](d *EncryptedDecoder, ciphertext []byte, newPayload func() T) (*Decoded[T], error) {
-	if newPayload == nil {
-		return nil, errors.New("new payload function is required")
-	}
-
-	payload := newPayload()
-	plainText, err := d.DecodeProtoJSONTo(ciphertext, payload)
 	if err != nil {
 		return nil, err
 	}

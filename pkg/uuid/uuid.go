@@ -13,10 +13,10 @@ package uuid
 
 import (
 	"crypto/md5"
+	"crypto/rand"
 	"encoding/hex"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/kamalyes/go-toolbox/pkg/convert"
 )
 
@@ -29,10 +29,14 @@ func SameSubStr(subStr string, repeat int) string {
 	return sb.String()
 }
 
-// UUID 生成uuid
+// UUID 生成uuid，输出 RFC 4122 v4 的 32 位小写十六进制，不含连字符
 func UUID() string {
-	id := uuid.New()
-	return strings.ReplaceAll(id.String(), "-", "")
+	var b [16]byte
+	// crypto/rand.Read 自 Go 1.24 起不再返回错误，熵源不可用时直接 panic
+	_, _ = rand.Read(b[:])
+	b[6] = (b[6] & 0x0f) | 0x40 // 版本位固定为 4
+	b[8] = (b[8] & 0x3f) | 0x80 // variant 位固定为 RFC 4122
+	return hex.EncodeToString(b[:])
 }
 
 // UniqueID 根据指定字段生成 uuid

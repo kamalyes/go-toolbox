@@ -65,9 +65,9 @@
 //   - 按 tag 与按类型的脱敏（adapter.go、desensitize.go、masker.go、model.go、
 //     constants.go）取自 github.com/kamalyes/go-toolbox v0.17.0 的 pkg/desensitize，
 //     该包自 v0.17.0 起未再变动
-//   - 按字段名的规则表与判定（keyrules.go）取自 github.com/kamalyes/go-logger
+//   - 按字段名的规则表与判定（keyrules.go）取自 github.com/kamalyes/go-toolbox/pkg/logger
 //     的 sanitize.go，其中不依赖 Logger 的纯逻辑部分
 //
-// 提取后 go-toolbox 的 go-argus 依赖与 go-logger 的规则副本都不再需要，
+// 提取后 pkg/argus 依赖与 pkg/logger 的规则副本都不再需要，
 // 200 余条安全规则从此只有一处来源
 package desensitize

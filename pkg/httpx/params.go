@@ -13,9 +13,9 @@ package httpx
 import (
 	"reflect"
 
+	validator "github.com/kamalyes/go-toolbox/pkg/argus"
 	"github.com/kamalyes/go-toolbox/pkg/convert"
 	"github.com/kamalyes/go-toolbox/pkg/mathx"
-	"github.com/kamalyes/go-argus"
 )
 
 // ParamsBuilder 参数构建器，支持链式调用
