@@ -3,7 +3,7 @@ module github.com/kamalyes/go-toolbox/pkg/i18n/yamlloader
 go 1.25.0
 
 require (
-	github.com/kamalyes/go-toolbox v0.19.2
+	github.com/kamalyes/go-toolbox v0.19.3
 	github.com/stretchr/testify v1.12.1
 	gopkg.in/yaml.v3 v3.0.1
 )

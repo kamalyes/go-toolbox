@@ -5,7 +5,7 @@ go 1.25.0
 require (
 	github.com/disintegration/imaging v1.6.2
 	github.com/fogleman/gg v1.3.0
-	github.com/kamalyes/go-toolbox v0.19.2
+	github.com/kamalyes/go-toolbox v0.19.3
 	github.com/stretchr/testify v1.12.1
 )
 
