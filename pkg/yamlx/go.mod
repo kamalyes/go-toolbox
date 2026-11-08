@@ -3,7 +3,7 @@ module github.com/kamalyes/go-toolbox/pkg/yamlx
 go 1.25.0
 
 require (
-	github.com/kamalyes/go-toolbox v0.19.3
+	github.com/kamalyes/go-toolbox v0.19.4
 	github.com/stretchr/testify v1.12.1
 	gopkg.in/yaml.v3 v3.0.1
 )
