@@ -6,14 +6,14 @@ require (
 	github.com/kamalyes/go-toolbox v0.19.4
 	github.com/stretchr/testify v1.12.1
 	go.opentelemetry.io/otel/trace v1.47.0
-	google.golang.org/grpc v1.79.3
+	google.golang.org/grpc v1.85.0
 )
 
 require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	go.opentelemetry.io/otel v1.47.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
-	golang.org/x/sys v0.40.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 )
 
 // 本仓库内的父模块：发布前需把上面的 require 版本提到含所需符号的 tag
