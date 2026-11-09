@@ -1,6 +1,6 @@
 module github.com/kamalyes/go-toolbox/pkg/imgix
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/disintegration/imaging v1.6.2
