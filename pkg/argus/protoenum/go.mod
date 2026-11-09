@@ -1,6 +1,6 @@
 module github.com/kamalyes/go-toolbox/pkg/argus/protoenum
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/kamalyes/go-toolbox v0.19.4
